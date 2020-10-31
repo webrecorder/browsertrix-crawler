@@ -1,0 +1,21 @@
+debug: true
+
+ 
+proxy:
+  coll: capture
+  recording: true
+
+  enable_banner: false
+  enable_wombat: true
+
+recorder:
+  dedup_policy: skip
+  source_coll: live
+  cache: always
+
+#autoindex: 10
+
+enable_auto_fetch: true
+
+collections:
+  live: $live

@@ -1,0 +1,5 @@
+*.pyc
+__pycache__
+*.egg-info/
+collections/
+node_modules/

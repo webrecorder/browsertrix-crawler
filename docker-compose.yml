@@ -1,0 +1,6 @@
+version: '3.3'
+  
+services:
+    browsertrix-crawler:
+        image: webrecorder/browsertrix-crawler
+        build: ./
