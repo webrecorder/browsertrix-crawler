@@ -16,16 +16,6 @@ const HTTPS_AGENT = require("https").Agent({
 
 const HTTP_AGENT = require("http").Agent();
 
-process.once("SIGINT", () => {
-  console.log("SIGINT received, exiting");
-  process.exit(1);
-});
-
-process.once("SIGTERM", () => {
-  console.log("SIGTERM received, exiting");
-  process.exit(1);
-});
-
 
 // ============================================================================
 class Crawler {
@@ -52,7 +42,7 @@ class Crawler {
   }
 
   bootstrap() {
-    const opts = {stdio: "ignore"};
+    const opts = {stdio: "ignore", cwd: this.params.cwd};
 
     child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
 
@@ -153,6 +143,12 @@ class Crawler {
         describe: "If set, generate index (CDXJ) for use with pywb after crawl is done",
         type: "boolean",
         default: false,
+      },
+
+      "cwd": {
+        describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd",
+        type: "string",
+        default: process.cwd(),
       }
     };
   }
@@ -307,7 +303,7 @@ class Crawler {
     if (this.params.generateCdx) {
       console.log("Generate CDX");
 
-      child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit"});
+      child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
   }
 

@@ -34,7 +34,7 @@ ADD *.js /app/
 
 RUN ln -s /app/main.js /usr/bin/crawl
 
-WORKDIR /output
+WORKDIR /crawls
 
 CMD ["crawl"]
 

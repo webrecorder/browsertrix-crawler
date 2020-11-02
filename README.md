@@ -26,9 +26,9 @@ The system uses:
  - `pywb` - in recording mode for capturing the content
 
 
-The crawl produces a single pywb collection, at `/output/collections/<collection name>` in the Docker container.
+The crawl produces a single pywb collection, at `/crawls/collections/<collection name>` in the Docker container.
 
-To access the contents of the crawl, the `/output` directory should be mounted to a volume (default in the Docker Compose setup).
+To access the contents of the crawl, the `/crawls` directory in the container should be mounted to a volume (default in the Docker Compose setup).
 
 
 ## Crawling Parameters
@@ -62,9 +62,11 @@ Options:
       --headless     Run in headless mode, otherwise start xvfb
                                                       [boolean] [default: false]
       --driver       JS driver for the crawler
-     [string] [default: "/Users/ilya/work/browsertrix-crawler/defaultDriver.js"]
+                                     [string] [default: "/app/defaultDriver.js"]
       --generateCDX  If set, generate index (CDXJ) for use with pywb after crawl
                      is done                          [boolean] [default: false]
+      --cwd          Crawl working directory for captures (pywb root). If not
+                     set, defaults to process.cwd  [string] [default: "/crawls"]
 ```
 
 For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options).
@@ -86,9 +88,9 @@ docker-compose build
 docker-compose run crawler crawl --url https://webrecorder.net/ --generateCDX --collection wr-net --workers 2
 ```
 
-While the crawl is running, puppeteer-cluster provides monitoring output which is enabled by default and prints the crawl status to the Docker log.
+In this example, the crawl data is written to `./crawls/collections/wr-net` by default.
 
-The output is written to `./crawls/collections/wr-net` by default.
+While the crawl is running, the status of the crawl (provide by puppeteer-cluster monitoring) prints the progress to the Docker log.
 
 When done, you can even use the browsertrix-crawler image to also start a local [pywb](https://github.com/webrecorder/pywb) instance
 to preview the crawl:
@@ -110,7 +112,7 @@ flags are [needed to run Chrome in Docker](https://github.com/puppeteer/puppetee
 
 
 ```bash
-docker run -v $PWD/crawls:/output --cap-add=SYS_ADMIN --cap-add=NET_ADMIN --shm-size=1g -it webrecorder/browsertrix-crawler --url https://webrecorder.net/ --workers 2
+docker run -v $PWD/crawls:/crawls --cap-add=SYS_ADMIN --cap-add=NET_ADMIN --shm-size=1g -it webrecorder/browsertrix-crawler --url https://webrecorder.net/ --workers 2
 
 ```
 

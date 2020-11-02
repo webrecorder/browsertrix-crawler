@@ -7,7 +7,7 @@ services:
           context: ./
 
         volumes:
-          - ./crawls:/output
+          - ./crawls:/crawls
 
         cap_add:
           - NET_ADMIN
