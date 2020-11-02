@@ -1,13 +1,22 @@
 # Browsertrix Crawler
 
-Browsertrix Crwaler is a simplified browser-based high-fidelity crawling system, designed to run a single crawl in a single Docker container.
-
-It is designed as part of a more streamlined replacement of the original [Browsertrix](https://github.com/webrecorder/browsertrix).
+Browsertrix Crawler is a simplified browser-based high-fidelity crawling system, designed to run a single crawl in a single Docker container. It is designed as part of a more streamlined replacement of the original [Browsertrix](https://github.com/webrecorder/browsertrix).
 
 The original Browsertrix may be too complex for situations where a single crawl is needed, and requires managing multiple containers.
 
 This is an attempt to refactor Browsertrix into a core crawling system, driven by [puppeteer-cluster](https://github.com/thomasdondorf/puppeteer-cluster)
 and [puppeteer](https://github.com/puppeteer/puppeteer)
+
+## Features
+
+Thus far, Browsertrix Crawler supports:
+
+- Single-container, browser based crawling with multiple headless/headful browsers
+- Support for some behaviors: autoplay to capture video/audio, scrolling
+- Support for direct capture for non-HTML resources
+- Extensible driver script for customizing behavior per crawl or page via Puppeteer
+
+## Architecture
 
 The Docker container provided here packages up several components used in Browsertrix.
 
@@ -17,9 +26,9 @@ The system uses:
  - `pywb` - in recording mode for capturing the content
 
 
-The crawl produces a single pywb collection, at `/output/collections/<collection name>`.
+The crawl produces a single pywb collection, at `/output/collections/<collection name>` in the Docker container.
 
-The collection can be mounted as a Docker volume and then accessed in pywb.
+To access the contents of the crawl, the `/output` directory should be mounted to a volume (default in the Docker Compose setup).
 
 
 ## Crawling Parameters
