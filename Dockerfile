@@ -32,7 +32,9 @@ ADD config.yaml /app/
 ADD uwsgi.ini /app/
 ADD *.js /app/
 
+RUN ln -s /app/main.js /usr/bin/crawl
+
 WORKDIR /output
 
-ENTRYPOINT ["node", "/app/main.js"]
+CMD ["crawl"]
 

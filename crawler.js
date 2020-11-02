@@ -83,6 +83,7 @@ class Crawler {
         alias: "u",
         describe: "The URL to start crawling from",
         type: "string",
+        demandOption: true,
       },
 
       "workers": {
@@ -131,7 +132,7 @@ class Crawler {
 
       "collection": {
         alias: "c",
-        describe: "Collection Name",
+        describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",
         type: "string",
         default: "capture"
       },
@@ -148,7 +149,7 @@ class Crawler {
         default: path.join(__dirname, "defaultDriver.js"),
       },
 
-      "generate-cdx": {
+      "generateCDX": {
         describe: "If set, generate index (CDXJ) for use with pywb after crawl is done",
         type: "boolean",
         default: false,
