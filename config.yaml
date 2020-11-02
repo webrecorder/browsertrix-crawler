@@ -2,7 +2,7 @@ debug: true
 
  
 proxy:
-  coll: capture
+  coll: ${COLL}
   recording: true
 
   enable_banner: false

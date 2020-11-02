@@ -1,12 +1,19 @@
 (() => {
-
   function run() {
-    if (window.navigator.__crawler_autoplay) {
+    if (self.navigator.__crawler_autoplay) {
       return;
     }
 
+    function loadAutoplay(url) {
+      if (self.__crawler_autoplayLoad) {
+        self.__crawler_autoplayLoad(url);
+      }
+      // delay to allow splash image to load
+      setTimeout(() => self.location.href = url, 1000);
+    }
+
     //console.log("checking autoplay for " + document.location.href);
-    window.navigator.__crawler_autoplay = true;
+    self.navigator.__crawler_autoplay = true;
 
     const specialActions = [
       {
@@ -20,7 +27,7 @@
           // set continuous_play to true in order to handle
           // a playlist etc
           url.searchParams.set('continuous_play', 'true');
-          self.location.href = url.href;
+          loadAutoplay(url.href);
         },
       },
       {
@@ -31,10 +38,7 @@
         },
         handle(url) {
           url.searchParams.set('autoplay', '1');
-          if (window.__crawler_autoplayLoad) {
-            window.__crawler_autoplayLoad(url.href);
-          }
-          self.location.href = url.href;
+          loadAutoplay(url.href);
         },
       },
     ];
@@ -55,9 +59,9 @@
     }
   }
 
-  document.addEventListener("readystatechange", run);
+  self.document.addEventListener("readystatechange", run);
 
-  if (document.readyState === "complete") {
+  if (self.document.readyState === "complete") {
     run();
   }
 
@@ -65,13 +69,13 @@
   const mediaSet = new Set();
 
   setInterval(() => {
-    const medias = document.querySelectorAll("video, audio");
+    const medias = self.document.querySelectorAll("video, audio");
 
     for (const media of medias) {
       try {
         if (media.src && !mediaSet.has(media.src)) {
-          if (window.__crawler_queueUrls && (media.src.startsWith("http:") || media.src.startsWith("https:"))) {
-            window.__crawler_queueUrls(media.src);
+          if (self.__crawler_queueUrls && (media.src.startsWith("http:") || media.src.startsWith("https:"))) {
+            self.__crawler_queueUrls(media.src);
           }
           mediaSet.add(media.src);
         } else if (!media.src) {
@@ -82,8 +86,6 @@
       }
     }
   }, 3000);
-
- 
 
 })();
 

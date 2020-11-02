@@ -1,6 +1,13 @@
-version: '3.3'
+version: '3.5'
   
 services:
     browsertrix-crawler:
         image: webrecorder/browsertrix-crawler
-        build: ./
+        build:
+          context: ./
+
+        cap_add:
+          - NET_ADMIN
+          - SYS_ADMIN
+
+        shm_size: 1gb
