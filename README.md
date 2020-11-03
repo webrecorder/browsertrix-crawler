@@ -96,8 +96,7 @@ When done, you can even use the browsertrix-crawler image to also start a local 
 to preview the crawl:
 
 ```
-cd crawls
-docker run it -p 8080:8080 webrecorder/browsertrix-crawler pywb
+docker run -it -v $(pwd)/crawls:/crawls -p 8080:8080 webrecorder/browsertrix-crawler pywb
 ```
 
 Then, loading the `http://localhost:8080/wr-net/https://webrecorder.net/` should load a recent crawl of the `https://webrecorder.net/` site.
