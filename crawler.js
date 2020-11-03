@@ -300,7 +300,7 @@ class Crawler {
     console.log("Waiting 5s to ensure WARCs are finished");
     await this.sleep(5000);
 
-    if (this.params.generateCdx) {
+    if (this.params.generateCDX) {
       console.log("Generate CDX");
 
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
