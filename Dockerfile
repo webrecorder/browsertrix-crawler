@@ -33,6 +33,7 @@ ADD uwsgi.ini /app/
 ADD *.js /app/
 
 RUN ln -s /app/main.js /usr/bin/crawl
+RUN ln -s /opt/google/chrome/google-chrome /usr/bin/google-chrome
 
 WORKDIR /crawls
 

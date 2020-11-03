@@ -7,7 +7,8 @@ const path = require("path");
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
 const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
-const CHROME_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.89 Safari/537.36";
+
+const CHROME_PATH = "google-chrome";
 
 // to ignore HTTPS error for HEAD check
 const HTTPS_AGENT = require("https").Agent({
@@ -20,7 +21,7 @@ const HTTP_AGENT = require("http").Agent();
 // ============================================================================
 class Crawler {
   constructor() {
-    this.headers = {"User-Agent": CHROME_USER_AGENT};
+    this.headers = {};
 
     this.seenList = new Set();
 
@@ -43,6 +44,15 @@ class Crawler {
 
   bootstrap() {
     const opts = {stdio: "ignore", cwd: this.params.cwd};
+
+    let version = "84";
+
+    try {
+      version = child_process.execFileSync("google-chrome", ["--product-version"], {encoding: "utf8"}).trim();
+    } catch(e) {}
+
+    this.userAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
+    this.headers = {"User-Agent": this.userAgent};
 
     child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
 
@@ -245,7 +255,7 @@ class Crawler {
     // Puppeter Options
     return {
       headless: this.params.headless,
-      executablePath: "/opt/google/chrome/google-chrome",
+      executablePath: CHROME_PATH,
       ignoreHTTPSErrors: true,
       args: this.chromeArgs
     };
