@@ -18,9 +18,10 @@ RUN pip install git+https://github.com/webrecorder/pywb@patch-work
 
 RUN pip install uwsgi 'gevent>=20.9.0'
 
-COPY --from=chrome /usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
-COPY --from=chrome /lib/x86_64-linux-gnu/libdbus* /lib/x86_64-linux-gnu/
-COPY --from=chrome /opt/google/chrome/ /opt/google/chrome/
+COPY --from=chrome /tmp/*.deb /deb/
+COPY --from=chrome /app/libpepflashplayer.so /app/libpepflashplayer.so
+RUN dpkg -i /deb/*.deb; apt-get update; apt-get install -fqqy && \
+    rm -rf /var/lib/opts/lists/*
 
 WORKDIR /app
 
@@ -33,7 +34,6 @@ ADD uwsgi.ini /app/
 ADD *.js /app/
 
 RUN ln -s /app/main.js /usr/bin/crawl
-RUN ln -s /opt/google/chrome/google-chrome /usr/bin/google-chrome
 
 WORKDIR /crawls
 
