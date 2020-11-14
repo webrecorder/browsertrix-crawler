@@ -4,6 +4,7 @@ const child_process = require("child_process");
 const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
 const path = require("path");
+const Sitemapper = require('sitemapper');
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
 const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
@@ -209,6 +210,10 @@ class Crawler {
       "userAgentSuffix": {
         describe: "Append suffix to existing browser user-agent (ex: +MyCrawler, info@example.com)",
         type: "string",
+      },
+
+      "useSitemap": {
+        describe: "If enabled, check for sitemaps at /sitemap.xml, or custom URL if URL is specified",
       }
     };
   }
@@ -270,6 +275,12 @@ class Crawler {
       if (!this.emulateDevice) {
         throw new Error("Unknown device: " + argv.mobileDevice);
       }
+    }
+
+    if (argv.useSitemap === true) {
+      const url = new URL(argv.url);
+      url.pathname = "/sitemap.xml";
+      argv.useSitemap = url.href;
     }
 
     // Support one or multiple exclude
@@ -360,6 +371,10 @@ class Crawler {
 
     this.queueUrl(this.params.url);
 
+    if (this.params.useSitemap) {
+      await this.parseSitemap(this.params.useSitemap);
+    }
+
     await this.cluster.idle();
     await this.cluster.close();
 
@@ -387,8 +402,12 @@ class Crawler {
       return;
     }
 
+    this.queueUrls(results);
+  }
+
+  queueUrls(urls) {
     try {
-      for (const url of results) {
+      for (const url of urls) {
         const captureUrl = this.shouldCrawl(url);
 
         if (captureUrl) {
@@ -512,6 +531,23 @@ class Crawler {
 
   rxEscape(string) {
     return string.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+  }
+
+  async parseSitemap(url) {
+    const sitemapper = new Sitemapper({
+      url,
+      timeout: 15000,
+      requestHeaders: this.headers
+    });
+
+    try {
+      const { sites } = await sitemapper.fetch();
+
+      this.queueUrls(sites);
+
+    } catch(e) {
+      console.log(e);
+    }
   }
 }
 

@@ -10,6 +10,7 @@
     "node-fetch": "^2.6.1",
     "puppeteer-cluster": "^0.22.0",
     "puppeteer-core": "^5.3.1",
+    "sitemapper": "^3.1.2",
     "yargs": "^16.0.3"
   },
   "devDependencies": {
