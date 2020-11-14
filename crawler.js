@@ -85,7 +85,7 @@ class Crawler {
   bootstrap() {
     const opts = {stdio: "ignore", cwd: this.params.cwd};
 
-    this.userAgent = this.configureUA();
+    this.configureUA();
 
     this.headers = {"User-Agent": this.userAgent};
 
