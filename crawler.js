@@ -25,10 +25,15 @@ class Crawler {
 
     this.seenList = new Set();
 
+    this.emulateDevice = null;
+
     // links crawled counter
     this.numLinks = 0;
 
     this.monitor = true;
+
+    this.userAgent = "";
+    this.headers = {};
 
     const params = require("yargs")
       .usage("browsertrix-crawler [options]")
@@ -42,16 +47,46 @@ class Crawler {
     this.capturePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record/id_/`;
   }
 
+  configureUA() {
+    // override userAgent
+    if (this.params.userAgent) {
+
+      if (this.emulateDevice) {
+        this.emulateDevice.userAgent = this.params.userAgent;
+      }
+
+      this.userAgent = this.params.userAgent;
+      return;
+    }
+
+    // if device set, it overrides the default Chrome UA
+    if (this.emulateDevice) {
+      this.userAgent = this.emulateDevice.userAgent;
+    } else {
+      let version = "84";
+
+      try {
+        version = child_process.execFileSync("google-chrome", ["--product-version"], {encoding: "utf8"}).trim();
+      } catch(e) {}
+
+      this.userAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
+    }
+
+    // suffix to append to default userAgent
+    if (this.params.userAgentSuffix) {
+      this.userAgent += " " + this.params.userAgentSuffix;
+
+      if (this.emulateDevice) {
+        this.emulateDevice.userAgent += " " + this.params.userAgentSuffix;
+      }
+    }
+  }
+
   bootstrap() {
     const opts = {stdio: "ignore", cwd: this.params.cwd};
 
-    let version = "84";
+    this.userAgent = this.configureUA();
 
-    try {
-      version = child_process.execFileSync("google-chrome", ["--product-version"], {encoding: "utf8"}).trim();
-    } catch(e) {}
-
-    this.userAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
     this.headers = {"User-Agent": this.userAgent};
 
     child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
@@ -159,6 +194,21 @@ class Crawler {
         describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd",
         type: "string",
         default: process.cwd(),
+      },
+
+      "mobileDevice": {
+        describe: "Emulate mobile device by name from: https://github.com/puppeteer/puppeteer/blob/main/src/common/DeviceDescriptors.ts",
+        type: "string",
+      },
+
+      "userAgent": {
+        describe: "Override user-agent with specified string",
+        type: "string",
+      },
+
+      "userAgentSuffix": {
+        describe: "Append suffix to existing browser user-agent (ex: +MyCrawler, info@example.com)",
+        type: "string",
       }
     };
   }
@@ -213,6 +263,13 @@ class Crawler {
 
     default:
       throw new Error("Invalid newContext, must be one of: page, session, browser");
+    }
+
+    if (argv.mobileDevice) {
+      this.emulateDevice = puppeteer.devices[argv.mobileDevice];
+      if (!this.emulateDevice) {
+        throw new Error("Unknown device: " + argv.mobileDevice);
+      }
     }
 
     // Support one or multiple exclude

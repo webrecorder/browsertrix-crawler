@@ -15,6 +15,10 @@ module.exports = async ({data, page, crawler}) => {
     return;
   }
 
+  if (crawler.emulateDevice) {
+    await page.emulate(crawler.emulateDevice);
+  }
+
   const mediaResults = [];
 
   await page.exposeFunction("__crawler_queueUrls", async (url) => {
