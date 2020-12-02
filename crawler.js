@@ -4,6 +4,7 @@ const child_process = require("child_process");
 const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
 const path = require("path");
+const fs = require("fs");
 const Sitemapper = require('sitemapper');
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
@@ -214,6 +215,10 @@ class Crawler {
 
       "useSitemap": {
         describe: "If enabled, check for sitemaps at /sitemap.xml, or custom URL if URL is specified",
+      },
+
+      "statsFilename": {
+        describe: "If set, output stats as JSON to this file. (Relative filename resolves to crawl working directory)"
       }
     };
   }
@@ -305,6 +310,11 @@ class Crawler {
       argv.scope = [];
     }
 
+    // Resolve statsFilename
+    if (argv.statsFilename) {
+      argv.statsFilename = path.resolve(argv.cwd, argv.statsFilename);
+    }
+
     return true;
   }
 
@@ -364,6 +374,9 @@ class Crawler {
     this.cluster.task(async (opts) => {
       try {
         await this.driver({...opts, crawler: this});
+
+        this.writeStats();
+
       } catch (e) {
         console.warn(e);
       }
@@ -378,6 +391,8 @@ class Crawler {
     await this.cluster.idle();
     await this.cluster.close();
 
+    this.writeStats();
+
     // extra wait for all resources to land into WARCs
     console.log("Waiting 5s to ensure WARCs are finished");
     await this.sleep(5000);
@@ -386,6 +401,23 @@ class Crawler {
       console.log("Generate CDX");
 
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
+    }
+  }
+
+  writeStats() {
+    if (this.params.statsFilename) {
+
+      const total = this.cluster.allTargetCount;
+      const workersRunning = this.cluster.workersBusy.length;
+      const numCrawled = total - this.cluster.jobQueue.size() - workersRunning;
+
+      const stats = {numCrawled, workersRunning, total};
+
+      try {
+        fs.writeFileSync(this.params.statsFilename, JSON.stringify(stats, null, 2))
+      } catch (err) {
+        console.warn("Stats output failed", err);
+      }
     }
   }
 
