@@ -1,6 +1,9 @@
 const fs = require("fs");
 
 const autoplayScript = fs.readFileSync("/app/autoplay.js", "utf-8");
+
+const autofetchScript = fs.readFileSync("/app/autofetcher.js", "utf-8");
+
 //const autoplayScript = require("/app/autoplay.js");
 
 /* eslint-disable no-undef */
@@ -34,6 +37,7 @@ module.exports = async ({data, page, crawler}) => {
 
   try {
     await page.evaluateOnNewDocument(autoplayScript);
+    await page.evaluateOnNewDocument(autofetchScript);
   } catch(e) {
     console.log(e);
   }
