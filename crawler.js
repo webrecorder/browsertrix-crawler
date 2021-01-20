@@ -6,6 +6,7 @@ const AbortController = require("abort-controller");
 const path = require("path");
 const fs = require("fs");
 const Sitemapper = require('sitemapper');
+const unzipper = require('unzipper');
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
 const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
@@ -191,7 +192,13 @@ class Crawler {
         type: "boolean",
         default: false,
       },
-
+      
+      "generateWacz": {
+        describe: "If set, generate wacz",
+        type: "boolean",
+        default: false,
+      },
+      
       "cwd": {
         describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd",
         type: "string",
@@ -355,6 +362,7 @@ class Crawler {
   async crawl() {
     try {
       this.driver = require(this.params.driver);
+      console.log(this.driver)
     } catch(e) {
       console.log(e);
       return;
@@ -401,6 +409,55 @@ class Crawler {
       console.log("Generate CDX");
 
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
+    }
+    if (this.params.generateWacz) {
+      console.log("Generating Wacz");
+    
+      // Access the collections the user has specified
+      var dir = "collections/" + this.params.collection + "/archive"
+      
+      // Get a list of the warcs inside
+      var file_list = fs.readdirSync(dir)
+      
+      // Build the argument list to pass to the wacz create command
+      var argument_list = ["create", "-f"]
+      file_list.forEach((val, index) => argument_list.push("collections/" + this.params.collection + "/archive/" + val));
+      argument_list.push("--detect-pages")
+      argument_list.push("--text")
+      
+      // Run the wacz create command
+      child_process.spawnSync('wacz' , argument_list);
+      
+      if (fs.existsSync("archive.wacz")) {
+        
+        // Unzip the created wacz file in memory
+        const zip = fs.createReadStream('archive.wacz').pipe(unzipper.Parse({forceStream: true}));
+        for await (const entry of zip) {
+          const fileName = entry.path;
+        
+          // If the pages.jsonl file is detected, as it should be, unzip it.
+          if (fileName === "pages/pages.jsonl") {
+            console.log("Extracting pages/pages.jsonl file")     
+            
+            // If the pages folder already exists delete it's contents
+            if (fs.existsSync("pages")) {
+              fs.rmdirSync("pages", { recursive: true });
+              }
+            
+            // Make pages directory and save pages.jsonl file to it
+            fs.mkdirSync('pages');
+            entry.pipe(fs.createWriteStream('pages/pages.jsonl'));
+          }
+           else {
+            entry.autodrain();
+          }
+        } 
+        console.log("Wacz successfully generated and saved as archive.wacz")
+        console.log("pages/pages.jsonl file successfully extracted")       
+      }
+      else{
+        console.log("Wacz not created")
+      } 
     }
   }
 
