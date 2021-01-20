@@ -362,7 +362,6 @@ class Crawler {
   async crawl() {
     try {
       this.driver = require(this.params.driver);
-      console.log(this.driver)
     } catch(e) {
       console.log(e);
       return;

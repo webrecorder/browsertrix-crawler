@@ -16,6 +16,8 @@ ENV PROXY_HOST=localhost \
 
 RUN pip install git+https://github.com/webrecorder/pywb@patch-work
 
+RUN pip install wacz 
+
 RUN pip install uwsgi 'gevent>=20.9.0'
 
 COPY --from=chrome /tmp/*.deb /deb/
