@@ -6,7 +6,7 @@ const AbortController = require("abort-controller");
 const path = require("path");
 const fs = require("fs");
 const Sitemapper = require('sitemapper');
-const unzipper = require('unzipper');
+const { v4: uuidv4 } = require('uuid');
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
 const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
@@ -91,6 +91,7 @@ class Crawler {
     this.configureUA();
 
     this.headers = {"User-Agent": this.userAgent};
+    this.pages = [{"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}]
 
     child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
 
@@ -388,7 +389,6 @@ class Crawler {
         console.warn(e);
       }
     });
-
     this.queueUrl(this.params.url);
 
     if (this.params.useSitemap) {
@@ -409,6 +409,7 @@ class Crawler {
 
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
+    
     if (this.params.generateWacz) {
       console.log("Generating Wacz");
     
@@ -421,44 +422,13 @@ class Crawler {
       // Build the argument list to pass to the wacz create command
       var argument_list = ["create", "-f"]
       file_list.forEach((val, index) => argument_list.push("collections/" + this.params.collection + "/archive/" + val));
-      argument_list.push("--detect-pages")
-      argument_list.push("--text")
       
       // Run the wacz create command
       child_process.spawnSync('wacz' , argument_list);
-      
-      if (fs.existsSync("archive.wacz")) {
-        
-        // Unzip the created wacz file in memory
-        const zip = fs.createReadStream('archive.wacz').pipe(unzipper.Parse({forceStream: true}));
-        for await (const entry of zip) {
-          const fileName = entry.path;
-        
-          // If the pages.jsonl file is detected, as it should be, unzip it.
-          if (fileName === "pages/pages.jsonl") {
-            console.log("Extracting pages/pages.jsonl file")     
-            
-            // If the pages folder already exists delete it's contents
-            if (fs.existsSync("pages")) {
-              fs.rmdirSync("pages", { recursive: true });
-              }
-            
-            // Make pages directory and save pages.jsonl file to it
-            fs.mkdirSync('pages');
-            entry.pipe(fs.createWriteStream('pages/pages.jsonl'));
-          }
-           else {
-            entry.autodrain();
-          }
-        } 
-        console.log("Wacz successfully generated and saved as archive.wacz")
-        console.log("pages/pages.jsonl file successfully extracted")       
+      console.log("Wacz successfully generated and saved as archive.wacz")
       }
-      else{
-        console.log("Wacz not created")
-      } 
     }
-  }
+
 
   writeStats() {
     if (this.params.statsFilename) {
@@ -489,15 +459,23 @@ class Crawler {
       console.warn("Link Extraction failed", e);
       return;
     }
-
     this.queueUrls(results);
+
+    try {
+      var jsonl = ''
+      for (const page of this.pages){
+        jsonl = jsonl + JSON.stringify(page) + "\n"
+      }
+      fs.writeFileSync('pages/pages.jsonl', jsonl)
+    } catch (err) {
+      console.warn("Stats output failed", err);
+    }
   }
 
   queueUrls(urls) {
     try {
       for (const url of urls) {
         const captureUrl = this.shouldCrawl(url);
-
         if (captureUrl) {
           if (!this.queueUrl(captureUrl)) {
             break;
@@ -519,9 +497,17 @@ class Crawler {
     return true;
   }
 
+  createPage(url){
+    var id = uuidv4();
+    var today = new Date();
+    var row = {"id": id, "url": url.href, "ts": today}
+    this.pages.push(row)
+  }
+  
   shouldCrawl(url) {
     try {
       url = new URL(url);
+      this.createPage(url)
     } catch(e) {
       return false;
     }
