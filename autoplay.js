@@ -31,7 +31,7 @@
         },
       },
       {
-        rx: [/player\.vimeo\.com/, /youtube\.com\/embed\//],
+        rx: [/player\.vimeo\.com/, /youtube(?:-nocookie)?\.com\/embed\//],
         check(url) {
           const autoplay = url.searchParams.get('autoplay');
           return autoplay === '1';
