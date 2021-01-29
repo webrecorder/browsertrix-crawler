@@ -1,4 +1,4 @@
-FROM oldwebtoday/chrome:84 as chrome
+FROM oldwebtoday/chrome:88 as chrome
 
 FROM nikolaik/python-nodejs:python3.8-nodejs14
 
@@ -14,9 +14,9 @@ ENV PROXY_HOST=localhost \
     DISPLAY=:99 \
     GEOMETRY=1360x1020x16
 
-RUN pip install git+https://github.com/webrecorder/pywb@patch-work
+RUN pip install uwsgi
 
-RUN pip install uwsgi 'gevent>=20.9.0'
+RUN pip install pywb>=2.5.0
 
 COPY --from=chrome /tmp/*.deb /deb/
 COPY --from=chrome /app/libpepflashplayer.so /app/libpepflashplayer.so

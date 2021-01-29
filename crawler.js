@@ -65,7 +65,7 @@ class Crawler {
     if (this.emulateDevice) {
       this.userAgent = this.emulateDevice.userAgent;
     } else {
-      let version = "84";
+      let version = "88";
 
       try {
         version = child_process.execFileSync("google-chrome", ["--product-version"], {encoding: "utf8"}).trim();
@@ -326,6 +326,7 @@ class Crawler {
       "--no-sandbox",
       "--disable-background-media-suspend",
       "--autoplay-policy=no-user-gesture-required",
+      "--disable-features=IsolateOrigins,site-per-process",
     ];
   }
 
