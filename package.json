@@ -12,7 +12,6 @@
     "puppeteer-core": "^5.3.1",
     "sitemapper": "^3.1.2",
     "yargs": "^16.0.3",
-    "tmp": "0.2.1",
     "uuid": "8.3.2"
 },
   "devDependencies": {
