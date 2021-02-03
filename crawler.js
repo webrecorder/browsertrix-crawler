@@ -468,7 +468,7 @@ class Crawler {
       }
       fs.writeFileSync('pages/pages.jsonl', jsonl)
     } catch (err) {
-      console.warn("Stats output failed", err);
+      console.warn("Pages output failed", err);
     }
   }
 
@@ -500,7 +500,7 @@ class Crawler {
   createPage(url){
     var id = uuidv4();
     var today = new Date();
-    var row = {"id": id, "url": url.href, "ts": today}
+    var row = {"id": id, "url": url.href, "title": page.title()}
     this.pages.push(row)
   }
   
