@@ -500,7 +500,7 @@ class Crawler {
       var filePath = path.join("collections/", this.params.collection, 'archive/pages/pages.jsonl')
       var dirPath = path.join("collections/", this.params.collection, 'archive/pages')
       if (fs.existsSync(dirPath) == false) {
-        fs.mkdirSync(path.join('collections/', this.params.collection, 'archive/pages'))
+        fs.mkdirSync(dirPath)
         var header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n")
         fs.writeFileSync(filePath, header)
       }
