@@ -33,6 +33,9 @@ class Crawler {
     // links crawled counter
     this.numLinks = 0;
 
+    // was the limit hit?
+    this.limitHit = false;
+
     this.monitor = true;
 
     this.userAgent = "";
@@ -66,7 +69,7 @@ class Crawler {
     if (this.emulateDevice) {
       this.userAgent = this.emulateDevice.userAgent;
     } else {
-      let version = "84";
+      let version = "88";
 
       try {
         version = child_process.execFileSync("google-chrome", ["--product-version"], {encoding: "utf8"}).trim();
@@ -333,6 +336,7 @@ class Crawler {
       "--no-sandbox",
       "--disable-background-media-suspend",
       "--autoplay-policy=no-user-gesture-required",
+      "--disable-features=IsolateOrigins,site-per-process",
     ];
   }
 
@@ -435,8 +439,8 @@ class Crawler {
       const total = this.cluster.allTargetCount;
       const workersRunning = this.cluster.workersBusy.length;
       const numCrawled = total - this.cluster.jobQueue.size() - workersRunning;
-
-      const stats = {numCrawled, workersRunning, total};
+      const limit = {max: this.params.limit || 0, hit: this.limitHit};
+      const stats = {numCrawled, workersRunning, total, limit};
 
       try {
         fs.writeFileSync(this.params.statsFilename, JSON.stringify(stats, null, 2))
@@ -479,6 +483,7 @@ class Crawler {
   queueUrl(url) {
     this.seenList.add(url);
     if (this.numLinks >= this.params.limit && this.params.limit > 0) {
+      this.limitHit = true;
       return false;
     }
     this.numLinks++;
