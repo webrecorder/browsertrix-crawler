@@ -385,7 +385,8 @@ class Crawler {
     this.cluster.task(async (opts) => {
       try {
         await this.driver({...opts, crawler: this});
-        this.writePage(opts.data.url, opts.page._target._targetInfo.title)
+        var title = await opts.page.title()
+        this.writePage(opts.data.url, title)
         this.writeStats();
 
       } catch (e) {
