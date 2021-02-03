@@ -91,7 +91,7 @@ class Crawler {
     this.configureUA();
 
     this.headers = {"User-Agent": this.userAgent};
-    this.pages = [{"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}]
+    this.pages = []
 
     child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
 
@@ -382,7 +382,7 @@ class Crawler {
     this.cluster.task(async (opts) => {
       try {
         await this.driver({...opts, crawler: this});
-
+        this.createPage(opts.data)
         this.writeStats();
 
       } catch (e) {
@@ -414,14 +414,14 @@ class Crawler {
       console.log("Generating Wacz");
     
       // Access the collections the user has specified
-      var dir = "collections/" + this.params.collection + "/archive"
+      var dir = path.join("collections/" + this.params.collection + "/archive")
       
       // Get a list of the warcs inside
       var file_list = fs.readdirSync(dir)
       
       // Build the argument list to pass to the wacz create command
       var argument_list = ["create", "-f"]
-      file_list.forEach((val, index) => argument_list.push("collections/" + this.params.collection + "/archive/" + val));
+      file_list.forEach((val, index) => argument_list.push(path.join(dir, val)));
       
       // Run the wacz create command
       child_process.spawnSync('wacz' , argument_list);
@@ -462,11 +462,16 @@ class Crawler {
     this.queueUrls(results);
 
     try {
-      var jsonl = ''
-      for (const page of this.pages){
-        jsonl = jsonl + JSON.stringify(page) + "\n"
+      var filePath = path.join("collections/", this.params.collection, 'archive/pages/pages.jsonl')
+      var dirPath = path.join("collections/", this.params.collection, 'archive/pages')
+      if (fs.existsSync(dirPath) == false) {
+        fs.mkdirSync(path.join('collections/', this.params.collection, 'archive/pages'))
+        var header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n")
+        fs.writeFileSync(filePath, header)
       }
-      fs.writeFileSync('pages/pages.jsonl', jsonl)
+      for (const page of this.pages){
+        fs.appendFileSync(filePath, page)
+      }
     } catch (err) {
       console.warn("Pages output failed", err);
     }
@@ -497,17 +502,18 @@ class Crawler {
     return true;
   }
 
-  createPage(url){
+  createPage(params){
     var id = uuidv4();
     var today = new Date();
-    var row = {"id": id, "url": url.href, "title": page.title()}
-    this.pages.push(row)
+    console.log(params)
+    var row = {"id": id, "url": params.url}
+    var processedRow = JSON.stringify(row).concat("\n")
+    this.pages.push(processedRow)
   }
   
   shouldCrawl(url) {
     try {
       url = new URL(url);
-      this.createPage(url)
     } catch(e) {
       return false;
     }
