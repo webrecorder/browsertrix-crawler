@@ -91,7 +91,6 @@ class Crawler {
     this.configureUA();
 
     this.headers = {"User-Agent": this.userAgent};
-    this.pages = []
 
     child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
 
@@ -382,7 +381,7 @@ class Crawler {
     this.cluster.task(async (opts) => {
       try {
         await this.driver({...opts, crawler: this});
-        this.createPage(opts.data)
+        this.writePage(opts.data.url, opts.page._target._targetInfo.title)
         this.writeStats();
 
       } catch (e) {
@@ -460,21 +459,6 @@ class Crawler {
       return;
     }
     this.queueUrls(results);
-
-    try {
-      var filePath = path.join("collections/", this.params.collection, 'archive/pages/pages.jsonl')
-      var dirPath = path.join("collections/", this.params.collection, 'archive/pages')
-      if (fs.existsSync(dirPath) == false) {
-        fs.mkdirSync(path.join('collections/', this.params.collection, 'archive/pages'))
-        var header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n")
-        fs.writeFileSync(filePath, header)
-      }
-      for (const page of this.pages){
-        fs.appendFileSync(filePath, page)
-      }
-    } catch (err) {
-      console.warn("Pages output failed", err);
-    }
   }
 
   queueUrls(urls) {
@@ -502,13 +486,24 @@ class Crawler {
     return true;
   }
 
-  createPage(params){
+  writePage(url, title){
     var id = uuidv4();
     var today = new Date();
-    console.log(params)
-    var row = {"id": id, "url": params.url}
+    var row = {"id": id, "url": url, "title": title}
     var processedRow = JSON.stringify(row).concat("\n")
-    this.pages.push(processedRow)
+    try {
+      var filePath = path.join("collections/", this.params.collection, 'archive/pages/pages.jsonl')
+      var dirPath = path.join("collections/", this.params.collection, 'archive/pages')
+      if (fs.existsSync(dirPath) == false) {
+        fs.mkdirSync(path.join('collections/', this.params.collection, 'archive/pages'))
+        var header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n")
+        fs.writeFileSync(filePath, header)
+      }
+      fs.appendFileSync(filePath, processedRow)
+    }
+    catch (err) {
+    console.warn("Pages output failed", err);
+    }
   }
   
   shouldCrawl(url) {
