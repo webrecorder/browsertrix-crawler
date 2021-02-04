@@ -5,8 +5,8 @@ const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
 const path = require("path");
 const fs = require("fs");
-const Sitemapper = require('sitemapper');
-const { v4: uuidv4 } = require('uuid');
+const Sitemapper = require("sitemapper");
+const { v4: uuidv4 } = require("uuid");
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
 const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
@@ -73,7 +73,9 @@ class Crawler {
 
       try {
         version = child_process.execFileSync("google-chrome", ["--product-version"], {encoding: "utf8"}).trim();
-      } catch(e) {}
+      } catch(e) {
+        console.log(e);
+      }
 
       this.userAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
     }
@@ -385,8 +387,8 @@ class Crawler {
     this.cluster.task(async (opts) => {
       try {
         await this.driver({...opts, crawler: this});
-        var title = await opts.page.title()
-        this.writePage(opts.data.url, title)
+        const title = await opts.page.title();
+        this.writePage(opts.data.url, title);
         this.writeStats();
 
       } catch (e) {
@@ -418,20 +420,20 @@ class Crawler {
       console.log("Generating Wacz");
     
       // Access the collections the user has specified
-      var dir = path.join("collections/" + this.params.collection + "/archive")
+      const dir = path.join("collections/" + this.params.collection + "/archive");
       
       // Get a list of the warcs inside
-      var file_list = fs.readdirSync(dir)
+      const file_list = fs.readdirSync(dir);
       
       // Build the argument list to pass to the wacz create command
-      var argument_list = ["create", "-f"]
+      const argument_list = ["create", "-f"];
       file_list.forEach((val, index) => argument_list.push(path.join(dir, val)));
       
       // Run the wacz create command
-      child_process.spawnSync('wacz' , argument_list);
-      console.log("Wacz successfully generated and saved as archive.wacz")
-      }
+      child_process.spawnSync("wacz" , argument_list);
+      console.log("Wacz successfully generated and saved as archive.wacz");
     }
+  }
 
 
   writeStats() {
@@ -444,7 +446,7 @@ class Crawler {
       const stats = {numCrawled, workersRunning, total, limit};
 
       try {
-        fs.writeFileSync(this.params.statsFilename, JSON.stringify(stats, null, 2))
+        fs.writeFileSync(this.params.statsFilename, JSON.stringify(stats, null, 2));
       } catch (err) {
         console.warn("Stats output failed", err);
       }
@@ -493,22 +495,22 @@ class Crawler {
   }
 
   writePage(url, title){
-    var id = uuidv4();
-    var today = new Date();
-    var row = {"id": id, "url": url, "title": title}
-    var processedRow = JSON.stringify(row).concat("\n")
+    const id = uuidv4();
+    const today = new Date();
+    const row = {"id": id, "url": url, "title": title};
+    const processedRow = JSON.stringify(row).concat("\n");
     try {
-      var filePath = path.join("collections/", this.params.collection, 'archive/pages/pages.jsonl')
-      var dirPath = path.join("collections/", this.params.collection, 'archive/pages')
+      const filePath = path.join("collections/", this.params.collection, "archive/pages/pages.jsonl");
+      const dirPath = path.join("collections/", this.params.collection, "archive/pages");
       if (fs.existsSync(dirPath) == false) {
-        fs.mkdirSync(dirPath)
-        var header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n")
-        fs.writeFileSync(filePath, header)
+        fs.mkdirSync(dirPath);
+        const header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n");
+        fs.writeFileSync(filePath, header);
       }
-      fs.appendFileSync(filePath, processedRow)
+      fs.appendFileSync(filePath, processedRow);
     }
     catch (err) {
-    console.warn("Pages output failed", err);
+      console.warn("Pages output failed", err);
     }
   }
   
