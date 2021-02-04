@@ -5,7 +5,8 @@ const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
 const path = require("path");
 const fs = require("fs");
-const Sitemapper = require('sitemapper');
+const Sitemapper = require("sitemapper");
+const { v4: uuidv4 } = require("uuid");
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
 const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
@@ -50,6 +51,16 @@ class Crawler {
 
     this.params = params;
     this.capturePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record/id_/`;
+
+
+    // root collections dir
+    this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
+
+    // pages directory
+    this.pagesDir = path.join(this.collDir, "pages");
+
+    // pages file
+    this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
   }
 
   configureUA() {
@@ -72,7 +83,9 @@ class Crawler {
 
       try {
         version = child_process.execFileSync("google-chrome", ["--product-version"], {encoding: "utf8"}).trim();
-      } catch(e) {}
+      } catch(e) {
+        console.log(e);
+      }
 
       this.userAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
     }
@@ -194,7 +207,13 @@ class Crawler {
         type: "boolean",
         default: false,
       },
-
+      
+      "generateWACZ": {
+        describe: "If set, generate wacz",
+        type: "boolean",
+        default: false,
+      },
+      
       "cwd": {
         describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd",
         type: "string",
@@ -378,13 +397,16 @@ class Crawler {
     this.cluster.task(async (opts) => {
       try {
         await this.driver({...opts, crawler: this});
-
+        const title = await opts.page.title();
+        this.writePage(opts.data.url, title);
         this.writeStats();
 
       } catch (e) {
         console.warn(e);
       }
     });
+
+    this.initPages();
 
     this.queueUrl(this.params.url);
 
@@ -406,11 +428,30 @@ class Crawler {
 
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
+    
+    if (this.params.generateWACZ) {
+      console.log("Generating WACZ");
+
+      const archiveDir = path.join(this.collDir, "archive");
+
+      // Get a list of the warcs inside
+      const warcFileList = fs.readdirSync(archiveDir);
+      
+      // Build the argument list to pass to the wacz create command
+      const waczFilename = this.params.collection.concat(".wacz");
+      const waczPath = path.join(this.collDir, waczFilename);
+      const argument_list = ["create", "-o", waczPath, "--pages", this.pagesFile, "-f"];
+      warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val)));
+      
+      // Run the wacz create command
+      child_process.spawnSync("wacz" , argument_list);
+      console.log(`WACZ successfully generated and saved to: ${waczFilename}`);
+    }
   }
+
 
   writeStats() {
     if (this.params.statsFilename) {
-
       const total = this.cluster.allTargetCount;
       const workersRunning = this.cluster.workersBusy.length;
       const numCrawled = total - this.cluster.jobQueue.size() - workersRunning;
@@ -418,7 +459,7 @@ class Crawler {
       const stats = {numCrawled, workersRunning, total, limit};
 
       try {
-        fs.writeFileSync(this.params.statsFilename, JSON.stringify(stats, null, 2))
+        fs.writeFileSync(this.params.statsFilename, JSON.stringify(stats, null, 2));
       } catch (err) {
         console.warn("Stats output failed", err);
       }
@@ -437,7 +478,6 @@ class Crawler {
       console.warn("Link Extraction failed", e);
       return;
     }
-
     this.queueUrls(results);
   }
 
@@ -445,7 +485,6 @@ class Crawler {
     try {
       for (const url of urls) {
         const captureUrl = this.shouldCrawl(url);
-
         if (captureUrl) {
           if (!this.queueUrl(captureUrl)) {
             break;
@@ -468,6 +507,32 @@ class Crawler {
     return true;
   }
 
+  initPages() {
+    try {
+      // create pages dir if doesn't exist and write pages.jsonl header
+      if (!fs.existsSync(this.pagesDir)) {
+        fs.mkdirSync(this.pagesDir);
+        const header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n");
+        fs.writeFileSync(this.pagesFile, header);
+      }
+    } catch(err) {
+      console.log("pages/pages.jsonl creation failed", err);
+    }
+  }
+
+  writePage(url, title){
+    const id = uuidv4();
+    const today = new Date();
+    const row = {"id": id, "url": url, "title": title};
+    const processedRow = JSON.stringify(row).concat("\n");
+    try {
+      fs.appendFileSync(this.pagesFile, processedRow);
+    }
+    catch (err) {
+      console.warn("pages/pages.jsonl append failed", err);
+    }
+  }
+  
   shouldCrawl(url) {
     try {
       url = new URL(url);

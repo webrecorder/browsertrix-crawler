@@ -11,8 +11,9 @@
     "puppeteer-cluster": "^0.22.0",
     "puppeteer-core": "^5.3.1",
     "sitemapper": "^3.1.2",
-    "yargs": "^16.0.3"
-  },
+    "yargs": "^16.0.3",
+    "uuid": "8.3.2"
+},
   "devDependencies": {
     "eslint": "^7.12.1"
   }

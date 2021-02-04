@@ -14,14 +14,12 @@ ENV PROXY_HOST=localhost \
     DISPLAY=:99 \
     GEOMETRY=1360x1020x16
 
-RUN pip install uwsgi
-
-RUN pip install pywb>=2.5.0
-
 COPY --from=chrome /tmp/*.deb /deb/
 COPY --from=chrome /app/libpepflashplayer.so /app/libpepflashplayer.so
 RUN dpkg -i /deb/*.deb; apt-get update; apt-get install -fqqy && \
     rm -rf /var/lib/opts/lists/*
+
+RUN pip install pywb>=2.5.0 uwsgi wacz
 
 WORKDIR /app
 
