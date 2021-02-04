@@ -69,7 +69,9 @@ class Crawler {
 
       try {
         version = child_process.execFileSync("google-chrome", ["--product-version"], {encoding: "utf8"}).trim();
-      } catch(e) {}
+      } catch(e) {
+        console.log(e);
+      }
 
       this.userAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
     }
@@ -549,11 +551,9 @@ class Crawler {
     }
   }
 
-  async directFetchCapture(url) {
+  async directFetchCapture() {
     //console.log(`Direct capture: ${this.capturePrefix}${url}`);
     const abort = new AbortController();
-    const signal = abort.signal;
-    const resp2 = await fetch(this.capturePrefix + url, {signal, headers: this.headers});
     abort.abort();
   }
 

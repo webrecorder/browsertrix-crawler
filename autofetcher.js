@@ -71,7 +71,7 @@ class AutoFetcher
           const resp = await fetch(url);
           await resp.blob();
         } catch (e) {
-
+          console.log(e)
         }
         this.numPending--;
       }
