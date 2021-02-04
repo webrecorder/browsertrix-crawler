@@ -420,13 +420,15 @@ class Crawler {
       console.log("Generating Wacz");
     
       // Access the collections the user has specified
-      const dir = path.join("collections/" + this.params.collection + "/archive");
+      const dir = path.join("collections/", this.params.collection, "/archive");
       
       // Get a list of the warcs inside
       const file_list = fs.readdirSync(dir);
       
       // Build the argument list to pass to the wacz create command
-      const argument_list = ["create", "-f"];
+      const wacz_filename = this.params.collection.concat(".wacz");
+      const wacz_path = path.join("collections/", this.params.collection, wacz_filename);
+      const argument_list = ["create", "-o", wacz_path, "-f"];
       file_list.forEach((val, index) => argument_list.push(path.join(dir, val)));
       
       // Run the wacz create command
@@ -500,8 +502,8 @@ class Crawler {
     const row = {"id": id, "url": url, "title": title};
     const processedRow = JSON.stringify(row).concat("\n");
     try {
-      const filePath = path.join("collections/", this.params.collection, "archive/pages/pages.jsonl");
-      const dirPath = path.join("collections/", this.params.collection, "archive/pages");
+      const filePath = path.join("collections/", this.params.collection, "pages/pages.jsonl");
+      const dirPath = path.join("collections/", this.params.collection, "pages");
       if (fs.existsSync(dirPath) == false) {
         fs.mkdirSync(dirPath);
         const header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n");
