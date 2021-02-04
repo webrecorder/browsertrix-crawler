@@ -5,6 +5,7 @@ const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 const warcio = require("warcio");
@@ -44,6 +45,7 @@ class Crawler {
 
     this.userAgent = "";
     this.behaviorsLogDebug = false;
+    this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
     const params = require("yargs")
       .usage("browsertrix-crawler [options]")
@@ -399,6 +401,10 @@ class Crawler {
       argv.statsFilename = path.resolve(argv.cwd, argv.statsFilename);
     }
 
+    if (argv.profile) {
+      child_process.execSync("tar xvfz " + argv.profile, {cwd: this.profileDir});
+    }
+
     return true;
   }
 
@@ -411,6 +417,7 @@ class Crawler {
       "--disable-background-media-suspend",
       "--autoplay-policy=no-user-gesture-required",
       "--disable-features=IsolateOrigins,site-per-process",
+      "--disable-popup-blocking"
     ];
   }
 
@@ -420,7 +427,9 @@ class Crawler {
       headless: this.params.headless,
       executablePath: CHROME_PATH,
       ignoreHTTPSErrors: true,
-      args: this.chromeArgs
+      args: this.chromeArgs,
+      userDataDir: this.profileDir,
+      defaultViewport: null,
     };
   }
 
@@ -436,7 +445,21 @@ class Crawler {
       process.exit(1);
     }
   }
-  
+
+  _behaviorLog({data, type}) {
+    switch (type) {
+      case "info":
+        console.log(JSON.stringify(data));
+        break;
+
+      case "debug":
+      default:
+        if (this.behaviorsLogDebug) {
+          console.log("behavior debug: " + JSON.stringify(data));
+        }
+    }
+  }
+
   async crawlPage({page, data}) {
     try {
       if (this.emulateDevice) {
@@ -444,26 +467,11 @@ class Crawler {
       }
 
       if (this.behaviorOpts) {
-        await page.exposeFunction(BEHAVIOR_LOG_FUNC, ({data, type}) => {
-          switch (type) {
-          case "info":
-            console.log(JSON.stringify(data));
-            break;
-
-          case "debug":
-          default:
-            if (this.behaviorsLogDebug) {
-              console.log("behavior debug: " + JSON.stringify(data));
-            }
-          }
-        });
-
-        await page.evaluateOnNewDocument(behaviors + `
-          self.__bx_behaviors.init(${this.behaviorOpts});
-        `);
+        await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
+        await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.behaviorOpts});`);
       }
 
-      // run custom driver here
+     // run custom driver here
       await this.driver({page, data, crawler: this});
       
       
