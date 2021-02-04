@@ -428,7 +428,8 @@ class Crawler {
       // Build the argument list to pass to the wacz create command
       const wacz_filename = this.params.collection.concat(".wacz");
       const wacz_path = path.join("collections/", this.params.collection, wacz_filename);
-      const argument_list = ["create", "-o", wacz_path, "-f"];
+      const pages_path = path.join("collections/", this.params.collection, "pages/pages.jsonl");
+      const argument_list = ["create", "-o", wacz_path, "--pages", pages_path, "-f"];
       file_list.forEach((val, index) => argument_list.push(path.join(dir, val)));
       
       // Run the wacz create command
