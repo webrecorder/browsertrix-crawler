@@ -51,6 +51,16 @@ class Crawler {
 
     this.params = params;
     this.capturePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record/id_/`;
+
+
+    // root collections dir
+    this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
+
+    // pages directory
+    this.pagesDir = path.join(this.collDir, "pages");
+
+    // pages file
+    this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
   }
 
   configureUA() {
@@ -198,7 +208,7 @@ class Crawler {
         default: false,
       },
       
-      "generateWacz": {
+      "generateWACZ": {
         describe: "If set, generate wacz",
         type: "boolean",
         default: false,
@@ -395,6 +405,9 @@ class Crawler {
         console.warn(e);
       }
     });
+
+    this.initPages();
+
     this.queueUrl(this.params.url);
 
     if (this.params.useSitemap) {
@@ -416,32 +429,29 @@ class Crawler {
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
     
-    if (this.params.generateWacz) {
-      console.log("Generating Wacz");
-    
-      // Access the collections the user has specified
-      const dir = path.join("collections/", this.params.collection, "/archive");
-      
+    if (this.params.generateWACZ) {
+      console.log("Generating WACZ");
+
+      const archiveDir = path.join(this.collDir, "archive");
+
       // Get a list of the warcs inside
-      const file_list = fs.readdirSync(dir);
+      const warcFileList = fs.readdirSync(archiveDir);
       
       // Build the argument list to pass to the wacz create command
-      const wacz_filename = this.params.collection.concat(".wacz");
-      const wacz_path = path.join("collections/", this.params.collection, wacz_filename);
-      const pages_path = path.join("collections/", this.params.collection, "pages/pages.jsonl");
-      const argument_list = ["create", "-o", wacz_path, "--pages", pages_path, "-f"];
-      file_list.forEach((val, index) => argument_list.push(path.join(dir, val)));
+      const waczFilename = this.params.collection.concat(".wacz");
+      const waczPath = path.join(this.collDir, waczFilename);
+      const argument_list = ["create", "-o", waczPath, "--pages", this.pagesFile, "-f"];
+      warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val)));
       
       // Run the wacz create command
       child_process.spawnSync("wacz" , argument_list);
-      console.log("Wacz successfully generated and saved as archive.wacz");
+      console.log(`WACZ successfully generated and saved to: ${waczFilename}`);
     }
   }
 
 
   writeStats() {
     if (this.params.statsFilename) {
-
       const total = this.cluster.allTargetCount;
       const workersRunning = this.cluster.workersBusy.length;
       const numCrawled = total - this.cluster.jobQueue.size() - workersRunning;
@@ -497,23 +507,29 @@ class Crawler {
     return true;
   }
 
+  initPages() {
+    try {
+      // create pages dir if doesn't exist and write pages.jsonl header
+      if (!fs.existsSync(this.pagesDir)) {
+        fs.mkdirSync(this.pagesDir);
+        const header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n");
+        fs.writeFileSync(this.pagesFile, header);
+      }
+    } catch(err) {
+      console.log("pages/pages.jsonl creation failed", err);
+    }
+  }
+
   writePage(url, title){
     const id = uuidv4();
     const today = new Date();
     const row = {"id": id, "url": url, "title": title};
     const processedRow = JSON.stringify(row).concat("\n");
     try {
-      const filePath = path.join("collections/", this.params.collection, "pages/pages.jsonl");
-      const dirPath = path.join("collections/", this.params.collection, "pages");
-      if (fs.existsSync(dirPath) == false) {
-        fs.mkdirSync(dirPath);
-        const header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n");
-        fs.writeFileSync(filePath, header);
-      }
-      fs.appendFileSync(filePath, processedRow);
+      fs.appendFileSync(this.pagesFile, processedRow);
     }
     catch (err) {
-      console.warn("Pages output failed", err);
+      console.warn("pages/pages.jsonl append failed", err);
     }
   }
   
