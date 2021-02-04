@@ -79,7 +79,7 @@ class Crawler {
     if (this.emulateDevice) {
       this.userAgent = this.emulateDevice.userAgent;
     } else {
-      let version = "88";
+      let version = process.env.BROWSER_VERSION;
 
       try {
         version = child_process.execFileSync("google-chrome", ["--product-version"], {encoding: "utf8"}).trim();
