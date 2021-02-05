@@ -153,8 +153,8 @@ class Crawler {
       },
 
       "waitUntil": {
-        describe: "Puppeteer page.goto() condition to wait for before continuing",
-        default: "load",
+        describe: "Puppeteer page.goto() condition to wait for before continuing, can be multiple separate by ','",
+        default: "load,networkidle0",
       },
 
       "limit": {
@@ -215,7 +215,7 @@ class Crawler {
       },
       
       "cwd": {
-        describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd",
+        describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd()",
         type: "string",
         default: process.cwd(),
       },
@@ -271,9 +271,14 @@ class Crawler {
     argv.timeout *= 1000;
 
     // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
+    // can be multiple separate by comma
     // (see: https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options)
-    if (!WAIT_UNTIL_OPTS.includes(argv.waitUntil)) {
-      throw new Error("Invalid waitUntil, must be one of: " + WAIT_UNTIL_OPTS.join(","));
+    argv.waitUntil = argv.waitUntil.split(",");
+
+    for (const opt of argv.waitUntil) {
+      if (!WAIT_UNTIL_OPTS.includes(opt)) {
+        throw new Error("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
+      }
     }
 
     if (!argv.newContext) {
