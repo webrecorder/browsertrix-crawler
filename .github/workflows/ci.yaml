@@ -17,5 +17,12 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
-    - run: npm install
-    - run: yarn run eslint .
+    - name: install requirements
+      run: npm install
+    - name: run linter
+      run: yarn run eslint .
+    - name: build docker
+      run: docker-compose build
+    - name: run crawl
+      run: docker-compose run crawler crawl --url http://www.example.com/ --generateWacz  --collection wr-net --workers 2              
+
