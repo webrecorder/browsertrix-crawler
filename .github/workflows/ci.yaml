@@ -3,7 +3,7 @@ name: Node.js CI
 on: [push]
 
 jobs:
-  build:
+  lint:
 
     runs-on: ubuntu-latest
 
@@ -21,8 +21,42 @@ jobs:
       run: npm install
     - name: run linter
       run: yarn run eslint .
+  
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [14.x]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
     - name: build docker
       run: docker-compose build
     - name: run crawl
       run: docker-compose run crawler crawl --url http://www.example.com/ --generateWacz  --collection wr-net --workers 2              
+
+  wacz-validate:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [14.x]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+    - name: build wacz
+      run: pip install wacz
+    - name: run crawl
+      run: wacz validate --file crawls/wr-net/wr-net.wacz
 
