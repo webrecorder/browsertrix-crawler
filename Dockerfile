@@ -1,4 +1,6 @@
-FROM oldwebtoday/chrome:84 as chrome
+ARG BROWSER_VERSION=88
+
+FROM oldwebtoday/chrome:${BROWSER_VERSION} as chrome
 
 FROM nikolaik/python-nodejs:python3.8-nodejs14
 
@@ -7,21 +9,22 @@ RUN apt-get update -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+ARG BROWSER_VERSION
+
 ENV PROXY_HOST=localhost \
     PROXY_PORT=8080 \
     PROXY_CA_URL=http://wsgiprox/download/pem \
     PROXY_CA_FILE=/tmp/proxy-ca.pem \
     DISPLAY=:99 \
-    GEOMETRY=1360x1020x16
-
-RUN pip install git+https://github.com/webrecorder/pywb@patch-work
-
-RUN pip install uwsgi 'gevent>=20.9.0'
+    GEOMETRY=1360x1020x16 \
+    BROWSER_VERSION=${BROWSER_VERSION}
 
 COPY --from=chrome /tmp/*.deb /deb/
 COPY --from=chrome /app/libpepflashplayer.so /app/libpepflashplayer.so
 RUN dpkg -i /deb/*.deb; apt-get update; apt-get install -fqqy && \
     rm -rf /var/lib/opts/lists/*
+
+RUN pip install pywb>=2.5.0 uwsgi wacz
 
 WORKDIR /app
 

@@ -39,26 +39,8 @@ jobs:
     - name: build docker
       run: docker-compose build
     - name: run crawl
-      run: docker-compose run crawler crawl --url http://www.example.com/ --generateWacz  --collection wr-net --workers 2              
-
-  wacz-validate:
-
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [14.x]
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
-      with:
-        node-version: ${{ matrix.node-version }}
-    - name: setup pip 
-      run: pip install --upgrade setuptools
-    - name: build wacz
-      run: pip install pywb>=2.5.0 uwsgi wacz
+      run: docker-compose run crawler crawl --url http://www.example.com/ --generateWACZ  --collection wr-net --workers 2              
     - name: validate existing wacz
-      run: wacz validate --file crawls/wr-net/wr-net.wacz
+      run: docker-compose run crawler wacz validate --file crawls/wr-net/wr-net.wacz
+
 
