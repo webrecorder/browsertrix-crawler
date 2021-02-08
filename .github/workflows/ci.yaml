@@ -55,8 +55,10 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
+    - name: setup pip 
+      run: pip install --upgrade setuptools
     - name: build wacz
-      run: pip install wacz
-    - name: run crawl
+      run: pip install pywb>=2.5.0 uwsgi wacz
+    - name: validate existing wacz
       run: wacz validate --file crawls/wr-net/wr-net.wacz
 
