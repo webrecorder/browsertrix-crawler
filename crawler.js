@@ -628,7 +628,7 @@ class Crawler {
     //console.log(`Direct capture: ${this.capturePrefix}${url}`);
     const abort = new AbortController();
     const signal = abort.signal;
-    const resp2 = await fetch(this.capturePrefix + url, {signal, headers: this.headers});
+    await fetch(this.capturePrefix + url, {signal, headers: this.headers});
     abort.abort();
   }
 
