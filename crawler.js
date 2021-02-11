@@ -187,7 +187,7 @@ class Crawler {
         alias: "c",
         describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",
         type: "string",
-        default: "capture"
+        default: `capture-${new Date().toISOString().slice(0,18)}`.replace(/:/g, "-")
       },
 
       "headless": {
