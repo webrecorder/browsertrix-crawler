@@ -1,4 +1,5 @@
-(() => {
+// ===========================================================================
+function autoplay() {
   function run() {
     if (self.navigator.__crawler_autoplay) {
       return;
@@ -87,5 +88,52 @@
     }
   }, 3000);
 
-})();
+};
+
+
+// ===========================================================================
+class AutoPlayBehavior
+{
+  constructor() {
+    this.mediaPromises = [];
+    this.waitForVideo = false;
+  }
+
+  async beforeLoad(page, crawler) {
+    try {
+      await page.exposeFunction("__crawler_queueUrls", async (url) => {
+        this.mediaPromises.push(crawler.directFetchCapture(url));
+      });
+
+      await page.exposeFunction("__crawler_autoplayLoad", (url) => {
+        console.log("*** Loading autoplay URL: " + url);
+        this.waitForVideo = true;
+      });
+
+      const iife = `(${autoplay.toString()})();`;
+      await page.evaluateOnNewDocument(iife);
+ 
+    } catch(err) {
+      console.log(err);
+    }
+  }
+
+  async afterLoad(page, crawler) {
+    try {
+      await Promise.all(this.mediaPromises);
+    } catch (e) {
+      console.log("Error loading media URLs", e);
+    }
+
+    if (this.waitForVideo) {
+      console.log("Extra wait 15s for video loading");
+      await crawler.sleep(15000);
+    }
+  }
+}
+
+
+
+
+module.exports = AutoPlayBehavior
 

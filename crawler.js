@@ -8,6 +8,9 @@ const fs = require("fs");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 
+const BackgroundBehaviors = require("./behaviors/bgbehaviors");
+
+
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
 const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
 
@@ -61,6 +64,9 @@ class Crawler {
 
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
+
+    // background behaviors
+    this.bgbehaviors = new BackgroundBehaviors(this.params.bgbehaviors || []);
   }
 
   configureUA() {
@@ -241,7 +247,13 @@ class Crawler {
 
       "statsFilename": {
         describe: "If set, output stats as JSON to this file. (Relative filename resolves to crawl working directory)"
-      }
+      },
+
+      "bgbehaviors": {
+        describe: "Which background behaviors to enable on each page",
+        default: "auto-play,auto-fetch",
+        type: "string",
+      },
     };
   }
 
@@ -280,6 +292,9 @@ class Crawler {
         throw new Error("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
       }
     }
+
+    // background behaviors to apply
+    argv.bgbehaviors = argv.bgbehaviors.split(",");
 
     if (!argv.newContext) {
       argv.newContext = "page";
@@ -380,6 +395,31 @@ class Crawler {
     }
   }
 
+  async crawlPage({page, data}) {
+    try {
+      if (this.emulateDevice) {
+        await page.emulate(this.emulateDevice);
+      }
+
+      const bgbehavior = await this.bgbehaviors.setup(page, this);
+
+      // run custom driver here
+      await this.driver({page, data, crawler: this});
+
+      const title = await page.title();
+      this.writePage(data.url, title);
+
+      if (bgbehavior) {
+        await bgbehavior();
+      }
+
+      this.writeStats();
+
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+
   async crawl() {
     try {
       this.driver = require(this.params.driver);
@@ -399,17 +439,7 @@ class Crawler {
       monitor: this.monitor
     });
 
-    this.cluster.task(async (opts) => {
-      try {
-        await this.driver({...opts, crawler: this});
-        const title = await opts.page.title();
-        this.writePage(opts.data.url, title);
-        this.writeStats();
-
-      } catch (e) {
-        console.warn(e);
-      }
-    });
+    this.cluster.task((opts) => this.crawlPage(opts));
 
     this.initPages();
 
