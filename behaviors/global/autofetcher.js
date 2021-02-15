@@ -35,6 +35,7 @@ function autofetcher() {
     }
 
     async run() {
+      /*eslint no-constant-condition: ["error", { "checkLoops": false }]*/
       while (true) {
         this.extractSrcSrcSetAll(document);
         this.extractStyleSheets();
