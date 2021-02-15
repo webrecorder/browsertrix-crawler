@@ -11,7 +11,7 @@ function autofetcher() {
   'video > source[srcset], video > source[data-srcset], video > source[data-src], ' +
   'audio > source[srcset], audio > source[data-srcset], audio > source[data-src]';
 
-  const SRCSET_REGEX = /\s*(\S*\s+[\d\.]+[wx]),|(?:\s*,(?:\s+|(?=https?:)))/;
+  const SRCSET_REGEX = /\s*(\S*\s+[\d\.]+[wx]),|(?:\s*,(?:\s+|(?=https?:)))/; // eslint-disable-line no-useless-escape
 
   const STYLE_REGEX = /(url\s*\(\s*[\\"']*)([^)'"]+)([\\"']*\s*\))/gi;
   const IMPORT_REGEX = /(@import\s*[\\"']*)([^)'";]+)([\\"']*\s*;?)/gi;
@@ -211,7 +211,7 @@ function autofetcher() {
   }
 
   new AutoFetcher().init();
-};
+}
 
 
 // ===========================================================================

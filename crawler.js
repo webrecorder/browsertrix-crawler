@@ -476,7 +476,7 @@ class Crawler {
       const waczFilename = this.params.collection.concat(".wacz");
       const waczPath = path.join(this.collDir, waczFilename);
       const argument_list = ["create", "-o", waczPath, "--pages", this.pagesFile, "-f"];
-      warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val)));
+      warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
       
       // Run the wacz create command
       child_process.spawnSync("wacz" , argument_list);
@@ -557,7 +557,6 @@ class Crawler {
 
   writePage(url, title){
     const id = uuidv4();
-    const today = new Date();
     const row = {"id": id, "url": url, "title": title};
     const processedRow = JSON.stringify(row).concat("\n");
     try {
