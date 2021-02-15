@@ -464,7 +464,7 @@ class Crawler {
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
     
-    if (this.params.generateWACZ) {
+    if (this.params.generateWACZ || this.params.generateWacz || this.params.generatewacz ) {
       console.log("Generating WACZ");
 
       const archiveDir = path.join(this.collDir, "archive");
