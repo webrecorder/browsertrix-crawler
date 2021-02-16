@@ -209,12 +209,14 @@ class Crawler {
       },
 
       "generateCDX": {
+        alias: ["generatecdx", "generateCdx"],
         describe: "If set, generate index (CDXJ) for use with pywb after crawl is done",
         type: "boolean",
         default: false,
       },
-      
+
       "generateWACZ": {
+        alias: ["generatewacz", "generateWacz"],
         describe: "If set, generate wacz",
         type: "boolean",
         default: false,
