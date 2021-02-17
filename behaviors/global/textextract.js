@@ -50,7 +50,7 @@ class TextExtract {
     const accum = [];
     const metadata = {};
 
-    this.parseText(this.dom.root, metadata, accum);
+    parseText(this.dom.root, metadata, accum);
 
     return accum.join('\n');
   }
