@@ -22,12 +22,12 @@ async function autoScroll() {
 class AutoScrollBehavior
 {
 
-  async beforeLoad(page, crawler) {
+  async beforeLoad() {
   }
 
   async afterLoad(page, crawler) {
     try {
-      await Promise.race([page.evaluate(autoscroll), crawler.sleep(30000)]);
+      await Promise.race([page.evaluate(autoScroll), crawler.sleep(30000)]);
     } catch (e) {
       console.warn("Autoscroll Behavior Failed", e);
     }

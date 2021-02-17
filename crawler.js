@@ -209,12 +209,14 @@ class Crawler {
       },
 
       "generateCDX": {
+        alias: ["generatecdx", "generateCdx"],
         describe: "If set, generate index (CDXJ) for use with pywb after crawl is done",
         type: "boolean",
         default: false,
       },
-      
+
       "generateWACZ": {
+        alias: ["generatewacz", "generateWacz"],
         describe: "If set, generate wacz",
         type: "boolean",
         default: false,
@@ -464,7 +466,7 @@ class Crawler {
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
     
-    if (this.params.generateWACZ) {
+    if (this.params.generateWACZ || this.params.generateWacz || this.params.generatewacz ) {
       console.log("Generating WACZ");
 
       const archiveDir = path.join(this.collDir, "archive");
@@ -476,7 +478,7 @@ class Crawler {
       const waczFilename = this.params.collection.concat(".wacz");
       const waczPath = path.join(this.collDir, waczFilename);
       const argument_list = ["create", "-o", waczPath, "--pages", this.pagesFile, "-f"];
-      warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val)));
+      warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
       
       // Run the wacz create command
       child_process.spawnSync("wacz" , argument_list);
@@ -557,7 +559,6 @@ class Crawler {
 
   writePage(url, title){
     const id = uuidv4();
-    const today = new Date();
     const row = {"id": id, "url": url, "title": title};
     const processedRow = JSON.stringify(row).concat("\n");
     try {
