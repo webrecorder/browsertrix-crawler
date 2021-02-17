@@ -7,7 +7,7 @@ const path = require("path");
 const fs = require("fs");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
-
+const TextExtract = require("./behaviors/global/textextract");
 const BackgroundBehaviors = require("./behaviors/bgbehaviors");
 
 
@@ -220,6 +220,12 @@ class Crawler {
         default: false,
       },
       
+      "text": {
+        describe: "If set, extract text to the pages.jsonl file",
+        type: "boolean",
+        default: false,
+      },
+      
       "cwd": {
         describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd()",
         type: "string",
@@ -394,7 +400,7 @@ class Crawler {
       process.exit(1);
     }
   }
-
+  
   async crawlPage({page, data}) {
     try {
       if (this.emulateDevice) {
@@ -405,9 +411,17 @@ class Crawler {
 
       // run custom driver here
       await this.driver({page, data, crawler: this});
-
+      
+      
       const title = await page.title();
-      this.writePage(data.url, title);
+      var text = ''
+      if (this.params.text){
+        const client = await page.target().createCDPSession();
+        const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
+        var text = await new TextExtract(result).parseTextFromDom()
+      }
+    
+      this.writePage(data.url, title, this.params.text, text);
 
       if (bgbehavior) {
         await bgbehavior();
@@ -484,7 +498,6 @@ class Crawler {
     }
   }
 
-
   writeStats() {
     if (this.params.statsFilename) {
       const total = this.cluster.allTargetCount;
@@ -547,18 +560,32 @@ class Crawler {
       // create pages dir if doesn't exist and write pages.jsonl header
       if (!fs.existsSync(this.pagesDir)) {
         fs.mkdirSync(this.pagesDir);
-        const header = JSON.stringify({"format": "json-pages-1.0", "id": "pages", "title": "All Pages", "hasText": false}).concat("\n");
-        fs.writeFileSync(this.pagesFile, header);
+        const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"}
+        if (this.params.text) {
+          console.log("creating pages with full text");
+          header["hasText"] = true
+        }
+        else{
+          console.log("creating pages without full text");
+          header["hasText"] = false
+        }
+        const header_formatted = JSON.stringify(header).concat("\n")
+        fs.writeFileSync(this.pagesFile, header_formatted);
       }
     } catch(err) {
       console.log("pages/pages.jsonl creation failed", err);
     }
   }
 
-  writePage(url, title){
+  writePage(url, title, text, text_content){
     const id = uuidv4();
     const today = new Date();
     const row = {"id": id, "url": url, "title": title};
+
+    if (text == true){
+      row['text'] = text_content
+    }
+    
     const processedRow = JSON.stringify(row).concat("\n");
     try {
       fs.appendFileSync(this.pagesFile, processedRow);
