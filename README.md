@@ -65,6 +65,10 @@ Options:
                                      [string] [default: "/app/defaultDriver.js"]
       --generateCDX  If set, generate index (CDXJ) for use with pywb after crawl
                      is done                          [boolean] [default: false]
+      --generateWACZ If set, generate wacz for use with pywb after crawl
+                      is done                          [boolean] [default: false]
+      --text         If set, extract the pages full text to be added to the pages.jsonl  
+                      file                         [boolean] [default: false]
       --cwd          Crawl working directory for captures (pywb root). If not
                      set, defaults to process.cwd  [string] [default: "/crawls"]
 ```
