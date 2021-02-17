@@ -16,9 +16,7 @@ module.exports = async ({data, page, crawler}) => {
   };
 
   try {
-    console.log("Wait page load...");
     await page.goto(url, gotoOpts);
-    console.log("Done");
   } catch (e) {
     console.log(`Load timeout for ${url}`, e);
   }

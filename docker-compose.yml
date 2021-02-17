@@ -2,7 +2,7 @@ version: '3.5'
   
 services:
     crawler:
-        image: webrecorder/browsertrix-crawler:0.2.0
+        image: webrecorder/browsertrix-crawler:0.2.1-beta.0
         build:
           context: ./
 
