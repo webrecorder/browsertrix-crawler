@@ -20,7 +20,7 @@ test('check that the hash in the pages folder and in the unzipped wacz folders m
     var wacz_hash = md5(buf);
   });
   
-  expect(browsertrix_hash).toBe(wacz_hash;
+  expect(browsertrix_hash).toBe(wacz_hash);
 });
 
 test('check that the fixture hash matches both of the other hashes', () => {
@@ -37,7 +37,7 @@ test('check that the fixture hash matches both of the other hashes', () => {
     var wacz_hash = md5(buf);
   });
   
-  expect(browsertrix_hash).toBe(wacz_hash;
-  expect(browsertrix_hash).toBe(fixture_hash;
-  expect(wacz_hash).toBe(fixture_hash;
+  expect(browsertrix_hash).toBe(wacz_hash);
+  expect(browsertrix_hash).toBe(fixture_hash);
+  expect(wacz_hash).toBe(fixture_hash);
 });
