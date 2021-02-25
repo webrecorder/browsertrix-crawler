@@ -12,7 +12,7 @@ const BackgroundBehaviors = require("./behaviors/bgbehaviors");
 
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
-const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
+const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"]
 
 const CHROME_PATH = "google-chrome";
 
@@ -107,14 +107,21 @@ class Crawler {
   }
 
   bootstrap() {
-    const opts = {stdio: "ignore", cwd: this.params.cwd};
+    var opts = {}
+    if (this.params.log) {
+      var s = fs.openSync('pywb-log', 'w');
+      opts = {stdio: [process.stdin, s, process.stderr, process.stdout], cwd: this.params.cwd};
+    }
+    else{
+      opts = {stdio: "ignore", cwd: this.params.cwd};
+    }
 
     this.configureUA();
 
     this.headers = {"User-Agent": this.userAgent};
 
     child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
-
+    
     child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
     opts.env = {...process.env, COLL: this.params.collection};
@@ -219,6 +226,12 @@ class Crawler {
         alias: ["generatewacz", "generateWacz"],
         describe: "If set, generate wacz",
         type: "boolean",
+        default: false,
+      },
+      
+      "log": {
+        describe: "If set, generate pywb log file",
+         type: "boolean",
         default: false,
       },
       
@@ -420,7 +433,7 @@ class Crawler {
       if (this.params.text){
         const client = await page.target().createCDPSession();
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
-        var text = await new TextExtract(result).parseTextFromDom()
+        text = await new TextExtract(result).parseTextFromDom()
       }
     
       this.writePage(data.url, title, this.params.text, text);
