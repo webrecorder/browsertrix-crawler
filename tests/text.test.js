@@ -16,7 +16,7 @@ test('check that the hash in the pages folder and in the unzipped wacz folders m
   const fixture_hash = md5(JSON.parse(fs.readFileSync('tests/fixtures/pages.jsonl', 'utf8').split('\n')[1])['text']);
   
   expect(wacz_hash).toEqual(fixture_hash);
-  expect(wacz_hash).toEqual(crawls_hash);
+  expect(wacz_hash).toEqual(crawl_hash);
 
 });
 
