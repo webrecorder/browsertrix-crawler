@@ -7,7 +7,6 @@
   "license": "MIT",
   "dependencies": {
     "abort-controller": "^3.0.0",
-    "md5": "^2.3.0",
     "node-fetch": "^2.6.1",
     "puppeteer-cluster": "^0.22.0",
     "puppeteer-core": "^5.3.1",
@@ -18,6 +17,7 @@
   "devDependencies": {
     "eslint": "^7.20.0",
     "eslint-plugin-react": "^7.22.0",
-    "jest": "^26.6.3"
+    "jest": "^26.6.3",
+    "md5": "^2.3.0"
   }
 }
