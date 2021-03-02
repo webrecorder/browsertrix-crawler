@@ -36,11 +36,20 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
+    - name: install requirements
+      run: npm install
     - name: build docker
       run: docker-compose build
     - name: run crawl
-      run: docker-compose run crawler crawl --url http://www.example.com/ --generateWACZ  --collection wr-net --workers 2              
+      run: docker-compose run crawler crawl --url http://www.example.com/ --generateWACZ  --text --collection wr-net --workers 2              
     - name: validate existing wacz
       run: docker-compose run crawler wacz validate --file collections/wr-net/wr-net.wacz
+    - name: unzip wacz
+      run: docker-compose run crawler unzip collections/wr-net/wr-net.wacz -d collections/wr-net/wacz
+    - name: run jest
+      run: sudo yarn jest
+        
+
+
 
 
