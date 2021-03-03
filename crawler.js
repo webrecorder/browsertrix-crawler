@@ -110,7 +110,7 @@ class Crawler {
     var opts = {}
     if (this.params.log) {
       var s = fs.openSync('pywb-log', 'w');
-      opts = {stdio: [process.stdin, s, process.stderr, process.stdout], cwd: this.params.cwd};
+      opts = {stdio: "inherit", cwd: this.params.cwd};
     }
     else{
       opts = {stdio: "ignore", cwd: this.params.cwd};
@@ -730,4 +730,3 @@ class Crawler {
 }
 
 module.exports.Crawler = Crawler;
-
