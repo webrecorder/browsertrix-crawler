@@ -109,7 +109,6 @@ class Crawler {
   bootstrap() {
     var opts = {}
     if (this.params.log) {
-      var s = fs.openSync('pywb-log', 'w');
       opts = {stdio: "inherit", cwd: this.params.cwd};
     }
     else{
