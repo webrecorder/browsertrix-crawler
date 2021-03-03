@@ -228,7 +228,7 @@ class Crawler {
         default: false,
       },
       
-      "log": {
+      "pywb-log": {
         describe: "If set, generate pywb log file",
          type: "boolean",
         default: false,
