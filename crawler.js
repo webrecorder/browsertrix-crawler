@@ -107,7 +107,7 @@ class Crawler {
   }
 
   bootstrap() {
-    var opts = {}
+    let opts = {}
     if (this.params.pywb_log) {
       opts = {stdio: "inherit", cwd: this.params.cwd};
     }
