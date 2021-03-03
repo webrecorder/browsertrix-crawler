@@ -12,7 +12,7 @@ const BackgroundBehaviors = require("./behaviors/bgbehaviors");
 
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
-const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"]
+const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
 
 const CHROME_PATH = "google-chrome";
 
