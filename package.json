@@ -1,12 +1,13 @@
 {
   "name": "browsertrix-crawler",
-  "version": "0.2.1-beta.0",
+  "version": "0.3.0-beta.0",
   "main": "browsertrix-crawler",
   "repository": "https://github.com/webrecorder/browsertrix-crawler",
   "author": "Ilya Kreymer <ikreymer@gmail.com>, Webrecorder Software",
   "license": "MIT",
   "dependencies": {
     "abort-controller": "^3.0.0",
+    "browsertrix-behaviors": "github:webrecorder/browsertrix-behaviors",
     "node-fetch": "^2.6.1",
     "puppeteer-cluster": "^0.22.0",
     "puppeteer-core": "^5.3.1",
