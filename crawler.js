@@ -7,12 +7,14 @@ const path = require("path");
 const fs = require("fs");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
-const TextExtract = require("./behaviors/global/textextract");
-const BackgroundBehaviors = require("./behaviors/bgbehaviors");
 
+const TextExtract = require("./textextract");
+const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
 const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
+
+const BEHAVIOR_LOG_FUNC = "__bx_log";
 
 const CHROME_PATH = "google-chrome";
 
@@ -39,10 +41,8 @@ class Crawler {
     // was the limit hit?
     this.limitHit = false;
 
-    this.monitor = true;
-
     this.userAgent = "";
-    this.headers = {};
+    this.behaviorsLogDebug = false;
 
     const params = require("yargs")
       .usage("browsertrix-crawler [options]")
@@ -64,9 +64,6 @@ class Crawler {
 
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
-
-    // background behaviors
-    this.bgbehaviors = new BackgroundBehaviors(this.params.bgbehaviors || []);
   }
 
   configureUA() {
@@ -108,7 +105,7 @@ class Crawler {
 
   bootstrap() {
     let opts = {}
-    if (this.params.pywb_log) {
+    if (this.params.logging.includes("pywb")) {
       opts = {stdio: "inherit", cwd: this.params.cwd};
     }
     else{
@@ -189,12 +186,6 @@ class Crawler {
         describe: "Regex of page URLs that should be excluded from the crawl."
       },
 
-      "scroll": {
-        describe: "If set, will autoscroll to bottom of the page",
-        type: "boolean",
-        default: false,
-      },
-
       "collection": {
         alias: "c",
         describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",
@@ -228,12 +219,12 @@ class Crawler {
         default: false,
       },
       
-      "pywb-log": {
-        describe: "If set, generate pywb log file",
-         type: "boolean",
-        default: false,
+      "logging": {
+        describe: "Logging options for crawler, can include: stats, pywb, behaviors",
+        type: "string",
+        default: "stats",
       },
-      
+    
       "text": {
         describe: "If set, extract text to the pages.jsonl file",
         type: "boolean",
@@ -269,9 +260,9 @@ class Crawler {
         describe: "If set, output stats as JSON to this file. (Relative filename resolves to crawl working directory)"
       },
 
-      "bgbehaviors": {
+      "behaviors": {
         describe: "Which background behaviors to enable on each page",
-        default: "auto-play,auto-fetch",
+        default: "autoplay,autofetch,siteSpecific",
         type: "string",
       },
     };
@@ -313,8 +304,19 @@ class Crawler {
       }
     }
 
+    // log options
+    argv.logging = argv.logging.split(",");
+
     // background behaviors to apply
-    argv.bgbehaviors = argv.bgbehaviors.split(",");
+    const behaviorOpts = {};
+    argv.behaviors.split(",").forEach((x) => behaviorOpts[x] = true);
+    if (argv.logging.includes("behaviors")) {
+      behaviorOpts.log = BEHAVIOR_LOG_FUNC;
+    } else if (argv.logging.includes("behaviors-debug")) {
+      behaviorOpts.log = BEHAVIOR_LOG_FUNC;
+      this.behaviorsLogDebug = true;
+    }
+    this.behaviorOpts = JSON.stringify(behaviorOpts);
 
     if (!argv.newContext) {
       argv.newContext = "page";
@@ -421,15 +423,33 @@ class Crawler {
         await page.emulate(this.emulateDevice);
       }
 
-      const bgbehavior = await this.bgbehaviors.setup(page, this);
+      if (this.behaviorOpts) {
+        await page.exposeFunction(BEHAVIOR_LOG_FUNC, ({data, type}) => {
+          switch (type) {
+            case "info":
+              console.log(JSON.stringify(data));
+              break;
+
+            case "debug":
+            default:
+              if (this.behaviorsLogDebug) {
+                console.log("behavior debug: " + JSON.stringify(data));
+              }
+          }
+        });
+
+        await page.evaluateOnNewDocument(behaviors + `
+          self.__bx_behaviors.init(${this.behaviorOpts});
+        `);
+      }
 
       // run custom driver here
       await this.driver({page, data, crawler: this});
       
       
       const title = await page.title();
-      var text = ''
-      if (this.params.text){
+      let text = '';
+      if (this.params.text) {
         const client = await page.target().createCDPSession();
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
@@ -437,8 +457,8 @@ class Crawler {
     
       this.writePage(data.url, title, this.params.text, text);
 
-      if (bgbehavior) {
-        await bgbehavior();
+      if (this.behaviorOpts) {
+        await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
       }
 
       this.writeStats();
@@ -464,7 +484,7 @@ class Crawler {
       timeout: this.params.timeout * 2,
       puppeteerOptions: this.puppeteerArgs,
       puppeteer,
-      monitor: this.monitor
+      monitor: this.params.logging.includes("stats")
     });
 
     this.cluster.task((opts) => this.crawlPage(opts));
@@ -669,8 +689,8 @@ class Crawler {
       });
 
       if (resp.status >= 400) {
-        console.log(`Skipping ${url}, invalid status ${resp.status}`);
-        return false;
+        console.log(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
+        return true;
       }
 
       const contentType = resp.headers.get("Content-Type");

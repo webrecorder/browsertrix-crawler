@@ -1,5 +1,3 @@
-//const autoplayScript = require("/app/autoplay.js");
-
 /* eslint-disable no-undef */
 
 module.exports = async ({data, page, crawler}) => {

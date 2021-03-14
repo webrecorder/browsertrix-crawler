@@ -4,6 +4,8 @@ FROM oldwebtoday/chrome:${BROWSER_VERSION} as chrome
 
 FROM nikolaik/python-nodejs:python3.8-nodejs14
 
+RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
+
 RUN apt-get update -y \
     && apt-get install --no-install-recommends -qqy fonts-stix locales-all redis-server xvfb \
     && apt-get clean \
@@ -24,18 +26,21 @@ COPY --from=chrome /app/libpepflashplayer.so /app/libpepflashplayer.so
 RUN dpkg -i /deb/*.deb; apt-get update; apt-get install -fqqy && \
     rm -rf /var/lib/opts/lists/*
 
-RUN pip install pywb>=2.5.0 uwsgi wacz
-
 WORKDIR /app
 
+ADD requirements.txt /app/
+RUN pip install -r requirements.txt
+
 ADD package.json /app/
+
+# to allow forcing rebuilds from this stage
+ARG REBUILD
 
 RUN yarn install
 
 ADD config.yaml /app/
 ADD uwsgi.ini /app/
 ADD *.js /app/
-ADD behaviors/ /app/behaviors/
 
 RUN ln -s /app/main.js /usr/bin/crawl
 

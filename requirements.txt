@@ -1,0 +1,3 @@
+pywb>=2.5.0
+uwsgi
+wacz>=0.2.1
