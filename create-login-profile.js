@@ -151,7 +151,8 @@ function promptInput(msg, hidden = false) {
   });
 
   if (hidden) {
-    rl.input.on("keypress", function (c, k) {
+    // from https://stackoverflow.com/a/59727173
+    rl.input.on("keypress", function () {
       // get the number of characters entered so far:
       const len = rl.line.length;
       // move cursor back to the beginning of the input:
