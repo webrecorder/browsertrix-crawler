@@ -573,13 +573,13 @@ class Crawler {
       generatedCombinedWarcs.push(combinedWarcName)
       
       // Iterate through the sorted file size array. 
-      for (var i = 0; i < fileSizeObjects.length; i++){
+      for (var j = 0; i < fileSizeObjects.length; j++){
         // Check the size of the existing combined warc.
         var currentCombinedWarcSize = await this.getFileSize(path.join(this.collDir, "archive", combinedWarcName));
         //  If adding the current warc to the existing combined file creates a file smaller than the rollover size add the data to the combinedWarc
-        var proposedWarcSize = fileSizeObjects[i].fileSize; + currentCombinedWarcSize;
+        var proposedWarcSize = fileSizeObjects[j].fileSize; + currentCombinedWarcSize;
         if (proposedWarcSize < this.params.rolloverSize){
-          fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[i].fileName));
+          fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[j].fileName));
         }
         // If adding the current warc to the existing combined file creates a file larger than the rollover size do the following: 
         // 1. increment the combinedWarcNumber 
@@ -591,7 +591,7 @@ class Crawler {
           const combinedWarcName = this.params.collection.concat("_", combinedWarcNumber.toString(),".warc");
           generatedCombinedWarcs.push(combinedWarcName)
           fs.writeFileSync(path.join(this.collDir, "archive", combinedWarcName), warcBuffer);
-          fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[i].fileName));
+          fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[j].fileName));
         }
       }
 
