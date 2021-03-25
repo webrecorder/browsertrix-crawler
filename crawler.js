@@ -7,6 +7,7 @@ const path = require("path");
 const fs = require("fs");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
+const warcio = require('warcio');
 
 const TextExtract = require("./textextract");
 const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
@@ -120,8 +121,8 @@ class Crawler {
     
     child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
-    opts.env = {...process.env, COLL: this.params.collection};
-
+    opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
+    
     child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts);
 
     if (!this.params.headless) {
@@ -212,6 +213,19 @@ class Crawler {
         default: false,
       },
 
+      "combineWARC": {
+        alias: ["combinewarc", "combineWarc"],
+        describe: "If set, combine the warcs",
+        type: "boolean",
+        default: false,
+      },
+      
+      "rolloverSize": {
+        describe: "If set, declare the rollover size",
+        default: 1000000000,
+        type: "number",
+      },
+      
       "generateWACZ": {
         alias: ["generatewacz", "generateWacz"],
         describe: "If set, generate wacz",
@@ -467,6 +481,27 @@ class Crawler {
       console.warn(e);
     }
   }
+  
+  async createWARCInfo(filename) {
+    const warcVersion = "WARC/1.1";
+    const type = "warcinfo";
+    const packageFileJSON = JSON.parse(fs.readFileSync('../app/package.json'))
+    const pywb_version = fs.readFileSync('/usr/local/lib/python3.8/site-packages/pywb/version.py', 'utf8').split("\n")[0].split("=")[1].trim().replace(/['"]+/g, '')
+
+    const info = {
+      "software": `Browsertrix-crawler ${packageFileJSON['version']} (with warcio.js ${packageFileJSON['devDependencies']['warcio']} pywb ${pywb_version})`,
+      "format": "WARC File Format 1.1"
+    };
+
+    const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, info);
+    const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
+    return buffer;
+  }
+  
+  async getFileSize(filename) {
+    var stats = fs.statSync(filename);
+    return stats.size;
+  }
 
   async crawl() {
     try {
@@ -505,6 +540,63 @@ class Crawler {
     // extra wait for all resources to land into WARCs
     console.log("Waiting 5s to ensure WARCs are finished");
     await this.sleep(5000);
+    
+    if (this.params.combineWARC) {
+      console.log("Combining the warcs");
+      
+  
+      // Get the list of created Warcs
+      const warcLists = fs.readdirSync(path.join(this.collDir, "archive"));
+  
+      const fileSizeObjects = []; // Used to sort the created warc by fileSize 
+      
+      // Used to name the combined warcs
+      var combinedWarcNumber = 0;
+      var combinedWarcName = this.params.collection.concat("_", combinedWarcNumber.toString(),".warc");
+      
+      // Create the header for the first combined warc
+      const warcBuffer = await this.createWARCInfo(combinedWarcName);
+
+      // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
+      for (var i = 0; i < warcLists.length; i++) {
+        var fileName = path.join(this.collDir, "archive", warcLists[i])
+        var fileSize = await this.getFileSize(fileName)
+        fileSizeObjects.push({'fileSize': fileSize, 'fileName': fileName});
+        fileSizeObjects.sort(function(a, b){
+            return b.fileSize - a.fileSize;
+        });
+      }
+      
+      // Write out the header for the first combined warc file
+      fs.writeFileSync(path.join(this.collDir, "archive", combinedWarcName), warcBuffer);
+      var generatedCombinedWarcs = []
+      generatedCombinedWarcs.push(combinedWarcName)
+      
+      // Iterate through the sorted file size array. 
+      for (var i = 0; i < fileSizeObjects.length; i++){
+        // Check the size of the existing combined warc.
+        var currentCombinedWarcSize = await this.getFileSize(path.join(this.collDir, "archive", combinedWarcName));
+        //  If adding the current warc to the existing combined file creates a file smaller than the rollover size add the data to the combinedWarc
+        var proposedWarcSize = fileSizeObjects[i].fileSize; + currentCombinedWarcSize;
+        if (proposedWarcSize < this.params.rolloverSize){
+          fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[i].fileName));
+        }
+        // If adding the current warc to the existing combined file creates a file larger than the rollover size do the following: 
+        // 1. increment the combinedWarcNumber 
+        // 2. create the name of the new combinedWarcFile
+        // 3. Write the header out to the new file 
+        // 4. Write out the current warc data to the combinedFile
+        else{
+          combinedWarcNumber = combinedWarcNumber + 1;
+          const combinedWarcName = this.params.collection.concat("_", combinedWarcNumber.toString(),".warc");
+          generatedCombinedWarcs.push(combinedWarcName)
+          fs.writeFileSync(path.join(this.collDir, "archive", combinedWarcName), warcBuffer);
+          fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[i].fileName));
+        }
+      }
+
+      console.log(`Combined warcs saved as  ${generatedCombinedWarcs}`)
+    }
 
     if (this.params.generateCDX) {
       console.log("Generate CDX");
