@@ -552,7 +552,7 @@ class Crawler {
       
       // Used to name the combined warcs
       var combinedWarcNumber = 0;
-      var combinedWarcName = this.params.collection.concat("_", combinedWarcNumber.toString(),".warc");
+      var combinedWarcName = this.params.collection.concat("_combined_", combinedWarcNumber.toString(),".warc");
       
       // Create the header for the first combined warc
       const warcBuffer = await this.createWARCInfo(combinedWarcName);

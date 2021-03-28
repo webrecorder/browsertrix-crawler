@@ -6,10 +6,9 @@ test('check that a combined warc file exists in the archive folder', () => {
   var captureFound = 0;
   
   for (var i = 0; i < warcLists.length; i++) {
-    if ('capture' in warcLists[i]){
+    if (warcLists[i].includes('combined')){
       captureFound = 1;
     }
   }
-
   expect(captureFound).toEqual(1);
 });
