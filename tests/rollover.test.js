@@ -1,12 +1,17 @@
 const fs = require("fs");
 const path = require("path");
 
+async getFileSize(filename) {
+  var stats = fs.statSync(filename);
+  return stats.size;
+}
+
 test('check that a combined warc file is under the rolloverSize', () => {
   const warcLists = fs.readdirSync(path.join('crawls/collections/wr-net/wacz', 'archive'));
   var rolloverSize = 0;
   
   for (var i = 0; i < warcLists.length; i++) {
-    var size = await fs.statSync(warcLists[i]).size;
+    var size = await getFileSize(warcLists[i]);
     if (size < 10000){
       rolloverSize = 1;
     }
