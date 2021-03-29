@@ -7,7 +7,7 @@ const path = require("path");
 const fs = require("fs");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
-const warcio = require('warcio');
+const warcio = require("warcio");
 
 const TextExtract = require("./textextract");
 const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
@@ -105,7 +105,7 @@ class Crawler {
   }
 
   bootstrap() {
-    let opts = {}
+    let opts = {};
     if (this.params.logging.includes("pywb")) {
       opts = {stdio: "inherit", cwd: this.params.cwd};
     }
@@ -440,15 +440,15 @@ class Crawler {
       if (this.behaviorOpts) {
         await page.exposeFunction(BEHAVIOR_LOG_FUNC, ({data, type}) => {
           switch (type) {
-            case "info":
-              console.log(JSON.stringify(data));
-              break;
+          case "info":
+            console.log(JSON.stringify(data));
+            break;
 
-            case "debug":
-            default:
-              if (this.behaviorsLogDebug) {
-                console.log("behavior debug: " + JSON.stringify(data));
-              }
+          case "debug":
+          default:
+            if (this.behaviorsLogDebug) {
+              console.log("behavior debug: " + JSON.stringify(data));
+            }
           }
         });
 
@@ -462,7 +462,7 @@ class Crawler {
       
       
       const title = await page.title();
-      let text = '';
+      let text = "";
       if (this.params.text) {
         const client = await page.target().createCDPSession();
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
@@ -485,11 +485,11 @@ class Crawler {
   async createWARCInfo(filename) {
     const warcVersion = "WARC/1.1";
     const type = "warcinfo";
-    const packageFileJSON = JSON.parse(fs.readFileSync('../app/package.json'))
-    const pywb_version = fs.readFileSync('/usr/local/lib/python3.8/site-packages/pywb/version.py', 'utf8').split("\n")[0].split("=")[1].trim().replace(/['"]+/g, '')
+    const packageFileJSON = JSON.parse(fs.readFileSync("../app/package.json"));
+    const pywb_version = fs.readFileSync("/usr/local/lib/python3.8/site-packages/pywb/version.py", "utf8").split("\n")[0].split("=")[1].trim().replace(/['"]+/g, "");
 
     const info = {
-      "software": `Browsertrix-crawler ${packageFileJSON['version']} (with warcio.js ${packageFileJSON['devDependencies']['warcio']} pywb ${pywb_version})`,
+      "software": `Browsertrix-crawler ${packageFileJSON["version"]} (with warcio.js ${packageFileJSON["devDependencies"]["warcio"]} pywb ${pywb_version})`,
       "format": "WARC File Format 1.1"
     };
 
@@ -559,18 +559,18 @@ class Crawler {
 
       // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
       for (var i = 0; i < warcLists.length; i++) {
-        var fileName = path.join(this.collDir, "archive", warcLists[i])
-        var fileSize = await this.getFileSize(fileName)
-        fileSizeObjects.push({'fileSize': fileSize, 'fileName': fileName});
+        var fileName = path.join(this.collDir, "archive", warcLists[i]);
+        var fileSize = await this.getFileSize(fileName);
+        fileSizeObjects.push({"fileSize": fileSize, "fileName": fileName});
         fileSizeObjects.sort(function(a, b){
-            return b.fileSize - a.fileSize;
+          return b.fileSize - a.fileSize;
         });
       }
       
       // Write out the header for the first combined warc file
       fs.writeFileSync(path.join(this.collDir, "archive", combinedWarcName), warcBuffer);
-      var generatedCombinedWarcs = []
-      generatedCombinedWarcs.push(combinedWarcName)
+      var generatedCombinedWarcs = [];
+      generatedCombinedWarcs.push(combinedWarcName);
       
       // Iterate through the sorted file size array. 
       for (var j = 0; i < fileSizeObjects.length; j++){
@@ -589,13 +589,13 @@ class Crawler {
         else{
           combinedWarcNumber = combinedWarcNumber + 1;
           const combinedWarcName = this.params.collection.concat("_", combinedWarcNumber.toString(),".warc");
-          generatedCombinedWarcs.push(combinedWarcName)
+          generatedCombinedWarcs.push(combinedWarcName);
           fs.writeFileSync(path.join(this.collDir, "archive", combinedWarcName), warcBuffer);
           fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[j].fileName));
         }
       }
 
-      console.log(`Combined warcs saved as  ${generatedCombinedWarcs}`)
+      console.log(`Combined warcs saved as  ${generatedCombinedWarcs}`);
     }
 
     if (this.params.generateCDX) {
@@ -686,16 +686,16 @@ class Crawler {
       // create pages dir if doesn't exist and write pages.jsonl header
       if (!fs.existsSync(this.pagesDir)) {
         fs.mkdirSync(this.pagesDir);
-        const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"}
+        const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
           console.log("creating pages with full text");
-          header["hasText"] = true
+          header["hasText"] = true;
         }
         else{
           console.log("creating pages without full text");
-          header["hasText"] = false
+          header["hasText"] = false;
         }
-        const header_formatted = JSON.stringify(header).concat("\n")
+        const header_formatted = JSON.stringify(header).concat("\n");
         fs.writeFileSync(this.pagesFile, header_formatted);
       }
     } catch(err) {
@@ -708,7 +708,7 @@ class Crawler {
     const row = {"id": id, "url": url, "title": title};
 
     if (text == true){
-      row['text'] = text_content
+      row["text"] = text_content;
     }
     
     const processedRow = JSON.stringify(row).concat("\n");
