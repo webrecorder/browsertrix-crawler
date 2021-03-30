@@ -487,12 +487,13 @@ class Crawler {
     const type = "warcinfo";
     const packageFileJSON = JSON.parse(fs.readFileSync("../app/package.json"));
     const pywb_version = fs.readFileSync("/usr/local/lib/python3.8/site-packages/pywb/version.py", "utf8").split("\n")[0].split("=")[1].trim().replace(/['"]+/g, "");
+    const warcioPackageJson = JSON.parse(fs.readFileSync("/app/node_modules/warcio/package.json"));
 
     const info = {
-      "software": `Browsertrix-crawler ${packageFileJSON["version"]} (with warcio.js ${packageFileJSON["devDependencies"]["warcio"]} pywb ${pywb_version})`,
+      "software": `Browsertrix-crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywb_version})`,
       "format": "WARC File Format 1.1"
     };
-
+    
     const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, info);
     const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
     return buffer;
