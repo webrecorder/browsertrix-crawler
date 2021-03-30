@@ -588,7 +588,7 @@ class Crawler {
         // 4. Write out the current warc data to the combinedFile
         else{
           combinedWarcNumber = combinedWarcNumber + 1;
-          const combinedWarcName = this.params.collection.concat("_", combinedWarcNumber.toString(),".warc");
+          const combinedWarcName =`${this.params.collection}_${combinedWarcNumber}.warc`;
           generatedCombinedWarcs.push(combinedWarcName);
           fs.writeFileSync(path.join(this.collDir, "archive", combinedWarcName), warcBuffer);
           fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[j].fileName));
