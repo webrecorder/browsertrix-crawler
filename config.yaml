@@ -12,6 +12,7 @@ recorder:
   dedup_policy: skip
   source_coll: live
   cache: always
+  rollover_size: ${ROLLOVER_SIZE}
 
 #autoindex: 10
 

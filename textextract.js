@@ -19,7 +19,7 @@ class TextExtract {
     const children = node.children || EMPTY_LIST;
 
     if (name === TEXT) {
-      const value = node.nodeValue ? node.nodeValue.trim() : '';
+      const value = node.nodeValue ? node.nodeValue.trim() : "";
       if (value) {
         accum.push(value);
       }
@@ -31,9 +31,9 @@ class TextExtract {
       }
 
       if (metadata) {
-        metadata.title = title.join(' ');
+        metadata.title = title.join(" ");
       } else {
-        accum.push(title.join(' '));
+        accum.push(title.join(" "));
       }
     } else {
       for (let child of children) {
@@ -41,7 +41,7 @@ class TextExtract {
       }
 
       if (node.contentDocument) { 
-      this.parseText(node.contentDocument, null, accum);
+        this.parseText(node.contentDocument, null, accum);
       } 
     }
   }
@@ -52,7 +52,7 @@ class TextExtract {
 
     this.parseText(this.dom.root, metadata, accum);
 
-    return accum.join('\n');
+    return accum.join("\n");
   }
 }
 

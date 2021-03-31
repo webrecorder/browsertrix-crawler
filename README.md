@@ -67,6 +67,10 @@ Options:
                      is done                          [boolean] [default: false]
       --generateWACZ If set, generate wacz for use with pywb after crawl
                       is done                          [boolean] [default: false]
+      --combineWARC If set, combine the individual warcs generated into a single warc after crawl
+                      is done                          [boolean] [default: false]
+      --rolloverSize If set, dictates the maximum size that a generated warc and combined warc can be
+                                                      [number] [default: 1000000000]
       --text         If set, extract the pages full text to be added to the pages.jsonl  
                       file                         [boolean] [default: false]
       --cwd          Crawl working directory for captures (pywb root). If not
