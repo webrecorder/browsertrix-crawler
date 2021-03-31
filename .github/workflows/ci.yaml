@@ -41,7 +41,7 @@ jobs:
     - name: build docker
       run: docker-compose build
     - name: run crawl
-      run: docker-compose run crawler crawl --url http://www.example.com/ --generateWACZ  --text --collection wr-net --workers 2              
+      run: docker-compose run crawler crawl --url http://www.example.com/ --generateWACZ  --text --collection wr-net --combineWARC --rolloverSize 10000 --workers 2              
     - name: validate existing wacz
       run: docker-compose run crawler wacz validate --file collections/wr-net/wr-net.wacz
     - name: unzip wacz

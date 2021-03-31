@@ -7,6 +7,7 @@ const path = require("path");
 const fs = require("fs");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
+const warcio = require("warcio");
 
 const TextExtract = require("./textextract");
 const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
@@ -117,7 +118,7 @@ class Crawler {
   }
 
   bootstrap() {
-    let opts = {}
+    let opts = {};
     if (this.params.logging.includes("pywb")) {
       opts = {stdio: "inherit", cwd: this.params.cwd};
     }
@@ -139,8 +140,8 @@ class Crawler {
     
     child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
-    opts.env = {...process.env, COLL: this.params.collection};
-
+    opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
+    
     child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts);
 
     if (!this.params.headless) {
@@ -231,6 +232,19 @@ class Crawler {
         default: false,
       },
 
+      "combineWARC": {
+        alias: ["combinewarc", "combineWarc"],
+        describe: "If set, combine the warcs",
+        type: "boolean",
+        default: false,
+      },
+      
+      "rolloverSize": {
+        describe: "If set, declare the rollover size",
+        default: 1000000000,
+        type: "number",
+      },
+      
       "generateWACZ": {
         alias: ["generatewacz", "generateWacz"],
         describe: "If set, generate wacz",
@@ -445,15 +459,15 @@ class Crawler {
       if (this.behaviorOpts) {
         await page.exposeFunction(BEHAVIOR_LOG_FUNC, ({data, type}) => {
           switch (type) {
-            case "info":
-              console.log(JSON.stringify(data));
-              break;
+          case "info":
+            console.log(JSON.stringify(data));
+            break;
 
-            case "debug":
-            default:
-              if (this.behaviorsLogDebug) {
-                console.log("behavior debug: " + JSON.stringify(data));
-              }
+          case "debug":
+          default:
+            if (this.behaviorsLogDebug) {
+              console.log("behavior debug: " + JSON.stringify(data));
+            }
           }
         });
 
@@ -467,7 +481,7 @@ class Crawler {
       
       
       const title = await page.title();
-      let text = '';
+      let text = "";
       if (this.params.text) {
         const client = await page.target().createCDPSession();
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
@@ -485,6 +499,28 @@ class Crawler {
     } catch (e) {
       console.warn(e);
     }
+  }
+  
+  async createWARCInfo(filename) {
+    const warcVersion = "WARC/1.1";
+    const type = "warcinfo";
+    const packageFileJSON = JSON.parse(fs.readFileSync("../app/package.json"));
+    const pywb_version = fs.readFileSync("/usr/local/lib/python3.8/site-packages/pywb/version.py", "utf8").split("\n")[0].split("=")[1].trim().replace(/['"]+/g, "");
+    const warcioPackageJson = JSON.parse(fs.readFileSync("/app/node_modules/warcio/package.json"));
+
+    const info = {
+      "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywb_version})`,
+      "format": "WARC File Format 1.1"
+    };
+    
+    const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, info);
+    const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
+    return buffer;
+  }
+  
+  getFileSize(filename) {
+    var stats = fs.statSync(filename);
+    return stats.size;
   }
 
   async crawl() {
@@ -524,6 +560,10 @@ class Crawler {
     // extra wait for all resources to land into WARCs
     console.log("Waiting 5s to ensure WARCs are finished");
     await this.sleep(5000);
+    
+    if (this.params.combineWARC) {
+      await this.combineWARC();
+    }
 
     if (this.params.generateCDX) {
       console.log("Generate CDX");
@@ -613,16 +653,16 @@ class Crawler {
       // create pages dir if doesn't exist and write pages.jsonl header
       if (!fs.existsSync(this.pagesDir)) {
         fs.mkdirSync(this.pagesDir);
-        const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"}
+        const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
           console.log("creating pages with full text");
-          header["hasText"] = true
+          header["hasText"] = true;
         }
         else{
           console.log("creating pages without full text");
-          header["hasText"] = false
+          header["hasText"] = false;
         }
-        const header_formatted = JSON.stringify(header).concat("\n")
+        const header_formatted = JSON.stringify(header).concat("\n");
         fs.writeFileSync(this.pagesFile, header_formatted);
       }
     } catch(err) {
@@ -635,7 +675,7 @@ class Crawler {
     const row = {"id": id, "url": url, "title": title};
 
     if (text == true){
-      row['text'] = text_content
+      row["text"] = text_content;
     }
     
     const processedRow = JSON.stringify(row).concat("\n");
@@ -764,6 +804,76 @@ class Crawler {
     } catch(e) {
       console.log(e);
     }
+  }
+
+  async combineWARC() {
+    console.log("Combining the warcs");
+
+    // Get the list of created Warcs
+    const warcLists = fs.readdirSync(path.join(this.collDir, "archive"));
+
+    const fileSizeObjects = []; // Used to sort the created warc by fileSize
+
+    // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
+    for (let i = 0; i < warcLists.length; i++) {
+      let fileName = path.join(this.collDir, "archive", warcLists[i]);
+      let fileSize = this.getFileSize(fileName);
+      fileSizeObjects.push({"fileSize": fileSize, "fileName": fileName});
+      fileSizeObjects.sort(function(a, b){
+        return b.fileSize - a.fileSize;
+      });
+    }
+
+    const generatedCombinedWarcs = [];
+
+    // Used to name combined warcs, default to -1 for first increment
+    let combinedWarcNumber = -1;
+
+    // write combine WARC to collection root
+    let combinedWarcFullPath = "";
+
+    // Iterate through the sorted file size array.
+    for (let j = 0; j < fileSizeObjects.length; j++) {
+
+      // if need to rollover to new warc
+      let doRollover = false;
+
+      // set to true for first warc
+      if (combinedWarcNumber < 0) {
+        doRollover = true;
+      } else {
+        // Check the size of the existing combined warc.
+        const currentCombinedWarcSize = this.getFileSize(combinedWarcFullPath);
+
+        //  If adding the current warc to the existing combined file creates a file smaller than the rollover size add the data to the combinedWarc
+        const proposedWarcSize = fileSizeObjects[j].fileSize + currentCombinedWarcSize;
+
+        doRollover = (proposedWarcSize >= this.params.rolloverSize);
+      }
+
+      if (doRollover) {
+        // If adding the current warc to the existing combined file creates a file larger than the rollover size do the following: 
+        // 1. increment the combinedWarcNumber
+        // 2. create the name of the new combinedWarcFile
+        // 3. Write the header out to the new file
+        // 4. Write out the current warc data to the combinedFile
+        combinedWarcNumber = combinedWarcNumber + 1;
+
+        const combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc`;
+
+        // write combined warcs to root collection dir as they're output of a collection (like wacz)
+        combinedWarcFullPath = path.join(this.collDir, combinedWarcName);
+
+        generatedCombinedWarcs.push(combinedWarcName);
+
+        const warcBuffer = await this.createWARCInfo(combinedWarcName);
+        fs.writeFileSync(combinedWarcFullPath, warcBuffer);
+      }
+
+      fs.appendFileSync(combinedWarcFullPath, fs.readFileSync(fileSizeObjects[j].fileName));
+    }
+
+    console.log(`Combined warcs saved as: ${generatedCombinedWarcs}`);
   }
 }
 
