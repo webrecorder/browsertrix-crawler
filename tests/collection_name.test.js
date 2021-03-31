@@ -1,0 +1,37 @@
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
+
+test("check that the collection name is properly validation", async () => {
+  jest.setTimeout(30000);
+  let passed = '';
+
+  try{
+    const data = await exec('docker-compose run crawler crawl --url http://www.example.com/ --collection valid_collection-nameisvalid');
+    if (data.stdout.includes('Waiting 5s to ensure WARCs are finished')){
+      passed = true
+    }
+    else{
+      passed = false
+    }
+  }
+  catch (error) {
+    passed = false
+  }
+  expect(passed).toBe(true)
+});
+
+
+test("check that the collection name is not accepted if it doesn't meets our standards", async () => {
+  jest.setTimeout(30000);
+  let passed = '';
+
+  try{
+    let data = await exec('docker-compose run crawler crawl --url http://www.example.com/ --collection invalid_c!!ollection-nameisvalid');
+    passed = true
+  }
+  catch(e){
+    passed = false
+  }
+  expect(passed).toBe(false)
+
+});

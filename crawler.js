@@ -104,19 +104,6 @@ class Crawler {
     }
   }
   
-  isAlphaNumeric(str) {
-    let valid;
-    let re = /^[a-zA-Z0-9_\-.]*$/;
-    let match = re.exec(str);
-    if (match === null){ 
-      valid = false; 
-    }
-    else { 
-      valid = true;
-    }
-    return valid;
-  }
-
   bootstrap() {
     let opts = {};
     if (this.params.logging.includes("pywb")) {
@@ -129,9 +116,9 @@ class Crawler {
     this.configureUA();
     
     // Check that the collection name is valid.
-    if(this.isAlphaNumeric(this.params.collection) == false){
-      console.log(`\n${this.params.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - .]\n`)
-      return
+    if (this.params.collection.search(/^[a-zA-Z0-9_\-]*$/) === -1){
+      console.log(`\n${this.params.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - .]\n`);
+      return;
     }
     
     this.headers = {"User-Agent": this.userAgent};
