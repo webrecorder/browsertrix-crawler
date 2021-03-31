@@ -105,7 +105,7 @@ class Crawler {
   
   isAlphaNumeric(str) {
     let valid;
-    let re = /^[a-zA-Z0-9\_\-\.]*$/;
+    let re = /^[a-zA-Z0-9_\-.]*$/;
     let match = re.exec(str);
     if (match === null){ 
       valid = false; 
@@ -114,7 +114,7 @@ class Crawler {
       valid = true;
     }
     return valid;
-  };
+  }
 
   bootstrap() {
     let opts = {}
