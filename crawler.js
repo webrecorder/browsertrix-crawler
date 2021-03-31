@@ -116,7 +116,7 @@ class Crawler {
     this.configureUA();
     
     // Check that the collection name is valid.
-    if (this.params.collection.search(/^[a-zA-Z0-9_\-]*$/) === -1){
+    if (this.params.collection.search(/^[a-zA-Z0-9_-]*$/) === -1){
       console.log(`\n${this.params.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - .]\n`);
       return;
     }
