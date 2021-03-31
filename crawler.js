@@ -499,7 +499,7 @@ class Crawler {
     return buffer;
   }
   
-  async getFileSize(filename) {
+  getFileSize(filename) {
     var stats = fs.statSync(filename);
     return stats.size;
   }
@@ -543,60 +543,7 @@ class Crawler {
     await this.sleep(5000);
     
     if (this.params.combineWARC) {
-      console.log("Combining the warcs");
-      
-  
-      // Get the list of created Warcs
-      const warcLists = fs.readdirSync(path.join(this.collDir, "archive"));
-  
-      const fileSizeObjects = []; // Used to sort the created warc by fileSize 
-      
-      // Used to name the combined warcs
-      var combinedWarcNumber = 0;
-      let combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc`
-      
-      // Create the header for the first combined warc
-      const warcBuffer = await this.createWARCInfo(combinedWarcName);
-
-      // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
-      for (var i = 0; i < warcLists.length; i++) {
-        var fileName = path.join(this.collDir, "archive", warcLists[i]);
-        var fileSize = await this.getFileSize(fileName);
-        fileSizeObjects.push({"fileSize": fileSize, "fileName": fileName});
-        fileSizeObjects.sort(function(a, b){
-          return b.fileSize - a.fileSize;
-        });
-      }
-      
-      // Write out the header for the first combined warc file
-      fs.writeFileSync(path.join(this.collDir, "archive", combinedWarcName), warcBuffer);
-      var generatedCombinedWarcs = [];
-      generatedCombinedWarcs.push(combinedWarcName);
-      
-      // Iterate through the sorted file size array. 
-      for (var j = 0; i < fileSizeObjects.length; j++){
-        // Check the size of the existing combined warc.
-        var currentCombinedWarcSize = await this.getFileSize(path.join(this.collDir, "archive", combinedWarcName));
-        //  If adding the current warc to the existing combined file creates a file smaller than the rollover size add the data to the combinedWarc
-        var proposedWarcSize = fileSizeObjects[j].fileSize; + currentCombinedWarcSize;
-        if (proposedWarcSize < this.params.rolloverSize){
-          fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[j].fileName));
-        }
-        // If adding the current warc to the existing combined file creates a file larger than the rollover size do the following: 
-        // 1. increment the combinedWarcNumber 
-        // 2. create the name of the new combinedWarcFile
-        // 3. Write the header out to the new file 
-        // 4. Write out the current warc data to the combinedFile
-        else{
-          combinedWarcNumber = combinedWarcNumber + 1;
-          combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc`;
-          generatedCombinedWarcs.push(combinedWarcName);
-          fs.writeFileSync(path.join(this.collDir, "archive", combinedWarcName), warcBuffer);
-          fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[j].fileName));
-        }
-      }
-
-      console.log(`Combined warcs saved as  ${generatedCombinedWarcs}`);
+      await this.combineWARC();
     }
 
     if (this.params.generateCDX) {
@@ -838,6 +785,75 @@ class Crawler {
     } catch(e) {
       console.log(e);
     }
+  }
+
+  async combineWARC() {
+    console.log("Combining the warcs");
+
+    // Get the list of created Warcs
+    const warcLists = fs.readdirSync(path.join(this.collDir, "archive"));
+
+    const fileSizeObjects = []; // Used to sort the created warc by fileSize
+
+    // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
+    for (var i = 0; i < warcLists.length; i++) {
+      let fileName = path.join(this.collDir, "archive", warcLists[i]);
+      let fileSize = this.getFileSize(fileName);
+      fileSizeObjects.push({"fileSize": fileSize, "fileName": fileName});
+      fileSizeObjects.sort(function(a, b){
+        return b.fileSize - a.fileSize;
+      });
+    }
+
+
+    let generatedCombinedWarcs = [];
+
+    // Used to name combined warcs, default to -1 for first increment
+    let combinedWarcNumber = -1;
+
+    // write combine WARC to collection root
+    let combinedWarcFullPath = "";
+
+    // Iterate through the sorted file size array.
+    for (let j = 0; i < fileSizeObjects.length; j++) {
+
+      // if need to rollover to new warc
+      let doRollover = false;
+
+      // set to true for first warc
+      if (combinedWarcNumber < 0) {
+        doRollover = true;
+      } else {
+        // Check the size of the existing combined warc.
+        const currentCombinedWarcSize = this.getFileSize(combinedWarcFullPath);
+
+        //  If adding the current warc to the existing combined file creates a file smaller than the rollover size add the data to the combinedWarc
+        const proposedWarcSize = fileSizeObjects[j].fileSize + currentCombinedWarcSize;
+
+        doRollover = (proposedWarcSize >= this.params.rolloverSize);
+      }
+
+      if (doRollover) {
+        // If adding the current warc to the existing combined file creates a file larger than the rollover size do the following: 
+        // 1. increment the combinedWarcNumber
+        // 2. create the name of the new combinedWarcFile
+        // 3. Write the header out to the new file
+        // 4. Write out the current warc data to the combinedFile
+        combinedWarcNumber = combinedWarcNumber + 1;
+
+        const combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc`;
+        combinedWarcFullPath = path.join(this.collDir, combinedWarcName);
+
+        generatedCombinedWarcs.push(combinedWarcName);
+
+        const warcBuffer = await this.createWARCInfo(combinedWarcName);
+        fs.writeFileSync(combinedWarcFullPath, warcBuffer);
+      }
+
+      fs.appendFileSync(combinedWarcFullPath, fs.readFileSync(fileSizeObjects[j].fileName));
+    }
+
+    console.log(`Combined warcs saved as  ${generatedCombinedWarcs}`);
   }
 }
 
