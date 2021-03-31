@@ -796,7 +796,7 @@ class Crawler {
     const fileSizeObjects = []; // Used to sort the created warc by fileSize
 
     // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
-    for (var i = 0; i < warcLists.length; i++) {
+    for (let i = 0; i < warcLists.length; i++) {
       let fileName = path.join(this.collDir, "archive", warcLists[i]);
       let fileSize = this.getFileSize(fileName);
       fileSizeObjects.push({"fileSize": fileSize, "fileName": fileName});
@@ -805,8 +805,7 @@ class Crawler {
       });
     }
 
-
-    let generatedCombinedWarcs = [];
+    const generatedCombinedWarcs = [];
 
     // Used to name combined warcs, default to -1 for first increment
     let combinedWarcNumber = -1;
@@ -815,7 +814,7 @@ class Crawler {
     let combinedWarcFullPath = "";
 
     // Iterate through the sorted file size array.
-    for (let j = 0; i < fileSizeObjects.length; j++) {
+    for (let j = 0; j < fileSizeObjects.length; j++) {
 
       // if need to rollover to new warc
       let doRollover = false;
@@ -842,6 +841,8 @@ class Crawler {
         combinedWarcNumber = combinedWarcNumber + 1;
 
         const combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc`;
+
+        // write combined warcs to root collection dir as they're output of a collection (like wacz)
         combinedWarcFullPath = path.join(this.collDir, combinedWarcName);
 
         generatedCombinedWarcs.push(combinedWarcName);
@@ -853,7 +854,7 @@ class Crawler {
       fs.appendFileSync(combinedWarcFullPath, fs.readFileSync(fileSizeObjects[j].fileName));
     }
 
-    console.log(`Combined warcs saved as  ${generatedCombinedWarcs}`);
+    console.log(`Combined warcs saved as: ${generatedCombinedWarcs}`);
   }
 }
 
