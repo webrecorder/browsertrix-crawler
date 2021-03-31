@@ -102,6 +102,19 @@ class Crawler {
       }
     }
   }
+  
+  isAlphaNumeric(str) {
+    let valid;
+    let re = /^[a-zA-Z0-9\_\-\.]*$/;
+    let match = re.exec(str);
+    if (match === null){ 
+      valid = false; 
+    }
+    else { 
+      valid = true;
+    }
+    return valid;
+  };
 
   bootstrap() {
     let opts = {}
@@ -113,7 +126,13 @@ class Crawler {
     }
 
     this.configureUA();
-
+    
+    // Check that the collection name is valid.
+    if(this.isAlphaNumeric(this.params.collection) == false){
+      console.log(`\n${this.params.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - .]\n`)
+      return
+    }
+    
     this.headers = {"User-Agent": this.userAgent};
 
     child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
