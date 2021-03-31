@@ -490,7 +490,7 @@ class Crawler {
     const warcioPackageJson = JSON.parse(fs.readFileSync("/app/node_modules/warcio/package.json"));
 
     const info = {
-      "software": `Browsertrix-crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywb_version})`,
+      "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywb_version})`,
       "format": "WARC File Format 1.1"
     };
     
@@ -553,7 +553,7 @@ class Crawler {
       
       // Used to name the combined warcs
       var combinedWarcNumber = 0;
-      var combinedWarcName = this.params.collection.concat("_combined_", combinedWarcNumber.toString(),".warc");
+      let combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc`
       
       // Create the header for the first combined warc
       const warcBuffer = await this.createWARCInfo(combinedWarcName);
@@ -589,7 +589,7 @@ class Crawler {
         // 4. Write out the current warc data to the combinedFile
         else{
           combinedWarcNumber = combinedWarcNumber + 1;
-          const combinedWarcName =`${this.params.collection}_${combinedWarcNumber}.warc`;
+          combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc`;
           generatedCombinedWarcs.push(combinedWarcName);
           fs.writeFileSync(path.join(this.collDir, "archive", combinedWarcName), warcBuffer);
           fs.appendFileSync(path.join(this.collDir, "archive", combinedWarcName), fs.readFileSync(fileSizeObjects[j].fileName));
