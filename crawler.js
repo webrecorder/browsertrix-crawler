@@ -307,8 +307,8 @@ class Crawler {
     
     
     // Check that the collection name is valid.
-    if (this.params.collection.search(/^[a-zA-Z0-9_-]*$/) === -1){
-      throw new Error(`\n${this.params.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - .]\n`);
+    if (argv.collection.search(/^[a-zA-Z0-9_-]*$/) === -1){
+      throw new Error(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - .]\n`);
     }
   
     argv.timeout *= 1000;
