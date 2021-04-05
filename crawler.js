@@ -115,12 +115,6 @@ class Crawler {
 
     this.configureUA();
     
-    // Check that the collection name is valid.
-    if (this.params.collection.search(/^[a-zA-Z0-9_-]*$/) === -1){
-      console.log(`\n${this.params.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - .]\n`);
-      return;
-    }
-    
     this.headers = {"User-Agent": this.userAgent};
 
     child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
@@ -310,7 +304,13 @@ class Crawler {
       //argv.scope = url.href.slice(0, url.href.lastIndexOf("/") + 1);
       argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
     }
-
+    
+    
+    // Check that the collection name is valid.
+    if (this.params.collection.search(/^[a-zA-Z0-9_-]*$/) === -1){
+      throw new Error(`\n${this.params.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - .]\n`);
+    }
+  
     argv.timeout *= 1000;
 
     // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
