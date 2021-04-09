@@ -36,7 +36,7 @@ function cliOpts() {
       type: "boolean",
       default: false,
     },
-  }
+  };
 }
 
 
@@ -76,7 +76,7 @@ async function main() {
       "--disable-features=IsolateOrigins,site-per-process",
       "--user-data-dir=/tmp/profile"
     ]
-  }
+  };
 
   if (!params.user) {
     params.user = await promptInput("Enter username: ");
@@ -122,7 +122,7 @@ async function main() {
   await p.type(params.password);
 
   await Promise.allSettled([
-    p.press('Enter'),
+    p.press("Enter"),
     page.waitForNavigation({waitUntil})
   ]);
 

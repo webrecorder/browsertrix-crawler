@@ -448,15 +448,15 @@ class Crawler {
 
   _behaviorLog({data, type}) {
     switch (type) {
-      case "info":
-        console.log(JSON.stringify(data));
-        break;
+    case "info":
+      console.log(JSON.stringify(data));
+      break;
 
-      case "debug":
-      default:
-        if (this.behaviorsLogDebug) {
-          console.log("behavior debug: " + JSON.stringify(data));
-        }
+    case "debug":
+    default:
+      if (this.behaviorsLogDebug) {
+        console.log("behavior debug: " + JSON.stringify(data));
+      }
     }
   }
 
@@ -471,7 +471,7 @@ class Crawler {
         await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.behaviorOpts});`);
       }
 
-     // run custom driver here
+      // run custom driver here
       await this.driver({page, data, crawler: this});
       
       
