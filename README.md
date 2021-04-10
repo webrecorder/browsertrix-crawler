@@ -23,10 +23,12 @@ You don't even need to clone this repo, just choose a directory where you'd like
 the following commands. Replace `[URL]` with the web site you'd like to crawl.
 
 1. Run `docker pull webrecorder/browsertrix-crawler`
-2. `docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --url [URL] --generateWACZ --collection test`
+2. `docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --url [URL] --generateWACZ --text --collection test`
 3. The crawl will now run and progress of the crawl will be output to the console. Depending on the size of the site, this may take a bit!
 4. Once the crawl is finished, a WACZ file will be created in `crawls/collection/test/test.wacz` from the directory you ran the crawl!
 5. You can go to [ReplayWeb.page](https://replayweb.page) and open the generated WACZ file and browse your newly crawled archive!
+
+- To include automated text extraction for full text search, add the `--text` flag.
 
 - To limit the crawl to a maximum number of pages, add `--limit P` where P is the number of pages that will be crawled.
 
