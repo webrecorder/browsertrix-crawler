@@ -1,8 +1,6 @@
 # Browsertrix Crawler
 
-Browsertrix Crawler is a simplified browser-based high-fidelity crawling system, designed to run a single crawl in a single Docker container. It is designed as part of a more streamlined replacement of the original [Browsertrix](https://github.com/webrecorder/browsertrix).
-
-The original Browsertrix may be too complex for situations where a single crawl is needed, and requires managing multiple containers.
+Browsertrix Crawler is a simplified browser-based high-fidelity crawling system, designed to run a single crawl in a single Docker container. It is designed as  a core component of to replace the the original [Browsertrix](https://github.com/webrecorder/browsertrix) application.
 
 This is an attempt to refactor Browsertrix into a core crawling system, driven by [puppeteer-cluster](https://github.com/thomasdondorf/puppeteer-cluster)
 and [puppeteer](https://github.com/puppeteer/puppeteer)
@@ -12,9 +10,10 @@ and [puppeteer](https://github.com/puppeteer/puppeteer)
 Thus far, Browsertrix Crawler supports:
 
 - Single-container, browser based crawling with multiple headless/headful browsers
-- Support for some behaviors: autoplay to capture video/audio, scrolling
+- Support for browser behaviors, loaded from [Browsertix Behaviors](https://github.com/webrecorder/browsertrix-behaviors)
 - Support for direct capture for non-HTML resources
 - Extensible driver script for customizing behavior per crawl or page via Puppeteer
+- Ability to create re-useable profiles with user/password login
 
 ## Architecture
 
@@ -33,48 +32,76 @@ To access the contents of the crawl, the `/crawls` directory in the container sh
 
 ## Crawling Parameters
 
-The image currently accepts the following parameters:
+The Browsertrix Crawler docker image currently accepts the following parameters:
 
 ```
 browsertrix-crawler [options]
 
 Options:
-      --help         Show help                                         [boolean]
-      --version      Show version number                               [boolean]
-  -u, --url          The URL to start crawling from          [string] [required]
-  -w, --workers      The number of workers to run in parallel
-                                                           [number] [default: 1]
-      --newContext   The context for each new capture, can be a new: page,
-                     session or browser.              [string] [default: "page"]
-      --waitUntil    Puppeteer page.goto() condition to wait for before
-                     continuing                                [default: "load"]
-      --limit        Limit crawl to this number of pages   [number] [default: 0]
-      --timeout      Timeout for each page to load (in seconds)
-                                                          [number] [default: 90]
-      --scope        Regex of page URLs that should be included in the crawl
-                     (defaults to the immediate directory of URL)
-      --exclude      Regex of page URLs that should be excluded from the crawl.
-      --scroll       If set, will autoscroll to bottom of the page
-                                                      [boolean] [default: false]
-  -c, --collection   Collection name to crawl to (replay will be accessible
-                     under this name in pywb preview)
-                                                   [string] [default: "capture"]
-      --headless     Run in headless mode, otherwise start xvfb
-                                                      [boolean] [default: false]
-      --driver       JS driver for the crawler
+      --help                                Show help                  [boolean]
+      --version                             Show version number        [boolean]
+  -u, --url                                 The URL to start crawling from
+                                                             [string] [required]
+  -w, --workers                             The number of workers to run in
+                                            parallel       [number] [default: 1]
+      --newContext                          The context for each new capture,
+                                            can be a new: page, session or
+                                            browser.  [string] [default: "page"]
+      --waitUntil                           Puppeteer page.goto() condition to
+                                            wait for before continuing, can be
+                                            multiple separate by ','
+                                                  [default: "load,networkidle0"]
+      --limit                               Limit crawl to this number of pages
+                                                           [number] [default: 0]
+      --timeout                             Timeout for each page to load (in
+                                            seconds)      [number] [default: 90]
+      --scope                               Regex of page URLs that should be
+                                            included in the crawl (defaults to
+                                            the immediate directory of URL)
+      --exclude                             Regex of page URLs that should be
+                                            excluded from the crawl.
+  -c, --collection                          Collection name to crawl to (replay
+                                            will be accessible under this name
+                                            in pywb preview)
+                                [string] [default: "capture-2021-04-10T04-49-4"]
+      --headless                            Run in headless mode, otherwise
+                                            start xvfb[boolean] [default: false]
+      --driver                              JS driver for the crawler
                                      [string] [default: "/app/defaultDriver.js"]
-      --generateCDX  If set, generate index (CDXJ) for use with pywb after crawl
-                     is done                          [boolean] [default: false]
-      --generateWACZ If set, generate wacz for use with pywb after crawl
-                      is done                          [boolean] [default: false]
-      --combineWARC If set, combine the individual warcs generated into a single warc after crawl
-                      is done                          [boolean] [default: false]
-      --rolloverSize If set, dictates the maximum size that a generated warc and combined warc can be
-                                                      [number] [default: 1000000000]
-      --text         If set, extract the pages full text to be added to the pages.jsonl  
-                      file                         [boolean] [default: false]
-      --cwd          Crawl working directory for captures (pywb root). If not
-                     set, defaults to process.cwd  [string] [default: "/crawls"]
+      --generateCDX, --generatecdx,         If set, generate index (CDXJ) for
+      --generateCdx                         use with pywb after crawl is done
+                                                      [boolean] [default: false]
+      --generateWACZ, --generatewacz,       If set, generate wacz
+      --generateWacz                                  [boolean] [default: false]
+      --logging                             Logging options for crawler, can
+                                            include: stats, pywb, behaviors
+                                                     [string] [default: "stats"]
+      --text                                If set, extract text to the
+                                            pages.jsonl file
+                                                      [boolean] [default: false]
+      --cwd                                 Crawl working directory for captures
+                                            (pywb root). If not set, defaults to
+                                            process.cwd()
+                                                   [string] [default: "/crawls"]
+      --mobileDevice                        Emulate mobile device by name from:
+                                            https://github.com/puppeteer/puppete
+                                            er/blob/main/src/common/DeviceDescri
+                                            ptors.ts                    [string]
+      --userAgent                           Override user-agent with specified
+                                            string                      [string]
+      --userAgentSuffix                     Append suffix to existing browser
+                                            user-agent (ex: +MyCrawler,
+                                            info@example.com)           [string]
+      --useSitemap                          If enabled, check for sitemaps at
+                                            /sitemap.xml, or custom URL if URL
+                                            is specified
+      --statsFilename                       If set, output stats as JSON to this
+                                            file. (Relative filename resolves to
+                                            crawl working directory)
+      --behaviors                           Which background behaviors to enable
+                                            on each page
+                           [string] [default: "autoplay,autofetch,siteSpecific"]
+
 ```
 
 For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options).
