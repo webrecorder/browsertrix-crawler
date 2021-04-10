@@ -120,11 +120,12 @@ while `--waitUntil networkidle0` may make sense for dynamic sites.
 ### Behaviors
 
 Browsertrix Crawler also supports automatically running customized in-browser behaviors. The behaviors auto-play videos (when possible),
-and auto-fetch content that is not loaded by default, and also run custom behaviors on certain sites. See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors).
+and auto-fetch content that is not loaded by default, and also run custom behaviors on certain sites.
 
 Behaviors to run can be specified via a comma-separated list passed to the `--behaviors` option. By default, the auto-scroll behavior is not enabled by default, as it may slow down crawling. To enable this behaviors, you can add
 `--behaviors autoscroll` or to enable all behaviors, add `--behaviors autoscroll,autoplay,autofetch,siteSpecific`.
 
+See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for more info on all of the currently available behaviors.
 
 ## Creating and Using Browser Profiles
 
