@@ -29,7 +29,7 @@ the following commands. Replace `[URL]` with the web site you'd like to crawl.
 5. You can go to [ReplayWeb.page](https://replayweb.page) and open the generated WACZ file and browse your newly crawled archive!
 
 - To limit the crawl to a maximum number of pages, add `--limit P` where P is the number of pages that will be crawled.
-- 
+
 - To run more than one browser worker and crawl in parallel, and `--workers N` where N is number of browsers to run in parallel. More browsers will require more CPU and network bandwidth, and does not guarantee faster crawling.
 
 - To crawl into a new directory, specify a different name for the `--collection` param, or, if omitted, a new collection directory based on current time will be created.
@@ -116,6 +116,14 @@ For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.co
 
 The default is `load`, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example),
 while `--waitUntil networkidle0` may make sense for dynamic sites.
+
+### Behaviors
+
+Browsertrix Crawler also supports automatically running customized in-browser behaviors. The behaviors auto-play videos (when possible),
+and auto-fetch content that is not loaded by default, and also run custom behaviors on certain sites. See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors).
+
+Behaviors to run can be specified via a comma-separated list passed to the `--behaviors` option. By default, the auto-scroll behavior is not enabled by default, as it may slow down crawling. To enable this behaviors, you can add
+`--behaviors autoscroll` or to enable all behaviors, add `--behaviors autoscroll,autoplay,autofetch,siteSpecific`.
 
 
 ## Creating and Using Browser Profiles
