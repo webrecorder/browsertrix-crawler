@@ -24,13 +24,19 @@ the following commands. Replace `[URL]` with the web site you'd like to crawl.
 
 1. Run `docker pull webrecorder/browsertrix-crawler`
 2. `docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --url [URL] --generateWACZ --collection test`
-3. The crawl will now run and progress of the crawl will be output to the console. Depending on the size of the site, this may take a bit! (You can also add `--limit N` to limit number of pages crawled to N pages)
+3. The crawl will now run and progress of the crawl will be output to the console. Depending on the size of the site, this may take a bit!
 4. Once the crawl is finished, a WACZ file will be created in `crawls/collection/test/test.wacz` from the directory you ran the crawl!
 5. You can go to [ReplayWeb.page](https://replayweb.page) and open the generated WACZ file and browse your newly crawled archive!
 
+- To limit the crawl to a maximum number of pages, add `--limit P` where P is the number of pages that will be crawled.
+- 
+- To run more than one browser worker and crawl in parallel, and `--workers N` where N is number of browsers to run in parallel. More browsers will require more CPU and network bandwidth, and does not guarantee faster crawling.
+
+- To crawl into a new directory, specify a different name for the `--collection` param, or, if omitted, a new collection directory based on current time will be created.
+
 Browsertrix Crawler includes a number of parameters and crawling options, explained further below.
 
-## Crawling Parameters
+## Crawling Configuration Options
 
 The Browsertrix Crawler docker image currently accepts the following parameters:
 
@@ -101,13 +107,50 @@ Options:
       --behaviors                           Which background behaviors to enable
                                             on each page
                            [string] [default: "autoplay,autofetch,siteSpecific"]
-
+      --profile                             Path to tar.gz file which will be
+                                            extracted and used as the browser
+                                            profile                     [string]
 ```
 
 For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options).
 
 The default is `load`, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example),
 while `--waitUntil networkidle0` may make sense for dynamic sites.
+
+
+## Creating and Using Browser Profiles
+
+Browsertrix Crawler also includes a way to use existing browser profiles when running a crawl. This allows pre-configuring the browser, such as by logging in
+to certain sites or setting other settings, and running a crawl exactly with those settings. By creating a logged in profile, the actual login credentials are not included in the crawl, only (temporary) session cookies.
+
+Browsertrix Crawler currently includes a script to login to a single website with supplied credentials and then save the profile.
+It can also take a screenshot so you can check if the login succeeded. The `--url` parameter should specify the URL of a login page.
+
+For example, to create a profile logged in to Twitter, you can run:
+
+```bash
+docker run -v $PWD/crawls/profiles:/output/ -it webrecorder/browsertrix-crawler create-login-profile --url "https://twitter.com/login"
+```
+
+The script will then prompt you for login credentials, attempt to login and create a tar.gz file in `./crawls/profiles/profile.tar.gz`.
+
+- To specify a custom filename, pass along `--filename` parameter.
+
+- To specify the username and password on the command line (for automated profile creation), pass a `--username` and `--password` flags.
+
+- To specify headless mode, add the `--headless` flag. Note that for crawls run with `--headless` flag, it is recommended to also create the profile with `--headless` to ensure the profile is compatible.
+
+The `--profile` flag can then be used to specify a Chrome profile stored as a tarball when running the regular `crawl` command. With this option, it is possible to crawl with the browser already pre-configured. To ensure compatibility, the profile should be created using the following mechanism.
+
+After running the above command, you can now run a crawl with the profile, as follows:
+
+```bash
+
+docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --profile /crawls/profiles/profile.tar.gz --url https://twitter.com/--generateWACZ --collection test-with-profile
+```
+
+The current profile creation script is still experimental and the script attempts to detect the usename and password fields on a site as generically as possible, but may not work for all sites. Additional profile functionality, such as support for custom profile creation scripts, may be added in the future. 
+
 
 ## Architecture
 
