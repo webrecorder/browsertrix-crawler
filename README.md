@@ -1,34 +1,34 @@
 # Browsertrix Crawler
 
-Browsertrix Crawler is a simplified browser-based high-fidelity crawling system, designed to run a single crawl in a single Docker container. It is designed as  a core component of to replace the the original [Browsertrix](https://github.com/webrecorder/browsertrix) application.
-
-This is an attempt to refactor Browsertrix into a core crawling system, driven by [puppeteer-cluster](https://github.com/thomasdondorf/puppeteer-cluster)
-and [puppeteer](https://github.com/puppeteer/puppeteer)
+Browsertrix Crawler is a simplified (Chrome)  browser-based high-fidelity crawling system, designed to run a complex, customizable browser-based crawl in a single Docker container. Browsertrix Crawler uses [puppeteer-cluster](https://github.com/thomasdondorf/puppeteer-cluster)
+and [puppeteer](https://github.com/puppeteer/puppeteer) to control one or more browsers in parallel.
 
 ## Features
 
 Thus far, Browsertrix Crawler supports:
 
-- Single-container, browser based crawling with multiple headless/headful browsers
-- Support for browser behaviors, loaded from [Browsertix Behaviors](https://github.com/webrecorder/browsertrix-behaviors)
-- Support for direct capture for non-HTML resources
-- Extensible driver script for customizing behavior per crawl or page via Puppeteer
-- Ability to create re-useable profiles with user/password login
+- Single-container, browser based crawling with multiple headless/headful browsers.
+- Support for custom browser behaviors, ysing [Browsertix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) including autoscroll, video autoplay and site-specific behaviors.
+- Optimized (non-browser) capture of non-HTML resources.
+- Extensible Puppeteer driver script for customizing behavior per crawl or page.
+- Ability to create and reuse browser profiles with user/password login
 
-## Architecture
+## Getting Started
 
-The Docker container provided here packages up several components used in Browsertrix.
+Browsertrix Crawler requires [Docker](https://docs.docker.com/get-docker/) to be installed on the machine running the crawl.
 
-The system uses:
- - `oldwebtoday/chrome` - to install a recent version of Chrome (currently chrome:84)
- - `puppeteer-cluster` - for running Chrome browsers in parallel
- - `pywb` - in recording mode for capturing the content
+Assuming Docker is installed, you can run a crawl and test your archive with the following steps.
 
+You don't even need to clone this repo, just choose a directory where you'd like the crawl data to be placed, and then run
+the following commands. Replace `[URL]` with the web site you'd like to crawl.
 
-The crawl produces a single pywb collection, at `/crawls/collections/<collection name>` in the Docker container.
+1. Run `docker pull webrecorder/browsertrix-crawler`
+2. `docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --url [URL] --generateWACZ --collection test`
+3. The crawl will now run and progress of the crawl will be output to the console. Depending on the size of the site, this may take a bit! (You can also add `--limit N` to limit number of pages crawled to N pages)
+4. Once the crawl is finished, a WACZ file will be created in `crawls/collection/test/test.wacz` from the directory you ran the crawl!
+5. You can go to [ReplayWeb.page](https://replayweb.page) and open the generated WACZ file and browse your newly crawled archive!
 
-To access the contents of the crawl, the `/crawls` directory in the container should be mounted to a volume (default in the Docker Compose setup).
-
+Browsertrix Crawler includes a number of parameters and crawling options, explained further below.
 
 ## Crawling Parameters
 
@@ -108,6 +108,22 @@ For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.co
 
 The default is `load`, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example),
 while `--waitUntil networkidle0` may make sense for dynamic sites.
+
+## Architecture
+
+The Docker container provided here packages up several components used in Browsertrix.
+
+The system uses:
+ - `oldwebtoday/chrome` - to install a recent version of Chrome (currently chrome:84)
+ - `puppeteer-cluster` - for running Chrome browsers in parallel
+ - `pywb` - in recording mode for capturing the content
+
+
+The crawl produces a single pywb collection, at `/crawls/collections/<collection name>` in the Docker container.
+
+To access the contents of the crawl, the `/crawls` directory in the container should be mounted to a volume (default in the Docker Compose setup).
+
+
 
 ### Example Usage
 
