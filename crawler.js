@@ -14,6 +14,10 @@ const warcio = require("warcio");
 const Redis = require("ioredis");
 
 const TextExtract = require("./textextract");
+
+const readabilityJs = fs.readFileSync("/app/node_modules/@mozilla/readability/Readability-readerable.js", "utf-8")
+  + fs.readFileSync("/app/node_modules/@mozilla/readability/Readability.js", "utf-8");
+
 const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
@@ -281,6 +285,12 @@ class Crawler {
         default: false,
       },
       
+      "readerView": {
+        describe: "If set, apply Mozilla's reader view and add the 'article' object to the pages.jsonl file, see https://github.com/mozilla/readability",
+        type: "boolean",
+        default: false,
+      },
+
       "cwd": {
         describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd()",
         type: "string",
@@ -571,14 +581,33 @@ class Crawler {
       
       
       const title = await page.title();
-      let text = "";
+      let text = null;
+      let article = null;
+
       if (this.params.text) {
         const client = await page.target().createCDPSession();
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
       }
-    
-      await this.writePage(data.url, title, this.params.text, text);
+
+      if (this.params.readerView) {
+        article = {};
+        try {
+          // Note: DOM tree is cloned to avoid side effects
+          // because it is modified by @mozilla/readability
+          await page.exposeFunction("readabilityLog", (msg) => console.log(msg));
+          article = await page.evaluate(`${readabilityJs};\n(async () => {
+            if (isProbablyReaderable(document)) {
+              return await new Readability(document.cloneNode(true)).parse();
+            } else {
+              readabilityLog("Not readerable: " + document.URL);
+            }})();`);
+        } catch(e) {
+          console.log("Error applying reader view:", e);
+        }
+      }
+
+      await this.writePage(data.url, title, text, article);
 
       if (this.behaviorOpts) {
         await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
@@ -792,14 +821,20 @@ class Crawler {
 
       if (createNew) {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
+        header["hasText"] = this.params.text;
+        header["hasReaderView"] = this.params.readerView;
+        let msg = "creating pages ";
         if (this.params.text) {
-          console.log("creating pages with full text");
-          header["hasText"] = true;
+          msg += "with full text";
+          if (this.params.readerView) {
+            msg += " and reader view";
+          }
+        } else if (this.params.readerView) {
+          msg += "with reader view";
+        } else {
+          msg += "without full text or reader view";
         }
-        else{
-          console.log("creating pages without full text");
-          header["hasText"] = false;
-        }
+        console.log(msg);
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
       }
@@ -809,14 +844,18 @@ class Crawler {
     }
   }
 
-  async writePage(url, title, text, text_content){
+  async writePage(url, title, text, article){
     const id = uuidv4();
     const row = {"id": id, "url": url, "title": title};
 
-    if (text == true){
-      row["text"] = text_content;
+    if (text) {
+      row["text"] = text;
     }
-    
+
+    if (article) {
+      row["article"] = article;
+    }
+
     const processedRow = JSON.stringify(row).concat("\n");
     try {
       this.pagesFH.writeFile(processedRow);
