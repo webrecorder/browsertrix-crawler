@@ -46,7 +46,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
 The Browsertrix Crawler docker image currently accepts the following parameters:
 
 ```
-browsertrix-crawler [options]
+crawler [options]
 
 Options:
       --help                                Show help                  [boolean]
@@ -74,7 +74,7 @@ Options:
   -c, --collection                          Collection name to crawl to (replay
                                             will be accessible under this name
                                             in pywb preview)
-                                [string] [default: "capture-2021-04-10T04-49-4"]
+                                [string] [default: "capture-YYYY-MM-DDTHH-MM-SS"]
       --headless                            Run in headless mode, otherwise
                                             start xvfb[boolean] [default: false]
       --driver                              JS driver for the crawler
@@ -82,10 +82,15 @@ Options:
       --generateCDX, --generatecdx,         If set, generate index (CDXJ) for
       --generateCdx                         use with pywb after crawl is done
                                                       [boolean] [default: false]
+      --combineWARC, --combinewarc,         If set, combine the warcs
+      --combineWarc                                   [boolean] [default: false]
+      --rolloverSize                        If set, declare the rollover size
+                                                  [number] [default: 1000000000]
       --generateWACZ, --generatewacz,       If set, generate wacz
       --generateWacz                                  [boolean] [default: false]
       --logging                             Logging options for crawler, can
-                                            include: stats, pywb, behaviors
+                                            include: stats, pywb, behaviors,
+                                            behaviors-debug
                                                      [string] [default: "stats"]
       --text                                If set, extract text to the
                                             pages.jsonl file

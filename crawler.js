@@ -48,7 +48,7 @@ class Crawler {
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
     const params = require("yargs")
-      .usage("browsertrix-crawler [options]")
+      .usage("crawler [options]")
       .option(this.cliOpts)
       .check((argv) => this.validateArgs(argv)).argv;
 
@@ -193,7 +193,7 @@ class Crawler {
         alias: "c",
         describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",
         type: "string",
-        default: `capture-${new Date().toISOString().slice(0,18)}`.replace(/:/g, "-")
+        default: `capture-${new Date().toISOString().slice(0,19)}`.replace(/:/g, "-")
       },
 
       "headless": {
@@ -236,7 +236,7 @@ class Crawler {
       },
       
       "logging": {
-        describe: "Logging options for crawler, can include: stats, pywb, behaviors",
+        describe: "Logging options for crawler, can include: stats, pywb, behaviors, behaviors-debug",
         type: "string",
         default: "stats",
       },

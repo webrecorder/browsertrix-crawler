@@ -7,7 +7,7 @@
   "license": "MIT",
   "dependencies": {
     "abort-controller": "^3.0.0",
-    "browsertrix-behaviors": "^0.1.0",
+    "browsertrix-behaviors": "^0.1.1",
     "node-fetch": "^2.6.1",
     "puppeteer-cluster": "^0.22.0",
     "puppeteer-core": "^5.3.1",
