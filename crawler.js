@@ -317,7 +317,7 @@ class Crawler {
     if (!argv.scope) {
       //argv.scope = url.href.slice(0, url.href.lastIndexOf("/") + 1);
       argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
-      if (argv.urlFileList != '') {
+      if (argv.urlFileList != "") {
         let urlFileList = fs.readFileSync( path.join(__dirname, argv.urlFileList), "utf-8").split("\n");
         for (let url of urlFileList) {
           if (url.substr(-1) != "/"){
