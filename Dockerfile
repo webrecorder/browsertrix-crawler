@@ -38,7 +38,7 @@ ARG REBUILD
 
 RUN yarn install
 
-ADD tests/fixtures app/fixtures
+ADD tests/fixtures/urlSeedFile.txt /app/fixtures/urlSeedFile.txt
 ADD config.yaml /app/
 ADD uwsgi.ini /app/
 ADD *.js /app/
