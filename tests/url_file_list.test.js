@@ -25,12 +25,12 @@ test("check that all urls in a file list are crawled when the filelisturl param 
     }
   }
 
-  for (var i = 1; i < crawled_pages.length; i++) {
-    if (crawled_pages[j] != undefined){
-      crawled_pages_list.push(JSON.parse(crawled_pages[i])["url"]);
+  let foundSeedUrl = true; 
+  
+  for (var i = 1; i < seed_file_list.length; i++) {
+    if (crawled_pages.indexOf(seed_file_list[i]) == -1){
+      foundSeedUrl = false;
     }
   }
-  console.log(crawled_pages_list);
-  console.log(seed_file_list);
-  expect(crawled_pages_list.sort()).toBe(seed_file_list);
+  expect(foundSeedUrl).toBe(true);
 });
