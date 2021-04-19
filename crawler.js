@@ -240,7 +240,14 @@ class Crawler {
         type: "string",
         default: "stats",
       },
-    
+      
+      "urlFileList": {
+        alias: ["urlfilelist", "urlFILELIST"],
+        describe: "If set, read a list of urls from the passed file. The default file name is urlSeedFile.txt",
+        type: "string",
+        default: "",
+      },
+      
       "text": {
         describe: "If set, extract text to the pages.jsonl file",
         type: "boolean",
@@ -310,6 +317,14 @@ class Crawler {
     if (!argv.scope) {
       //argv.scope = url.href.slice(0, url.href.lastIndexOf("/") + 1);
       argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
+      let urlFileList = fs.readFileSync( path.join(__dirname, argv.urlFileList), "utf-8").split("\n");
+      for (let url of urlFileList) {
+        if (url.substr(-1) != "/"){
+          url = url + "/";
+        }
+        let urlScope = new RegExp("^" + this.rxEscape(url.slice(0, url.lastIndexOf("/") + 1)));
+        argv.scope.push(urlScope);
+      }
     }
     
     
@@ -543,9 +558,14 @@ class Crawler {
     });
 
     this.cluster.task((opts) => this.crawlPage(opts));
-
+    
     this.initPages();
-
+    
+    if (this.params.urlFileList != "") {
+      let urlSeedFile = fs.readFileSync( path.join(__dirname, this.params.urlFileList), "utf-8").split("\n");
+      this.queueUrls(urlSeedFile);
+    }
+    
     this.queueUrl(this.params.url);
 
     if (this.params.useSitemap) {
@@ -708,7 +728,6 @@ class Crawler {
     if (this.seenList.has(url)) {
       return false;
     }
-
     let inScope = false;
 
     // check scopes
@@ -718,6 +737,7 @@ class Crawler {
         break;
       }
     }
+    
 
     if (!inScope) {
       //console.log(`Not in scope ${url} ${scope}`);
