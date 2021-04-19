@@ -1,1 +1,1 @@
-"https://www.example.com"
+https://www.example.org
