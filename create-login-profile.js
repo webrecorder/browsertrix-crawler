@@ -103,7 +103,7 @@ async function main() {
   let u, p;
 
   try {
-    u = await page.waitForXPath("//input[contains(@name, 'user')]");
+    u = await page.waitForXPath("//input[contains(@name, 'user')] or contains(@name, 'email')]");
 
     p = await page.waitForXPath("//input[contains(@name, 'pass') and @type='password']");
 
