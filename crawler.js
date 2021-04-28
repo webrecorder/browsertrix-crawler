@@ -10,6 +10,8 @@ const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 const warcio = require("warcio");
 
+const Redis = require('ioredis');
+
 const TextExtract = require("./textextract");
 const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
 
@@ -558,9 +560,8 @@ class Crawler {
     this.writeStats();
 
     // extra wait for all resources to land into WARCs
-    console.log("Waiting 5s to ensure WARCs are finished");
-    await this.sleep(5000);
-    
+    await this.awaitPendingClear();
+
     if (this.params.combineWARC) {
       await this.combineWARC();
     }
@@ -779,6 +780,23 @@ class Crawler {
     const signal = abort.signal;
     await fetch(this.capturePrefix + url, {signal, headers: this.headers});
     abort.abort();
+  }
+
+  async awaitPendingClear() {
+    console.log("Waiting to ensure pending data is written to WARC...");
+
+    const redis = new Redis("redis://localhost/0");
+
+    while (true) {
+      const res = await redis.get(`pywb:${this.params.collection}:pending`);
+      if (res === "0" || !res) {
+        break;
+      }
+
+      console.log(`Still waiting for ${res} pending requests to finish...`);
+
+      await this.sleep(1000);
+    }
   }
 
   sleep(time) {
