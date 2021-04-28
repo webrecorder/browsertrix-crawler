@@ -6,13 +6,8 @@ test("check that the collection name is properly validation", async () => {
   let passed = "";
 
   try{
-    const data = await exec("docker-compose run crawler crawl --url http://www.example.com/ --collection valid_collection-nameisvalid");
-    if (data.stdout.includes("Waiting 5s to ensure WARCs are finished")){
-      passed = true;
-    }
-    else{
-      passed = false;
-    }
+    await exec("docker-compose run crawler crawl --url http://www.example.com/ --collection valid_collection-nameisvalid");
+    passed = true;
   }
   catch (error) {
     passed = false;
