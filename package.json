@@ -5,6 +5,9 @@
   "repository": "https://github.com/webrecorder/browsertrix-crawler",
   "author": "Ilya Kreymer <ikreymer@gmail.com>, Webrecorder Software",
   "license": "MIT",
+  "scripts": {
+    "lint": "eslint *.js"
+  },
   "dependencies": {
     "abort-controller": "^3.0.0",
     "browsertrix-behaviors": "^0.2.0",

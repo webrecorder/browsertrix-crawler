@@ -26,6 +26,10 @@ module.exports = {
       "semi": [
           "error",
           "always"
+      ],
+      "no-constant-condition": [
+          "error",
+          {"checkLoops": false }
       ]
   }
 };

@@ -10,7 +10,7 @@ const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 const warcio = require("warcio");
 
-const Redis = require('ioredis');
+const Redis = require("ioredis");
 
 const TextExtract = require("./textextract");
 const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
