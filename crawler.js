@@ -11,6 +11,7 @@ const { v4: uuidv4 } = require("uuid");
 const warcio = require("warcio");
 
 const TextExtract = require("./textextract");
+const Screenshots = require("./screenshots");
 const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
 
 const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
@@ -247,6 +248,12 @@ class Crawler {
         default: false,
       },
       
+      "screenshot": {
+        describe: "If set, take screenshots of the page (initially visible area and full page), wrap them into WARC files and place them in the folder screenshots/",
+        type: "boolean",
+        default: false,
+      },
+
       "cwd": {
         describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd()",
         type: "string",
@@ -469,6 +476,10 @@ class Crawler {
     try {
       if (this.emulateDevice) {
         await page.emulate(this.emulateDevice);
+      } else if (this.params.screenshot) {
+        /* Select a viewport common for recent desktop computers or notebooks:
+         * contemporary web page layouts look ugly with the default (800x600) */
+        await page.setViewport({width: 1920, height: 1080}); // FullHD
       }
 
       if (this.behaviorOpts) {
@@ -478,8 +489,13 @@ class Crawler {
 
       // run custom driver here
       await this.driver({page, data, crawler: this});
-      
-      
+
+      const pageID = uuidv4();
+
+      if (this.params.screenshot) {
+        await new Screenshots({page, id: pageID, url: data.url, directory: this.screenShotDir}).take();
+      }
+
       const title = await page.title();
       let text = "";
       if (this.params.text) {
@@ -488,7 +504,7 @@ class Crawler {
         text = await new TextExtract(result).parseTextFromDom();
       }
     
-      this.writePage(data.url, title, this.params.text, text);
+      this.writePage(pageID, data.url, title, this.params.text, text);
 
       if (this.behaviorOpts) {
         await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
@@ -545,6 +561,7 @@ class Crawler {
     this.cluster.task((opts) => this.crawlPage(opts));
 
     this.initPages();
+    this.initScreenshots();
 
     this.queueUrl(this.params.url);
 
@@ -670,8 +687,7 @@ class Crawler {
     }
   }
 
-  writePage(url, title, text, text_content){
-    const id = uuidv4();
+  writePage(id, url, title, text, text_content){
     const row = {"id": id, "url": url, "title": title};
 
     if (text == true){
@@ -687,6 +703,15 @@ class Crawler {
     }
   }
   
+  initScreenshots() {
+    if (this.params.screenshot) {
+      this.screenShotDir = path.join(this.collDir, "screenshots");
+      if (!fs.existsSync(this.screenShotDir)) {
+        fs.mkdirSync(this.screenShotDir);
+      }
+    }
+  }
+
   shouldCrawl(url) {
     try {
       url = new URL(url);
