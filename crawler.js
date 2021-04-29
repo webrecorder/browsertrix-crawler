@@ -5,6 +5,7 @@ const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
 const path = require("path");
 const fs = require("fs");
+const fsp = require("fs/promises");
 const os = require("os");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
@@ -39,6 +40,9 @@ class Crawler {
 
     // links crawled counter
     this.numLinks = 0;
+
+    // pages file
+    this.pagesFH = null;
 
     // was the limit hit?
     this.limitHit = false;
@@ -488,13 +492,13 @@ class Crawler {
         text = await new TextExtract(result).parseTextFromDom();
       }
     
-      this.writePage(data.url, title, this.params.text, text);
+      await this.writePage(data.url, title, this.params.text, text);
 
       if (this.behaviorOpts) {
         await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
       }
 
-      this.writeStats();
+      await this.writeStats();
 
     } catch (e) {
       console.warn(e);
@@ -504,12 +508,13 @@ class Crawler {
   async createWARCInfo(filename) {
     const warcVersion = "WARC/1.1";
     const type = "warcinfo";
-    const packageFileJSON = JSON.parse(fs.readFileSync("../app/package.json"));
-    const pywb_version = fs.readFileSync("/usr/local/lib/python3.8/site-packages/pywb/version.py", "utf8").split("\n")[0].split("=")[1].trim().replace(/['"]+/g, "");
-    const warcioPackageJson = JSON.parse(fs.readFileSync("/app/node_modules/warcio/package.json"));
+    const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
+    const version = await fsp.readFile("/usr/local/lib/python3.8/site-packages/pywb/version.py", "utf8");
+    const pywbVersion = version.split("\n")[0].split("=")[1].trim().replace(/['"]+/g, "");
+    const warcioPackageJson = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
 
     const info = {
-      "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywb_version})`,
+      "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywbVersion})`,
       "format": "WARC File Format 1.1"
     };
     
@@ -518,8 +523,8 @@ class Crawler {
     return buffer;
   }
   
-  getFileSize(filename) {
-    var stats = fs.statSync(filename);
+  async getFileSize(filename) {
+    var stats = await fsp.stat(filename);
     return stats.size;
   }
 
@@ -544,7 +549,7 @@ class Crawler {
 
     this.cluster.task((opts) => this.crawlPage(opts));
 
-    this.initPages();
+    await this.initPages();
 
     this.queueUrl(this.params.url);
 
@@ -556,6 +561,10 @@ class Crawler {
     await this.cluster.close();
 
     this.writeStats();
+
+    if (this.pagesFH) {
+      await this.pagesFH.close();
+    }
 
     // extra wait for all resources to land into WARCs
     console.log("Waiting 5s to ensure WARCs are finished");
@@ -577,7 +586,7 @@ class Crawler {
       const archiveDir = path.join(this.collDir, "archive");
 
       // Get a list of the warcs inside
-      const warcFileList = fs.readdirSync(archiveDir);
+      const warcFileList = await fsp.readdir(archiveDir);
       
       // Build the argument list to pass to the wacz create command
       const waczFilename = this.params.collection.concat(".wacz");
@@ -591,7 +600,7 @@ class Crawler {
     }
   }
 
-  writeStats() {
+  async writeStats() {
     if (this.params.statsFilename) {
       const total = this.cluster.allTargetCount;
       const workersRunning = this.cluster.workersBusy.length;
@@ -600,7 +609,7 @@ class Crawler {
       const stats = {numCrawled, workersRunning, total, limit};
 
       try {
-        fs.writeFileSync(this.params.statsFilename, JSON.stringify(stats, null, 2));
+        await fsp.writeFile(this.params.statsFilename, JSON.stringify(stats, null, 2));
       } catch (err) {
         console.warn("Stats output failed", err);
       }
@@ -648,11 +657,26 @@ class Crawler {
     return true;
   }
 
-  initPages() {
+  async initPages() {
     try {
       // create pages dir if doesn't exist and write pages.jsonl header
-      if (!fs.existsSync(this.pagesDir)) {
-        fs.mkdirSync(this.pagesDir);
+      try {
+        await fs.stat(this.pagesDir);
+      } catch (e) {
+        await fsp.mkdir(this.pagesDir);
+      }
+
+      let createNew = false;
+
+      try {
+        await fs.stat(this.pagesFile);
+      } catch (e) {
+        createNew = true;
+      }
+
+      this.pagesFH = await fsp.open(this.pagesFile, "a");
+
+      if (createNew) {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
           console.log("creating pages with full text");
@@ -663,14 +687,15 @@ class Crawler {
           header["hasText"] = false;
         }
         const header_formatted = JSON.stringify(header).concat("\n");
-        fs.writeFileSync(this.pagesFile, header_formatted);
+        await this.pagesFH.writeFile(header_formatted);
       }
+
     } catch(err) {
       console.log("pages/pages.jsonl creation failed", err);
     }
   }
 
-  writePage(url, title, text, text_content){
+  async writePage(url, title, text, text_content){
     const id = uuidv4();
     const row = {"id": id, "url": url, "title": title};
 
@@ -680,7 +705,7 @@ class Crawler {
     
     const processedRow = JSON.stringify(row).concat("\n");
     try {
-      fs.appendFileSync(this.pagesFile, processedRow);
+      this.pagesFH.writeFile(processedRow);
     }
     catch (err) {
       console.warn("pages/pages.jsonl append failed", err);
@@ -807,17 +832,19 @@ class Crawler {
   }
 
   async combineWARC() {
-    console.log("Combining the warcs");
+    console.log("Combining the WARCs");
 
     // Get the list of created Warcs
-    const warcLists = fs.readdirSync(path.join(this.collDir, "archive"));
+    const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));
+
+    console.log(`Combining ${warcLists.length} WARCs...`);
 
     const fileSizeObjects = []; // Used to sort the created warc by fileSize
 
     // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
     for (let i = 0; i < warcLists.length; i++) {
       let fileName = path.join(this.collDir, "archive", warcLists[i]);
-      let fileSize = this.getFileSize(fileName);
+      let fileSize = await this.getFileSize(fileName);
       fileSizeObjects.push({"fileSize": fileSize, "fileName": fileName});
       fileSizeObjects.sort(function(a, b){
         return b.fileSize - a.fileSize;
@@ -832,6 +859,9 @@ class Crawler {
     // write combine WARC to collection root
     let combinedWarcFullPath = "";
 
+    // fileHandler
+    let fh = null;
+
     // Iterate through the sorted file size array.
     for (let j = 0; j < fileSizeObjects.length; j++) {
 
@@ -843,7 +873,7 @@ class Crawler {
         doRollover = true;
       } else {
         // Check the size of the existing combined warc.
-        const currentCombinedWarcSize = this.getFileSize(combinedWarcFullPath);
+        const currentCombinedWarcSize = await this.getFileSize(combinedWarcFullPath);
 
         //  If adding the current warc to the existing combined file creates a file smaller than the rollover size add the data to the combinedWarc
         const proposedWarcSize = fileSizeObjects[j].fileSize + currentCombinedWarcSize;
@@ -859,21 +889,41 @@ class Crawler {
         // 4. Write out the current warc data to the combinedFile
         combinedWarcNumber = combinedWarcNumber + 1;
 
-        const combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc`;
+        const combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc.gz`;
 
         // write combined warcs to root collection dir as they're output of a collection (like wacz)
         combinedWarcFullPath = path.join(this.collDir, combinedWarcName);
 
+        if (fh) {
+          fh.end();
+        }
+
+        fh = fs.createWriteStream(combinedWarcFullPath, {flags: "a"});
+
         generatedCombinedWarcs.push(combinedWarcName);
 
         const warcBuffer = await this.createWARCInfo(combinedWarcName);
-        fs.writeFileSync(combinedWarcFullPath, warcBuffer);
+        fh.write(warcBuffer);
       }
 
-      fs.appendFileSync(combinedWarcFullPath, fs.readFileSync(fileSizeObjects[j].fileName));
+      console.log(`Appending WARC ${fileSizeObjects[j].fileName}`);
+
+      const reader = fs.createReadStream(fileSizeObjects[j].fileName);
+
+      const p = new Promise((resolve) => {
+        reader.on("end", () => resolve());
+      });
+
+      reader.pipe(fh, {end: false});
+
+      await p;
     }
 
-    console.log(`Combined warcs saved as: ${generatedCombinedWarcs}`);
+    if (fh) {
+      await fh.end();
+    }
+
+    console.log(`Combined WARCs saved as: ${generatedCombinedWarcs}`);
   }
 }
 
