@@ -660,7 +660,10 @@ class Crawler {
   async initPages() {
     try {
       // create pages dir if doesn't exist and write pages.jsonl header
-      if (!await fs.exists(this.pagesDir)) {
+      try {
+        await fs.stat(this.pagesDir);
+        this.pagesFH = await fsp.open(this.pagesFile, "a");
+      } catch (e) {
         await fsp.mkdir(this.pagesDir);
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
@@ -674,8 +677,6 @@ class Crawler {
         const header_formatted = JSON.stringify(header).concat("\n");
         this.pagesFH = await fsp.open(this.pagesFile, "a");
         await this.pagesFH.writeFile(this.pagesFH, header_formatted);
-      } else {
-        this.pagesFH = await fsp.open(this.pagesFile, "a");
       }
     } catch(err) {
       console.log("pages/pages.jsonl creation failed", err);
