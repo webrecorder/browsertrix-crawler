@@ -662,9 +662,21 @@ class Crawler {
       // create pages dir if doesn't exist and write pages.jsonl header
       try {
         await fs.stat(this.pagesDir);
-        this.pagesFH = await fsp.open(this.pagesFile, "a");
       } catch (e) {
         await fsp.mkdir(this.pagesDir);
+      }
+
+      let createNew = false;
+
+      try {
+        await fs.stat(this.pagesFile);
+      } catch (e) {
+        createNew = true;
+      }
+
+      this.pagesFH = await fsp.open(this.pagesFile, "a");
+
+      if (createNew) {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
           console.log("creating pages with full text");
@@ -675,9 +687,9 @@ class Crawler {
           header["hasText"] = false;
         }
         const header_formatted = JSON.stringify(header).concat("\n");
-        this.pagesFH = await fsp.open(this.pagesFile, "a");
-        await this.pagesFH.writeFile(this.pagesFH, header_formatted);
+        await this.pagesFH.writeFile(header_formatted);
       }
+
     } catch(err) {
       console.log("pages/pages.jsonl creation failed", err);
     }
