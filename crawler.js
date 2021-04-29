@@ -793,25 +793,6 @@ class Crawler {
     abort.abort();
   }
 
-  async awaitPendingClear() {
-    console.log("Waiting to ensure pending data is written to WARC...");
-
-    const redis = new Redis("redis://localhost/0");
-
-    while (true) {
-      const res = await redis.get(`pywb:${this.params.collection}:pending`);
-      if (res === "0" || !res) {
-        break;
-      }
-
-      // the counter actually counts 1 for request, and 1 for response
-      // to make it more clear, divide by 2 to show total number of requests + responses
-      console.log(`Still waiting for ${res / 2.0} pending request(s) to finish...`);
-
-      await this.sleep(1000);
-    }
-  }
-
   sleep(time) {
     return new Promise(resolve => setTimeout(resolve, time));
   }
