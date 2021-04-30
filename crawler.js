@@ -617,13 +617,14 @@ class Crawler {
   }
 
   async extractLinks(page, selector = "a[href]") {
-    let results = null;
+    let results = [];
 
     try {
-      results = await page.evaluate((selector) => {
+      await Promise.allSettled(page.frames().map(frame => frame.evaluate((selector) => {
         /* eslint-disable-next-line no-undef */
         return [...document.querySelectorAll(selector)].map(elem => elem.href);
-      }, selector);
+      }, selector))).then((linkResults) => {
+        linkResults.forEach((linkResult) => {linkResult.value.forEach(link => results.push(link));});});
     } catch (e) {
       console.warn("Link Extraction failed", e);
       return;

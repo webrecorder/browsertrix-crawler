@@ -8,7 +8,7 @@ and [puppeteer](https://github.com/puppeteer/puppeteer) to control one or more b
 Thus far, Browsertrix Crawler supports:
 
 - Single-container, browser based crawling with multiple headless/headful browsers.
-- Support for custom browser behaviors, ysing [Browsertix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) including autoscroll, video autoplay and site-specific behaviors.
+- Support for custom browser behaviors, using [Browsertix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) including autoscroll, video autoplay and site-specific behaviors.
 - Optimized (non-browser) capture of non-HTML resources.
 - Extensible Puppeteer driver script for customizing behavior per crawl or page.
 - Ability to create and reuse browser profiles with user/password login
