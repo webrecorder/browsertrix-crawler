@@ -70,7 +70,7 @@ class Crawler {
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
-
+    
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
   }
@@ -661,21 +661,14 @@ class Crawler {
 
   async initPages() {
     try {
-      // create pages dir if doesn't exist and write pages.jsonl header
-      try {
-        await fs.stat(this.pagesDir);
-      } catch (e) {
-        await fsp.mkdir(this.pagesDir);
-      }
-
       let createNew = false;
 
-      try {
-        await fs.stat(this.pagesFile);
-      } catch (e) {
+      // create pages dir if doesn't exist and write pages.jsonl header
+      if (fs.existsSync(this.pagesDir) != true){
+        await fsp.mkdir(this.pagesDir);
         createNew = true;
       }
-
+        
       this.pagesFH = await fsp.open(this.pagesFile, "a");
 
       if (createNew) {
