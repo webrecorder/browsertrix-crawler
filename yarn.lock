@@ -1046,10 +1046,10 @@ browserslist@^4.14.5:
     escalade "^3.1.1"
     node-releases "^1.1.70"
 
-browsertrix-behaviors@^0.2.0:
-  version "0.2.0"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.2.0.tgz#35b4fead29b4138e495ccd759e2506fb7502a239"
-  integrity sha512-Kn/X2HB0/Mchz04T/CWsTr84opNG1lTpQFodYqPq0CXvdc7dHD05DgyvK4ZI+tpqa6Ul4extiQkj52p0YTR7mg==
+browsertrix-behaviors@^0.2.1:
+  version "0.2.1"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.2.1.tgz#5a3b7d2f1ed5dad5054312738c69748b8ec638b8"
+  integrity sha512-NkReAj+PMS91oewA0tpsyvQVFspsy8mhKLXT8sg33pSDGYCDVlezqPt2agKmsmG1Y2m39yOzt31L8A3v4WcJDw==
 
 bser@2.1.1:
   version "2.1.1"
