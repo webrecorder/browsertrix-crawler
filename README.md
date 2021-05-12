@@ -52,7 +52,10 @@ Options:
       --help                                Show help                  [boolean]
       --version                             Show version number        [boolean]
   -u, --url                                 The URL to start crawling from
-                                                             [string] [required]
+                                                              [string] 
+   --urlFileList,							A .txt file with each url to be archived seperated by a new line. If     --urlfilelist, 						   this is set the --url flag will be ignored.
+   --urlFILELIST     						[.txt file] 
+                 							
   -w, --workers                             The number of workers to run in
                                             parallel       [number] [default: 1]
       --newContext                          The context for each new capture,

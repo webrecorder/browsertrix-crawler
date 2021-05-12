@@ -319,7 +319,7 @@ class Crawler {
     }
     
     if (argv.url && argv.urlFileList) {
-      console.log("You've passed a urlFileList, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.")
+      console.log("You've passed a urlFileList, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
     }
     
     if (!argv.scope && argv.url && !argv.urlFileList) {
@@ -564,9 +564,9 @@ class Crawler {
     await this.initPages();
     
     if (this.params.urlFileList) {
-      const urlSeedFile =  await fsp.readFile(path.join(__dirname, this.params.urlFileList), "utf8")
-      const urlSeedFileList = urlSeedFile.split("\n")
-      this.queueUrls(urlSeedFileList, true) 
+      const urlSeedFile =  await fsp.readFile(path.join(__dirname, this.params.urlFileList), "utf8");
+      const urlSeedFileList = urlSeedFile.split("\n");
+      this.queueUrls(urlSeedFileList, true); 
     }
     
     if (!this.params.urlFileList) {
@@ -748,7 +748,7 @@ class Crawler {
     let inScope = false;
 
     if (ignoreScope){
-      inScope = true
+      inScope = true;
     }
     
     // check scopes
