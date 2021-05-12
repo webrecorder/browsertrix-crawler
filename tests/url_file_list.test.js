@@ -14,7 +14,7 @@ test("check that all urls in a file list are crawled when the filelisturl param 
     console.log(error);
   }
 
-  let crawled_pages = fs.readFileSync("crawls/collections/filelisttest/pages/pages.jsonl", "utf8").split("\n").sort();
+  let crawled_pages = fs.readFileSync("crawls/collections/filelisttest/pages/pages.jsonl", "utf8");
   let seed_file = fs.readFileSync("tests/fixtures/urlSeedFile.txt", "utf8").split("\n").sort();
 
   let seed_file_list = [];
@@ -23,9 +23,9 @@ test("check that all urls in a file list are crawled when the filelisturl param 
       seed_file_list.push(seed_file[j]);
     }
   }
-
-  let foundSeedUrl = true; 
   
+  let foundSeedUrl = true; 
+
   for (var i = 1; i < seed_file_list.length; i++) {
     if (crawled_pages.indexOf(seed_file_list[i]) == -1){
       foundSeedUrl = false;
