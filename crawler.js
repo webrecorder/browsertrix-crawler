@@ -5,10 +5,13 @@ const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
 const path = require("path");
 const fs = require("fs");
+const fsp = require("fs/promises");
 const os = require("os");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 const warcio = require("warcio");
+
+const Redis = require("ioredis");
 
 const TextExtract = require("./textextract");
 const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
@@ -40,6 +43,9 @@ class Crawler {
     // links crawled counter
     this.numLinks = 0;
 
+    // pages file
+    this.pagesFH = null;
+
     // was the limit hit?
     this.limitHit = false;
 
@@ -64,7 +70,7 @@ class Crawler {
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
-
+    
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
   }
@@ -148,7 +154,6 @@ class Crawler {
         alias: "u",
         describe: "The URL to start crawling from",
         type: "string",
-        demandOption: true,
       },
 
       "workers": {
@@ -243,9 +248,8 @@ class Crawler {
       
       "urlFileList": {
         alias: ["urlfilelist", "urlFILELIST"],
-        describe: "If set, read a list of urls from the passed file. The default file name is urlSeedFile.txt",
+        describe: "If set, read a list of urls from the passed file INSTEAD of the url from the --url flag. The default file name is urlSeedFile.txt",
         type: "string",
-        default: "",
       },
       
       "text": {
@@ -313,20 +317,15 @@ class Crawler {
       //argv.seeds = [Crawler.validateUserUrl(argv.url)];
       argv.url = this.validateUserUrl(argv.url);
     }
-
-    if (!argv.scope) {
+    
+    if (argv.url && argv.urlFileList) {
+      console.log("You've passed a urlFileList, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.")
+    }
+    
+    if (!argv.scope && argv.url && !argv.urlFileList) {
       //argv.scope = url.href.slice(0, url.href.lastIndexOf("/") + 1);
       argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
-      if (argv.urlFileList != "") {
-        let urlFileList = fs.readFileSync( path.join(__dirname, argv.urlFileList), "utf-8").split("\n");
-        for (let url of urlFileList) {
-          if (url.substr(-1) != "/"){
-            url = url + "/";
-          }
-          let urlScope = new RegExp("^" + this.rxEscape(url.slice(0, url.lastIndexOf("/") + 1)));
-          argv.scope.push(urlScope);
-        }
-      }
+  
     }
     
     
@@ -505,13 +504,13 @@ class Crawler {
         text = await new TextExtract(result).parseTextFromDom();
       }
     
-      this.writePage(data.url, title, this.params.text, text);
+      await this.writePage(data.url, title, this.params.text, text);
 
       if (this.behaviorOpts) {
         await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
       }
 
-      this.writeStats();
+      await this.writeStats();
 
     } catch (e) {
       console.warn(e);
@@ -521,12 +520,13 @@ class Crawler {
   async createWARCInfo(filename) {
     const warcVersion = "WARC/1.1";
     const type = "warcinfo";
-    const packageFileJSON = JSON.parse(fs.readFileSync("../app/package.json"));
-    const pywb_version = fs.readFileSync("/usr/local/lib/python3.8/site-packages/pywb/version.py", "utf8").split("\n")[0].split("=")[1].trim().replace(/['"]+/g, "");
-    const warcioPackageJson = JSON.parse(fs.readFileSync("/app/node_modules/warcio/package.json"));
+    const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
+    const version = await fsp.readFile("/usr/local/lib/python3.8/site-packages/pywb/version.py", "utf8");
+    const pywbVersion = version.split("\n")[0].split("=")[1].trim().replace(/['"]+/g, "");
+    const warcioPackageJson = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
 
     const info = {
-      "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywb_version})`,
+      "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywbVersion})`,
       "format": "WARC File Format 1.1"
     };
     
@@ -535,8 +535,8 @@ class Crawler {
     return buffer;
   }
   
-  getFileSize(filename) {
-    var stats = fs.statSync(filename);
+  async getFileSize(filename) {
+    var stats = await fsp.stat(filename);
     return stats.size;
   }
 
@@ -561,15 +561,17 @@ class Crawler {
 
     this.cluster.task((opts) => this.crawlPage(opts));
     
-    this.initPages();
+    await this.initPages();
     
-    if (this.params.urlFileList != "") {
-      let urlSeedFile = fs.readFileSync( path.join(__dirname, this.params.urlFileList), "utf-8").split("\n");
-      this.queueUrls(urlSeedFile);
+    if (this.params.urlFileList) {
+      const urlSeedFile =  await fsp.readFile(path.join(__dirname, this.params.urlFileList), "utf8")
+      const urlSeedFileList = urlSeedFile.split("\n")
+      this.queueUrls(urlSeedFileList, true) 
     }
     
-    this.queueUrl(this.params.url);
-
+    if (!this.params.urlFileList) {
+      this.queueUrl(this.params.url);
+    }
     if (this.params.useSitemap) {
       await this.parseSitemap(this.params.useSitemap);
     }
@@ -579,10 +581,13 @@ class Crawler {
 
     this.writeStats();
 
+    if (this.pagesFH) {
+      await this.pagesFH.close();
+    }
+
     // extra wait for all resources to land into WARCs
-    console.log("Waiting 5s to ensure WARCs are finished");
-    await this.sleep(5000);
-    
+    await this.awaitPendingClear();
+
     if (this.params.combineWARC) {
       await this.combineWARC();
     }
@@ -599,7 +604,7 @@ class Crawler {
       const archiveDir = path.join(this.collDir, "archive");
 
       // Get a list of the warcs inside
-      const warcFileList = fs.readdirSync(archiveDir);
+      const warcFileList = await fsp.readdir(archiveDir);
       
       // Build the argument list to pass to the wacz create command
       const waczFilename = this.params.collection.concat(".wacz");
@@ -613,7 +618,7 @@ class Crawler {
     }
   }
 
-  writeStats() {
+  async writeStats() {
     if (this.params.statsFilename) {
       const total = this.cluster.allTargetCount;
       const workersRunning = this.cluster.workersBusy.length;
@@ -622,7 +627,7 @@ class Crawler {
       const stats = {numCrawled, workersRunning, total, limit};
 
       try {
-        fs.writeFileSync(this.params.statsFilename, JSON.stringify(stats, null, 2));
+        await fsp.writeFile(this.params.statsFilename, JSON.stringify(stats, null, 2));
       } catch (err) {
         console.warn("Stats output failed", err);
       }
@@ -630,13 +635,14 @@ class Crawler {
   }
 
   async extractLinks(page, selector = "a[href]") {
-    let results = null;
+    let results = [];
 
     try {
-      results = await page.evaluate((selector) => {
+      await Promise.allSettled(page.frames().map(frame => frame.evaluate((selector) => {
         /* eslint-disable-next-line no-undef */
         return [...document.querySelectorAll(selector)].map(elem => elem.href);
-      }, selector);
+      }, selector))).then((linkResults) => {
+        linkResults.forEach((linkResult) => {linkResult.value.forEach(link => results.push(link));});});
     } catch (e) {
       console.warn("Link Extraction failed", e);
       return;
@@ -644,10 +650,10 @@ class Crawler {
     this.queueUrls(results);
   }
 
-  queueUrls(urls) {
+  queueUrls(urls, ignoreScope=false) {
     try {
       for (const url of urls) {
-        const captureUrl = this.shouldCrawl(url);
+        const captureUrl = this.shouldCrawl(url, ignoreScope);
         if (captureUrl) {
           if (!this.queueUrl(captureUrl)) {
             break;
@@ -670,11 +676,19 @@ class Crawler {
     return true;
   }
 
-  initPages() {
+  async initPages() {
     try {
+      let createNew = false;
+
       // create pages dir if doesn't exist and write pages.jsonl header
-      if (!fs.existsSync(this.pagesDir)) {
-        fs.mkdirSync(this.pagesDir);
+      if (fs.existsSync(this.pagesDir) != true){
+        await fsp.mkdir(this.pagesDir);
+        createNew = true;
+      }
+        
+      this.pagesFH = await fsp.open(this.pagesFile, "a");
+
+      if (createNew) {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
           console.log("creating pages with full text");
@@ -685,14 +699,15 @@ class Crawler {
           header["hasText"] = false;
         }
         const header_formatted = JSON.stringify(header).concat("\n");
-        fs.writeFileSync(this.pagesFile, header_formatted);
+        await this.pagesFH.writeFile(header_formatted);
       }
+
     } catch(err) {
       console.log("pages/pages.jsonl creation failed", err);
     }
   }
 
-  writePage(url, title, text, text_content){
+  async writePage(url, title, text, text_content){
     const id = uuidv4();
     const row = {"id": id, "url": url, "title": title};
 
@@ -702,14 +717,14 @@ class Crawler {
     
     const processedRow = JSON.stringify(row).concat("\n");
     try {
-      fs.appendFileSync(this.pagesFile, processedRow);
+      this.pagesFH.writeFile(processedRow);
     }
     catch (err) {
       console.warn("pages/pages.jsonl append failed", err);
     }
   }
   
-  shouldCrawl(url) {
+  shouldCrawl(url, ignoreScope) {
     try {
       url = new URL(url);
     } catch(e) {
@@ -732,15 +747,20 @@ class Crawler {
     }
     let inScope = false;
 
+    if (ignoreScope){
+      inScope = true
+    }
+    
     // check scopes
-    for (const s of this.params.scope) {
-      if (s.exec(url)) {
-        inScope = true;
-        break;
+    if (!ignoreScope){
+      for (const s of this.params.scope) {
+        if (s.exec(url)) {
+          inScope = true;
+          break;
+        }
       }
     }
     
-
     if (!inScope) {
       //console.log(`Not in scope ${url} ${scope}`);
       return false;
@@ -803,6 +823,23 @@ class Crawler {
     abort.abort();
   }
 
+  async awaitPendingClear() {
+    console.log("Waiting to ensure pending data is written to WARC...");
+
+    const redis = new Redis("redis://localhost/0");
+
+    while (true) {
+      const res = await redis.get(`pywb:${this.params.collection}:pending`);
+      if (res === "0" || !res) {
+        break;
+      }
+
+      console.log(`Still waiting for ${res} pending requests to finish...`);
+
+      await this.sleep(1000);
+    }
+  }
+
   sleep(time) {
     return new Promise(resolve => setTimeout(resolve, time));
   }
@@ -820,26 +857,26 @@ class Crawler {
 
     try {
       const { sites } = await sitemapper.fetch();
-
       this.queueUrls(sites);
-
     } catch(e) {
       console.log(e);
     }
   }
 
   async combineWARC() {
-    console.log("Combining the warcs");
+    console.log("Combining the WARCs");
 
     // Get the list of created Warcs
-    const warcLists = fs.readdirSync(path.join(this.collDir, "archive"));
+    const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));
+
+    console.log(`Combining ${warcLists.length} WARCs...`);
 
     const fileSizeObjects = []; // Used to sort the created warc by fileSize
 
     // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
     for (let i = 0; i < warcLists.length; i++) {
       let fileName = path.join(this.collDir, "archive", warcLists[i]);
-      let fileSize = this.getFileSize(fileName);
+      let fileSize = await this.getFileSize(fileName);
       fileSizeObjects.push({"fileSize": fileSize, "fileName": fileName});
       fileSizeObjects.sort(function(a, b){
         return b.fileSize - a.fileSize;
@@ -854,6 +891,9 @@ class Crawler {
     // write combine WARC to collection root
     let combinedWarcFullPath = "";
 
+    // fileHandler
+    let fh = null;
+
     // Iterate through the sorted file size array.
     for (let j = 0; j < fileSizeObjects.length; j++) {
 
@@ -865,7 +905,7 @@ class Crawler {
         doRollover = true;
       } else {
         // Check the size of the existing combined warc.
-        const currentCombinedWarcSize = this.getFileSize(combinedWarcFullPath);
+        const currentCombinedWarcSize = await this.getFileSize(combinedWarcFullPath);
 
         //  If adding the current warc to the existing combined file creates a file smaller than the rollover size add the data to the combinedWarc
         const proposedWarcSize = fileSizeObjects[j].fileSize + currentCombinedWarcSize;
@@ -881,21 +921,41 @@ class Crawler {
         // 4. Write out the current warc data to the combinedFile
         combinedWarcNumber = combinedWarcNumber + 1;
 
-        const combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc`;
+        const combinedWarcName = `${this.params.collection}_${combinedWarcNumber}.warc.gz`;
 
         // write combined warcs to root collection dir as they're output of a collection (like wacz)
         combinedWarcFullPath = path.join(this.collDir, combinedWarcName);
 
+        if (fh) {
+          fh.end();
+        }
+
+        fh = fs.createWriteStream(combinedWarcFullPath, {flags: "a"});
+
         generatedCombinedWarcs.push(combinedWarcName);
 
         const warcBuffer = await this.createWARCInfo(combinedWarcName);
-        fs.writeFileSync(combinedWarcFullPath, warcBuffer);
+        fh.write(warcBuffer);
       }
 
-      fs.appendFileSync(combinedWarcFullPath, fs.readFileSync(fileSizeObjects[j].fileName));
+      console.log(`Appending WARC ${fileSizeObjects[j].fileName}`);
+
+      const reader = fs.createReadStream(fileSizeObjects[j].fileName);
+
+      const p = new Promise((resolve) => {
+        reader.on("end", () => resolve());
+      });
+
+      reader.pipe(fh, {end: false});
+
+      await p;
     }
 
-    console.log(`Combined warcs saved as: ${generatedCombinedWarcs}`);
+    if (fh) {
+      await fh.end();
+    }
+
+    console.log(`Combined WARCs saved as: ${generatedCombinedWarcs}`);
   }
 }
 

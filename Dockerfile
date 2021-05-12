@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=88
+ARG BROWSER_VERSION=90
 
 FROM oldwebtoday/chrome:${BROWSER_VERSION} as chrome
 
