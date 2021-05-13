@@ -154,7 +154,6 @@ class Crawler {
         alias: "u",
         describe: "The URL to start crawling from",
         type: "string",
-        demandOption: true,
       },
 
       "workers": {
@@ -246,7 +245,13 @@ class Crawler {
         type: "string",
         default: "stats",
       },
-    
+      
+      "urlFile": {
+        alias: ["urlfile", "url-file", "url-list"],
+        describe: "If set, read a list of urls from the passed file INSTEAD of the url from the --url flag.",
+        type: "string",
+      },
+      
       "text": {
         describe: "If set, extract text to the pages.jsonl file",
         type: "boolean",
@@ -312,10 +317,15 @@ class Crawler {
       //argv.seeds = [Crawler.validateUserUrl(argv.url)];
       argv.url = this.validateUserUrl(argv.url);
     }
-
-    if (!argv.scope) {
+    
+    if (argv.url && argv.urlFile) {
+      console.log("You've passed a urlFile param, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
+    }
+    
+    if (!argv.scope && argv.url && !argv.urlFile) {
       //argv.scope = url.href.slice(0, url.href.lastIndexOf("/") + 1);
       argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
+  
     }
     
     
@@ -550,11 +560,18 @@ class Crawler {
     });
 
     this.cluster.task((opts) => this.crawlPage(opts));
-
+    
     await this.initPages();
-
-    this.queueUrl(this.params.url);
-
+    
+    if (this.params.urlFile) {
+      const urlSeedFile =  await fsp.readFile(path.join(__dirname, this.params.urlFile), "utf8");
+      const urlSeedFileList = urlSeedFile.split("\n");
+      this.queueUrls(urlSeedFileList, true); 
+    }
+    
+    if (!this.params.urlFile) {
+      this.queueUrl(this.params.url);
+    }
     if (this.params.useSitemap) {
       await this.parseSitemap(this.params.useSitemap);
     }
@@ -633,10 +650,10 @@ class Crawler {
     this.queueUrls(results);
   }
 
-  queueUrls(urls) {
+  queueUrls(urls, ignoreScope=false) {
     try {
       for (const url of urls) {
-        const captureUrl = this.shouldCrawl(url);
+        const captureUrl = this.shouldCrawl(url, ignoreScope);
         if (captureUrl) {
           if (!this.queueUrl(captureUrl)) {
             break;
@@ -707,7 +724,7 @@ class Crawler {
     }
   }
   
-  shouldCrawl(url) {
+  shouldCrawl(url, ignoreScope) {
     try {
       url = new URL(url);
     } catch(e) {
@@ -728,17 +745,22 @@ class Crawler {
     if (this.seenList.has(url)) {
       return false;
     }
-
     let inScope = false;
 
+    if (ignoreScope){
+      inScope = true;
+    }
+    
     // check scopes
-    for (const s of this.params.scope) {
-      if (s.exec(url)) {
-        inScope = true;
-        break;
+    if (!ignoreScope){
+      for (const s of this.params.scope) {
+        if (s.exec(url)) {
+          inScope = true;
+          break;
+        }
       }
     }
-
+    
     if (!inScope) {
       //console.log(`Not in scope ${url} ${scope}`);
       return false;
@@ -835,9 +857,7 @@ class Crawler {
 
     try {
       const { sites } = await sitemapper.fetch();
-
       this.queueUrls(sites);
-
     } catch(e) {
       console.log(e);
     }

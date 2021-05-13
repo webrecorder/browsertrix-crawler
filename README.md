@@ -52,7 +52,10 @@ Options:
       --help                                Show help                  [boolean]
       --version                             Show version number        [boolean]
   -u, --url                                 The URL to start crawling from
-                                                             [string] [required]
+                                                              [string] 
+      --urlFile, --urlfile, --url-file,     If set, read a list of urls from the
+      --url-list                            passed file INSTEAD of the url from
+                                            the --url flag.             [string]
   -w, --workers                             The number of workers to run in
                                             parallel       [number] [default: 1]
       --newContext                          The context for each new capture,
