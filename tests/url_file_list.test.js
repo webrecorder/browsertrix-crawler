@@ -7,8 +7,7 @@ test("check that all urls in a file list are crawled when the filelisturl param 
 
   try{
 
-    await exec("docker-compose run crawler crawl --collection filelisttest --urlFileList fixtures/urlSeedFile.txt");
-
+    await exec("docker-compose run -v $PWD/tests/fixtures:/app/tests/fixtures  crawler crawl --collection filelisttest --urlFileList tests/fixtures/urlSeedFile.txt --timeout 10000");
   }
   catch (error) {
     console.log(error);
