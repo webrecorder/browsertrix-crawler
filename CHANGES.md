@@ -1,7 +1,7 @@
 ## CHANGES
 
 v0.3.2
-- Added the --urlList options: Allows users to specify a .txt file list of exact URLs to crawl (one URL per line).
+- Added a `--urlFile` option: Allows users to specify a .txt file list of exact URLs to crawl (one URL per line).
 
 
 v0.3.1

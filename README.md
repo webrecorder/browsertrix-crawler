@@ -53,9 +53,9 @@ Options:
       --version                             Show version number        [boolean]
   -u, --url                                 The URL to start crawling from
                                                               [string] 
-   --urlFileList,							A .txt file with each url to be archived seperated by a new line. If     --urlfilelist, 						   this is set the --url flag will be ignored.
-   --urlFILELIST     						[.txt file] 
-                 							
+      --urlFile, --urlfile, --url-file,     If set, read a list of urls from the
+      --url-list                            passed file INSTEAD of the url from
+                                            the --url flag.             [string]
   -w, --workers                             The number of workers to run in
                                             parallel       [number] [default: 1]
       --newContext                          The context for each new capture,
