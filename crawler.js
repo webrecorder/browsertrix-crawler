@@ -247,8 +247,8 @@ class Crawler {
       },
       
       "urlFile": {
-        alias: ["urlfile", "url-file"],
-        describe: "If set, read a list of urls from the passed file INSTEAD of the url from the --url flag. The default file name is urlSeedFile.txt",
+        alias: ["urlfile", "url-file", "url-list"],
+        describe: "If set, read a list of urls from the passed file INSTEAD of the url from the --url flag.",
         type: "string",
       },
       

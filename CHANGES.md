@@ -1,8 +1,7 @@
 ## CHANGES
 
 v0.3.2
-- Adding the urlFileList flag: Adds a flag so that users can pass a .txt file list of urls to crawl instead of a single url that has it's scope evaluated
-
+- Added the --urlList options: Allows users to specify a .txt file list of exact URLs to crawl (one URL per line).
 
 
 v0.3.1
