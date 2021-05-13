@@ -246,8 +246,8 @@ class Crawler {
         default: "stats",
       },
       
-      "urlFileList": {
-        alias: ["urlfilelist", "urlFILELIST"],
+      "urlFile": {
+        alias: ["urlfile", "url-file"],
         describe: "If set, read a list of urls from the passed file INSTEAD of the url from the --url flag. The default file name is urlSeedFile.txt",
         type: "string",
       },
@@ -318,11 +318,11 @@ class Crawler {
       argv.url = this.validateUserUrl(argv.url);
     }
     
-    if (argv.url && argv.urlFileList) {
-      console.log("You've passed a urlFileList, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
+    if (argv.url && argv.urlFile) {
+      console.log("You've passed a urlFile param, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
     }
     
-    if (!argv.scope && argv.url && !argv.urlFileList) {
+    if (!argv.scope && argv.url && !argv.urlFile) {
       //argv.scope = url.href.slice(0, url.href.lastIndexOf("/") + 1);
       argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
   
@@ -563,13 +563,13 @@ class Crawler {
     
     await this.initPages();
     
-    if (this.params.urlFileList) {
-      const urlSeedFile =  await fsp.readFile(path.join(__dirname, this.params.urlFileList), "utf8");
+    if (this.params.urlFile) {
+      const urlSeedFile =  await fsp.readFile(path.join(__dirname, this.params.urlFile), "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
       this.queueUrls(urlSeedFileList, true); 
     }
     
-    if (!this.params.urlFileList) {
+    if (!this.params.urlFile) {
       this.queueUrl(this.params.url);
     }
     if (this.params.useSitemap) {
