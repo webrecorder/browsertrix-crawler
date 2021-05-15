@@ -64,6 +64,10 @@ class Crawler {
     this.params = params;
     this.capturePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record/id_/`;
 
+    this.gotoOpts = {
+      waitUntil: this.params.waitUntil,
+      timeout: this.params.timeout
+    };
 
     // root collections dir
     this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
@@ -126,7 +130,7 @@ class Crawler {
     this.headers = {"User-Agent": this.userAgent};
 
     child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
-    
+
     child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
@@ -192,6 +196,10 @@ class Crawler {
 
       "exclude": {
         describe: "Regex of page URLs that should be excluded from the crawl."
+      },
+
+      "spaMode": {
+        describe: "Crawl single-page app, following hashtag links",
       },
 
       "collection": {
@@ -307,15 +315,18 @@ class Crawler {
       throw new Error("URL must start with http:// or https://");
     }
 
-    return url.href;
+    return url;
   }
 
   validateArgs(argv) {
+    let purl;
+
     if (argv.url) {
       // Scope for crawl, default to the domain of the URL
       // ensure valid url is used (adds trailing slash if missing)
       //argv.seeds = [Crawler.validateUserUrl(argv.url)];
-      argv.url = this.validateUserUrl(argv.url);
+      purl = this.validateUserUrl(argv.url);
+      argv.url = purl.href;
     }
     
     if (argv.url && argv.urlFile) {
@@ -323,12 +334,16 @@ class Crawler {
     }
     
     if (!argv.scope && argv.url && !argv.urlFile) {
-      //argv.scope = url.href.slice(0, url.href.lastIndexOf("/") + 1);
-      argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
-  
+
+      if (argv.spaMode) {
+        // allow only hashtags for current page
+        argv.scope = [new RegExp("^" + this.rxEscape(argv.url).replace(purl.protocol, "https?:") + "#.+")];
+      } else {
+        argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
+      }
     }
-    
-    
+
+
     // Check that the collection name is valid.
     if (argv.collection.search(/^[\w][\w-]*$/) === -1){
       throw new Error(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
@@ -439,6 +454,7 @@ class Crawler {
       "--autoplay-policy=no-user-gesture-required",
       "--disable-features=IsolateOrigins,site-per-process",
       "--disable-popup-blocking"
+      "--disable-backgrounding-occluded-windows",
     ];
   }
 
@@ -564,9 +580,9 @@ class Crawler {
     await this.initPages();
     
     if (this.params.urlFile) {
-      const urlSeedFile =  await fsp.readFile(path.join(__dirname, this.params.urlFile), "utf8");
+      const urlSeedFile =  await fsp.readFile(this.params.urlFile, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
-      this.queueUrls(urlSeedFileList, true); 
+      this.queueUrls(urlSeedFileList, true, true); 
     }
     
     if (!this.params.urlFile) {
@@ -634,6 +650,23 @@ class Crawler {
     }
   }
 
+  async loadPage(page, url, selector = "a[href]") {
+    if (!await this.isHTML(url)) {
+      await this.directFetchCapture(url);
+      return;
+    }
+
+    try {
+      await page.goto(url, this.gotoOpts);
+    } catch (e) {
+      console.log(`Load timeout for ${url}`, e);
+    }
+
+    if (selector) {
+      await this.extractLinks(page, selector);
+    }
+  }
+
   async extractLinks(page, selector = "a[href]") {
     let results = [];
 
@@ -650,10 +683,10 @@ class Crawler {
     this.queueUrls(results);
   }
 
-  queueUrls(urls, ignoreScope=false) {
+  queueUrls(urls, ignoreScope=false, allowHash=false) {
     try {
       for (const url of urls) {
-        const captureUrl = this.shouldCrawl(url, ignoreScope);
+        const captureUrl = this.shouldCrawl(url, ignoreScope, allowHash);
         if (captureUrl) {
           if (!this.queueUrl(captureUrl)) {
             break;
@@ -724,15 +757,17 @@ class Crawler {
     }
   }
   
-  shouldCrawl(url, ignoreScope) {
+  shouldCrawl(url, ignoreScope, allowHash) {
     try {
       url = new URL(url);
     } catch(e) {
       return false;
     }
 
-    // remove hashtag
-    url.hash = "";
+    if (!this.params.spaMode && !allowHash) {
+      // remove hashtag
+      url.hash = "";
+    }
 
     // only queue http/https URLs
     if (url.protocol != "http:" && url.protocol != "https:") {

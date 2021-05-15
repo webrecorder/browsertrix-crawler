@@ -16,7 +16,7 @@ recorder:
 
 #autoindex: 10
 
-enable_auto_fetch: true
+#enable_auto_fetch: true
 
 collections:
   live: $live
