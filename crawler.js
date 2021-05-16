@@ -129,13 +129,21 @@ class Crawler {
     
     this.headers = {"User-Agent": this.userAgent};
 
-    child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
+    const subprocesses = [];
+
+    subprocesses.push(child_process.spawn("redis-server", {...opts, cwd: "/tmp/"}));
 
     child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
     
-    child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts);
+    subprocesses.push(child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts));
+
+    process.on("exit", () => {
+      for (const proc of subprocesses) {
+        proc.kill();
+      }
+    });
 
     if (!this.params.headless) {
       child_process.spawn("Xvfb", [
