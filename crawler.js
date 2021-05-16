@@ -202,6 +202,10 @@ class Crawler {
         describe: "Crawl single-page app, following hashtag links",
       },
 
+      "allowHash": {
+        describe: "Allow Hashtag URLs, useful for single-page-application crawling",
+      },
+
       "collection": {
         alias: "c",
         describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",
@@ -338,6 +342,7 @@ class Crawler {
       if (argv.spaMode) {
         // allow only hashtags for current page
         argv.scope = [new RegExp("^" + this.rxEscape(argv.url).replace(purl.protocol, "https?:") + "#.+")];
+        argv.allowHash = true;
       } else {
         argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
       }
@@ -582,7 +587,8 @@ class Crawler {
     if (this.params.urlFile) {
       const urlSeedFile =  await fsp.readFile(this.params.urlFile, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
-      this.queueUrls(urlSeedFileList, true, true); 
+      this.queueUrls(urlSeedFileList, true);
+      this.params.allowHash = true;
     }
     
     if (!this.params.urlFile) {
@@ -598,6 +604,7 @@ class Crawler {
     this.writeStats();
 
     if (this.pagesFH) {
+      await this.pagesFH.sync();
       await this.pagesFH.close();
     }
 
@@ -683,10 +690,10 @@ class Crawler {
     this.queueUrls(results);
   }
 
-  queueUrls(urls, ignoreScope=false, allowHash=false) {
+  queueUrls(urls, ignoreScope=false) {
     try {
       for (const url of urls) {
-        const captureUrl = this.shouldCrawl(url, ignoreScope, allowHash);
+        const captureUrl = this.shouldCrawl(url, ignoreScope);
         if (captureUrl) {
           if (!this.queueUrl(captureUrl)) {
             break;
@@ -757,14 +764,14 @@ class Crawler {
     }
   }
   
-  shouldCrawl(url, ignoreScope, allowHash) {
+  shouldCrawl(url, ignoreScope) {
     try {
       url = new URL(url);
     } catch(e) {
       return false;
     }
 
-    if (!this.params.spaMode && !allowHash) {
+    if (!this.params.allowHash) {
       // remove hashtag
       url.hash = "";
     }
