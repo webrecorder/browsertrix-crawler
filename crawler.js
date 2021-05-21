@@ -202,16 +202,17 @@ class Crawler {
         describe: "Regex of page URLs that should be included in the crawl (defaults to the immediate directory of URL)",
       },
 
+      "scopeType": {
+        describe: "Simplified scope for which URLs to crawl, can be: prefix, page, domain, any",
+        type: "string",
+      },
+
       "exclude": {
         describe: "Regex of page URLs that should be excluded from the crawl."
       },
 
-      "spaMode": {
-        describe: "Crawl single-page app, following hashtag links",
-      },
-
-      "allowHash": {
-        describe: "Allow Hashtag URLs, useful for single-page-application crawling",
+      "allowHashUrls": {
+        describe: "Allow Hashtag URLs, useful for single-page-application crawling or when different hashtags load dynamic content",
       },
 
       "collection": {
@@ -342,20 +343,8 @@ class Crawler {
     }
     
     if (argv.url && argv.urlFile) {
-      console.log("You've passed a urlFile param, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
+      console.warn("You've passed a urlFile param, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
     }
-    
-    if (!argv.scope && argv.url && !argv.urlFile) {
-
-      if (argv.spaMode) {
-        // allow only hashtags for current page
-        argv.scope = [new RegExp("^" + this.rxEscape(argv.url).replace(purl.protocol, "https?:") + "#.+")];
-        argv.allowHash = true;
-      } else {
-        argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
-      }
-    }
-
 
     // Check that the collection name is valid.
     if (argv.collection.search(/^[\w][\w-]*$/) === -1){
@@ -434,7 +423,12 @@ class Crawler {
       argv.exclude = [];
     }
 
-    // Support one or multiple scopes
+    // warn if both scope and scopeType are set
+    if (argv.scope && argv.scopeType) {
+      console.warn("You've specified a --scopeType and a --scope regex. The custom scope regex will take precedence, overriding the scopeType");
+    }
+
+    // Support one or multiple scopes set directly, or via scopeType
     if (argv.scope) {
       if (typeof(argv.scope) === "string") {
         argv.scope = [new RegExp(argv.scope)];
@@ -442,7 +436,38 @@ class Crawler {
         argv.scope = argv.scope.map(e => new RegExp(e));
       }
     } else {
-      argv.scope = [];
+
+      // Set scope via scopeType
+      if (!argv.scopeType) {
+        argv.scopeType = argv.urlFile ? "any" : "prefix";
+      }
+
+      if (argv.scopeType && argv.url) {
+        switch (argv.scopeType) {
+        case "page":
+          // allow scheme-agnostic URLS as likely redirects
+          argv.scope = [new RegExp("^" + this.rxEscape(argv.url).replace(purl.protocol, "https?:") + "#.+")];
+          argv.allowHashUrls = true;
+          break;
+
+        case "prefix":
+          argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
+          break;
+
+        case "domain":
+          argv.scope = [new RegExp("^" + this.rxEscape(purl.origin + "/"))];
+          break;
+
+        case "any":
+          argv.scope = [];
+          break;
+
+        default:
+          throw new Error(`Invalid scope type "${argv.scopeType}" specified, valid types are: page, prefix, domain`);
+
+
+        }
+      }
     }
 
     // Resolve statsFilename
@@ -596,7 +621,7 @@ class Crawler {
       const urlSeedFile =  await fsp.readFile(this.params.urlFile, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
       this.queueUrls(urlSeedFileList, true);
-      this.params.allowHash = true;
+      this.params.allowHashUrls = true;
     }
     
     if (!this.params.urlFile) {
@@ -779,7 +804,7 @@ class Crawler {
       return false;
     }
 
-    if (!this.params.allowHash) {
+    if (!this.params.allowHashUrls) {
       // remove hashtag
       url.hash = "";
     }
@@ -797,7 +822,7 @@ class Crawler {
     }
     let inScope = false;
 
-    if (ignoreScope){
+    if (ignoreScope || !this.params.scope.length){
       inScope = true;
     }
     
