@@ -64,6 +64,10 @@ class Crawler {
     this.params = params;
     this.capturePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record/id_/`;
 
+    this.gotoOpts = {
+      waitUntil: this.params.waitUntil,
+      timeout: this.params.timeout
+    };
 
     // root collections dir
     this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
@@ -125,13 +129,21 @@ class Crawler {
     
     this.headers = {"User-Agent": this.userAgent};
 
-    child_process.spawn("redis-server", {...opts, cwd: "/tmp/"});
-    
+    const subprocesses = [];
+
+    subprocesses.push(child_process.spawn("redis-server", {...opts, cwd: "/tmp/"}));
+
     child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
     
-    child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts);
+    subprocesses.push(child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts));
+
+    process.on("exit", () => {
+      for (const proc of subprocesses) {
+        proc.kill();
+      }
+    });
 
     if (!this.params.headless) {
       child_process.spawn("Xvfb", [
@@ -190,8 +202,17 @@ class Crawler {
         describe: "Regex of page URLs that should be included in the crawl (defaults to the immediate directory of URL)",
       },
 
+      "scopeType": {
+        describe: "Simplified scope for which URLs to crawl, can be: prefix, page, domain, any",
+        type: "string",
+      },
+
       "exclude": {
         describe: "Regex of page URLs that should be excluded from the crawl."
+      },
+
+      "allowHashUrls": {
+        describe: "Allow Hashtag URLs, useful for single-page-application crawling or when different hashtags load dynamic content",
       },
 
       "collection": {
@@ -307,28 +328,24 @@ class Crawler {
       throw new Error("URL must start with http:// or https://");
     }
 
-    return url.href;
+    return url;
   }
 
   validateArgs(argv) {
+    let purl;
+
     if (argv.url) {
       // Scope for crawl, default to the domain of the URL
       // ensure valid url is used (adds trailing slash if missing)
       //argv.seeds = [Crawler.validateUserUrl(argv.url)];
-      argv.url = this.validateUserUrl(argv.url);
+      purl = this.validateUserUrl(argv.url);
+      argv.url = purl.href;
     }
     
     if (argv.url && argv.urlFile) {
-      console.log("You've passed a urlFile param, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
+      console.warn("You've passed a urlFile param, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
     }
-    
-    if (!argv.scope && argv.url && !argv.urlFile) {
-      //argv.scope = url.href.slice(0, url.href.lastIndexOf("/") + 1);
-      argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
-  
-    }
-    
-    
+
     // Check that the collection name is valid.
     if (argv.collection.search(/^[\w][\w-]*$/) === -1){
       throw new Error(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
@@ -406,7 +423,12 @@ class Crawler {
       argv.exclude = [];
     }
 
-    // Support one or multiple scopes
+    // warn if both scope and scopeType are set
+    if (argv.scope && argv.scopeType) {
+      console.warn("You've specified a --scopeType and a --scope regex. The custom scope regex will take precedence, overriding the scopeType");
+    }
+
+    // Support one or multiple scopes set directly, or via scopeType
     if (argv.scope) {
       if (typeof(argv.scope) === "string") {
         argv.scope = [new RegExp(argv.scope)];
@@ -414,7 +436,38 @@ class Crawler {
         argv.scope = argv.scope.map(e => new RegExp(e));
       }
     } else {
-      argv.scope = [];
+
+      // Set scope via scopeType
+      if (!argv.scopeType) {
+        argv.scopeType = argv.urlFile ? "any" : "prefix";
+      }
+
+      if (argv.scopeType && argv.url) {
+        switch (argv.scopeType) {
+        case "page":
+          // allow scheme-agnostic URLS as likely redirects
+          argv.scope = [new RegExp("^" + this.rxEscape(argv.url).replace(purl.protocol, "https?:") + "#.+")];
+          argv.allowHashUrls = true;
+          break;
+
+        case "prefix":
+          argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
+          break;
+
+        case "domain":
+          argv.scope = [new RegExp("^" + this.rxEscape(purl.origin + "/"))];
+          break;
+
+        case "any":
+          argv.scope = [];
+          break;
+
+        default:
+          throw new Error(`Invalid scope type "${argv.scopeType}" specified, valid types are: page, prefix, domain`);
+
+
+        }
+      }
     }
 
     // Resolve statsFilename
@@ -438,7 +491,8 @@ class Crawler {
       "--disable-background-media-suspend",
       "--autoplay-policy=no-user-gesture-required",
       "--disable-features=IsolateOrigins,site-per-process",
-      "--disable-popup-blocking"
+      "--disable-popup-blocking",
+      "--disable-backgrounding-occluded-windows",
     ];
   }
 
@@ -564,9 +618,10 @@ class Crawler {
     await this.initPages();
     
     if (this.params.urlFile) {
-      const urlSeedFile =  await fsp.readFile(path.join(__dirname, this.params.urlFile), "utf8");
+      const urlSeedFile =  await fsp.readFile(this.params.urlFile, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
-      this.queueUrls(urlSeedFileList, true); 
+      this.queueUrls(urlSeedFileList, true);
+      this.params.allowHashUrls = true;
     }
     
     if (!this.params.urlFile) {
@@ -582,6 +637,7 @@ class Crawler {
     this.writeStats();
 
     if (this.pagesFH) {
+      await this.pagesFH.sync();
       await this.pagesFH.close();
     }
 
@@ -631,6 +687,23 @@ class Crawler {
       } catch (err) {
         console.warn("Stats output failed", err);
       }
+    }
+  }
+
+  async loadPage(page, url, selector = "a[href]") {
+    if (!await this.isHTML(url)) {
+      await this.directFetchCapture(url);
+      return;
+    }
+
+    try {
+      await page.goto(url, this.gotoOpts);
+    } catch (e) {
+      console.log(`Load timeout for ${url}`, e);
+    }
+
+    if (selector) {
+      await this.extractLinks(page, selector);
     }
   }
 
@@ -731,8 +804,10 @@ class Crawler {
       return false;
     }
 
-    // remove hashtag
-    url.hash = "";
+    if (!this.params.allowHashUrls) {
+      // remove hashtag
+      url.hash = "";
+    }
 
     // only queue http/https URLs
     if (url.protocol != "http:" && url.protocol != "https:") {
@@ -747,7 +822,7 @@ class Crawler {
     }
     let inScope = false;
 
-    if (ignoreScope){
+    if (ignoreScope || !this.params.scope.length){
       inScope = true;
     }
     
