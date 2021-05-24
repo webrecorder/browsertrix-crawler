@@ -350,6 +350,12 @@ class Crawler {
       return;
     }
 
+    if (this.params.storageApi && this.params.generateWACZ) {
+      console.log("Initing Storage...");
+      this.storage = new S3StorageSync(this.params.storageApi, this.params.storageUser);
+      await this.storage.init();
+    }
+
     // Puppeteer Cluster init and options
     this.cluster = await Cluster.launch({
       concurrency: this.params.newContext,
@@ -436,6 +442,10 @@ class Crawler {
       // Run the wacz create command
       child_process.spawnSync("wacz" , argument_list, {stdio: "inherit"});
       this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
+
+      if (this.storage) {
+        await this.storage.uploadCollWACZ(waczPath);
+      }
     }
   }
 
