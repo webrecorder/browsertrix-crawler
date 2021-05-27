@@ -405,6 +405,7 @@ class Crawler {
 
     case "window":
       argv.newContext = NewWindowPage;
+      break;
 
     default:
       throw new Error("Invalid newContext, must be one of: page, session, browser");
