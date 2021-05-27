@@ -393,6 +393,9 @@ class Crawler {
     switch (argv.newContext) {
     case "page":
       argv.newContext = Cluster.CONCURRENCY_PAGE;
+      if (argv.screencastPort && argv.workers > 1) {
+        console.warn("Note: Screencast with >1 workers and default page context may only show one page at a time. To fix, add '--newContext window' to open each page in a new window");
+      }
       break;
 
     case "session":
