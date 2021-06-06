@@ -33,7 +33,7 @@ class ScreenCaster
 
     this.wss = new ws.Server({ noServer: true });
 
-    this.wss.on("connection", (ws) => this.initWS(ws));
+    this.wss.on("connection", (ws) => this.initWebSocket(ws));
 
     this.httpServer.on("upgrade", (request, socket, head) => {
       const pathname = url.parse(request.url).pathname;
@@ -49,7 +49,7 @@ class ScreenCaster
     console.log(`Screencast Server started on: ${port}`);
   }
 
-  initWS(ws) {
+  initWebSocket(ws) {
     for (const id of this.targets.keys()) {
       const data = this.caches.get(id);
       const url = this.urls.get(id);
@@ -64,7 +64,7 @@ class ScreenCaster
     }
 
     ws.on("close", () => {
-      console.log("ws closed");
+      console.log("Screencast WebSocket Disconnected");
       this.allWS.delete(ws);
 
       if (this.allWS.size === 0) {
@@ -186,7 +186,6 @@ class NewWindowPage extends SingleBrowserImplementation {
         this.newTargets.push(target);
         this._nextTarget();
         this.nextPromise();
-        console.log("got new target");
       }
     });
   }
@@ -196,8 +195,6 @@ class NewWindowPage extends SingleBrowserImplementation {
   }
 
   async getNewPage() {
-    console.log("new window");
-
     const p = this._nextPromise;
 
     await this.mainPage.evaluate("window.open('about:blank', '', 'resizable');");
