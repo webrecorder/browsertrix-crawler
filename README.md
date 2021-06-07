@@ -135,7 +135,18 @@ The default is `load`, but for static sites, `--wait-until domcontentloaded` may
 while `--waitUntil networkidle0` may make sense for dynamic sites.
 
 
-### Screencasting
+### Behaviors
+
+Browsertrix Crawler also supports automatically running customized in-browser behaviors. The behaviors auto-play videos (when possible),
+and auto-fetch content that is not loaded by default, and also run custom behaviors on certain sites.
+
+Behaviors to run can be specified via a comma-separated list passed to the `--behaviors` option. By default, the auto-scroll behavior is not enabled by default, as it may slow down crawling. To enable this behaviors, you can add
+`--behaviors autoscroll` or to enable all behaviors, add `--behaviors autoscroll,autoplay,autofetch,siteSpecific`.
+
+See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for more info on all of the currently available behaviors.
+
+
+### Watching the crawl -- Screencasting
 
 With version 0.4.0, Browsertrix Crawler includes an experimental 'screencasting' option, which allows watching the crawl in real-time via screencast (connected via a websocket).
 
@@ -157,19 +168,6 @@ docker-compose run -p 9037:9037 crawler crawl --url [URL] --screencastPort 9037 
 
 will start a crawl with 3 workers, and show the screen of each of the workers from `http://localhost:9037/`.
 
-The screencasting feature is still experimental and may not always work.
-
-
-
-### Behaviors
-
-Browsertrix Crawler also supports automatically running customized in-browser behaviors. The behaviors auto-play videos (when possible),
-and auto-fetch content that is not loaded by default, and also run custom behaviors on certain sites.
-
-Behaviors to run can be specified via a comma-separated list passed to the `--behaviors` option. By default, the auto-scroll behavior is not enabled by default, as it may slow down crawling. To enable this behaviors, you can add
-`--behaviors autoscroll` or to enable all behaviors, add `--behaviors autoscroll,autoplay,autofetch,siteSpecific`.
-
-See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for more info on all of the currently available behaviors.
 
 ## Creating and Using Browser Profiles
 

@@ -178,7 +178,7 @@ class Crawler {
       },
 
       "newContext": {
-        describe: "The context for each new capture, can be a new: page, session or browser.",
+        describe: "The context for each new capture, can be a new: page, window, session or browser.",
         default: "page",
         type: "string"
       },
