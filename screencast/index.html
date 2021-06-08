@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+<style>
+  #content {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  #content img {
+    width: 640px;
+    height: 480px;
+    margin: 2rem;
+  }
+</style>
+<script>
+  const ws = new WebSocket(window.location.origin.replace("http", "ws") + "/ws");
+  ws.addEventListener("message", (event) => handleMessage(event.data));
+
+  const unusedElems = [];
+
+  function handleMessage(resp) {
+    resp = JSON.parse(resp);
+
+    switch (resp.msg) {
+      case "newTarget":
+      case "screencast":
+        img = createImage(resp.id);
+        if (resp.data) {
+          setImageData(img, resp.data); 
+        }
+        break;
+
+      case "endTarget":
+        img = unuseImage(resp.id);
+        break;
+    }
+  }
+
+  function setImageData(img, data) {
+    //img.style.display = "";
+    img.src = "data:image/png;base64," + data;
+  }
+
+  function createImage(id) {
+    let elem = document.getElementById(id);
+    if (elem) {
+      return elem;
+    }
+
+    if (unusedElems.length) {
+      elem = unusedElems.shift();
+      elem.setAttribute("id", id);
+      return elem;
+    }
+
+    elem = document.createElement("img");
+    elem.setAttribute("id", id);
+    document.getElementById("content").appendChild(elem);
+    return elem;
+  }
+
+  function unuseImage(id) {
+    const elem = document.getElementById(id);
+    if (!elem) {
+      return;
+    }
+    //elem.style.display = "none";
+    unusedElems.push(elem);
+  }
+</script>
+<head>
+<body>
+<div id="content">
+</div>
+</body>

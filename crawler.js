@@ -30,6 +30,8 @@ const HTTPS_AGENT = require("https").Agent({
 
 const HTTP_AGENT = require("http").Agent();
 
+const { ScreenCaster, NewWindowPage } = require("./screencaster");
+
 
 // ============================================================================
 class Crawler {
@@ -176,7 +178,7 @@ class Crawler {
       },
 
       "newContext": {
-        describe: "The context for each new capture, can be a new: page, session or browser.",
+        describe: "The context for each new capture, can be a new: page, window, session or browser.",
         default: "page",
         type: "string"
       },
@@ -318,6 +320,12 @@ class Crawler {
         describe: "Path to tar.gz file which will be extracted and used as the browser profile",
         type: "string",
       },
+
+      "screencastPort": {
+        describe: "If set to a non-zero value, starts an HTTP server with screencast accessible on this port",
+        type: "number",
+        default: 0
+      }
     };
   }
 
@@ -385,6 +393,9 @@ class Crawler {
     switch (argv.newContext) {
     case "page":
       argv.newContext = Cluster.CONCURRENCY_PAGE;
+      if (argv.screencastPort && argv.workers > 1) {
+        console.warn("Note: Screencast with >1 workers and default page context may only show one page at a time. To fix, add '--newContext window' to open each page in a new window");
+      }
       break;
 
     case "session":
@@ -393,6 +404,10 @@ class Crawler {
 
     case "browser":
       argv.newContext = Cluster.CONCURRENCY_BROWSER;
+      break;
+
+    case "window":
+      argv.newContext = NewWindowPage;
       break;
 
     default:
@@ -537,13 +552,18 @@ class Crawler {
 
   async crawlPage({page, data}) {
     try {
+      if (this.screencaster) {
+        await this.screencaster.newTarget(page.target());
+      }
+
       if (this.emulateDevice) {
         await page.emulate(this.emulateDevice);
       }
 
-      if (this.behaviorOpts) {
+      if (this.behaviorOpts && !page.__bx_inited) {
         await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
         await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.behaviorOpts});`);
+        page.__bx_inited = true;
       }
 
       // run custom driver here
@@ -565,6 +585,10 @@ class Crawler {
       }
 
       await this.writeStats();
+
+      if (this.screencaster) {
+        await this.screencaster.endTarget(page.target());
+      }
 
     } catch (e) {
       console.warn(e);
@@ -616,7 +640,11 @@ class Crawler {
     this.cluster.task((opts) => this.crawlPage(opts));
     
     await this.initPages();
-    
+
+    if (this.params.screencastPort) {
+      this.screencaster = new ScreenCaster(this.cluster, this.params.screencastPort);
+    }
+
     if (this.params.urlFile) {
       const urlSeedFile =  await fsp.readFile(this.params.urlFile, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
@@ -627,6 +655,7 @@ class Crawler {
     if (!this.params.urlFile) {
       this.queueUrl(this.params.url);
     }
+
     if (this.params.useSitemap) {
       await this.parseSitemap(this.params.useSitemap);
     }

@@ -123,12 +123,17 @@ Options:
       --profile                             Path to tar.gz file which will be
                                             extracted and used as the browser
                                             profile                     [string]
+      --screencastPort                      If set to a non-zero value, starts
+                                            an HTTP server with screencast
+                                            accessible on this port
+                                                           [number] [default: 0]
 ```
 
 For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options).
 
 The default is `load`, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example),
 while `--waitUntil networkidle0` may make sense for dynamic sites.
+
 
 ### Behaviors
 
@@ -139,6 +144,30 @@ Behaviors to run can be specified via a comma-separated list passed to the `--be
 `--behaviors autoscroll` or to enable all behaviors, add `--behaviors autoscroll,autoplay,autofetch,siteSpecific`.
 
 See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for more info on all of the currently available behaviors.
+
+
+### Watching the crawl -- Screencasting
+
+With version 0.4.0, Browsertrix Crawler includes an experimental 'screencasting' option, which allows watching the crawl in real-time via screencast (connected via a websocket).
+
+To enable, add `--screencastPort` command-line option and also map the port on the docker container. An example command might be:
+
+```
+docker-compose run -p 9037:9037 crawler crawl --url [URL] --screencastPort 9037
+```
+
+Then, you can open `http://localhost:9037/` and watch the crawl.
+
+Note: If specifying multiple workers, the crawler should additional be instructed to open each one in a new window, otherwise the screencasting can only update one page at a time.
+
+For example,
+
+```
+docker-compose run -p 9037:9037 crawler crawl --url [URL] --screencastPort 9037 --newContext window --workers 3
+```
+
+will start a crawl with 3 workers, and show the screen of each of the workers from `http://localhost:9037/`.
+
 
 ## Creating and Using Browser Profiles
 
