@@ -29,6 +29,9 @@ const { parseArgs } = require("./util/argParser");
 
 const { BROWSER_BIN, BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
 
+const { Exclusions } = require("./exclusions");
+
+
 // ============================================================================
 class Crawler {
   constructor() {
@@ -70,6 +73,9 @@ class Crawler {
 
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
+
+
+    this.exclusions = null;
   }
 
   configureUA() {
@@ -298,6 +304,10 @@ class Crawler {
 
     await this.initPages();
 
+    if (this.params.exclusions) {
+      this.exclusions = new Exclusions(yaml.load(await fsp.readFile(this.params.exclusions)).capture_exclusions);
+    }
+
     if (this.params.screencastPort) {
       this.screencaster = new ScreenCaster(this.cluster, this.params.screencastPort);
     }
@@ -376,6 +386,10 @@ class Crawler {
     if (!await this.isHTML(url)) {
       await this.directFetchCapture(url);
       return;
+    }
+
+    if (this.exclusions) {
+      await this.exclusions.initPage(page);
     }
 
     try {
