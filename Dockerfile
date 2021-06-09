@@ -38,9 +38,13 @@ ARG REBUILD
 
 RUN yarn install
 
-ADD config.yaml /app/
+ADD browsertrixArgsConfig.yaml /app/
 ADD uwsgi.ini /app/
 ADD *.js /app/
+ADD screencast/ /app/screencast/
+ADD config.yaml /app/
+ADD util/*.js /app/util/
+
 ADD screencast/ /app/screencast/
 
 RUN ln -s /app/main.js /usr/bin/crawl
