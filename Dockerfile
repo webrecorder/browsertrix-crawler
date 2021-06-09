@@ -38,7 +38,7 @@ ARG REBUILD
 
 RUN yarn install
 
-ADD browsertrixArgsConfig.yaml /app/
+ADD *.yaml /app/
 ADD uwsgi.ini /app/
 ADD *.js /app/
 ADD screencast/ /app/screencast/
