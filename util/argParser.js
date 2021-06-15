@@ -46,7 +46,7 @@ class argParser {
   
   parseYaml(){
     try {
-      console.log("YAML config detected. The values declared in this file will be used and any command line flags passed will be ignored");                                              
+      console.log("YAML config detected. The values declared in this file will be used and any command line flags passed will override them");                                              
       var fileContents = fs.readFileSync("/app/browsertrixArgsConfig.yaml", "utf8");
       var data = yaml.safeLoad(fileContents);
       if (!data.crawler){
@@ -86,9 +86,13 @@ class argParser {
     return url;
   }
 
-  validateArgs(argv) {
+  
+  validateArgs(argv, yamlArgs) {
     let purl;
-
+    console.log("here")
+    
+  
+          
     if (argv.url) {
       // Scope for crawl, default to the domain of the URL
       // ensure valid url is used (adds trailing slash if missing)

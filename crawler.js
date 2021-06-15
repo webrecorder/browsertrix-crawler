@@ -10,6 +10,8 @@ const os = require("os");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 const warcio = require("warcio");
+const yargs = require('yargs/yargs')
+const { hideBin } = require('yargs/helpers')
 
 const Redis = require("ioredis");
 
@@ -50,12 +52,24 @@ class Crawler {
 
     this.userAgent = "";
     this.behaviorsLogDebug = false;
-    this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
+    this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));  
+
+    var parsedArgs = yargs(hideBin(process.argv)).argv;
     
-    const params = fs.existsSync("/app/browsertrixArgsConfig.yaml") ? this.argParser.parseYaml() : require("yargs")
+    if (fs.existsSync("/app/browsertrixArgsConfig.yaml")) {
+      parsedArgs = this.argParser.parseYaml();
+      var commandLineArgs = yargs(hideBin(process.argv)).argv
+
+      for (const property in commandLineArgs) {
+        parsedArgs[property] = commandLineArgs[property]
+      }
+    }
+    
+    console.log(parsedArgs)
+    const params = require("yargs")
       .usage("crawler [options]")
       .option(this.cliOpts)
-      .check((argv) => this.argParser.validateArgs(argv)).argv;
+      .check((parsedArgs) => this.argParser.validateArgs(parsedArgs)).argv;
 
     this.params = params;
   

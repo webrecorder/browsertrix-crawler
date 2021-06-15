@@ -38,7 +38,7 @@ ARG REBUILD
 
 RUN yarn install
 
-ADD *.yaml /app/
+COPY browsertrixArgsConfig.yaml /app/
 ADD uwsgi.ini /app/
 ADD *.js /app/
 ADD util/*.js /app/util/
