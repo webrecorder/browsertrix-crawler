@@ -87,11 +87,8 @@ class argParser {
   }
 
   
-  validateArgs(argv, yamlArgs) {
+  validateArgs(argv) {
     let purl;
-    console.log("here")
-    
-  
           
     if (argv.url) {
       // Scope for crawl, default to the domain of the URL

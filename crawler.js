@@ -10,8 +10,8 @@ const os = require("os");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 const warcio = require("warcio");
-const yargs = require('yargs/yargs')
-const { hideBin } = require('yargs/helpers')
+const yargs = require("yargs/yargs");
+const { hideBin } = require("yargs/helpers");
 
 const Redis = require("ioredis");
 
@@ -24,7 +24,7 @@ const HTTPS_AGENT = require("https").Agent({
 
 const HTTP_AGENT = require("http").Agent();
 
-const { TextExtract } = require("./util/textextract");
+const  TextExtract  = require("./util/textextract");
 const { ScreenCaster } = require("./util/screencaster");
 const { argParser } = require("./util/argParser");
 const { constants } = require("./util/constants");
@@ -58,14 +58,12 @@ class Crawler {
     
     if (fs.existsSync("/app/browsertrixArgsConfig.yaml")) {
       parsedArgs = this.argParser.parseYaml();
-      var commandLineArgs = yargs(hideBin(process.argv)).argv
-
+      var commandLineArgs = yargs(hideBin(process.argv)).argv;
       for (const property in commandLineArgs) {
-        parsedArgs[property] = commandLineArgs[property]
+        parsedArgs[property] = commandLineArgs[property];
       }
     }
     
-    console.log(parsedArgs)
     const params = require("yargs")
       .usage("crawler [options]")
       .option(this.cliOpts)
