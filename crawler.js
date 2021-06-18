@@ -638,7 +638,9 @@ class Crawler {
       monitor: this.params.logging.includes("stats")
     });
     
-    await fsp.mkdir(this.collDir);
+    if (fs.existsSync(this.collDir) != true){
+      await fsp.mkdir(this.collDir);
+    }
     
     this.cluster.task((opts) => this.crawlPage(opts));
     
