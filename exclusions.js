@@ -12,8 +12,7 @@ class Exclusions
         this.exclusions.push({urlRx: new RegExp(exclude)});
       } else {
         exclude.urlRx = new RegExp(exclude.urlRx);
-        exclude.textRx = new RegExp(exclude.textRx);
-        exclude.matchRx = new RegExp(exclude.matchRx);
+        exclude.textMatchRx = new RegExp(exclude.textMatchRx);
         // should be bool
         exclude.includeMatch = !!exclude.includeMatch;
         this.exclusions.push(exclude);
@@ -45,15 +44,15 @@ class Exclusions
   async shouldExclude(rule, request) {
     const url = request.url();
 
-    const {urlRx, textRx, matchRx, includeMatch} = rule;
+    const {urlRx, textMatchRx, includeMatch} = rule;
 
     if (!url.match(urlRx)) {
       return false;
     }
 
-    console.log("Matched Rule for: " + url, textRx, matchRx);
+    console.log("Matched Rule for: " + url, textMatchRx);
 
-    if (!textRx || !matchRx) {
+    if (!textMatchRx) {
       return true;
     }
 
@@ -61,11 +60,9 @@ class Exclusions
       const res = await fetch(url);
       const text = await res.text();
 
-      const m = text.match(textRx);
-
-      // if first group matches expected match
       // return true if includeMatch, otherwise include matched
-      return m && m[1].match(matchRx) ? !includeMatch : includeMatch;
+      return text.match(textMatchRx) ? !includeMatch : includeMatch;
+
     } catch (e) {
       console.log(e);
     }
