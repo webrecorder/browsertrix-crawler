@@ -72,6 +72,7 @@ class Crawler {
     };
 
     // root collections dir
+  
     this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
 
     // pages directory
@@ -636,7 +637,9 @@ class Crawler {
       puppeteer,
       monitor: this.params.logging.includes("stats")
     });
-
+    
+    await fsp.mkdir(this.collDir);
+    
     this.cluster.task((opts) => this.crawlPage(opts));
     
     await this.initPages();
