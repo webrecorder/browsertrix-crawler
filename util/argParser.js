@@ -11,62 +11,23 @@ const { constants } = require("./constants");
 class argParser {
   constructor(){
     this.constants = new constants();
-    this.arguments = {
-      url: null,
-      workers: 1,
-      newContext: "page",
-      waitUntil: "load,networkidle0",
-      limit: 0,
-      timetout: 90,
-      scope: null,
-      exclude: null,
-      spaMode: null,
-      allowHash: null,
-      collection: `capture-${new Date().toISOString().slice(0,19)}`.replace(/:/g, "-"),
-      headless: false,
-      driver: path.join("../", "defaultDriver.js"),
-      generateCDX: false,
-      combineWARC: false,
-      rolloverSize: 1000000000,
-      generateWACZ: false,
-      logging: "stats",
-      urlFile: null,
-      text: false,
-      cwd: process.cwd(),
-      mobileDevice: null,
-      userAgent: null,
-      userAgentSuffix: null,
-      useSitemap: null,
-      statsFilename: null,
-      behaviors: "autoplay,autofetch,siteSpecific",
-      profile: null
-    };
-
   }
 
   parseYaml(yamlConfigFile){
     try {
       console.log("YAML config detected. The values declared in this file will be used and any command line flags passed will override them");
-      console.log(yamlConfigFile)
+
       var fileContents = fs.readFileSync(yamlConfigFile, "utf8");
-      console.log(fileContents)
+
       var data = yaml.safeLoad(fileContents);
+
       if (!data.crawler){
-        console.log("Error parsing the browsertrixArgsConfig.yaml file: Yaml config file needs to have the arguments under 'crawler' field please see the github readme for more details on the yaml configuration");
+        console.log("Error parsing the yaml file: Yaml config file needs to have the arguments under 'crawler' field please see the github readme for more details on the yaml configuration");
         return false;
       }
-      for (const property in data.crawler) {
-        if (property in Object.keys(this.arguments)){
-          console.log(`Error parsing the browsertrixArgsConfig.yaml file: ${property} is not a recognized argument. Please see the github readme for more details on the yaml configuration`);
-          return false;
-        }
-        else{
-          this.arguments[property] = data.crawler[property];
-        }
-      }
-      this.validateArgs(this.arguments);
-      console.log("we did it")
-      return this.arguments;
+
+      this.validateArgs(data.crawler);
+      return data.crawler;
     }
     catch (e) {
       console.log(e);
@@ -91,17 +52,11 @@ class argParser {
 
   validateArgs(argv) {
     let purl;
-    console.log("HHSDSDF")
     if (argv.url) {
-      console.log("sob")
-      console.log(argv.url)
-
       // Scope for crawl, default to the domain of the URL
       // ensure valid url is used (adds trailing slash if missing)
       //argv.seeds = [Crawler.validateUserUrl(argv.url)];
       purl = this.validateUserUrl(argv.url);
-      console.log(purl.href)
-
       argv.url = purl.href;
     }
 

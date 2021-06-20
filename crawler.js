@@ -63,6 +63,18 @@ class Crawler {
 
     this.params = params;
 
+    if (this.params.yamlConfig){
+      var yamlConfigFile = fs.existsSync(this.params.yamlConfig);
+      parsedArgs = this.argParser.parseYaml(this.params.yamlConfig);
+      var commandLineArgs = yargs(hideBin(process.argv)).argv;
+      console.log("yaml parsed")
+      console.log(parsedArgs)
+      console.log(commandLineArgs)
+      for (const property in commandLineArgs) {
+        parsedArgs[property] = commandLineArgs[property];
+      }
+      this.params = parsedArgs
+    }
     console.log("Exclusions Regexes: ", this.params.exclude);
     console.log("Scope Regexes: ", this.params.scope);
 
@@ -83,14 +95,6 @@ class Crawler {
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
-    if (this.params.yamlConfig){
-      var yamlConfigFile = fs.existsSync(this.params.yamlConfig);
-      parsedArgs = this.argParser.parseYaml(this.params.yamlConfig);
-      var commandLineArgs = yargs(hideBin(process.argv)).argv;
-      for (const property in commandLineArgs) {
-        parsedArgs[property] = commandLineArgs[property];
-      }
-    }
   }
 
   configureUA() {
@@ -469,7 +473,11 @@ class Crawler {
   }
 
   async crawl() {
+
     try {
+      console.log("were in it dawg")
+      console.log(this.params.driver)
+      console.log(this.params)
       this.driver = require(this.params.driver);
     } catch(e) {
       console.log(e);
@@ -737,12 +745,14 @@ class Crawler {
 
   async isHTML(url) {
     try {
+      console.log("HI url")
+      console.log(url)
       const resp = await fetch(url, {
         method: "HEAD",
         headers: this.headers,
         agent: this.resolveAgent
       });
-
+      console.log(resp)
       if (resp.status >= 400) {
         console.log(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
         return true;
