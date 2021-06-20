@@ -12,7 +12,7 @@ class argParser {
   constructor(){
     this.constants = new constants();
     this.arguments = {
-      url: null, 
+      url: null,
       workers: 1,
       newContext: "page",
       waitUntil: "load,networkidle0",
@@ -43,11 +43,13 @@ class argParser {
     };
 
   }
-  
-  parseYaml(){
+
+  parseYaml(yamlConfigFile){
     try {
-      console.log("YAML config detected. The values declared in this file will be used and any command line flags passed will override them");                                              
-      var fileContents = fs.readFileSync("/app/browsertrixArgsConfig.yaml", "utf8");
+      console.log("YAML config detected. The values declared in this file will be used and any command line flags passed will override them");
+      console.log(yamlConfigFile)
+      var fileContents = fs.readFileSync(yamlConfigFile, "utf8");
+      console.log(fileContents)
       var data = yaml.safeLoad(fileContents);
       if (!data.crawler){
         console.log("Error parsing the browsertrixArgsConfig.yaml file: Yaml config file needs to have the arguments under 'crawler' field please see the github readme for more details on the yaml configuration");
@@ -63,8 +65,9 @@ class argParser {
         }
       }
       this.validateArgs(this.arguments);
-      return this.arguments;  
-    } 
+      console.log("we did it")
+      return this.arguments;
+    }
     catch (e) {
       console.log(e);
       return false;
@@ -74,11 +77,10 @@ class argParser {
   rxEscape(string) {
     return string.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
   }
-  
-  
+
+
   validateUserUrl(url) {
     url = new URL(url);
-
     if (url.protocol !== "http:" && url.protocol != "https:") {
       throw new Error("URL must start with http:// or https://");
     }
@@ -86,18 +88,23 @@ class argParser {
     return url;
   }
 
-  
+
   validateArgs(argv) {
     let purl;
-          
+    console.log("HHSDSDF")
     if (argv.url) {
+      console.log("sob")
+      console.log(argv.url)
+
       // Scope for crawl, default to the domain of the URL
       // ensure valid url is used (adds trailing slash if missing)
       //argv.seeds = [Crawler.validateUserUrl(argv.url)];
       purl = this.validateUserUrl(argv.url);
+      console.log(purl.href)
+
       argv.url = purl.href;
     }
-      
+
     if (argv.url && argv.urlFile) {
       console.warn("You've passed a urlFile param, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
     }
@@ -106,7 +113,7 @@ class argParser {
     if (argv.collection.search(/^[\w][\w-]*$/) === -1){
       throw new Error(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
-    
+
     argv.timeout *= 1000;
 
     // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
@@ -115,7 +122,7 @@ class argParser {
     if (typeof argv.waitUntil != "object"){
       argv.waitUntil = argv.waitUntil.split(",");
     }
-      
+
     for (const opt of argv.waitUntil) {
       if (!this.constants.WAIT_UNTIL_OPTS.includes(opt)) {
         throw new Error("Invalid waitUntil option, must be one of: " + this.constants.WAIT_UNTIL_OPTS.join(","));
@@ -187,7 +194,7 @@ class argParser {
       } else {
         argv.exclude = argv.exclude.map(e => new RegExp(e));
       }
-    } 
+    }
     else {
       argv.exclude = [];
     }
@@ -251,5 +258,5 @@ class argParser {
     return true;
   }
 }
-  
+
 module.exports.argParser = argParser;

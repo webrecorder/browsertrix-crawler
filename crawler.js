@@ -33,10 +33,10 @@ const { constants } = require("./util/constants");
 class Crawler {
   constructor() {
     this.headers = {};
-    
+
     this.argParser = new argParser();
     this.constants = new constants();
-     
+
     this.seenList = new Set();
 
     this.emulateDevice = null;
@@ -52,25 +52,17 @@ class Crawler {
 
     this.userAgent = "";
     this.behaviorsLogDebug = false;
-    this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));  
+    this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
     var parsedArgs = yargs(hideBin(process.argv)).argv;
-    
-    if (fs.existsSync("/app/browsertrixArgsConfig.yaml")) {
-      parsedArgs = this.argParser.parseYaml();
-      var commandLineArgs = yargs(hideBin(process.argv)).argv;
-      for (const property in commandLineArgs) {
-        parsedArgs[property] = commandLineArgs[property];
-      }
-    }
-    
+
     const params = require("yargs")
       .usage("crawler [options]")
       .option(this.cliOpts)
       .check((parsedArgs) => this.argParser.validateArgs(parsedArgs)).argv;
 
     this.params = params;
-  
+
     console.log("Exclusions Regexes: ", this.params.exclude);
     console.log("Scope Regexes: ", this.params.scope);
 
@@ -87,9 +79,18 @@ class Crawler {
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
-    
+
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
+
+    if (this.params.yamlConfig){
+      var yamlConfigFile = fs.existsSync(this.params.yamlConfig);
+      parsedArgs = this.argParser.parseYaml(this.params.yamlConfig);
+      var commandLineArgs = yargs(hideBin(process.argv)).argv;
+      for (const property in commandLineArgs) {
+        parsedArgs[property] = commandLineArgs[property];
+      }
+    }
   }
 
   configureUA() {
@@ -128,7 +129,7 @@ class Crawler {
       }
     }
   }
-  
+
   bootstrap() {
     let opts = {};
     if (this.params.logging.includes("pywb")) {
@@ -139,7 +140,7 @@ class Crawler {
     }
 
     this.configureUA();
-    
+
     this.headers = {"User-Agent": this.userAgent};
 
     const subprocesses = [];
@@ -149,7 +150,7 @@ class Crawler {
     child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
-    
+
     subprocesses.push(child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts));
 
     process.on("exit", () => {
@@ -260,38 +261,38 @@ class Crawler {
         type: "boolean",
         default: false,
       },
-      
+
       "rolloverSize": {
         describe: "If set, declare the rollover size",
         default: 1000000000,
         type: "number",
       },
-      
+
       "generateWACZ": {
         alias: ["generatewacz", "generateWacz"],
         describe: "If set, generate wacz",
         type: "boolean",
         default: false,
       },
-      
+
       "logging": {
         describe: "Logging options for crawler, can include: stats, pywb, behaviors, behaviors-debug",
         type: "string",
         default: "stats",
       },
-      
+
       "urlFile": {
         alias: ["urlfile", "url-file", "url-list"],
         describe: "If set, read a list of urls from the passed file INSTEAD of the url from the --url flag.",
         type: "string",
       },
-      
+
       "text": {
         describe: "If set, extract text to the pages.jsonl file",
         type: "boolean",
         default: false,
       },
-      
+
       "cwd": {
         describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd()",
         type: "string",
@@ -336,6 +337,11 @@ class Crawler {
         describe: "If set to a non-zero value, starts an HTTP server with screencast accessible on this port",
         type: "number",
         default: 0
+      },
+
+      "yamlConfig": {
+        describe: "If set the values in the yaml file wee be used. But overwritten by anything passed on the browser command line",
+        type: "string"
       }
     };
   }
@@ -412,8 +418,8 @@ class Crawler {
 
       // run custom driver here
       await this.driver({page, data, crawler: this});
-      
-      
+
+
       const title = await page.title();
       let text = "";
       if (this.params.text) {
@@ -421,7 +427,7 @@ class Crawler {
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
       }
-    
+
       await this.writePage(data.url, title, this.params.text, text);
 
       if (this.behaviorOpts) {
@@ -438,7 +444,7 @@ class Crawler {
       console.warn(e);
     }
   }
-  
+
   async createWARCInfo(filename) {
     const warcVersion = "WARC/1.1";
     const type = "warcinfo";
@@ -451,12 +457,12 @@ class Crawler {
       "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywbVersion})`,
       "format": "WARC File Format 1.1"
     };
-    
+
     const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, info);
     const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
     return buffer;
   }
-  
+
   async getFileSize(filename) {
     var stats = await fsp.stat(filename);
     return stats.size;
@@ -482,7 +488,7 @@ class Crawler {
     });
 
     this.cluster.task((opts) => this.crawlPage(opts));
-    
+
     await this.initPages();
 
     if (this.params.screencastPort) {
@@ -495,7 +501,7 @@ class Crawler {
       this.queueUrls(urlSeedFileList, true);
       this.params.allowHashUrls = true;
     }
-    
+
     if (!this.params.urlFile) {
       this.queueUrl(this.params.url);
     }
@@ -526,7 +532,7 @@ class Crawler {
 
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
-    
+
     if (this.params.generateWACZ || this.params.generateWacz || this.params.generatewacz ) {
       console.log("Generating WACZ");
 
@@ -534,13 +540,13 @@ class Crawler {
 
       // Get a list of the warcs inside
       const warcFileList = await fsp.readdir(archiveDir);
-      
+
       // Build the argument list to pass to the wacz create command
       const waczFilename = this.params.collection.concat(".wacz");
       const waczPath = path.join(this.collDir, waczFilename);
       const argument_list = ["create", "-o", waczPath, "--pages", this.pagesFile, "-f"];
       warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
-      
+
       // Run the wacz create command
       child_process.spawnSync("wacz" , argument_list);
       console.log(`WACZ successfully generated and saved to: ${waczFilename}`);
@@ -631,7 +637,7 @@ class Crawler {
         await fsp.mkdir(this.pagesDir);
         createNew = true;
       }
-        
+
       this.pagesFH = await fsp.open(this.pagesFile, "a");
 
       if (createNew) {
@@ -660,7 +666,7 @@ class Crawler {
     if (text == true){
       row["text"] = text_content;
     }
-    
+
     const processedRow = JSON.stringify(row).concat("\n");
     try {
       this.pagesFH.writeFile(processedRow);
@@ -669,7 +675,7 @@ class Crawler {
       console.warn("pages/pages.jsonl append failed", err);
     }
   }
-  
+
   shouldCrawl(url, ignoreScope) {
     try {
       url = new URL(url);
@@ -698,7 +704,7 @@ class Crawler {
     if (ignoreScope || !this.params.scope.length){
       inScope = true;
     }
-    
+
     // check scopes
     if (!ignoreScope){
       for (const s of this.params.scope) {
@@ -708,7 +714,7 @@ class Crawler {
         }
       }
     }
-    
+
     if (!inScope) {
       //console.log(`Not in scope ${url} ${scope}`);
       return false;
@@ -858,7 +864,7 @@ class Crawler {
       }
 
       if (doRollover) {
-        // If adding the current warc to the existing combined file creates a file larger than the rollover size do the following: 
+        // If adding the current warc to the existing combined file creates a file larger than the rollover size do the following:
         // 1. increment the combinedWarcNumber
         // 2. create the name of the new combinedWarcFile
         // 3. Write the header out to the new file
