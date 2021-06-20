@@ -39,6 +39,8 @@ ARG REBUILD
 RUN yarn install
 
 ADD config.yaml /app/
+ADD util/*.js /app/util/
+
 ADD uwsgi.ini /app/
 ADD *.js /app/
 ADD screencast/ /app/screencast/
@@ -49,4 +51,3 @@ RUN ln -s /app/create-login-profile.js /usr/bin/create-login-profile
 WORKDIR /crawls
 
 CMD ["crawl"]
-

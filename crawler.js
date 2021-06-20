@@ -11,17 +11,12 @@ const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 const warcio = require("warcio");
 
+const yargs = require("yargs/yargs");
+const { hideBin } = require("yargs/helpers");
+
 const Redis = require("ioredis");
 
-const TextExtract = require("./textextract");
 const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
-
-const HTML_TYPES = ["text/html", "application/xhtml", "application/xhtml+xml"];
-const WAIT_UNTIL_OPTS = ["load", "domcontentloaded", "networkidle0", "networkidle2"];
-
-const BEHAVIOR_LOG_FUNC = "__bx_log";
-
-const CHROME_PATH = "google-chrome";
 
 // to ignore HTTPS error for HEAD check
 const HTTPS_AGENT = require("https").Agent({
@@ -30,13 +25,18 @@ const HTTPS_AGENT = require("https").Agent({
 
 const HTTP_AGENT = require("http").Agent();
 
-const { ScreenCaster, NewWindowPage } = require("./screencaster");
-
+const  TextExtract  = require("./util/TextExtract");
+const { ScreenCaster } = require("./util/ScreenCaster");
+const { ArgParser } = require("./util/ArgParser");
+const { constants } = require("./util/constants");
 
 // ============================================================================
 class Crawler {
   constructor() {
     this.headers = {};
+
+    this.argParser = new ArgParser();
+    this.constants = new constants();
 
     this.seenList = new Set();
 
@@ -55,15 +55,19 @@ class Crawler {
     this.behaviorsLogDebug = false;
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
+    var commandLineArgs = yargs(hideBin(process.argv)).argv;
+
     const params = require("yargs")
       .usage("crawler [options]")
       .option(this.cliOpts)
-      .check((argv) => this.validateArgs(argv)).argv;
-
-    console.log("Exclusions Regexes: ", params.exclude);
-    console.log("Scope Regexes: ", params.scope);
+      .check((parsedArgs) => this.argParser.validateArgs(parsedArgs, commandLineArgs)).argv;
 
     this.params = params;
+
+    console.log("Exclusions Regexes: ", this.params.exclude);
+    console.log("Scope Regexes: ", this.params.scope);
+
+
     this.capturePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record/id_/`;
 
     this.gotoOpts = {
@@ -76,9 +80,10 @@ class Crawler {
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
-    
+
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
+
   }
 
   configureUA() {
@@ -117,7 +122,7 @@ class Crawler {
       }
     }
   }
-  
+
   bootstrap() {
     let opts = {};
     if (this.params.logging.includes("pywb")) {
@@ -128,7 +133,7 @@ class Crawler {
     }
 
     this.configureUA();
-    
+
     this.headers = {"User-Agent": this.userAgent};
 
     const subprocesses = [];
@@ -138,7 +143,7 @@ class Crawler {
     child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
-    
+
     subprocesses.push(child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts));
 
     process.on("exit", () => {
@@ -249,38 +254,38 @@ class Crawler {
         type: "boolean",
         default: false,
       },
-      
+
       "rolloverSize": {
         describe: "If set, declare the rollover size",
         default: 1000000000,
         type: "number",
       },
-      
+
       "generateWACZ": {
         alias: ["generatewacz", "generateWacz"],
         describe: "If set, generate wacz",
         type: "boolean",
         default: false,
       },
-      
+
       "logging": {
         describe: "Logging options for crawler, can include: stats, pywb, behaviors, behaviors-debug",
         type: "string",
         default: "stats",
       },
-      
+
       "urlFile": {
         alias: ["urlfile", "url-file", "url-list"],
         describe: "If set, read a list of urls from the passed file INSTEAD of the url from the --url flag.",
         type: "string",
       },
-      
+
       "text": {
         describe: "If set, extract text to the pages.jsonl file",
         type: "boolean",
         default: false,
       },
-      
+
       "cwd": {
         describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd()",
         type: "string",
@@ -325,177 +330,15 @@ class Crawler {
         describe: "If set to a non-zero value, starts an HTTP server with screencast accessible on this port",
         type: "number",
         default: 0
+      },
+
+      "yamlConfig": {
+        describe: "If set the values in the yaml file wee be used. But overwritten by anything passed on the browser command line",
+        type: "string"
       }
     };
   }
 
-  validateUserUrl(url) {
-    url = new URL(url);
-
-    if (url.protocol !== "http:" && url.protocol != "https:") {
-      throw new Error("URL must start with http:// or https://");
-    }
-
-    return url;
-  }
-
-  validateArgs(argv) {
-    let purl;
-
-    if (argv.url) {
-      // Scope for crawl, default to the domain of the URL
-      // ensure valid url is used (adds trailing slash if missing)
-      //argv.seeds = [Crawler.validateUserUrl(argv.url)];
-      purl = this.validateUserUrl(argv.url);
-      argv.url = purl.href;
-    }
-    
-    if (argv.url && argv.urlFile) {
-      console.warn("You've passed a urlFile param, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
-    }
-
-    // Check that the collection name is valid.
-    if (argv.collection.search(/^[\w][\w-]*$/) === -1){
-      throw new Error(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
-    }
-  
-    argv.timeout *= 1000;
-
-    // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
-    // can be multiple separate by comma
-    // (see: https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options)
-    argv.waitUntil = argv.waitUntil.split(",");
-
-    for (const opt of argv.waitUntil) {
-      if (!WAIT_UNTIL_OPTS.includes(opt)) {
-        throw new Error("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
-      }
-    }
-
-    // log options
-    argv.logging = argv.logging.split(",");
-
-    // background behaviors to apply
-    const behaviorOpts = {};
-    argv.behaviors.split(",").forEach((x) => behaviorOpts[x] = true);
-    if (argv.logging.includes("behaviors")) {
-      behaviorOpts.log = BEHAVIOR_LOG_FUNC;
-    } else if (argv.logging.includes("behaviors-debug")) {
-      behaviorOpts.log = BEHAVIOR_LOG_FUNC;
-      this.behaviorsLogDebug = true;
-    }
-    this.behaviorOpts = JSON.stringify(behaviorOpts);
-
-    if (!argv.newContext) {
-      argv.newContext = "page";
-    }
-
-    switch (argv.newContext) {
-    case "page":
-      argv.newContext = Cluster.CONCURRENCY_PAGE;
-      if (argv.screencastPort && argv.workers > 1) {
-        console.warn("Note: Screencast with >1 workers and default page context may only show one page at a time. To fix, add '--newContext window' to open each page in a new window");
-      }
-      break;
-
-    case "session":
-      argv.newContext = Cluster.CONCURRENCY_CONTEXT;
-      break;
-
-    case "browser":
-      argv.newContext = Cluster.CONCURRENCY_BROWSER;
-      break;
-
-    case "window":
-      argv.newContext = NewWindowPage;
-      break;
-
-    default:
-      throw new Error("Invalid newContext, must be one of: page, session, browser");
-    }
-
-    if (argv.mobileDevice) {
-      this.emulateDevice = puppeteer.devices[argv.mobileDevice];
-      if (!this.emulateDevice) {
-        throw new Error("Unknown device: " + argv.mobileDevice);
-      }
-    }
-
-    if (argv.useSitemap === true) {
-      const url = new URL(argv.url);
-      url.pathname = "/sitemap.xml";
-      argv.useSitemap = url.href;
-    }
-
-    // Support one or multiple exclude
-    if (argv.exclude) {
-      if (typeof(argv.exclude) === "string") {
-        argv.exclude = [new RegExp(argv.exclude)];
-      } else {
-        argv.exclude = argv.exclude.map(e => new RegExp(e));
-      }
-    } else {
-      argv.exclude = [];
-    }
-
-    // warn if both scope and scopeType are set
-    if (argv.scope && argv.scopeType) {
-      console.warn("You've specified a --scopeType and a --scope regex. The custom scope regex will take precedence, overriding the scopeType");
-    }
-
-    // Support one or multiple scopes set directly, or via scopeType
-    if (argv.scope) {
-      if (typeof(argv.scope) === "string") {
-        argv.scope = [new RegExp(argv.scope)];
-      } else {
-        argv.scope = argv.scope.map(e => new RegExp(e));
-      }
-    } else {
-
-      // Set scope via scopeType
-      if (!argv.scopeType) {
-        argv.scopeType = argv.urlFile ? "any" : "prefix";
-      }
-
-      if (argv.scopeType && argv.url) {
-        switch (argv.scopeType) {
-        case "page":
-          // allow scheme-agnostic URLS as likely redirects
-          argv.scope = [new RegExp("^" + this.rxEscape(argv.url).replace(purl.protocol, "https?:") + "#.+")];
-          argv.allowHashUrls = true;
-          break;
-
-        case "prefix":
-          argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
-          break;
-
-        case "domain":
-          argv.scope = [new RegExp("^" + this.rxEscape(purl.origin + "/"))];
-          break;
-
-        case "any":
-          argv.scope = [];
-          break;
-
-        default:
-          throw new Error(`Invalid scope type "${argv.scopeType}" specified, valid types are: page, prefix, domain`);
-
-
-        }
-      }
-    }
-
-    // Resolve statsFilename
-    if (argv.statsFilename) {
-      argv.statsFilename = path.resolve(argv.cwd, argv.statsFilename);
-    }
-
-    if (argv.profile) {
-      child_process.execSync("tar xvfz " + argv.profile, {cwd: this.profileDir});
-    }
-
-    return true;
-  }
 
   get chromeArgs() {
     // Chrome Flags, including proxy server
@@ -515,7 +358,7 @@ class Crawler {
     // Puppeter Options
     return {
       headless: this.params.headless,
-      executablePath: CHROME_PATH,
+      executablePath: this.constants.CHROME_PATH,
       ignoreHTTPSErrors: true,
       args: this.chromeArgs,
       userDataDir: this.profileDir,
@@ -561,15 +404,15 @@ class Crawler {
       }
 
       if (this.behaviorOpts && !page.__bx_inited) {
-        await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
+        await page.exposeFunction(this.constants.BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
         await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.behaviorOpts});`);
         page.__bx_inited = true;
       }
 
       // run custom driver here
       await this.driver({page, data, crawler: this});
-      
-      
+
+
       const title = await page.title();
       let text = "";
       if (this.params.text) {
@@ -577,7 +420,7 @@ class Crawler {
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
       }
-    
+
       await this.writePage(data.url, title, this.params.text, text);
 
       if (this.behaviorOpts) {
@@ -594,7 +437,7 @@ class Crawler {
       console.warn(e);
     }
   }
-  
+
   async createWARCInfo(filename) {
     const warcVersion = "WARC/1.1";
     const type = "warcinfo";
@@ -607,18 +450,19 @@ class Crawler {
       "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywbVersion})`,
       "format": "WARC File Format 1.1"
     };
-    
+
     const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, info);
     const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
     return buffer;
   }
-  
+
   async getFileSize(filename) {
     var stats = await fsp.stat(filename);
     return stats.size;
   }
 
   async crawl() {
+
     try {
       this.driver = require(this.params.driver);
     } catch(e) {
@@ -638,7 +482,7 @@ class Crawler {
     });
 
     this.cluster.task((opts) => this.crawlPage(opts));
-    
+
     await this.initPages();
 
     if (this.params.screencastPort) {
@@ -651,7 +495,7 @@ class Crawler {
       this.queueUrls(urlSeedFileList, true);
       this.params.allowHashUrls = true;
     }
-    
+
     if (!this.params.urlFile) {
       this.queueUrl(this.params.url);
     }
@@ -682,7 +526,7 @@ class Crawler {
 
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
-    
+
     if (this.params.generateWACZ || this.params.generateWacz || this.params.generatewacz ) {
       console.log("Generating WACZ");
 
@@ -690,13 +534,13 @@ class Crawler {
 
       // Get a list of the warcs inside
       const warcFileList = await fsp.readdir(archiveDir);
-      
+
       // Build the argument list to pass to the wacz create command
       const waczFilename = this.params.collection.concat(".wacz");
       const waczPath = path.join(this.collDir, waczFilename);
       const argument_list = ["create", "-o", waczPath, "--pages", this.pagesFile, "-f"];
       warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
-      
+
       // Run the wacz create command
       child_process.spawnSync("wacz" , argument_list);
       console.log(`WACZ successfully generated and saved to: ${waczFilename}`);
@@ -787,7 +631,7 @@ class Crawler {
         await fsp.mkdir(this.pagesDir);
         createNew = true;
       }
-        
+
       this.pagesFH = await fsp.open(this.pagesFile, "a");
 
       if (createNew) {
@@ -816,7 +660,7 @@ class Crawler {
     if (text == true){
       row["text"] = text_content;
     }
-    
+
     const processedRow = JSON.stringify(row).concat("\n");
     try {
       this.pagesFH.writeFile(processedRow);
@@ -825,7 +669,7 @@ class Crawler {
       console.warn("pages/pages.jsonl append failed", err);
     }
   }
-  
+
   shouldCrawl(url, ignoreScope) {
     try {
       url = new URL(url);
@@ -854,7 +698,7 @@ class Crawler {
     if (ignoreScope || !this.params.scope.length){
       inScope = true;
     }
-    
+
     // check scopes
     if (!ignoreScope){
       for (const s of this.params.scope) {
@@ -864,7 +708,7 @@ class Crawler {
         }
       }
     }
-    
+
     if (!inScope) {
       //console.log(`Not in scope ${url} ${scope}`);
       return false;
@@ -892,7 +736,6 @@ class Crawler {
         headers: this.headers,
         agent: this.resolveAgent
       });
-
       if (resp.status >= 400) {
         console.log(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
         return true;
@@ -907,7 +750,7 @@ class Crawler {
 
       const mime = contentType.split(";")[0];
 
-      if (HTML_TYPES.includes(mime)) {
+      if (this.constants.HTML_TYPES.includes(mime)) {
         return true;
       }
 
@@ -946,10 +789,6 @@ class Crawler {
 
   sleep(time) {
     return new Promise(resolve => setTimeout(resolve, time));
-  }
-
-  rxEscape(string) {
-    return string.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
   }
 
   async parseSitemap(url) {
@@ -1018,7 +857,7 @@ class Crawler {
       }
 
       if (doRollover) {
-        // If adding the current warc to the existing combined file creates a file larger than the rollover size do the following: 
+        // If adding the current warc to the existing combined file creates a file larger than the rollover size do the following:
         // 1. increment the combinedWarcNumber
         // 2. create the name of the new combinedWarcFile
         // 3. Write the header out to the new file
