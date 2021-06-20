@@ -10,8 +10,6 @@ const os = require("os");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 const warcio = require("warcio");
-const yargs = require("yargs/yargs");
-const { hideBin } = require("yargs/helpers");
 
 const Redis = require("ioredis");
 
@@ -26,17 +24,14 @@ const HTTP_AGENT = require("http").Agent();
 
 const  TextExtract  = require("./util/textextract");
 const { ScreenCaster } = require("./util/screencaster");
-const { argParser } = require("./util/argParser");
-const { constants } = require("./util/constants");
+const { parseArgs } = require("./util/argParser");
+
+const { CHROME_PATH, BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
 
 // ============================================================================
 class Crawler {
   constructor() {
     this.headers = {};
-
-    this.argParser = new argParser();
-    this.constants = new constants();
-
     this.seenList = new Set();
 
     this.emulateDevice = null;
@@ -54,27 +49,8 @@ class Crawler {
     this.behaviorsLogDebug = false;
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
-    var parsedArgs = yargs(hideBin(process.argv)).argv;
+    this.params = parseArgs();
 
-    const params = require("yargs")
-      .usage("crawler [options]")
-      .option(this.cliOpts)
-      .check((parsedArgs) => this.argParser.validateArgs(parsedArgs)).argv;
-
-    this.params = params;
-
-    if (this.params.yamlConfig){
-      var yamlConfigFile = fs.existsSync(this.params.yamlConfig);
-      parsedArgs = this.argParser.parseYaml(this.params.yamlConfig);
-      var commandLineArgs = yargs(hideBin(process.argv)).argv;
-      console.log("yaml parsed")
-      console.log(parsedArgs)
-      console.log(commandLineArgs)
-      for (const property in commandLineArgs) {
-        parsedArgs[property] = commandLineArgs[property];
-      }
-      this.params = parsedArgs
-    }
     console.log("Exclusions Regexes: ", this.params.exclude);
     console.log("Scope Regexes: ", this.params.scope);
 
@@ -94,7 +70,6 @@ class Crawler {
 
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
-
   }
 
   configureUA() {
@@ -116,7 +91,7 @@ class Crawler {
       let version = process.env.BROWSER_VERSION;
 
       try {
-        version = child_process.execFileSync("google-chrome", ["--product-version"], {encoding: "utf8"}).trim();
+        version = child_process.execFileSync(CHROME_PATH, ["--product-version"], {encoding: "utf8"}).trim();
       } catch(e) {
         console.log(e);
       }
@@ -178,179 +153,6 @@ class Crawler {
     }
   }
 
-  get cliOpts() {
-    return {
-      "url": {
-        alias: "u",
-        describe: "The URL to start crawling from",
-        type: "string",
-      },
-
-      "workers": {
-        alias: "w",
-        describe: "The number of workers to run in parallel",
-        default: 1,
-        type: "number",
-      },
-
-      "newContext": {
-        describe: "The context for each new capture, can be a new: page, window, session or browser.",
-        default: "page",
-        type: "string"
-      },
-
-      "waitUntil": {
-        describe: "Puppeteer page.goto() condition to wait for before continuing, can be multiple separate by ','",
-        default: "load,networkidle0",
-      },
-
-      "limit": {
-        describe: "Limit crawl to this number of pages",
-        default: 0,
-        type: "number",
-      },
-
-      "timeout": {
-        describe: "Timeout for each page to load (in seconds)",
-        default: 90,
-        type: "number",
-      },
-
-      "scope": {
-        describe: "Regex of page URLs that should be included in the crawl (defaults to the immediate directory of URL)",
-      },
-
-      "scopeType": {
-        describe: "Simplified scope for which URLs to crawl, can be: prefix, page, domain, any",
-        type: "string",
-      },
-
-      "exclude": {
-        describe: "Regex of page URLs that should be excluded from the crawl."
-      },
-
-      "allowHashUrls": {
-        describe: "Allow Hashtag URLs, useful for single-page-application crawling or when different hashtags load dynamic content",
-      },
-
-      "collection": {
-        alias: "c",
-        describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",
-        type: "string",
-        default: `capture-${new Date().toISOString().slice(0,19)}`.replace(/:/g, "-")
-      },
-
-      "headless": {
-        describe: "Run in headless mode, otherwise start xvfb",
-        type: "boolean",
-        default: false,
-      },
-
-      "driver": {
-        describe: "JS driver for the crawler",
-        type: "string",
-        default: path.join(__dirname, "defaultDriver.js"),
-      },
-
-      "generateCDX": {
-        alias: ["generatecdx", "generateCdx"],
-        describe: "If set, generate index (CDXJ) for use with pywb after crawl is done",
-        type: "boolean",
-        default: false,
-      },
-
-      "combineWARC": {
-        alias: ["combinewarc", "combineWarc"],
-        describe: "If set, combine the warcs",
-        type: "boolean",
-        default: false,
-      },
-
-      "rolloverSize": {
-        describe: "If set, declare the rollover size",
-        default: 1000000000,
-        type: "number",
-      },
-
-      "generateWACZ": {
-        alias: ["generatewacz", "generateWacz"],
-        describe: "If set, generate wacz",
-        type: "boolean",
-        default: false,
-      },
-
-      "logging": {
-        describe: "Logging options for crawler, can include: stats, pywb, behaviors, behaviors-debug",
-        type: "string",
-        default: "stats",
-      },
-
-      "urlFile": {
-        alias: ["urlfile", "url-file", "url-list"],
-        describe: "If set, read a list of urls from the passed file INSTEAD of the url from the --url flag.",
-        type: "string",
-      },
-
-      "text": {
-        describe: "If set, extract text to the pages.jsonl file",
-        type: "boolean",
-        default: false,
-      },
-
-      "cwd": {
-        describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd()",
-        type: "string",
-        default: process.cwd(),
-      },
-
-      "mobileDevice": {
-        describe: "Emulate mobile device by name from: https://github.com/puppeteer/puppeteer/blob/main/src/common/DeviceDescriptors.ts",
-        type: "string",
-      },
-
-      "userAgent": {
-        describe: "Override user-agent with specified string",
-        type: "string",
-      },
-
-      "userAgentSuffix": {
-        describe: "Append suffix to existing browser user-agent (ex: +MyCrawler, info@example.com)",
-        type: "string",
-      },
-
-      "useSitemap": {
-        describe: "If enabled, check for sitemaps at /sitemap.xml, or custom URL if URL is specified",
-      },
-
-      "statsFilename": {
-        describe: "If set, output stats as JSON to this file. (Relative filename resolves to crawl working directory)"
-      },
-
-      "behaviors": {
-        describe: "Which background behaviors to enable on each page",
-        default: "autoplay,autofetch,siteSpecific",
-        type: "string",
-      },
-
-      "profile": {
-        describe: "Path to tar.gz file which will be extracted and used as the browser profile",
-        type: "string",
-      },
-
-      "screencastPort": {
-        describe: "If set to a non-zero value, starts an HTTP server with screencast accessible on this port",
-        type: "number",
-        default: 0
-      },
-
-      "yamlConfig": {
-        describe: "If set the values in the yaml file wee be used. But overwritten by anything passed on the browser command line",
-        type: "string"
-      }
-    };
-  }
-
-
   get chromeArgs() {
     // Chrome Flags, including proxy server
     return [
@@ -369,7 +171,7 @@ class Crawler {
     // Puppeter Options
     return {
       headless: this.params.headless,
-      executablePath: this.constants.CHROME_PATH,
+      executablePath: CHROME_PATH,
       ignoreHTTPSErrors: true,
       args: this.chromeArgs,
       userDataDir: this.profileDir,
@@ -415,7 +217,7 @@ class Crawler {
       }
 
       if (this.behaviorOpts && !page.__bx_inited) {
-        await page.exposeFunction(this.constants.BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
+        await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
         await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.behaviorOpts});`);
         page.__bx_inited = true;
       }
@@ -475,9 +277,6 @@ class Crawler {
   async crawl() {
 
     try {
-      console.log("were in it dawg")
-      console.log(this.params.driver)
-      console.log(this.params)
       this.driver = require(this.params.driver);
     } catch(e) {
       console.log(e);
@@ -745,14 +544,11 @@ class Crawler {
 
   async isHTML(url) {
     try {
-      console.log("HI url")
-      console.log(url)
       const resp = await fetch(url, {
         method: "HEAD",
         headers: this.headers,
         agent: this.resolveAgent
       });
-      console.log(resp)
       if (resp.status >= 400) {
         console.log(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
         return true;
@@ -767,13 +563,12 @@ class Crawler {
 
       const mime = contentType.split(";")[0];
 
-      if (this.constants.HTML_TYPES.includes(mime)) {
+      if (HTML_TYPES.includes(mime)) {
         return true;
       }
 
       return false;
     } catch(e) {
-      console.log("HTML Check error", e);
       // can't confirm not html, so try in browser
       return true;
     }
