@@ -302,14 +302,20 @@ class Crawler {
       this.screencaster = new ScreenCaster(this.cluster, this.params.screencastPort);
     }
 
+    // first, check external seeds file
     if (this.params.urlFile) {
       const urlSeedFile =  await fsp.readFile(this.params.urlFile, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
       this.queueUrls(urlSeedFileList, true);
       this.params.allowHashUrls = true;
-    }
 
-    if (!this.params.urlFile) {
+    // check inline seeds
+    } else if (this.params.seeds) {
+      this.queueUrls(this.params.seeds, true);
+      this.params.allowHashUrls = true;
+
+    // check single URL
+    } else if (this.params.url) {
       this.queueUrl(this.params.url);
     }
 
@@ -340,7 +346,7 @@ class Crawler {
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
 
-    if (this.params.generateWACZ || this.params.generateWacz || this.params.generatewacz ) {
+    if (this.params.generateWACZ) {
       console.log("Generating WACZ");
 
       const archiveDir = path.join(this.collDir, "archive");
@@ -356,7 +362,7 @@ class Crawler {
 
       // Run the wacz create command
       child_process.spawnSync("wacz" , argument_list);
-      console.log(`WACZ successfully generated and saved to: ${waczFilename}`);
+      console.log(`WACZ successfully generated and saved to: ${waczPath}`);
     }
   }
 

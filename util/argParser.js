@@ -19,6 +19,11 @@ class ArgParser {
         type: "string",
       },
 
+      "seeds": {
+        describe: "The URL to start crawling from",
+				type: "array",
+      },
+
       "workers": {
         alias: "w",
         describe: "The number of workers to run in parallel",
@@ -205,18 +210,7 @@ class ArgParser {
     return url;
   }
 
-
   validateArgs(argv) {
-    /*
-    if (argv.yamlConfig) {
-			console.log("Reading config from: " + argv.yamlConfig);
-
-      const fileContents = fs.readFileSync(argv.yamlConfig, "utf8");
-      const yamlParams = yaml.safeLoad(fileContents);
-
-			argv = {...yamlParams, ...argv};
-		}
-*/
     let purl;
     if (argv.url) {
       // Scope for crawl, default to the domain of the URL
@@ -361,9 +355,9 @@ class ArgParser {
 
         default:
           throw new Error(`Invalid scope type "${argv.scopeType}" specified, valid types are: page, prefix, domain`);
-
-
         }
+      } else if (!argv.scope) {
+        argv.scope = [];
       }
     }
 
