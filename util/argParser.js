@@ -21,7 +21,7 @@ class ArgParser {
 
       "seeds": {
         describe: "The URL to start crawling from",
-				type: "array",
+        type: "array",
       },
 
       "workers": {
