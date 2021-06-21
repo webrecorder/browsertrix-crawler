@@ -514,7 +514,7 @@ class Crawler {
     }
     let inScope = false;
 
-    if (ignoreScope || !this.params.scope.length){
+    if (ignoreScope) {
       inScope = true;
     }
 

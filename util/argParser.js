@@ -330,7 +330,7 @@ class ArgParser {
 
       // Set scope via scopeType
       if (!argv.scopeType) {
-        argv.scopeType = argv.urlFile ? "any" : "prefix";
+        argv.scopeType = argv.urlFile ? "none" : "prefix";
       }
 
       if (argv.scopeType && argv.url) {
@@ -350,6 +350,10 @@ class ArgParser {
           break;
 
         case "any":
+          argv.scope = [/.*/];
+          break;
+
+        case "none":
           argv.scope = [];
           break;
 
