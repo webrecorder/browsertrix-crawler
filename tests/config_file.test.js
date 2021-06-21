@@ -15,21 +15,21 @@ test("check yaml config file with seed list is used", async () => {
   }
 
   const crawledPages = fs.readFileSync("crawls/collections/configtest/pages/pages.jsonl", "utf8");
-	const pages = new Set();
+  const pages = new Set();
 
-	for (const line of crawledPages.trim().split("\n")) {
-		pages.add(JSON.parse(line).url);
-	}
+  for (const line of crawledPages.trim().split("\n")) {
+    pages.add(JSON.parse(line).url);
+  }
 
-	const config = yaml.safeLoad(fs.readFileSync("tests/fixtures/crawl-1.yaml", "utf8"));
+  const config = yaml.safeLoad(fs.readFileSync("tests/fixtures/crawl-1.yaml", "utf8"));
 
   let foundAllSeeds = true; 
 
   for (const seed of config.seeds) {
-		const url = new URL(seed).href;
-		if (!pages.has(url)) {
-			foundAllSeeds = false;
-		}
+    const url = new URL(seed).href;
+    if (!pages.has(url)) {
+      foundAllSeeds = false;
+    }
   }
   expect(foundAllSeeds).toBe(true);
 
