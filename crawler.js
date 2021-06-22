@@ -822,7 +822,7 @@ class Crawler {
       if (createNew) {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         header["hasText"] = this.params.text;
-        header["hasReaderView"] = this.params.readerView;
+        header["textSource"] = (this.params.readerView ? "readability" : "browser-dom");
         let msg = "creating pages ";
         if (this.params.text) {
           msg += "with full text";
