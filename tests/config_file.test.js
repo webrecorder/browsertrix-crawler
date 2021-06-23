@@ -36,3 +36,28 @@ test("check yaml config file with seed list is used", async () => {
   expect(fs.existsSync("crawls/collections/configtest/configtest.wacz")).toBe(true);
 
 });
+
+test("check yaml config file will be overwritten by command line", async () => {
+  jest.setTimeout(30000);
+
+  try{
+
+    await exec("docker-compose run -v $PWD/crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection configtest --yamlConfig /tests/fixtures/crawl-1.yaml --url https://www.example.com --timeout 20000");
+  }
+  catch (error) {
+    console.log(error);
+  }
+
+  const crawledPages = fs.readFileSync("crawls/collections/configtest/pages/pages.jsonl", "utf8");
+  const pages = new Set();
+
+  for (const line of crawledPages.trim().split("\n")) {
+    pages.add(JSON.parse(line).url);
+  }
+
+
+  
+  expect(pages.has("https://www.example.com")).toBe(true);
+
+
+});
