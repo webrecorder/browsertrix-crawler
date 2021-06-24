@@ -129,7 +129,7 @@ Options:
                                             accessible on this port
                                                            [number] [default: 0]
 
-      --yamlConfigFile                     A path to a yaml file.
+      --yamlConfig                         A path to a yaml file.
                                            If set browsertrix will
                                            attempt to parse and use the parameters set in
                                            the yaml file passed. Values set in the
@@ -143,49 +143,26 @@ The default is `load`, but for static sites, `--wait-until domcontentloaded` may
 while `--waitUntil networkidle0` may make sense for dynamic sites.
 
 
-### Yaml Config
+### YAML Crawl Config
 
-Browsertix Crawler suppors the use of a yaml file to set parameters for a crawl. This can be used by passing a valid yaml file to the --yamlConfig.
+Browsertix Crawler supports the use of a yaml file to set parameters for a crawl. This can be used by passing a valid yaml file to the --yamlConfig.
 
-If a parameter is set on the command line and in the yaml file the value in the commandline will be used.
+The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used.
 
-The yamlconfig file must be passed as a volume. You can run a command similar to this.
+The config file must be passed as a volume. You can run a command similar to this.
 
 ```
-docker run -v $PWD/sample.yaml:/app/sample.yaml -v $PWD/crawls:/crawls/ -it webcrecorder_image crawl —yamlConfig /app/sample.yaml
+docker run -v $PWD/crawl.yaml:/app/crawl.yaml -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler:[VERSION] crawl —-yamlConfig /app/sample.yaml
 ```
-This is an example yaml config file
+
+An example config file might contain:
+
 ```
----
-crawler:
-  behaviors:
-    - autoplay
-    - autofetch
-  collection: example-collection
-  combineWARC: false
-  cwd: /crawls
-  driver: /app/defaultDriver.js
-  exclude: null
-  generateCDX: false
-  generateWACZ: false
-  headless: false
-  limit: 0
-  logging: stats
-  newContext: page
-  profile: ""
-  rolloverSize: 1000000000
-  scope: ".*"
-  url: "https://www.example.com"
-  statsFilename: statsFile.json
-  text: false
-  timeout: 10000
-  useSitemap: sitemap.xml
-  userAgent: ""
-  userAgentSuffix: ""
-  waitUntil:
-    - load
-    - networkidle0
-  workers: 4
+seeds:
+  - https://example.com/
+  - https://www.iana.org/
+
+combineWARCs: true
 ```
 
 ### Behaviors

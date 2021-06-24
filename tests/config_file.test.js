@@ -57,7 +57,7 @@ test("check yaml config file will be overwritten by command line", async () => {
 
 
   
-  expect(pages.has("https://www.example.com")).toBe(true);
+  expect(pages.has("https://www.example.com/")).toBe(true);
 
 
 });
