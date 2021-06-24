@@ -315,7 +315,8 @@ class Crawler {
       this.params.allowHashUrls = true;
 
     // check single URL
-    } else if (this.params.url) {
+    }
+    if (this.params.url) {
       this.queueUrl(this.params.url);
     }
 
