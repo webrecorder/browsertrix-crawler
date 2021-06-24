@@ -90,6 +90,12 @@ class ArgParser {
         describe: "Allow Hashtag URLs, useful for single-page-application crawling or when different hashtags load dynamic content",
       },
 
+      "captureExclusions": {
+        describe: "Additional rules for excluding URLs from being captured, when loaded on any page or from any seed",
+        type: "array",
+        default: [],
+      },
+
       "collection": {
         alias: "c",
         describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",

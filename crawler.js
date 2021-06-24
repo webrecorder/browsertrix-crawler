@@ -29,7 +29,7 @@ const { parseArgs } = require("./util/argParser");
 
 const { BROWSER_BIN, BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
 
-const { Exclusions } = require("./exclusions");
+const { Exclusions } = require("./util/exclusions");
 
 
 // ============================================================================
@@ -304,8 +304,8 @@ class Crawler {
 
     await this.initPages();
 
-    if (this.params.exclusions) {
-      this.exclusions = new Exclusions(yaml.load(await fsp.readFile(this.params.exclusions)).capture_exclusions);
+    if (this.params.capture_exclusions) {
+      this.exclusions = new Exclusions(this.params.capture_exclusions);
     }
 
     if (this.params.screencastPort) {

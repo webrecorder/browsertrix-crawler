@@ -31,7 +31,7 @@ class Exclusions
   async handleRequest(request) {
     for (const rule of this.exclusions) {
       if (await this.shouldExclude(rule, request)) {
-        console.log("Aborting Request for: " + request.url());
+        console.log("Excluding/Aborting Request for: " + request.url());
         // not allowed, abort loading this response
         request.abort();
         return;
@@ -50,11 +50,11 @@ class Exclusions
       return false;
     }
 
-    console.log("Matched Rule for: " + url, textMatchRx);
-
     if (!textMatchRx) {
       return true;
     }
+
+    console.log("Matched Rule for: " + url, textMatchRx);
 
     try {
       const res = await fetch(url);
