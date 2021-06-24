@@ -23,6 +23,10 @@ RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
     && curl https://bootstrap.pypa.io/get-pip.py | python3.8 \
     && pip install -U setuptools
 
+# needed to add args to main build stage
+ARG BROWSER_VERSION
+ARG BROWSER_BIN
+
 ENV PROXY_HOST=localhost \
     PROXY_PORT=8080 \
     PROXY_CA_URL=http://wsgiprox/download/pem \
