@@ -1,4 +1,4 @@
-#pywb>=2.5.0
-git+https://github.com/webrecorder/pywb@main
+pywb>=2.6.0b2
+#git+https://github.com/webrecorder/pywb@main
 uwsgi
 wacz>=0.3.0

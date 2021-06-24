@@ -6,7 +6,7 @@
   "author": "Ilya Kreymer <ikreymer@gmail.com>, Webrecorder Software",
   "license": "MIT",
   "scripts": {
-    "lint": "eslint *.js"
+    "lint": "eslint *.js util/*.js"
   },
   "dependencies": {
     "abort-controller": "^3.0.0",

@@ -1,0 +1,29 @@
+--- 
+crawler: 
+  behaviors: 
+    - autoplay
+    - autofetch
+  collection: example-collection
+  combineWARC: false
+  cwd: /crawls
+  driver: /app/defaultDriver.js
+  exclude: "*"
+  generateCDX: false
+  generateWACZ: false
+  headless: false
+  limit: 0
+  logging: stats
+  newContext: page
+  profile: ""
+  rolloverSize: 1000000000
+  scope: "*"
+  statsFilename: statsFile.json
+  text: false
+  timeout: 10000
+  useSitemap: sitemap.xml
+  userAgent: ""
+  userAgentSuffix: ""
+  waitUntil: 
+    - load
+    - networkidle0
+  workers: 4

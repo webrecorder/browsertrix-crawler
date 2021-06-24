@@ -37,7 +37,7 @@ Here's how you can use some of the command-line options to configure the crawl:
 - To run more than one browser worker and crawl in parallel, and `--workers N` where N is number of browsers to run in parallel. More browsers will require more CPU and network bandwidth, and does not guarantee faster crawling.
 
 - To crawl into a new directory, specify a different name for the `--collection` param, or, if omitted, a new collection directory based on current time will be created.
-- 
+-
 
 Browsertrix Crawler includes a number of additional command-line options, explained below.
 
@@ -52,7 +52,7 @@ Options:
       --help                                Show help                  [boolean]
       --version                             Show version number        [boolean]
   -u, --url                                 The URL to start crawling from
-                                                              [string] 
+                                                              [string]
       --urlFile, --urlfile, --url-file,     If set, read a list of urls from the
       --url-list                            passed file INSTEAD of the url from
                                             the --url flag.             [string]
@@ -123,10 +123,18 @@ Options:
       --profile                             Path to tar.gz file which will be
                                             extracted and used as the browser
                                             profile                     [string]
+
       --screencastPort                      If set to a non-zero value, starts
                                             an HTTP server with screencast
                                             accessible on this port
                                                            [number] [default: 0]
+
+      --yamlConfig                         A path to a yaml file.
+                                           If set browsertrix will
+                                           attempt to parse and use the parameters set in
+                                           the yaml file passed. Values set in the
+                                           command line will take precedence.              
+                                           [string]
 ```
 
 For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options).
@@ -134,6 +142,28 @@ For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.co
 The default is `load`, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example),
 while `--waitUntil networkidle0` may make sense for dynamic sites.
 
+
+### YAML Crawl Config
+
+Browsertix Crawler supports the use of a yaml file to set parameters for a crawl. This can be used by passing a valid yaml file to the --yamlConfig.
+
+The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used.
+
+The config file must be passed as a volume. You can run a command similar to this.
+
+```
+docker run -v $PWD/crawl.yaml:/app/crawl.yaml -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler:[VERSION] crawl —-yamlConfig /app/sample.yaml
+```
+
+An example config file might contain:
+
+```
+seeds:
+  - https://example.com/
+  - https://www.iana.org/
+
+combineWARCs: true
+```
 
 ### Behaviors
 
@@ -200,7 +230,7 @@ After running the above command, you can now run a crawl with the profile, as fo
 docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --profile /crawls/profiles/profile.tar.gz --url https://twitter.com/--generateWACZ --collection test-with-profile
 ```
 
-The current profile creation script is still experimental and the script attempts to detect the usename and password fields on a site as generically as possible, but may not work for all sites. Additional profile functionality, such as support for custom profile creation scripts, may be added in the future. 
+The current profile creation script is still experimental and the script attempts to detect the usename and password fields on a site as generically as possible, but may not work for all sites. Additional profile functionality, such as support for custom profile creation scripts, may be added in the future.
 
 
 ## Architecture

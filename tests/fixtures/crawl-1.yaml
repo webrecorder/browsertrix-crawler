@@ -1,0 +1,8 @@
+name: crawl-test-1
+
+seeds:
+  - https://www.example.org
+  - https://www.iana.org/
+
+generateWACZ: true
+
