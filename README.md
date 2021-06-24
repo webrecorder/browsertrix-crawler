@@ -37,13 +37,14 @@ Here's how you can use some of the command-line options to configure the crawl:
 - To run more than one browser worker and crawl in parallel, and `--workers N` where N is number of browsers to run in parallel. More browsers will require more CPU and network bandwidth, and does not guarantee faster crawling.
 
 - To crawl into a new directory, specify a different name for the `--collection` param, or, if omitted, a new collection directory based on current time will be created.
--
 
 Browsertrix Crawler includes a number of additional command-line options, explained below.
 
 ## Crawling Configuration Options
 
-The Browsertrix Crawler docker image currently accepts the following parameters:
+
+<details>
+      <summary><b>The Browsertrix Crawler docker image currently accepts the following parameters:</b></summary>
 
 ```
 crawler [options]
@@ -136,6 +137,8 @@ Options:
                                            command line will take precedence.              
                                            [string]
 ```
+</details>
+
 
 For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options).
 
@@ -238,7 +241,7 @@ The current profile creation script is still experimental and the script attempt
 The Docker container provided here packages up several components used in Browsertrix.
 
 The system uses:
- - `oldwebtoday/chrome` - to install a recent version of Chrome (currently chrome:84)
+ - `oldwebtoday/chrome` or `oldwebtoday/chromium` - to install a recent version of Chrome (currently chrome:90) or Chromium (see below).
  - `puppeteer-cluster` - for running Chrome browsers in parallel
  - `pywb` - in recording mode for capturing the content
 
@@ -247,6 +250,19 @@ The crawl produces a single pywb collection, at `/crawls/collections/<collection
 
 To access the contents of the crawl, the `/crawls` directory in the container should be mounted to a volume (default in the Docker Compose setup).
 
+### Building with Custom Browser Image / Building on Apple M1
+
+Browsertrix Crawler can be built on the new ARM M1 chip (for development). However, since there is no Linux build of Chrome for ARM, Chromium can be used instead. Currently, Webrecorder provides the `oldwebtoday/chromium:91-arm` for running Browsertrix Crawler on ARM-based systems.
+
+For example, to build with this Chromium image on an Apple M1 machine, run:
+
+```
+docker-compose build --build-arg BROWSER_IMAGE_BASE=oldwebtoday/chromium --build-arg "BROWSER_VERSION=91-arm" --build-arg BROWSER_BIN=chromium-browser
+```
+
+You should then be able to run Browsertrix Crawler natively on M1. 
+
+The build arguments specify the base image, version and browser binary. This approach can also be used to install a different browser in general from any Debian-based Docker image.
 
 
 ### Example Usage

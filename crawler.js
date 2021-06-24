@@ -26,7 +26,7 @@ const  TextExtract  = require("./util/textextract");
 const { ScreenCaster } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 
-const { CHROME_PATH, BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
+const { BROWSER_BIN, BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
 
 // ============================================================================
 class Crawler {
@@ -91,7 +91,7 @@ class Crawler {
       let version = process.env.BROWSER_VERSION;
 
       try {
-        version = child_process.execFileSync(CHROME_PATH, ["--product-version"], {encoding: "utf8"}).trim();
+        version = child_process.execFileSync(BROWSER_BIN, ["--product-version"], {encoding: "utf8"}).trim();
       } catch(e) {
         console.log(e);
       }
@@ -171,7 +171,7 @@ class Crawler {
     // Puppeter Options
     return {
       headless: this.params.headless,
-      executablePath: CHROME_PATH,
+      executablePath: BROWSER_BIN,
       ignoreHTTPSErrors: true,
       args: this.chromeArgs,
       userDataDir: this.profileDir,
@@ -255,9 +255,8 @@ class Crawler {
     const warcVersion = "WARC/1.1";
     const type = "warcinfo";
     const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
-    const version = await fsp.readFile("/usr/local/lib/python3.8/site-packages/pywb/version.py", "utf8");
-    const pywbVersion = version.split("\n")[0].split("=")[1].trim().replace(/['"]+/g, "");
     const warcioPackageJson = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
+    const pywbVersion = child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
 
     const info = {
       "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywbVersion})`,
