@@ -45,7 +45,7 @@ jobs:
     - name: validate existing wacz
       run: docker-compose run crawler wacz validate --file collections/wr-net/wr-net.wacz
     - name: unzip wacz
-      run: unzip crawls/collections/wr-net/wr-net.wacz -d crawls/collections/wr-net/wacz
+      run: sudo unzip crawls/collections/wr-net/wr-net.wacz -d crawls/collections/wr-net/wacz
     - name: run jest
       run: sudo yarn jest
         
