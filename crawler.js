@@ -255,9 +255,8 @@ class Crawler {
     const warcVersion = "WARC/1.1";
     const type = "warcinfo";
     const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
-    const version = await fsp.readFile("/usr/local/lib/python3.8/dist-packages/pywb/version.py", "utf8");
-    const pywbVersion = version.split("\n")[0].split("=")[1].trim().replace(/['"]+/g, "");
     const warcioPackageJson = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
+    const pywbVersion = child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
 
     const info = {
       "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywbVersion})`,
