@@ -279,7 +279,7 @@ class ArgParser {
     }
 
     if (argv.urlFile) {
-      const urlSeedFile = fs.readFileFile(argv.urlFile, "utf8");
+      const urlSeedFile = fs.readFileSync(argv.urlFile, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
 
       if (typeof(argv.seeds) === "string") {
