@@ -21,7 +21,7 @@ test("check yaml config file with seed list is used", async () => {
     pages.add(JSON.parse(line).url);
   }
 
-  const config = yaml.safeLoad(fs.readFileSync("tests/fixtures/crawl-1.yaml", "utf8"));
+  const config = yaml.load(fs.readFileSync("tests/fixtures/crawl-1.yaml", "utf8"));
 
   let foundAllSeeds = true; 
 

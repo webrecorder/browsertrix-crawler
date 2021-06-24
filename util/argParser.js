@@ -16,6 +16,10 @@ const { ScopedSeed } = require("./seeds");
 
 // ============================================================================
 class ArgParser {
+  constructor(profileDir) {
+    this.profileDir = profileDir;
+  }
+
   get cliOpts() {
     return {
       "seeds": {
@@ -198,7 +202,7 @@ class ArgParser {
       .usage("crawler [options]")
       .option(this.cliOpts)
       .config("yamlConfig", (configPath) => {
-        return yaml.safeLoad(fs.readFileSync(configPath, "utf-8"));
+        return yaml.load(fs.readFileSync(configPath, "utf-8"));
       })
       .check((argv) => this.validateArgs(argv))
       .argv;
@@ -239,9 +243,9 @@ class ArgParser {
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     } else if (argv.logging.includes("behaviors-debug")) {
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
-      this.behaviorsLogDebug = true;
+      argv.behaviorsLogDebug = true;
     }
-    this.behaviorOpts = JSON.stringify(behaviorOpts);
+    argv.behaviorOpts = JSON.stringify(behaviorOpts);
 
     if (!argv.newContext) {
       argv.newContext = "page";
@@ -272,8 +276,8 @@ class ArgParser {
     }
 
     if (argv.mobileDevice) {
-      this.emulateDevice = puppeteer.devices[argv.mobileDevice];
-      if (!this.emulateDevice) {
+      argv.emulateDevice = puppeteer.devices[argv.mobileDevice];
+      if (!argv.emulateDevice) {
         throw new Error("Unknown device: " + argv.mobileDevice);
       }
     }
@@ -328,6 +332,6 @@ class ArgParser {
 }
 
   
-module.exports.parseArgs = function(argv) {
-  return new ArgParser().parseArgs(argv);
+module.exports.parseArgs = function(profileDir, argv) {
+  return new ArgParser(profileDir).parseArgs(argv);
 };

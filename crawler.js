@@ -47,10 +47,11 @@ class Crawler {
     this.limitHit = false;
 
     this.userAgent = "";
-    this.behaviorsLogDebug = false;
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
-    this.params = parseArgs();
+    this.params = parseArgs(this.profileDir);
+
+    this.emulateDevice = this.params.emulateDevice;
 
     console.log("Seeds", this.params.scopedSeeds);
 
@@ -199,7 +200,7 @@ class Crawler {
 
     case "debug":
     default:
-      if (this.behaviorsLogDebug) {
+      if (this.params.behaviorsLogDebug) {
         console.log("behavior debug: " + JSON.stringify(data));
       }
     }
@@ -215,9 +216,9 @@ class Crawler {
         await page.emulate(this.emulateDevice);
       }
 
-      if (this.behaviorOpts && !page.__bx_inited) {
+      if (this.params.behaviorOpts && !page.__bx_inited) {
         await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
-        await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.behaviorOpts});`);
+        await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
         page.__bx_inited = true;
       }
 
@@ -235,7 +236,7 @@ class Crawler {
 
       await this.writePage(data.url, title, this.params.text, text);
 
-      if (this.behaviorOpts) {
+      if (this.params.behaviorOpts) {
         await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
       }
 
