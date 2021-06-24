@@ -8,7 +8,7 @@ test("check yaml config file with seed list is used", async () => {
 
   try{
 
-    await exec("docker-compose run -v $PWD/crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection configtest --yamlConfig /tests/fixtures/crawl-1.yaml --limit 3 --timeout 20000");
+    await exec("docker-compose run -v $PWD/crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection configtest --yamlConfig /tests/fixtures/crawl-1.yaml --depth 0");
   }
   catch (error) {
     console.log(error);

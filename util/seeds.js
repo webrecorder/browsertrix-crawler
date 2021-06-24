@@ -1,15 +1,16 @@
 class ScopedSeed
 {
   constructor({url, type, include, exclude = [], allowHash = false, depth = -1, sitemap = false} = {}) {
-    this.url = url;
+    const parsedUrl = this.parseUrl(url);
+    this.url = parsedUrl.href;
     this.type = type;
     if (type) {
-      [include, allowHash] = this.scopeFromType(type, url);
+      [include, allowHash] = this.scopeFromType(type, parsedUrl);
     }
     this.include = this.parseRx(include);
     this.exclude = this.parseRx(exclude);
-    this.allowHash = allowHash;
     this.sitemap = this.resolveSiteMap(sitemap);
+    this.allowHash = allowHash;
     this.maxDepth = depth < 0 ? 99999 : depth;
   }
 
@@ -43,16 +44,9 @@ class ScopedSeed
     return sitemap;
   }
 
-  scopeFromType(type, url) {
+  scopeFromType(type, parsedUrl) {
     let include;
     let allowHash = false;
-    let parsedUrl = null;
-
-    if (url) {
-      parsedUrl = this.parseUrl(url);
-    } else {
-      type = "any";
-    }
 
     switch (type) {
     case "page":

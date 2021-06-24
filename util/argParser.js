@@ -43,7 +43,7 @@ class ArgParser {
         default: "load,networkidle0",
       },
 
-      "maxDepth": {
+      "depth": {
         describe: "The depth of the crawl for all seeds",
         default: -1,
         type: "number",
@@ -298,7 +298,7 @@ class ArgParser {
       sitemap: argv.useSitemap,
       include: argv.scope,
       exclude: argv.exclude,
-      depth: argv.maxDepth,
+      depth: argv.depth,
     };
 
     if (argv.scope && argv.scopeType) {
