@@ -201,8 +201,11 @@ class ArgParser {
     return yargs(hideBin(argv))
       .usage("crawler [options]")
       .option(this.cliOpts)
-      .config("yamlConfig", (configPath) => {
-        return yaml.load(fs.readFileSync(configPath, "utf-8"));
+      .config("yamlConfig", "Path to YAML config file", (configPath) => {
+        if (configPath === "/crawls/stdin") {
+          configPath = process.stdin.fd;
+        }
+        return yaml.load(fs.readFileSync(configPath, "utf8"));
       })
       .check((argv) => this.validateArgs(argv))
       .argv;

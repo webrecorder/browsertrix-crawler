@@ -56,7 +56,7 @@ class ScopedSeed
       break;
 
     case "prefix":
-      include = [new RegExp("^" + rxEscape(parsedUrl.origin + parsedUrl.pathname.slice(parsedUrl.pathname.lastIndexOf("/") + 1)))];
+      include = [new RegExp("^" + rxEscape(parsedUrl.origin + parsedUrl.pathname.slice(0, parsedUrl.pathname.lastIndexOf("/") + 1)))];
       break;
 
     case "host":
