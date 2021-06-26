@@ -162,7 +162,6 @@ docker run -v $PWD/crawl-config.yaml:/app/crawl-config.yaml -v $PWD/crawls:/craw
 
 The config can also be passed via stdin, which can simplify the command. Note that this require running `docker run` with the `-i` flag. To read config from stdin, pass `--config stdin`
 
-
 ```
 cat ./crawl-config.yaml | docker run -i -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl —-config stdin
 ```
@@ -180,6 +179,38 @@ combineWARCs: true
 
 The list of seeds can be loaded via an external file by specifying the filename via the `seedFile` config or command-line option.
 
+#### Per Seed Settings
+
+Certain settings such scope type, scope includes and excludes, and depth can be configured per seed, for example:
+
+```
+seeds:
+  - url: https://webrecorder.net/
+    depth: 1
+    type: "prefix"
+```
+
+### Scope Types
+
+The crawl scope can be configured globally for all seeds, or customized per seed, by specifying the `--scopeType` command-line option or setting the `type` property for each seed.
+
+The scope controls which linked pages are also included in the crawl.
+
+The available types are:
+
+- `page` - crawl only this page, but load any links that include different hashtags. Useful for single-page apps that may load different content based on hashtag.
+
+- `prefix` - crawl any pages in the same directory, eg. starting from `https://example.com/path/page.html`, crawl anything under `https://example.com/path/` (default)
+
+- `host` - crawl pages that share the same host.
+
+- `any` - crawl any and all pages.
+
+- `none` - don't crawl any additional pages besides the seed.
+
+
+The `depth` setting also limits how many pages will be crawled for that seed, while the `limit` option sets the total
+number of pages crawled from any seed.
 
 
 ### Behaviors
