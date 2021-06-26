@@ -1,5 +1,4 @@
 const yaml = require("js-yaml");
-const util = require("util");
 const child_process = require("child_process");
 const fs = require("fs");
 
@@ -12,6 +11,8 @@ test("pass config file via stdin", async () => {
   try {
     const version = require("../package.json").version;
     const proc = child_process.execSync(`docker run -i -v $PWD/crawls:/crawls webrecorder/browsertrix-crawler:${version} crawl --yamlConfig stdin --exclude webrecorder.net/202`, {input: configYaml, stdin: "inherit", encoding: "utf8"});
+
+    console.log(proc);
   }
   catch (error) {
     console.log(error);
