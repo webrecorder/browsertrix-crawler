@@ -29,6 +29,12 @@ class ArgParser {
         default: [],
       },
 
+      "seedFile": {
+        alias: ["urlFile"],
+        describe: "If set, read a list of seed urls, one per line, from the specified",
+        type: "string",
+      },
+ 
       "workers": {
         alias: "w",
         describe: "The number of workers to run in parallel",
@@ -134,13 +140,7 @@ class ArgParser {
         type: "string",
         default: "stats",
       },
-      
-      "urlFile": {
-        alias: ["urlfile", "url-file", "url-list"],
-        describe: "If set, read a list of urls from the passed file INSTEAD of the url from the --url flag.",
-        type: "string",
-      },
-      
+  
       "text": {
         describe: "If set, extract text to the pages.jsonl file",
         type: "boolean",
@@ -201,7 +201,7 @@ class ArgParser {
     return yargs(hideBin(argv))
       .usage("crawler [options]")
       .option(this.cliOpts)
-      .config("yamlConfig", "Path to YAML config file", (configPath) => {
+      .config("config", "Path to YAML config file", (configPath) => {
         if (configPath === "/crawls/stdin") {
           configPath = process.stdin.fd;
         }
@@ -285,8 +285,8 @@ class ArgParser {
       }
     }
 
-    if (argv.urlFile) {
-      const urlSeedFile = fs.readFileSync(argv.urlFile, "utf8");
+    if (argv.seedFile) {
+      const urlSeedFile = fs.readFileSync(argv.seedFile, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
 
       if (typeof(argv.seeds) === "string") {

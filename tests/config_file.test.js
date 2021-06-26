@@ -8,7 +8,7 @@ test("check yaml config file with seed list is used", async () => {
 
   try{
 
-    await exec("docker-compose run -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection configtest --yamlConfig /tests/fixtures/crawl-1.yaml --depth 0");
+    await exec("docker-compose run -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection configtest --config /tests/fixtures/crawl-1.yaml --depth 0");
   }
   catch (error) {
     console.log(error);
@@ -45,7 +45,7 @@ test("check yaml config file will be overwritten by command line", async () => {
 
   try{
 
-    await exec("docker-compose run -v $PWD/crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection configtest --yamlConfig /tests/fixtures/crawl-1.yaml --url https://www.example.com --timeout 20000");
+    await exec("docker-compose run -v $PWD/crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection configtest --config /tests/fixtures/crawl-1.yaml --url https://www.example.com --timeout 20000");
   }
   catch (error) {
     console.log(error);
