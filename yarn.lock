@@ -811,6 +811,11 @@ argparse@^1.0.7:
   dependencies:
     sprintf-js "~1.0.2"
 
+argparse@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/argparse/-/argparse-2.0.1.tgz#246f50f3ca78a3240f6c997e8a9bd1eac49e4b38"
+  integrity sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==
+
 arr-diff@^4.0.0:
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/arr-diff/-/arr-diff-4.0.0.tgz#d6461074febfec71e7e15235761a329a5dc7c520"
@@ -1048,10 +1053,10 @@ browserslist@^4.14.5:
     escalade "^3.1.1"
     node-releases "^1.1.71"
 
-browsertrix-behaviors@^0.2.1:
-  version "0.2.1"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.2.1.tgz#5a3b7d2f1ed5dad5054312738c69748b8ec638b8"
-  integrity sha512-NkReAj+PMS91oewA0tpsyvQVFspsy8mhKLXT8sg33pSDGYCDVlezqPt2agKmsmG1Y2m39yOzt31L8A3v4WcJDw==
+browsertrix-behaviors@^0.2.2:
+  version "0.2.2"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.2.2.tgz#50b52fcab80ecb4793827b6affaf20a50a8b6c21"
+  integrity sha512-6yuanZtGBm90gSUNAYxkbTt52ikKzs84kDH9eLVTl6Q1H2PMQJHLd4SY47fF/WU5PR0A2yRSQyuU3GAbPefLPQ==
 
 bser@2.1.1:
   version "2.1.1"
@@ -2966,6 +2971,13 @@ js-yaml@^3.13.1:
   dependencies:
     argparse "^1.0.7"
     esprima "^4.0.0"
+
+js-yaml@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/js-yaml/-/js-yaml-4.1.0.tgz#c1fb65f8f5017901cdd2c951864ba18458a10602"
+  integrity sha512-wpxZs9NoxZaJESJGIZTyDEaYpl0FKSA+FB9aJiyemKhMwkxQg63h4T1KJgUGHpTqPDNRcmmYLugrRjJlBtWvRA==
+  dependencies:
+    argparse "^2.0.1"
 
 jsbn@~0.1.0:
   version "0.1.1"

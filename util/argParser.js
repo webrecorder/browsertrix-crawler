@@ -1,29 +1,40 @@
-const yaml = require("js-yaml");
-const puppeteer = require("puppeteer-core");
-const { Cluster } = require("puppeteer-cluster");
 const path = require("path");
 const fs = require("fs");
 const child_process = require("child_process");
-const { NewWindowPage} = require("./screencaster");
-const { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } = require("./constants");
+
+const yaml = require("js-yaml");
+const puppeteer = require("puppeteer-core");
+const { Cluster } = require("puppeteer-cluster");
 const yargs = require("yargs/yargs");
 const { hideBin } = require("yargs/helpers");
 
+const { NewWindowPage} = require("./screencaster");
+const { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } = require("./constants");
+const { ScopedSeed } = require("./seeds");
+
+
+
 // ============================================================================
 class ArgParser {
+  constructor(profileDir) {
+    this.profileDir = profileDir;
+  }
+
   get cliOpts() {
     return {
-      "url": {
-        alias: "u",
-        describe: "The URL to start crawling from",
-        type: "string",
-      },
-
       "seeds": {
+        alias: "url",
         describe: "The URL to start crawling from",
         type: "array",
+        default: [],
       },
 
+      "seedFile": {
+        alias: ["urlFile"],
+        describe: "If set, read a list of seed urls, one per line, from the specified",
+        type: "string",
+      },
+ 
       "workers": {
         alias: "w",
         describe: "The number of workers to run in parallel",
@@ -40,6 +51,12 @@ class ArgParser {
       "waitUntil": {
         describe: "Puppeteer page.goto() condition to wait for before continuing, can be multiple separate by ','",
         default: "load,networkidle0",
+      },
+
+      "depth": {
+        describe: "The depth of the crawl for all seeds",
+        default: -1,
+        type: "number",
       },
 
       "limit": {
@@ -59,8 +76,9 @@ class ArgParser {
       },
 
       "scopeType": {
-        describe: "Simplified scope for which URLs to crawl, can be: prefix, page, domain, any",
+        describe: "Simplified scope for which URLs to crawl, can be: prefix, page, host, any",
         type: "string",
+        default: "prefix",
       },
 
       "exclude": {
@@ -122,13 +140,7 @@ class ArgParser {
         type: "string",
         default: "stats",
       },
-      
-      "urlFile": {
-        alias: ["urlfile", "url-file", "url-list"],
-        describe: "If set, read a list of urls from the passed file INSTEAD of the url from the --url flag.",
-        type: "string",
-      },
-      
+  
       "text": {
         describe: "If set, extract text to the pages.jsonl file",
         type: "boolean",
@@ -189,41 +201,18 @@ class ArgParser {
     return yargs(hideBin(argv))
       .usage("crawler [options]")
       .option(this.cliOpts)
-      .config("yamlConfig", (configPath) => {
-        return yaml.safeLoad(fs.readFileSync(configPath, "utf-8"));
+      .config("config", "Path to YAML config file", (configPath) => {
+        if (configPath === "/crawls/stdin") {
+          configPath = process.stdin.fd;
+        }
+        return yaml.load(fs.readFileSync(configPath, "utf8"));
       })
       .check((argv) => this.validateArgs(argv))
       .argv;
   }
  
-  rxEscape(string) {
-    return string.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
-  }
-
-
-  validateUserUrl(url) {
-    url = new URL(url);
-    if (url.protocol !== "http:" && url.protocol != "https:") {
-      throw new Error("URL must start with http:// or https://");
-    }
-
-    return url;
-  }
 
   validateArgs(argv) {
-    let purl;
-    if (argv.url) {
-      // Scope for crawl, default to the domain of the URL
-      // ensure valid url is used (adds trailing slash if missing)
-      //argv.seeds = [Crawler.validateUserUrl(argv.url)];
-      purl = this.validateUserUrl(argv.url);
-      argv.url = purl.href;
-    }
-
-    if (argv.url && argv.urlFile) {
-      console.warn("You've passed a urlFile param, only urls listed in that file will be processed. If you also passed a url to the --url flag that will be ignored.");
-    }
-
     // Check that the collection name is valid.
     if (argv.collection.search(/^[\w][\w-]*$/) === -1){
       throw new Error(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
@@ -257,9 +246,9 @@ class ArgParser {
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     } else if (argv.logging.includes("behaviors-debug")) {
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
-      this.behaviorsLogDebug = true;
+      argv.behaviorsLogDebug = true;
     }
-    this.behaviorOpts = JSON.stringify(behaviorOpts);
+    argv.behaviorOpts = JSON.stringify(behaviorOpts);
 
     if (!argv.newContext) {
       argv.newContext = "page";
@@ -290,79 +279,46 @@ class ArgParser {
     }
 
     if (argv.mobileDevice) {
-      this.emulateDevice = puppeteer.devices[argv.mobileDevice];
-      if (!this.emulateDevice) {
+      argv.emulateDevice = puppeteer.devices[argv.mobileDevice];
+      if (!argv.emulateDevice) {
         throw new Error("Unknown device: " + argv.mobileDevice);
       }
     }
 
-    if (argv.useSitemap === true) {
-      const url = new URL(argv.url);
-      url.pathname = "/sitemap.xml";
-      argv.useSitemap = url.href;
-    }
+    if (argv.seedFile) {
+      const urlSeedFile = fs.readFileSync(argv.seedFile, "utf8");
+      const urlSeedFileList = urlSeedFile.split("\n");
 
-    // Support one or multiple exclude
-    if (argv.exclude) {
-      if (typeof(argv.exclude) === "string") {
-        argv.exclude = [new RegExp(argv.exclude)];
-      } else {
-        argv.exclude = argv.exclude.map(e => new RegExp(e));
+      if (typeof(argv.seeds) === "string") {
+        argv.seeds = [argv.seeds];
+      }
+
+      for (const seed of urlSeedFileList) {
+        if (seed) {
+          argv.seeds.push(seed);
+        }
       }
     }
-    else {
-      argv.exclude = [];
-    }
 
-    // warn if both scope and scopeType are set
+    const scopeOpts = {
+      type: argv.scopeType,
+      sitemap: argv.useSitemap,
+      include: argv.scope,
+      exclude: argv.exclude,
+      depth: argv.depth,
+    };
+
     if (argv.scope && argv.scopeType) {
       console.warn("You've specified a --scopeType and a --scope regex. The custom scope regex will take precedence, overriding the scopeType");
     }
 
-    // Support one or multiple scopes set directly, or via scopeType
-    if (argv.scope) {
-      if (typeof(argv.scope) === "string") {
-        argv.scope = [new RegExp(argv.scope)];
-      } else {
-        argv.scope = argv.scope.map(e => new RegExp(e));
+    argv.scopedSeeds = [];
+
+    for (let seed of argv.seeds) {
+      if (typeof(seed) === "string") {
+        seed = {url: seed};
       }
-    } else {
-
-      // Set scope via scopeType
-      if (!argv.scopeType) {
-        argv.scopeType = argv.urlFile ? "none" : "prefix";
-      }
-
-      if (argv.scopeType && argv.url) {
-        switch (argv.scopeType) {
-        case "page":
-          // allow scheme-agnostic URLS as likely redirects
-          argv.scope = [new RegExp("^" + this.rxEscape(argv.url).replace(purl.protocol, "https?:") + "#.+")];
-          argv.allowHashUrls = true;
-          break;
-
-        case "prefix":
-          argv.scope = [new RegExp("^" + this.rxEscape(argv.url.slice(0, argv.url.lastIndexOf("/") + 1)))];
-          break;
-
-        case "domain":
-          argv.scope = [new RegExp("^" + this.rxEscape(purl.origin + "/"))];
-          break;
-
-        case "any":
-          argv.scope = [/.*/];
-          break;
-
-        case "none":
-          argv.scope = [];
-          break;
-
-        default:
-          throw new Error(`Invalid scope type "${argv.scopeType}" specified, valid types are: page, prefix, domain`);
-        }
-      } else if (!argv.scope) {
-        argv.scope = [];
-      }
+      argv.scopedSeeds.push(new ScopedSeed({...scopeOpts, ...seed}));
     }
 
     // Resolve statsFilename
@@ -379,6 +335,6 @@ class ArgParser {
 }
 
   
-module.exports.parseArgs = function(argv) {
-  return new ArgParser().parseArgs(argv);
+module.exports.parseArgs = function(profileDir, argv) {
+  return new ArgParser(profileDir).parseArgs(argv);
 };

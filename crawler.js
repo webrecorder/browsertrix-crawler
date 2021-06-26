@@ -1,19 +1,8 @@
-const puppeteer = require("puppeteer-core");
-const { Cluster } = require("puppeteer-cluster");
 const child_process = require("child_process");
-const fetch = require("node-fetch");
-const AbortController = require("abort-controller");
 const path = require("path");
 const fs = require("fs");
 const fsp = require("fs/promises");
 const os = require("os");
-const Sitemapper = require("sitemapper");
-const { v4: uuidv4 } = require("uuid");
-const warcio = require("warcio");
-
-const Redis = require("ioredis");
-
-const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
 
 // to ignore HTTPS error for HEAD check
 const HTTPS_AGENT = require("https").Agent({
@@ -21,6 +10,18 @@ const HTTPS_AGENT = require("https").Agent({
 });
 
 const HTTP_AGENT = require("http").Agent();
+
+const fetch = require("node-fetch");
+const puppeteer = require("puppeteer-core");
+const { Cluster } = require("puppeteer-cluster");
+const AbortController = require("abort-controller");
+const Sitemapper = require("sitemapper");
+const { v4: uuidv4 } = require("uuid");
+const Redis = require("ioredis");
+
+const warcio = require("warcio");
+
+const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
 
 const  TextExtract  = require("./util/textextract");
 const { ScreenCaster } = require("./util/screencaster");
@@ -46,14 +47,13 @@ class Crawler {
     this.limitHit = false;
 
     this.userAgent = "";
-    this.behaviorsLogDebug = false;
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
-    this.params = parseArgs();
+    this.params = parseArgs(this.profileDir);
 
-    console.log("Exclusions Regexes: ", this.params.exclude);
-    console.log("Scope Regexes: ", this.params.scope);
+    this.emulateDevice = this.params.emulateDevice;
 
+    console.log("Seeds", this.params.scopedSeeds);
 
     this.capturePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record/id_/`;
 
@@ -200,7 +200,7 @@ class Crawler {
 
     case "debug":
     default:
-      if (this.behaviorsLogDebug) {
+      if (this.params.behaviorsLogDebug) {
         console.log("behavior debug: " + JSON.stringify(data));
       }
     }
@@ -216,9 +216,9 @@ class Crawler {
         await page.emulate(this.emulateDevice);
       }
 
-      if (this.behaviorOpts && !page.__bx_inited) {
+      if (this.params.behaviorOpts && !page.__bx_inited) {
         await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
-        await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.behaviorOpts});`);
+        await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
         page.__bx_inited = true;
       }
 
@@ -236,7 +236,7 @@ class Crawler {
 
       await this.writePage(data.url, title, this.params.text, text);
 
-      if (this.behaviorOpts) {
+      if (this.params.behaviorOpts) {
         await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
       }
 
@@ -301,26 +301,13 @@ class Crawler {
       this.screencaster = new ScreenCaster(this.cluster, this.params.screencastPort);
     }
 
-    // first, check external seeds file
-    if (this.params.urlFile) {
-      const urlSeedFile =  await fsp.readFile(this.params.urlFile, "utf8");
-      const urlSeedFileList = urlSeedFile.split("\n");
-      this.queueUrls(urlSeedFileList, true);
-      this.params.allowHashUrls = true;
+    for (let i = 0; i < this.params.scopedSeeds.length; i++) {
+      const seed = this.params.scopedSeeds[i];
+      this.queueUrl(i, seed.url, 0);
 
-    // check inline seeds
-    } else if (this.params.seeds) {
-      this.queueUrls(this.params.seeds, true);
-      this.params.allowHashUrls = true;
-
-    // check single URL
-    }
-    if (this.params.url) {
-      this.queueUrl(this.params.url);
-    }
-
-    if (this.params.useSitemap) {
-      await this.parseSitemap(this.params.useSitemap);
+      if (seed.sitemap) {
+        await this.parseSitemap(seed.sitemap, i);
+      }
     }
 
     await this.cluster.idle();
@@ -382,7 +369,9 @@ class Crawler {
     }
   }
 
-  async loadPage(page, url, selector = "a[href]") {
+  async loadPage(page, urlData, selector = "a[href]") {
+    const {url, seedId, depth} = urlData;
+
     if (!await this.isHTML(url)) {
       await this.directFetchCapture(url);
       return;
@@ -395,11 +384,11 @@ class Crawler {
     }
 
     if (selector) {
-      await this.extractLinks(page, selector);
+      await this.extractLinks(page, seedId, depth, selector);
     }
   }
 
-  async extractLinks(page, selector = "a[href]") {
+  async extractLinks(page, seedId, depth, selector = "a[href]") {
     let results = [];
 
     try {
@@ -412,17 +401,19 @@ class Crawler {
       console.warn("Link Extraction failed", e);
       return;
     }
-    this.queueUrls(results);
+    this.queueUrls(seedId, results, depth);
   }
 
-  queueUrls(urls, ignoreScope=false) {
+  queueUrls(seedId, urls, depth) {
     try {
+      depth += 1;
+      const seed = this.params.scopedSeeds[seedId];
+
       for (const url of urls) {
-        const captureUrl = this.shouldCrawl(url, ignoreScope);
+        const captureUrl = seed.isIncluded(url, depth);
+
         if (captureUrl) {
-          if (!this.queueUrl(captureUrl)) {
-            break;
-          }
+          this.queueUrl(seedId, captureUrl, depth);
         }
       }
     } catch (e) {
@@ -430,14 +421,18 @@ class Crawler {
     }
   }
 
-  queueUrl(url) {
+  queueUrl(seedId, url, depth) {
+    if (this.seenList.has(url)) {
+      return false;
+    }
+
     this.seenList.add(url);
     if (this.numLinks >= this.params.limit && this.params.limit > 0) {
       this.limitHit = true;
       return false;
     }
     this.numLinks++;
-    this.cluster.queue({url});
+    this.cluster.queue({url, seedId, depth});
     return true;
   }
 
@@ -487,61 +482,6 @@ class Crawler {
     catch (err) {
       console.warn("pages/pages.jsonl append failed", err);
     }
-  }
-
-  shouldCrawl(url, ignoreScope) {
-    try {
-      url = new URL(url);
-    } catch(e) {
-      return false;
-    }
-
-    if (!this.params.allowHashUrls) {
-      // remove hashtag
-      url.hash = "";
-    }
-
-    // only queue http/https URLs
-    if (url.protocol != "http:" && url.protocol != "https:") {
-      return false;
-    }
-
-    url = url.href;
-
-    // skip already crawled
-    if (this.seenList.has(url)) {
-      return false;
-    }
-    let inScope = false;
-
-    if (ignoreScope) {
-      inScope = true;
-    }
-
-    // check scopes
-    if (!ignoreScope){
-      for (const s of this.params.scope) {
-        if (s.exec(url)) {
-          inScope = true;
-          break;
-        }
-      }
-    }
-
-    if (!inScope) {
-      //console.log(`Not in scope ${url} ${scope}`);
-      return false;
-    }
-
-    // check exclusions
-    for (const e of this.params.exclude) {
-      if (e.exec(url)) {
-        //console.log(`Skipping ${url} excluded by ${e}`);
-        return false;
-      }
-    }
-
-    return url;
   }
 
   resolveAgent(urlParsed) {
@@ -609,7 +549,7 @@ class Crawler {
     return new Promise(resolve => setTimeout(resolve, time));
   }
 
-  async parseSitemap(url) {
+  async parseSitemap(url, seedId) {
     const sitemapper = new Sitemapper({
       url,
       timeout: 15000,
@@ -618,7 +558,7 @@ class Crawler {
 
     try {
       const { sites } = await sitemapper.fetch();
-      this.queueUrls(sites);
+      this.queueUrls(seedId, sites, 0);
     } catch(e) {
       console.log(e);
     }

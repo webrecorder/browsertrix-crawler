@@ -1,0 +1,10 @@
+name: crawl-test-2
+
+seeds:
+  - https://webrecorder.net/
+
+collection: config-stdin
+depth: 1
+behaviors: ""
+
+generateWACZ: true

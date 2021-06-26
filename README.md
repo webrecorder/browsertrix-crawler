@@ -52,20 +52,23 @@ crawler [options]
 Options:
       --help                                Show help                  [boolean]
       --version                             Show version number        [boolean]
-  -u, --url                                 The URL to start crawling from
-                                                              [string]
-      --urlFile, --urlfile, --url-file,     If set, read a list of urls from the
-      --url-list                            passed file INSTEAD of the url from
-                                            the --url flag.             [string]
+      --seeds, --url                        The URL to start crawling from
+                                                           [array] [default: []]
+      --seedFile, --urlFile                 If set, read a list of seed urls,
+                                            one per line, from the specified
+                                                                        [string]
   -w, --workers                             The number of workers to run in
                                             parallel       [number] [default: 1]
       --newContext                          The context for each new capture,
-                                            can be a new: page, session or
-                                            browser.  [string] [default: "page"]
+                                            can be a new: page, window, session
+                                            or browser.
+                                                      [string] [default: "page"]
       --waitUntil                           Puppeteer page.goto() condition to
                                             wait for before continuing, can be
                                             multiple separate by ','
                                                   [default: "load,networkidle0"]
+      --depth                               The depth of the crawl for all seeds
+                                                          [number] [default: -1]
       --limit                               Limit crawl to this number of pages
                                                            [number] [default: 0]
       --timeout                             Timeout for each page to load (in
@@ -73,12 +76,19 @@ Options:
       --scope                               Regex of page URLs that should be
                                             included in the crawl (defaults to
                                             the immediate directory of URL)
+      --scopeType                           Simplified scope for which URLs to
+                                            crawl, can be: prefix, page, host,
+                                            any     [string] [default: "prefix"]
       --exclude                             Regex of page URLs that should be
                                             excluded from the crawl.
+      --allowHashUrls                       Allow Hashtag URLs, useful for
+                                            single-page-application crawling or
+                                            when different hashtags load dynamic
+                                            content
   -c, --collection                          Collection name to crawl to (replay
                                             will be accessible under this name
                                             in pywb preview)
-                                [string] [default: "capture-YYYY-MM-DDTHH-MM-SS"]
+                               [string] [default: "capture-2021-06-26T19-38-10"]
       --headless                            Run in headless mode, otherwise
                                             start xvfb[boolean] [default: false]
       --driver                              JS driver for the crawler
@@ -124,18 +134,11 @@ Options:
       --profile                             Path to tar.gz file which will be
                                             extracted and used as the browser
                                             profile                     [string]
-
       --screencastPort                      If set to a non-zero value, starts
                                             an HTTP server with screencast
                                             accessible on this port
                                                            [number] [default: 0]
-
-      --yamlConfig                         A path to a yaml file.
-                                           If set browsertrix will
-                                           attempt to parse and use the parameters set in
-                                           the yaml file passed. Values set in the
-                                           command line will take precedence.              
-                                           [string]
+      --config                              Path to YAML config file
 ```
 </details>
 
@@ -148,15 +151,21 @@ while `--waitUntil networkidle0` may make sense for dynamic sites.
 
 ### YAML Crawl Config
 
-Browsertix Crawler supports the use of a yaml file to set parameters for a crawl. This can be used by passing a valid yaml file to the --yamlConfig.
+Browsertix Crawler supports the use of a yaml file to set parameters for a crawl. This can be used by passing a valid yaml file to the `--config` option.
 
-The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used.
+The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used. For example, the following should start a crawl with config in `crawl-config.yaml` (where [VERSION] represents the version of browsertrix-crawler image you're working with).
 
-The config file must be passed as a volume. You can run a command similar to this.
 
 ```
-docker run -v $PWD/crawl.yaml:/app/crawl.yaml -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler:[VERSION] crawl —-yamlConfig /app/sample.yaml
+docker run -v $PWD/crawl-config.yaml:/app/crawl-config.yaml -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl —-config /app/crawl-config.yaml
 ```
+
+The config can also be passed via stdin, which can simplify the command. Note that this require running `docker run` with the `-i` flag. To read config from stdin, pass `--config stdin`
+
+```
+cat ./crawl-config.yaml | docker run -i -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl —-config stdin
+```
+
 
 An example config file might contain:
 
@@ -167,6 +176,42 @@ seeds:
 
 combineWARCs: true
 ```
+
+The list of seeds can be loaded via an external file by specifying the filename via the `seedFile` config or command-line option.
+
+#### Per Seed Settings
+
+Certain settings such scope type, scope includes and excludes, and depth can be configured per seed, for example:
+
+```
+seeds:
+  - url: https://webrecorder.net/
+    depth: 1
+    type: "prefix"
+```
+
+### Scope Types
+
+The crawl scope can be configured globally for all seeds, or customized per seed, by specifying the `--scopeType` command-line option or setting the `type` property for each seed.
+
+The scope controls which linked pages are also included in the crawl.
+
+The available types are:
+
+- `page` - crawl only this page, but load any links that include different hashtags. Useful for single-page apps that may load different content based on hashtag.
+
+- `prefix` - crawl any pages in the same directory, eg. starting from `https://example.com/path/page.html`, crawl anything under `https://example.com/path/` (default)
+
+- `host` - crawl pages that share the same host.
+
+- `any` - crawl any and all pages.
+
+- `none` - don't crawl any additional pages besides the seed.
+
+
+The `depth` setting also limits how many pages will be crawled for that seed, while the `limit` option sets the total
+number of pages crawled from any seed.
+
 
 ### Behaviors
 
