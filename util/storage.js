@@ -1,5 +1,5 @@
 const fs = require("fs");
-const { pipeline, Transform } = require("stream");
+const { Transform } = require("stream");
 const { createHash } = require("crypto");
 
 const Minio = require("minio");
@@ -62,7 +62,7 @@ class S3StorageSync
 
   async syncUserLog(userId) {
     let stream = null;
-    
+  
     try {
       stream = await this.client.getObject(this.bucketName, this.objectPrefix + "contributors/" + userId + ".jsonl");
     } catch (e) {
@@ -163,7 +163,7 @@ class S3StorageSync
     const text = JSON.stringify(data, null, 2);
     console.log(text);
 
-    await this.client.putObject(this.bucketName, this.objectPrefix + "datapackage.json", text, null, {'x-amz-acl': 'public-read'});
+    await this.client.putObject(this.bucketName, this.objectPrefix + "datapackage.json", text, null, {"x-amz-acl": "public-read"});
   }
 }
 
