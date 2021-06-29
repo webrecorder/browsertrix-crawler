@@ -34,7 +34,7 @@ class ArgParser {
         describe: "If set, read a list of seed urls, one per line, from the specified",
         type: "string",
       },
- 
+
       "workers": {
         alias: "w",
         describe: "The number of workers to run in parallel",
@@ -122,32 +122,32 @@ class ArgParser {
         type: "boolean",
         default: false,
       },
-      
+
       "rolloverSize": {
         describe: "If set, declare the rollover size",
         default: 1000000000,
         type: "number",
       },
-      
+
       "generateWACZ": {
         alias: ["generatewacz", "generateWacz"],
         describe: "If set, generate wacz",
         type: "boolean",
         default: false,
       },
-      
+
       "logging": {
         describe: "Logging options for crawler, can include: stats, pywb, behaviors, behaviors-debug",
         type: "string",
         default: "stats",
       },
-  
+
       "text": {
         describe: "If set, extract text to the pages.jsonl file",
         type: "boolean",
         default: false,
       },
-      
+
       "cwd": {
         describe: "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd()",
         type: "string",
@@ -194,12 +194,18 @@ class ArgParser {
         type: "number",
         default: 0
       },
+
+      "warcInfo": {
+        alias: ["warcinfo"],
+        describe: "If set will record the values in the warcinfo. Currently accepting 'host', 'operator', and 'ip'",
+        type: "dict"
+      }
     };
   }
 
   parseArgs(argv) {
     argv = argv || process.argv;
-    
+
     return yargs(hideBin(argv))
       .usage("crawler [options]")
       .option(this.cliOpts)
@@ -212,7 +218,7 @@ class ArgParser {
       .check((argv) => this.validateArgs(argv))
       .argv;
   }
- 
+
 
   validateArgs(argv) {
     // Check that the collection name is valid.
@@ -232,6 +238,15 @@ class ArgParser {
     for (const opt of argv.waitUntil) {
       if (!WAIT_UNTIL_OPTS.includes(opt)) {
         throw new Error("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
+      }
+    }
+
+    if (argv.warcInfo){
+      argv.warcInfo = JSON.parse(argv.warcInfo)
+      for (const key in argv.warcInfo) {
+        if (!key in ['operator', 'host', 'ip']){
+          console.log(`${key} is not supported and will not be recorded. Only operator, host and ip are recognized at this time`)
+        }
       }
     }
 
@@ -339,7 +354,7 @@ class ArgParser {
   }
 }
 
-  
+
 module.exports.parseArgs = function(profileDir, argv) {
   return new ArgParser(profileDir).parseArgs(argv);
 };
