@@ -20,19 +20,3 @@ test("check that the warcinfo file works as expected on the command line", async
   var foundWarc = inputDecoded.indexOf("operator");
   expect(foundWarc).toBeGreaterThan(-1);
 });
-
-test("check that the warcinfo works in the yaml config", async () => {
-  jest.setTimeout(30000);
-
-  try{
-    await exec("docker-compose run -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection warcinfo--config /tests/fixtures/crawl-2.yaml  --combineWARC --depth 0");
-  }
-  catch (error) {
-    console.log(error);
-  }
-
-  await gunzip("crawls/collections/warcinfo/warcinfo_0.warc.gz", "crawls/collections/warcinfo/warcinfo_0.warc", () => {});
-  var input = fs.readFileSync("crawls/collections/warcinfo/warcinfo_0.warc", "utf8");
-  var foundWarc = input.indexOf("operator");
-  expect(foundWarc).toBeGreaterThan(-1);
-});
