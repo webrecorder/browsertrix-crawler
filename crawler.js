@@ -263,7 +263,7 @@ class Crawler {
       "format": "WARC File Format 1.1"
     };
 
-    info = Object.assign(info, this.params.warcInfo);
+    info = {...this.params.warcInfo, ...info};
     const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, info);
     const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
     return buffer;
