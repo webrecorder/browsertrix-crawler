@@ -8,3 +8,5 @@ depth: 1
 behaviors: ""
 
 generateWACZ: true
+warcInfo:
+  operator: test

@@ -11,16 +11,19 @@
   "dependencies": {
     "abort-controller": "^3.0.0",
     "browsertrix-behaviors": "^0.2.2",
-    "gunzip": "^1.2.2",
+    "gunzip-file": "^0.1.1",
     "ioredis": "^4.27.1",
     "js-yaml": "^4.1.0",
     "node-fetch": "^2.6.1",
+    "node-gzip": "^1.1.2",
+    "pako": "^2.0.3",
     "puppeteer-cluster": "^0.22.0",
     "puppeteer-core": "^8.0.0",
     "sitemapper": "^3.1.2",
     "uuid": "8.3.2",
     "ws": "^7.4.4",
-    "yargs": "^16.0.3"
+    "yargs": "^16.0.3",
+    "zlib": "^1.0.5"
   },
   "devDependencies": {
     "eslint": "^7.20.0",
