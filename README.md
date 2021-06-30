@@ -141,6 +141,9 @@ Options:
                                             accessible on this port
                                                            [number] [default: 0]
       --config                              Path to YAML config file
+      --warcinfo                            Takes a json block for
+                            supported warc info headers
+
 ```
 </details>
 
@@ -150,6 +153,13 @@ For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.co
 The default is `load`, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example),
 while `--waitUntil networkidle0` may make sense for dynamic sites.
 
+### warcinfo headers
+
+You can set the headers on the command line by using a command like this
+```
+--warcinfo '{"operator": "test"}'
+```
+be sure to pass valid json or to set in the yaml config file
 
 ### YAML Crawl Config
 
@@ -307,7 +317,7 @@ For example, to build with this Chromium image on an Apple M1 machine, run:
 docker-compose build --build-arg BROWSER_IMAGE_BASE=oldwebtoday/chromium --build-arg "BROWSER_VERSION=91-arm" --build-arg BROWSER_BIN=chromium-browser
 ```
 
-You should then be able to run Browsertrix Crawler natively on M1. 
+You should then be able to run Browsertrix Crawler natively on M1.
 
 The build arguments specify the base image, version and browser binary. This approach can also be used to install a different browser in general from any Debian-based Docker image.
 

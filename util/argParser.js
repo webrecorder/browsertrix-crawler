@@ -242,10 +242,10 @@ class ArgParser {
     }
 
     if (argv.warcInfo){
-      argv.warcInfo = JSON.parse(argv.warcInfo)
+      argv.warcInfo = JSON.parse(argv.warcInfo);
       for (const key in argv.warcInfo) {
-        if (!key in ['operator', 'host', 'ip']){
-          console.log(`${key} is not supported and will not be recorded. Only operator, host and ip are recognized at this time`)
+        if (!(key in ["operator", "host", "ip"])){
+          console.log(`${key} is not supported and will not be recorded. Only operator, host and ip are recognized at this time`);
         }
       }
     }
