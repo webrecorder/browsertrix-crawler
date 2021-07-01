@@ -3,9 +3,9 @@ class ScopedSeed
   constructor({url, type, include, exclude = [], allowHash = false, depth = -1, sitemap = false} = {}) {
     const parsedUrl = this.parseUrl(url);
     this.url = parsedUrl.href;
-    this.type = type;
-    if (type) {
-      [include, allowHash] = this.scopeFromType(type, parsedUrl);
+    this.type = type || "custom";
+    if (this.type !== "custom") {
+      [include, allowHash] = this.scopeFromType(this.type, parsedUrl);
     }
     this.include = this.parseRx(include);
     this.exclude = this.parseRx(exclude);
