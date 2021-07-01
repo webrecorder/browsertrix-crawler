@@ -1,14 +1,20 @@
 class ScopedSeed
 {
-  constructor({url, type, include, exclude = [], allowHash = false, depth = -1, sitemap = false} = {}) {
+  constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false} = {}) {
     const parsedUrl = this.parseUrl(url);
     this.url = parsedUrl.href;
-    this.type = type || "custom";
-    if (this.type !== "custom") {
-      [include, allowHash] = this.scopeFromType(this.type, parsedUrl);
-    }
     this.include = this.parseRx(include);
     this.exclude = this.parseRx(exclude);
+
+    if (!scopeType) {
+      scopeType = (this.include.length || this.exclude.length) ? "custom" : "prefix";
+    }
+
+    this.scopeType = scopeType;
+
+    if (this.scopeType !== "custom") {
+      [this.include, allowHash] = this.scopeFromType(this.scopeType, parsedUrl);
+    }
     this.sitemap = this.resolveSiteMap(sitemap);
     this.allowHash = allowHash;
     this.maxDepth = depth < 0 ? 99999 : depth;
@@ -44,11 +50,11 @@ class ScopedSeed
     return sitemap;
   }
 
-  scopeFromType(type, parsedUrl) {
+  scopeFromType(scopeType, parsedUrl) {
     let include;
     let allowHash = false;
 
-    switch (type) {
+    switch (scopeType) {
     case "page":
       // allow scheme-agnostic URLS as likely redirects
       include = [new RegExp("^" + rxEscape(parsedUrl.href).replace(parsedUrl.protocol, "https?:") + "#.+")];
@@ -72,7 +78,7 @@ class ScopedSeed
       break;
 
     default:
-      throw new Error(`Invalid scope type "${type}" specified, valid types are: page, prefix, host`);
+      throw new Error(`Invalid scope type "${scopeType}" specified, valid types are: page, prefix, host`);
     }
 
     return [include, allowHash];

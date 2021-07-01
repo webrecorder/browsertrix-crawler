@@ -170,6 +170,7 @@ class ArgParser {
       },
 
       "useSitemap": {
+        alias: "sitemap",
         describe: "If enabled, check for sitemaps at /sitemap.xml, or custom URL if URL is specified",
       },
 
@@ -309,8 +310,8 @@ class ArgParser {
     }
 
     const scopeOpts = {
-      type: argv.scopeType,
-      sitemap: argv.useSitemap,
+      scopeType: argv.scopeType,
+      sitemap: argv.sitemap,
       include: argv.include,
       exclude: argv.exclude,
       depth: argv.depth,

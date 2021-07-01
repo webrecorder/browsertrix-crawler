@@ -73,13 +73,15 @@ Options:
                                                            [number] [default: 0]
       --timeout                             Timeout for each page to load (in
                                             seconds)      [number] [default: 90]
-      --scope                               Regex of page URLs that should be
+      --scopeType                           Predefined for which URLs to crawl,
+                                            can be: prefix, page, host, any, or
+                                            custom, to use the
+                                            scopeIncludeRx/scopeExcludeRx
+                                                                        [string]
+      --scopeIncludeRx, --include           Regex of page URLs that should be
                                             included in the crawl (defaults to
                                             the immediate directory of URL)
-      --scopeType                           Simplified scope for which URLs to
-                                            crawl, can be: prefix, page, host,
-                                            any     [string] [default: "prefix"]
-      --exclude                             Regex of page URLs that should be
+      --scopeExcludeRx, --exclude           Regex of page URLs that should be
                                             excluded from the crawl.
       --allowHashUrls                       Allow Hashtag URLs, useful for
                                             single-page-application crawling or
@@ -88,7 +90,7 @@ Options:
   -c, --collection                          Collection name to crawl to (replay
                                             will be accessible under this name
                                             in pywb preview)
-                               [string] [default: "capture-2021-06-26T19-38-10"]
+                               [string] [default: "capture-2021-07-01T23-43-26"]
       --headless                            Run in headless mode, otherwise
                                             start xvfb[boolean] [default: false]
       --driver                              JS driver for the crawler
@@ -122,7 +124,7 @@ Options:
       --userAgentSuffix                     Append suffix to existing browser
                                             user-agent (ex: +MyCrawler,
                                             info@example.com)           [string]
-      --useSitemap                          If enabled, check for sitemaps at
+      --useSitemap, --sitemap               If enabled, check for sitemaps at
                                             /sitemap.xml, or custom URL if URL
                                             is specified
       --statsFilename                       If set, output stats as JSON to this
