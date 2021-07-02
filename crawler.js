@@ -351,9 +351,17 @@ class Crawler {
       return;
     }
 
-    if (this.params.storageApi && this.params.generateWACZ) {
+    if (this.params.generateWACZ && process.env.STORE_ENDPOINT_URL) {
+      const storeInfo = {
+        endpointUrl: process.env.STORE_ENDPOINT_URL,
+        accessKey: process.env.STORE_ACCESS_KEY,
+        secretKey: process.env.STORE_SECRET_KEY,
+      };
+
+      const user = process.env.STORE_USER;
+
       console.log("Initing Storage...");
-      this.storage = new S3StorageSync(this.params.storageApi, this.params.storageUser);
+      this.storage = new S3StorageSync(storeInfo, user);
       await this.storage.init();
     }
 

@@ -221,6 +221,7 @@ class ArgParser {
         type: "object"
       },
 
+<<<<<<< HEAD
       "redisStoreUrl": {
         describe: "If set, url for remote redis server to store state. Otherwise, using in-memory store",
         type: "string"
@@ -231,6 +232,14 @@ class ArgParser {
         type: "string",
         default: "partial",
         choices: ["never", "partial", "always"]
+      },
+
+      "storageApi": {
+        type: "string",
+      },
+
+      "storageUser": {
+        type: "string",
       }
     };
   }

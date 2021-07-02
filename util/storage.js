@@ -6,15 +6,28 @@ const Minio = require("minio");
 
 class S3StorageSync
 {
-  constructor(endpointUrl, userId) {
-    const url = new URL(endpointUrl);
+  constructor(urlOrData, userId) {
+    let url;
+    let accessKey;
+    let secretKey;
+
+    if (typeof(urlOrData) === "string") {
+      url = new URL(urlOrData);
+      accessKey = url.username;
+      secretKey = url.password;
+
+    } else {
+      url = new URL(urlOrData.endpointUrl);
+      accessKey = urlOrData.accessKey;
+      secretKey = urlOrData.secretKey;
+    }
 
     this.client = new Minio.Client({
       endPoint: url.hostname,
       port: Number(url.port) || (url.protocol === "https:" ? 443 : 80),
       useSSL: url.protocol === "https:",
-      accessKey: url.username,
-      secretKey: url.password
+      accessKey,
+      secretKey
     });
 
     this.bucketName = url.pathname.slice(1).split("/")[0];
@@ -26,7 +39,7 @@ class S3StorageSync
     this.userId = userId;
   }
 
-  async setPolicy() {
+  async setPublicPolicy() {
     const policy = `\
 {
   "Version":"2012-10-17",
@@ -36,17 +49,19 @@ class S3StorageSync
       "Effect":"Allow",
       "Principal": "*",
       "Action":["s3:GetObject","s3:GetObjectVersion"],
-      "Resource":["arn:aws:s3:::${this.bucketName}/${this.objectPrefix}/*"]
+      "Resource":["arn:aws:s3:::${this.bucketName}/${this.objectPrefix}*"]
     }
   ]
 }`;
+
+    console.log(this.bucketName, policy);
 
     await this.client.setBucketPolicy(this.bucketName, policy);
 
   }
 
   async init() {
-    await this.setPolicy();
+    await this.setPublicPolicy();
     this.userBuffer = await this.syncUserLog(this.userId);
     if (!this.userBuffer) {
       this.userBuffer = JSON.stringify({"op": "new-contributor", "id": this.userId, "ts": new Date().getTime()});
@@ -166,17 +181,5 @@ class S3StorageSync
     await this.client.putObject(this.bucketName, this.objectPrefix + "datapackage.json", text, null, {"x-amz-acl": "public-read"});
   }
 }
-
-async function main() {
-  const s3 = new S3StorageSync(process.argv[2], "ilya2");
-  await s3.init();
-
-  await s3.uploadCollWACZ(process.argv[3]);
-}
-
-if (require.main === module) {
-  main();
-}
-
 
 module.exports.S3StorageSync = S3StorageSync;
