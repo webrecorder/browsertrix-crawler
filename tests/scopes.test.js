@@ -1,6 +1,6 @@
 const { parseArgs } = require("../util/argParser");
 
-fs = require("fs");
+const fs = require("fs");
 
 function getSeeds(config) {
   const orig = fs.readFileSync;
@@ -10,7 +10,7 @@ function getSeeds(config) {
       return config;
     }
     return orig(name, ...args);
-  }
+  };
 
   return parseArgs(null, ["node", "crawler", "--config", "configtest"]).scopedSeeds;
 }

@@ -5,8 +5,8 @@ const child_process = require("child_process");
 const yaml = require("js-yaml");
 const puppeteer = require("puppeteer-core");
 const { Cluster } = require("puppeteer-cluster");
-const yargs = require("yargs/yargs");
 const { hideBin } = require("yargs/helpers");
+const yargs = require("yargs/yargs");
 
 const { NewWindowPage} = require("./screencaster");
 const { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } = require("./constants");
