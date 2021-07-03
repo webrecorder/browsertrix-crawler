@@ -2,10 +2,11 @@ const ws = require("ws");
 const http = require("http");
 const url = require("url");
 const fs = require("fs");
+const path = require("path");
 
 const SingleBrowserImplementation = require("puppeteer-cluster/dist/concurrency/SingleBrowserImplementation").default;
 
-const indexHTML = fs.readFileSync("/app/screencast/index.html", {encoding: "utf8"});
+const indexHTML = fs.readFileSync(path.join(__dirname, "..", "screencast", "index.html"), {encoding: "utf8"});
 
 
 // ===========================================================================
