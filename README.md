@@ -179,6 +179,21 @@ combineWARCs: true
 
 The list of seeds can be loaded via an external file by specifying the filename via the `seedFile` config or command-line option.
 
+### UrlFile
+
+The urlFile should be a .txt file formatted so that each line of the file is a url string. An example file is available in the fixture folder as urlSeedFile.txt
+
+The urlfile must be passed as a volume to the docker container. To do that you should format your docker command similar to this one.
+
+```
+docker run -v PATH_TO_URLFILE.TXT_LOCALLY:/PATH_TO_URLFILE.TXT_IN_DOCKER -v $PWD/crawls:/crawls/ -it WEBRECORDER_DOCKER_IMAGE crawl --urlFile PATH_TO_URLFILE.TXT_IN_DOCKER
+```
+
+Full example
+```
+docker run -v $PWD/urlFile.txt:/app/urlFile.txt -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler:0.4.0-beta.1 crawl --urlFile /app/urlFile.txt
+```
+
 #### Per Seed Settings
 
 Certain settings such scope type, scope includes and excludes, and depth can be configured per seed, for example:
@@ -305,7 +320,7 @@ For example, to build with this Chromium image on an Apple M1 machine, run:
 docker-compose build --build-arg BROWSER_IMAGE_BASE=oldwebtoday/chromium --build-arg "BROWSER_VERSION=91-arm" --build-arg BROWSER_BIN=chromium-browser
 ```
 
-You should then be able to run Browsertrix Crawler natively on M1. 
+You should then be able to run Browsertrix Crawler natively on M1.
 
 The build arguments specify the base image, version and browser binary. This approach can also be used to install a different browser in general from any Debian-based Docker image.
 
