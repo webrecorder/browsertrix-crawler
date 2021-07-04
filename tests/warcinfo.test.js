@@ -8,15 +8,16 @@ test("check that the warcinfo file works as expected on the command line", async
 
   try{
     var json = JSON.stringify({"operator": "test"});
-
-    await exec(`docker-compose run -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection warcinfo --warcinfo '${json}' --combineWARC --depth `);
+    await exec(`docker-compose run -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --url https://www.example.com --collection warcinfo --warcinfo '${json}' --combineWARC --depth `);
   }
   catch (error) {
     console.log(error);
   }
 
-  await gunzip("crawls/collections/warcinfo/warcinfo_0.warc.gz", "crawls/collections/warcinfo/warcinfo_0.warc", () => {});
-  var inputDecoded = fs.readFileSync("crawls/collections/warcinfo/warcinfo_0.warc", "utf8");
-  var foundWarc = inputDecoded.indexOf("operator");
-  expect(foundWarc).toBeGreaterThan(-1);
+  await gunzip("crawls/collections/warcinfo/warcinfo_0.warc.gz", "crawls/collections/warcinfo/warcinfo_0.warc", () => {
+    var data = fs.readFileSync("crawls/collections/warcinfo/warcinfo_0.warc", "utf-8");
+    var foundWarc = data.indexOf("operator");
+    expect(foundWarc).toBeGreaterThan(-1);
+
+  });
 });

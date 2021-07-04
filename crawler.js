@@ -262,7 +262,6 @@ class Crawler {
       "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywbVersion})`,
       "format": "WARC File Format 1.1"
     };
-
     info = {...this.params.warcInfo, ...info};
     const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, info);
     const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
