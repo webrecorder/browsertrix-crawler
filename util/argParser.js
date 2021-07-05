@@ -5,8 +5,8 @@ const child_process = require("child_process");
 const yaml = require("js-yaml");
 const puppeteer = require("puppeteer-core");
 const { Cluster } = require("puppeteer-cluster");
+const yargs = require("yargs/yargs");
 const { hideBin } = require("yargs/helpers");
-const yargsx = require("yargs/yargs");
 
 const { NewWindowPage} = require("./screencaster");
 const { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } = require("./constants");
@@ -200,7 +200,7 @@ class ArgParser {
   parseArgs(argv) {
     argv = argv || process.argv;
     
-    return yargsx(hideBin(argv))
+    return yargs(hideBin(argv))
       .usage("crawler [options]")
       .option(this.cliOpts)
       .config("config", "Path to YAML config file", (configPath) => {
