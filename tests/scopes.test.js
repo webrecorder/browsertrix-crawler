@@ -48,6 +48,7 @@ seeds:
 
 test("inherit scope", async () => {
   const seeds = getSeeds(`
+
 seeds:
    - url: https://example.com/1
    - url: https://example.com/2
@@ -72,5 +73,94 @@ exclude: https://example.com/pathexclude
 });
 
 
+test("override scope", async () => {
+  const seeds = getSeeds(`
 
+seeds:
+   - url: https://example.com/1
+     include: https://example.com/(path|other)
+
+   - https://example.com/2
+
+   - url: https://example.com/subpath/file.html
+     scopeType: prefix
+
+include: https://example.com/onlythispath
+`);
+
+  expect(seeds.length).toEqual(3);
+
+  expect(seeds[0].scopeType).toEqual("custom");
+  expect(seeds[0].url).toEqual("https://example.com/1");
+  expect(seeds[0].include).toEqual([/https:\/\/example.com\/(path|other)/]);
+  expect(seeds[0].exclude).toEqual([]);
+
+  expect(seeds[1].scopeType).toEqual("custom");
+  expect(seeds[1].url).toEqual("https://example.com/2");
+  expect(seeds[1].include).toEqual([/https:\/\/example.com\/onlythispath/]);
+  expect(seeds[1].exclude).toEqual([]);
+
+  expect(seeds[2].scopeType).toEqual("prefix");
+  expect(seeds[2].url).toEqual("https://example.com/subpath/file.html");
+  expect(seeds[2].include).toEqual([/^https:\/\/example\.com\/subpath\//]);
+  expect(seeds[2].exclude).toEqual([]);
+
+});
+
+
+test("override scope with exclude", async () => {
+  const seeds = getSeeds(`
+
+seeds:
+   - url: https://example.com/1
+     scopeType: page
+
+   - url: https://example.com/subpath/file.html
+     scopeType: prefix
+
+   - url: https://example.com/2
+     scopeType: any
+
+   - url: https://example.com/3
+     scopeType: none
+
+   - url: https://example.com/4
+     scopeType: none
+     exclude: ''
+
+exclude:
+  - /search\\?
+  - q\\?
+
+`);
+
+  expect(seeds.length).toEqual(5);
+  const excludeRxs = [/\/search\?/, /q\?/];
+
+  expect(seeds[0].scopeType).toEqual("page");
+  expect(seeds[0].url).toEqual("https://example.com/1");
+  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\/1#.+/]);
+  expect(seeds[0].exclude).toEqual(excludeRxs);
+
+  expect(seeds[1].scopeType).toEqual("prefix");
+  expect(seeds[1].url).toEqual("https://example.com/subpath/file.html");
+  expect(seeds[1].include).toEqual([/^https:\/\/example\.com\/subpath\//]);
+  expect(seeds[1].exclude).toEqual(excludeRxs);
+
+  expect(seeds[2].scopeType).toEqual("any");
+  expect(seeds[2].url).toEqual("https://example.com/2");
+  expect(seeds[2].include).toEqual([/.*/]);
+  expect(seeds[2].exclude).toEqual(excludeRxs);
+
+  expect(seeds[3].scopeType).toEqual("none");
+  expect(seeds[3].url).toEqual("https://example.com/3");
+  expect(seeds[3].include).toEqual([]);
+  expect(seeds[3].exclude).toEqual(excludeRxs);
+
+  expect(seeds[4].scopeType).toEqual("none");
+  expect(seeds[4].url).toEqual("https://example.com/4");
+  expect(seeds[4].include).toEqual([]);
+  expect(seeds[4].exclude).toEqual([]);
+
+});
 
