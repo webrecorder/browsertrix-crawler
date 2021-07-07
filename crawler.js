@@ -252,24 +252,25 @@ class Crawler {
   }
 
   async createWARCInfo(filename) {
-    const warcVersion = "WARC/1.1";
+    const warcVersion = "WARC/1.0";
     const type = "warcinfo";
     const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
-    const warcioPackageJson = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
+    const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
     const pywbVersion = child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
 
     const info = {
-      "software": `Browsertrix-Crawler ${packageFileJSON["version"]} (with warcio.js ${warcioPackageJson} pywb ${pywbVersion})`,
-      "format": "WARC File Format 1.1"
+      "software": `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`,
+      "format": "WARC File Format 1.0"
     };
-
-    const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, info);
+    
+    const warcInfo = {...info, ...this.params.warcInfo, };
+    const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, warcInfo);
     const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
     return buffer;
   }
 
   async getFileSize(filename) {
-    var stats = await fsp.stat(filename);
+    const stats = await fsp.stat(filename);
     return stats.size;
   }
 

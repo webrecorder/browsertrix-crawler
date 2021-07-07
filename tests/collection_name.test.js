@@ -1,7 +1,7 @@
 const util = require("util");
 const exec = util.promisify(require("child_process").exec);
 
-test("check that the collection name is properly validation", async () => {
+test("check that the collection name is properly validated", async () => {
   jest.setTimeout(30000);
   let passed = "";
 

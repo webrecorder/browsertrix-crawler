@@ -8,3 +8,7 @@ depth: 1
 behaviors: ""
 
 generateWACZ: true
+
+warcinfo:
+  operator: test
+  host: hostname
