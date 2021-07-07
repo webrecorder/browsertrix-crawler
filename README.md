@@ -216,13 +216,14 @@ The available types are:
 The `depth` setting also limits how many pages will be crawled for that seed, while the `limit` option sets the total
 number of pages crawled from any seed.
 
-### Custom Warcinfo metadata.
+### Custom Warcinfo Fields
 
-Custom data can be added to the `warcinfo` headers for combined WARC by specifying custom fields in the `warcinfo` config block or specifying each
-field via the command-line.
+Custom fields can be added to the `warcinfo` WARC record, generated for each combined WARCs. The fields can be specified in the YAML config under `warcinfo` section or specifying individually via the command-line.
 
-For example, the following are equivalent ways to add warcinfo metadata:
+For example, the following are equivalent ways to add additional warcinfo fields:
 
+
+via yaml config:
 
 ```yaml
 warcinfo:
