@@ -1,14 +1,16 @@
-const util = require("util");
-const exec = util.promisify(require("child_process").exec);
 const fs = require("fs");
 const gunzip = require("gunzip-file");
+const child_process = require("child_process");
 
 test("check that the warcinfo file works as expected on the command line", async () => {
   jest.setTimeout(30000);
 
   try{
-    var json = {"operator": "test"};
-    await exec(`docker-compose run -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --url https://www.example.com --collection warcinfo --warcinfo '${json}' --combineWARC --depth `);
+    const configYaml = fs.readFileSync("tests/fixtures/crawl-2.yaml", "utf8");
+    const version = require("../package.json").version;
+    const proc = child_process.execSync(`docker run -i -v $PWD/crawls:/crawls webrecorder/browsertrix-crawler:${version} crawl --config stdin --exclude webrecorder.net/202`, {input: configYaml, stdin: "inherit", encoding: "utf8"});
+
+    console.log(proc);
   }
   catch (error) {
     console.log(error);
@@ -20,4 +22,5 @@ test("check that the warcinfo file works as expected on the command line", async
     expect(foundWarc).toBeGreaterThan(-1);
 
   });
+
 });
