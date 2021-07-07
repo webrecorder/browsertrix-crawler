@@ -141,7 +141,8 @@ Options:
                                             accessible on this port
                                                            [number] [default: 0]
       --config                              Path to YAML config file
-      --warcinfo                            Optional metadata added to warcinfo
+      --warcinfo                            Optional fields added to the warcinfo
+                                            record in combined WARCs
 
 ```
 </details>
