@@ -252,7 +252,7 @@ class Crawler {
   }
 
   async createWARCInfo(filename) {
-    const warcVersion = "WARC/1.1";
+    const warcVersion = "WARC/1.0";
     const type = "warcinfo";
     const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
     const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
@@ -260,7 +260,7 @@ class Crawler {
 
     const info = {
       "software": `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`,
-      "format": "WARC File Format 1.1"
+      "format": "WARC File Format 1.0"
     };
     
     const warcInfo = {...info, ...this.params.warcInfo, };
