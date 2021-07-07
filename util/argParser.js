@@ -71,17 +71,18 @@ class ArgParser {
         type: "number",
       },
 
-      "scope": {
+      "scopeType": {
+        describe: "Predefined for which URLs to crawl, can be: prefix, page, host, any, or custom, to use the scopeIncludeRx/scopeExcludeRx",
+        type: "string",
+      },
+
+      "scopeIncludeRx": {
+        alias: "include",
         describe: "Regex of page URLs that should be included in the crawl (defaults to the immediate directory of URL)",
       },
 
-      "scopeType": {
-        describe: "Simplified scope for which URLs to crawl, can be: prefix, page, host, any",
-        type: "string",
-        default: "prefix",
-      },
-
-      "exclude": {
+      "scopeExcludeRx": {
+        alias: "exclude",
         describe: "Regex of page URLs that should be excluded from the crawl."
       },
 
@@ -169,6 +170,7 @@ class ArgParser {
       },
 
       "useSitemap": {
+        alias: "sitemap",
         describe: "If enabled, check for sitemaps at /sitemap.xml, or custom URL if URL is specified",
       },
 
@@ -300,17 +302,20 @@ class ArgParser {
       }
     }
 
+    if (argv.include || argv.exclude) {
+      if (argv.scopeType && argv.scopeType !== "custom") {
+        console.warn("You've specified a --scopeType and a --scopeIncludeRx or --scopeExcludeRx regex. The custom scope regex will take precedence, overriding the scopeType");
+        argv.scopeType = "custom";
+      }
+    }
+
     const scopeOpts = {
-      type: argv.scopeType,
-      sitemap: argv.useSitemap,
-      include: argv.scope,
+      scopeType: argv.scopeType,
+      sitemap: argv.sitemap,
+      include: argv.include,
       exclude: argv.exclude,
       depth: argv.depth,
     };
-
-    if (argv.scope && argv.scopeType) {
-      console.warn("You've specified a --scopeType and a --scope regex. The custom scope regex will take precedence, overriding the scopeType");
-    }
 
     argv.scopedSeeds = [];
 
