@@ -197,8 +197,8 @@ class ArgParser {
 
       "warcInfo": {
         alias: ["warcinfo"],
-        describe: "If set will record the values in the warcinfo. Currently accepting 'host', 'operator', and 'ip'",
-        type: "dict"
+        describe: "Optional fields added to the warcinfo record in combined WARCs",
+        type: "object"
       }
     };
   }

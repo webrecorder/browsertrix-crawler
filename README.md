@@ -141,8 +141,7 @@ Options:
                                             accessible on this port
                                                            [number] [default: 0]
       --config                              Path to YAML config file
-      --warcinfo                            Takes a json block for
-                            supported warc info headers
+      --warcinfo                            Optional metadata added to warcinfo
 
 ```
 </details>
@@ -152,14 +151,6 @@ For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.co
 
 The default is `load`, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example),
 while `--waitUntil networkidle0` may make sense for dynamic sites.
-
-### warcinfo headers
-
-You can set the headers on the command line by using a command like this
-```
---warcinfo '{"operator": "test"}'
-```
-be sure to pass valid json or to set in the yaml config file
 
 ### YAML Crawl Config
 
@@ -224,6 +215,26 @@ The available types are:
 The `depth` setting also limits how many pages will be crawled for that seed, while the `limit` option sets the total
 number of pages crawled from any seed.
 
+### Custom Warcinfo metadata.
+
+Custom data can be added to the `warcinfo` headers for combined WARC by specifying custom fields in the `warcinfo` config block or specifying each
+field via the command-line.
+
+For example, the following are equivalent ways to add warcinfo metadata:
+
+
+```yaml
+warcinfo:
+  operator: my-org
+  hostname: hostname.my-org
+```
+
+via command-line:
+
+```
+--warcinfo.operator my-org --warcinfo.hostname hostname.my-org
+
+```
 
 ### Behaviors
 
