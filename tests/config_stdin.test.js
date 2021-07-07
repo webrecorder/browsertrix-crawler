@@ -30,7 +30,7 @@ test("pass config file via stdin", async () => {
     expect(url.indexOf("webrecorder.net/202")).toEqual(-1);
   }
 
-  let foundAllSeeds = true; 
+  let foundAllSeeds = true;
 
   for (const seed of config.seeds) {
     const url = new URL(seed).href;
@@ -43,5 +43,3 @@ test("pass config file via stdin", async () => {
   expect(fs.existsSync("crawls/collections/config-stdin/config-stdin.wacz")).toBe(true);
 
 });
-
-

@@ -241,10 +241,6 @@ class ArgParser {
       }
     }
 
-    if (argv.warcInfo){
-      argv.warcInfo = JSON.parse(argv.warcInfo);
-    }
-
     // log options
     argv.logging = argv.logging.split(",");
 

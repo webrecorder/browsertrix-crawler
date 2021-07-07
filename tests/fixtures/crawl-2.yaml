@@ -9,4 +9,5 @@ behaviors: ""
 
 generateWACZ: true
 warcInfo:
-  operator: test
+  operator:
+    test

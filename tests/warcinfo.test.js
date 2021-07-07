@@ -7,7 +7,7 @@ test("check that the warcinfo file works as expected on the command line", async
   jest.setTimeout(30000);
 
   try{
-    var json = JSON.stringify({"operator": "test"});
+    var json = {"operator": "test"};
     await exec(`docker-compose run -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --url https://www.example.com --collection warcinfo --warcinfo '${json}' --combineWARC --depth `);
   }
   catch (error) {
