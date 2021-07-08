@@ -251,9 +251,6 @@ Note: If specifying multiple workers, the crawler should additional be instructe
 For example,
 
 ```
-docker run -v PATH_TO_URLFILE.TXT_LOCALLY:/PATH_TO_URLFILE.TXT_IN_DOCKER -v $PWD/crawls:/crawls/ -it WEBRECORDER_DOCKER_IMAGE crawl --seedFile PATH_TO_URLFILE.TXT_IN_DOCKER
-```
-```
 docker run -it WEBRECORDER_DOCKER_IMAGE -p 9037:9037 crawler crawl --url [URL] --screencastPort 9037 --newContext window --workers 3
 ```
 
