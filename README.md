@@ -153,7 +153,7 @@ while `--waitUntil networkidle0` may make sense for dynamic sites.
 
 Browsertix Crawler supports the use of a yaml file to set parameters for a crawl. This can be used by passing a valid yaml file to the `--config` option.
 
-The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used. For example, the following should start a crawl with config in `crawl-config.yaml` (where [VERSION] represents the version of browsertrix-crawler image you're working with).
+The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used. For example, the following should start a crawl with config in `crawl-config.yaml` (where [VERSION] represents the version of browsertrix-crawler image you're working with). The current [VERSION] can be found by checking the package.json file.
 
 
 ```
@@ -186,7 +186,7 @@ The seedFile should be a .txt file formatted so that each line of the file is a 
 The seedFile must be passed as a volume to the docker container. To do that you should format your docker command similar to this one.
 
 ```
-docker run -v PATH_TO_URLFILE.TXT_LOCALLY:/PATH_TO_URLFILE.TXT_IN_DOCKER -v $PWD/crawls:/crawls/ -it WEBRECORDER_DOCKER_IMAGE crawl --seedFile PATH_TO_URLFILE.TXT_IN_DOCKER
+docker run -v $PWD/seedFile.txt:/app/seedFile.txt -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl —-seedFile /app/seedFile.txt
 ```
 
 #### Per Seed Settings
@@ -241,7 +241,7 @@ With version 0.4.0, Browsertrix Crawler includes an experimental 'screencasting'
 To enable, add `--screencastPort` command-line option and also map the port on the docker container. An example command might be:
 
 ```
-docker-compose run -p 9037:9037 crawler crawl --url [URL] --screencastPort 9037
+docker run -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl -p 9037:9037 --url https://www.example.com --screencastPort 9037
 ```
 
 Then, you can open `http://localhost:9037/` and watch the crawl.
@@ -251,7 +251,7 @@ Note: If specifying multiple workers, the crawler should additional be instructe
 For example,
 
 ```
-docker run -it WEBRECORDER_DOCKER_IMAGE -p 9037:9037 crawler crawl --url [URL] --screencastPort 9037 --newContext window --workers 3
+docker run -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl -p 9037:9037 --url https://www.example.com --screencastPort 9037 --newContext window --workers 3
 ```
 
 will start a crawl with 3 workers, and show the screen of each of the workers from `http://localhost:9037/`.
