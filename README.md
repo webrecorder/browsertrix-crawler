@@ -179,19 +179,19 @@ combineWARCs: true
 
 The list of seeds can be loaded via an external file by specifying the filename via the `seedFile` config or command-line option.
 
-### seedFile
+#### Seed File
 
-The seedFile should be a .txt file formatted so that each line of the file is a url string. An example file is available in the fixture folder as urlSeedFile.txt
+The URL seed file should be a text file formatted so that each line of the file is a url string. (An example file is available in the fixture folder as urlSeedFile.txt)
 
-The seedFile must be passed as a volume to the docker container. To do that you should format your docker command similar to this one.
+The seed file must be passed as a volume to the docker container. To do that, you can format your docker command similar to the following:
 
 ```
 docker run -v $PWD/seedFile.txt:/app/seedFile.txt -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl —-seedFile /app/seedFile.txt
 ```
 
-#### Per Seed Settings
+#### Per-Seed Settings
 
-Certain settings such scope type, scope includes and excludes, and depth can be configured per seed, for example:
+Certain settings such scope type, scope includes and excludes, and depth can also be configured per seed directly in the YAML file, for example:
 
 ```
 seeds:
