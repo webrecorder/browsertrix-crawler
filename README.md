@@ -179,19 +179,14 @@ combineWARCs: true
 
 The list of seeds can be loaded via an external file by specifying the filename via the `seedFile` config or command-line option.
 
-### UrlFile
+### seedFile
 
-The urlFile should be a .txt file formatted so that each line of the file is a url string. An example file is available in the fixture folder as urlSeedFile.txt
+The seedFile should be a .txt file formatted so that each line of the file is a url string. An example file is available in the fixture folder as urlSeedFile.txt
 
-The urlfile must be passed as a volume to the docker container. To do that you should format your docker command similar to this one.
+The seedFile must be passed as a volume to the docker container. To do that you should format your docker command similar to this one.
 
 ```
-docker run -v PATH_TO_URLFILE.TXT_LOCALLY:/PATH_TO_URLFILE.TXT_IN_DOCKER -v $PWD/crawls:/crawls/ -it WEBRECORDER_DOCKER_IMAGE crawl --urlFile PATH_TO_URLFILE.TXT_IN_DOCKER
-```
-
-Full example
-```
-docker run -v $PWD/urlFile.txt:/app/urlFile.txt -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler:0.4.0-beta.1 crawl --urlFile /app/urlFile.txt
+docker run -v PATH_TO_URLFILE.TXT_LOCALLY:/PATH_TO_URLFILE.TXT_IN_DOCKER -v $PWD/crawls:/crawls/ -it WEBRECORDER_DOCKER_IMAGE crawl --seedFile PATH_TO_URLFILE.TXT_IN_DOCKER
 ```
 
 #### Per Seed Settings
@@ -256,7 +251,10 @@ Note: If specifying multiple workers, the crawler should additional be instructe
 For example,
 
 ```
-docker-compose run -p 9037:9037 crawler crawl --url [URL] --screencastPort 9037 --newContext window --workers 3
+docker run -v PATH_TO_URLFILE.TXT_LOCALLY:/PATH_TO_URLFILE.TXT_IN_DOCKER -v $PWD/crawls:/crawls/ -it WEBRECORDER_DOCKER_IMAGE crawl --seedFile PATH_TO_URLFILE.TXT_IN_DOCKER
+```
+```
+docker run -it WEBRECORDER_DOCKER_IMAGE -p 9037:9037 crawler crawl --url [URL] --screencastPort 9037 --newContext window --workers 3
 ```
 
 will start a crawl with 3 workers, and show the screen of each of the workers from `http://localhost:9037/`.
