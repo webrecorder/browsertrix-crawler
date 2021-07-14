@@ -304,8 +304,8 @@ class Crawler {
 
     await this.initPages();
 
-    if (this.params.capture_exclusions) {
-      this.exclusions = new Exclusions(this.params.capture_exclusions);
+    if (this.params.blockRules) {
+      this.exclusions = new Exclusions(this.params.blockRules);
     }
 
     if (this.params.screencastPort) {
