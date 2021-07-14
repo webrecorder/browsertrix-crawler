@@ -11,7 +11,9 @@ class Exclusions
       if (typeof(exclude) === "string") {
         this.exclusions.push({urlRx: new RegExp(exclude)});
       } else {
-        exclude.urlRx = new RegExp(exclude.urlRx);
+        exclude.urlRx = exclude.urlRx ? new RegExp(exclude.urlRx) : null;
+        exclude.notUrlRx = exclude.notUrlRx ? new RegExp(exclude.notUrlRx) : null;
+
         if (exclude.frameTextMatchRx && exclude.frameTextNotMatchRx) {
           throw new Error("Error: Only one of 'frameTextMatchRx' and 'frameTextNotMatchRx' can be included in each rule.");
         }
@@ -34,6 +36,13 @@ class Exclusions
   }
 
   async handleRequest(request) {
+    const url = request.url();
+
+    if (!url.startsWith("http:") && !url.startsWith("https:")) {
+      request.continue();
+      return;
+    }
+
     for (const rule of this.exclusions) {
       if (await this.shouldExclude(rule, request)) {
         console.log("Excluding/Aborting Request for: " + request.url());
@@ -49,22 +58,40 @@ class Exclusions
   async shouldExclude(rule, request) {
     const url = request.url();
 
-    const {urlRx, frameTextMatchRx, frameTextNotMatchRx} = rule;
+    const {urlRx, pageRx, notUrlRx, frameTextMatchRx, frameTextNotMatchRx} = rule;
 
-    if (!url.match(urlRx)) {
+    const pageUrl = request.frame().url();
+
+    // ignore initial page
+    if (pageUrl === "about:blank") {
       return false;
     }
 
-    // not a frame text-based rule, always exclude if rx matched
-    if (!frameTextMatchRx && !frameTextNotMatchRx) {
-      return true;
+    if (!urlRx === !notUrlRx) {
+      console.log(urlRx, notUrlRx);
+      throw new Error("Exactly one of 'urlRx' or 'notUrlRx' must be specified");
     }
 
+    // not a page match, skip rule
+    if (pageRx && !pageUrl.match(pageRx)) {
+      return false;
+    }
+
+    // not a url match, skip rule
+    if ((urlRx && !url.match(urlRx)) || (notUrlRx && url.match(notUrlRx))) {
+      return false;
+    }
+
+    // if frame text-based rule: apply if nav frame
     // frame text-based match: only applies to nav requests, never exclude otherwise
-    if (!request.isNavigationRequest()) {
-      return false;
+    if ((frameTextMatchRx || frameTextNotMatchRx) && request.isNavigationRequest()) {
+      return await this.shouldExcludeFrame(request, url, frameTextMatchRx, frameTextNotMatchRx);
     }
 
+    return true;
+  }
+
+  async shouldExcludeFrame(request, url, frameTextMatchRx, frameTextNotMatchRx) {
     try {
       const res = await fetch(url);
       const text = await res.text();
@@ -82,8 +109,6 @@ class Exclusions
     } catch (e) {
       console.log(e);
     }
-
-    return true;
   }
 }
 
