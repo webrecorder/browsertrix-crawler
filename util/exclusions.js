@@ -1,5 +1,7 @@
 const fetch = require("node-fetch");
 
+const RULE_TYPES = ["block", "allowOnly"];
+
 
 // ===========================================================================
 class Exclusions
@@ -9,19 +11,11 @@ class Exclusions
 
     for (const exclude of exclusions) {
       if (typeof(exclude) === "string") {
-        this.exclusions.push({urlRx: new RegExp(exclude)});
+        this.exclusions.push({url: new RegExp(exclude)});
       } else {
-        exclude.urlRx = exclude.urlRx ? new RegExp(exclude.urlRx) : null;
-        exclude.notUrlRx = exclude.notUrlRx ? new RegExp(exclude.notUrlRx) : null;
-
-        if (exclude.frameTextMatchRx && exclude.frameTextNotMatchRx) {
-          throw new Error("Error: Only one of 'frameTextMatchRx' and 'frameTextNotMatchRx' can be included in each rule.");
-        }
-        if (exclude.frameTextMatchRx) {
-          exclude.frameTextMatchRx = new RegExp(exclude.frameTextMatchRx);
-        } else if (exclude.frameTextNotMatchRx) {
-          exclude.frameTextNotMatchRx = new RegExp(exclude.frameTextNotMatchRx);
-        }
+        exclude.url = exclude.url ? new RegExp(exclude.url) : null;
+        exclude.frameTextMatch = exclude.frameTextMatch ? new RegExp(exclude.frameTextMatch) : null;
+        exclude.inFrameUrl = exclude.inFrameUrl ? new RegExp(exclude.inFrameUrl) : null;
         this.exclusions.push(exclude);
       }
     }
@@ -44,11 +38,17 @@ class Exclusions
     }
 
     for (const rule of this.exclusions) {
-      if (await this.shouldExclude(rule, request)) {
-        console.log("Excluding/Aborting Request for: " + request.url());
+      const {done, exclude} = await this.shouldExclude(rule, request);
+
+      if (exclude) {
+        const frameUrl = request.frame().url();
+        console.log("Excluding/Aborting Request for: " + request.url(), frameUrl);
         // not allowed, abort loading this response
         request.abort();
         return;
+      }
+      if (done) {
+        break;
       }
     }
 
@@ -56,55 +56,52 @@ class Exclusions
   }
 
   async shouldExclude(rule, request) {
-    const url = request.url();
+    const reqUrl = request.url();
 
-    const {urlRx, pageRx, notUrlRx, frameTextMatchRx, frameTextNotMatchRx} = rule;
+    const {url, inFrameUrl, frameTextMatch} = rule;
 
-    const pageUrl = request.frame().url();
+    const type = rule.type || "block";
+    const allowOnly = (type === "allowOnly");
+
+    if (!RULE_TYPES.includes(type)) {
+      throw new Error("Rule \"type\" must be: " + RULE_TYPES.join(", "));
+    }
+
+    const frameUrl = request.frame().url();
 
     // ignore initial page
-    if (pageUrl === "about:blank") {
-      return false;
+    if (frameUrl === "about:blank") {
+      return {exclude: false, done: true};
     }
 
-    if (!urlRx === !notUrlRx) {
-      console.log(urlRx, notUrlRx);
-      throw new Error("Exactly one of 'urlRx' or 'notUrlRx' must be specified");
-    }
-
-    // not a page match, skip rule
-    if (pageRx && !pageUrl.match(pageRx)) {
-      return false;
-    }
-
-    // not a url match, skip rule
-    if ((urlRx && !url.match(urlRx)) || (notUrlRx && url.match(notUrlRx))) {
-      return false;
+    // not a frame match, skip rule
+    if (inFrameUrl && !frameUrl.match(inFrameUrl)) {
+      return {exclude: false, done: false};
     }
 
     // if frame text-based rule: apply if nav frame
     // frame text-based match: only applies to nav requests, never exclude otherwise
-    if ((frameTextMatchRx || frameTextNotMatchRx) && request.isNavigationRequest()) {
-      return await this.shouldExcludeFrame(request, url, frameTextMatchRx, frameTextNotMatchRx);
+    if (frameTextMatch) {
+      if (!request.isNavigationRequest()) {
+        return {exclude: false, done: false};
+      }
+
+      const exclude = await this.isTextMatch(request, reqUrl, frameTextMatch) ? !allowOnly : allowOnly;
+      return {exclude, done: true};
     }
 
-    return true;
+
+    // for non frame text rule, simply match by URL
+    const exclude = (url && reqUrl.match(url)) ? !allowOnly : allowOnly;
+    return {exclude, done: false};
   }
 
-  async shouldExcludeFrame(request, url, frameTextMatchRx, frameTextNotMatchRx) {
+  async isTextMatch(request, reqUrl, frameTextMatch) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(reqUrl);
       const text = await res.text();
 
-      if (frameTextNotMatchRx) {
-        // exclude if not matched
-        console.log(`${!text.match(frameTextNotMatchRx) ? "BLOCKED" : "NOT BLOCKED"} because text of ${url} matched ${frameTextNotMatchRx}`);
-        return text.match(frameTextNotMatchRx) ? false : true;
-      } else {
-        // exclude if matched
-        console.log(`${text.match(frameTextNotMatchRx) ? "BLOCKED" : "NOT BLOCKED"} because text of ${url} did not match ${frameTextMatchRx}`);
-        return text.match(frameTextMatchRx) ? true : false;
-      }
+      return !!text.match(frameTextMatch);
 
     } catch (e) {
       console.log(e);
