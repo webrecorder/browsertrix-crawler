@@ -11,7 +11,7 @@ FROM ubuntu:bionic
 RUN apt-get update -y && apt-get install --no-install-recommends -qqy software-properties-common \
     && add-apt-repository -y ppa:deadsnakes \
     && apt-get update -y \
-    && apt-get install --no-install-recommends -qqy build-essential fonts-stix locales-all redis-server xvfb gpg-agent curl git \
+    && apt-get install --no-install-recommends -qqy build-essential fonts-stix locales-all redis-server xvfb gpg-agent curl git socat \
 	   python3.8 python3.8-distutils python3.8-dev gpg ca-certificates \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

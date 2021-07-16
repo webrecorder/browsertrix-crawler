@@ -79,10 +79,12 @@ class Exclusions
       return {exclude: false, done: false};
     }
 
-    // if frame text-based rule: apply if nav frame
+    const urlMatched = (url && reqUrl.match(url));
+
+    // if frame text-based rule: if url matched and a frame request
     // frame text-based match: only applies to nav requests, never exclude otherwise
     if (frameTextMatch) {
-      if (!request.isNavigationRequest()) {
+      if (!urlMatched || !request.isNavigationRequest()) {
         return {exclude: false, done: false};
       }
 
@@ -90,9 +92,8 @@ class Exclusions
       return {exclude, done: true};
     }
 
-
     // for non frame text rule, simply match by URL
-    const exclude = (url && reqUrl.match(url)) ? !allowOnly : allowOnly;
+    const exclude = urlMatched ? !allowOnly : allowOnly;
     return {exclude, done: false};
   }
 
