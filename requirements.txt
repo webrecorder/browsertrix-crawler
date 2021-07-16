@@ -1,4 +1,5 @@
 pywb>=2.6.0b4
-git+https://github.com/webrecorder/pywb@main
+#git+https://github.com/webrecorder/pywb@main
+cdxj-indexer>=1.4.1
 uwsgi
 wacz>=0.3.0

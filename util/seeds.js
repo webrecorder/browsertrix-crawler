@@ -84,6 +84,10 @@ class ScopedSeed
     return [include, allowHash];
   }
 
+  isAtMaxDepth(depth) {
+    return depth >= this.maxDepth;
+  }
+
   isIncluded(url, depth) {
     if (depth > this.maxDepth) {
       return false;

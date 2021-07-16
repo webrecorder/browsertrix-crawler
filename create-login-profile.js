@@ -6,6 +6,14 @@ const child_process = require("child_process");
 const puppeteer = require("puppeteer-core");
 const yargs = require("yargs");
 
+const { BROWSER_BIN } = require("./util/constants");
+
+const fs = require("fs");
+const path = require("path");
+const http = require("http");
+const url = require("url");
+const profileHTML = fs.readFileSync(path.join(__dirname, "screencast", "createProfile.html"), {encoding: "utf8"});
+
 function cliOpts() {
   return {
     "url": {
@@ -36,6 +44,10 @@ function cliOpts() {
       type: "boolean",
       default: false,
     },
+
+    "interactive": {
+      describe: "Start in interactive mode!",
+    }
   };
 }
 
@@ -66,7 +78,7 @@ async function main() {
 
   const args = {
     headless: !!params.headless,
-    executablePath: "google-chrome",
+    executablePath: BROWSER_BIN,
     ignoreHTTPSErrors: true,
     args: [
       "--no-xshm",
@@ -74,21 +86,26 @@ async function main() {
       "--disable-background-media-suspend",
       "--autoplay-policy=no-user-gesture-required",
       "--disable-features=IsolateOrigins,site-per-process",
-      "--user-data-dir=/tmp/profile"
+      "--user-data-dir=/tmp/profile",
+      "--remote-debugging-port=9221",
     ]
   };
 
-  if (!params.user) {
+  if (!params.user && !params.interactive) {
     params.user = await promptInput("Enter username: ");
   }
 
-  if (!params.password) {
+  if (!params.password && !params.interactive) {
     params.password = await promptInput("Enter password: ", true);
   }
 
   const browser = await puppeteer.launch(args);
 
   const page = await browser.newPage();
+
+  const target = page.target();
+
+  const targetUrl = `http://localhost:9222/devtools/inspector.html?ws=localhost:9222/devtools/page/${target._targetId}`;
 
   const waitUntil =  ["load", "networkidle2"];
 
@@ -99,6 +116,37 @@ async function main() {
   await page.goto(params.url, {waitUntil});
 
   console.log("loaded");
+
+  if (params.interactive) {
+    console.log("interactive");
+    child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
+
+    const httpServer = http.createServer(async (req, res) => {
+      const pathname = url.parse(req.url).pathname;
+      if (pathname === "/") {
+        res.writeHead(200, {"Content-Type": "text/html"});
+        res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl));
+
+      } else if (pathname === "/createProfile" && req.method === "POST") {
+
+        await createProfile(params, browser, page);
+
+        res.writeHead(200, {"Content-Type": "text/html"});
+        res.end("<html><body>Profile Created! You may now close this window.</body></html>");
+
+        setTimeout(() => process.exit(0), 200);
+
+      } else {
+        res.writeHead(404, {"Content-Type": "text/html"});
+        res.end("Not Found");
+      }
+    });
+
+    const port = 9223;
+    httpServer.listen(port);
+    console.log(`Profile Create Server started on: ${port}`);
+    return;
+  }
 
   let u, p;
 
@@ -125,11 +173,17 @@ async function main() {
     page.waitForNavigation({waitUntil})
   ]);
 
-  await page._client.send("Network.clearBrowserCache");
-
   if (params.debugScreenshot) {
     await page.screenshot({path: params.debugScreenshot});
   }
+
+  await createProfile(params, browser, page);
+
+  process.exit(0);
+}
+
+async function createProfile(params, browser, page) {
+  await page._client.send("Network.clearBrowserCache");
 
   await browser.close();
 
@@ -139,8 +193,6 @@ async function main() {
 
   child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {cwd: "/tmp/profile"});
   console.log("done");
-
-  process.exit(0);
 }
 
 function promptInput(msg, hidden = false) {
