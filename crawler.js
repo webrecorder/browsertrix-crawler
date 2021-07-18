@@ -29,7 +29,7 @@ const { parseArgs } = require("./util/argParser");
 
 const { BROWSER_BIN, BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
 
-const { Exclusions } = require("./util/exclusions");
+const { BlockRules } = require("./util/blockrules");
 
 
 // ============================================================================
@@ -75,7 +75,7 @@ class Crawler {
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
 
-    this.exclusions = null;
+    this.blockRules = null;
   }
 
   configureUA() {
@@ -305,7 +305,7 @@ class Crawler {
     await this.initPages();
 
     if (this.params.blockRules) {
-      this.exclusions = new Exclusions(this.params.blockRules);
+      this.blockRules = new BlockRules(this.params.blockRules);
     }
 
     if (this.params.screencastPort) {
@@ -388,8 +388,8 @@ class Crawler {
       return;
     }
 
-    if (this.exclusions) {
-      await this.exclusions.initPage(page);
+    if (this.blockRules) {
+      await this.blockRules.initPage(page);
     }
 
     try {
