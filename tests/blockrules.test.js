@@ -96,4 +96,39 @@ test("test block rule based on iframe text, block matched", () => {
   expect(doesCDXContain("block-4", "\"video/mp4\"")).toBe(false);
 });
 
+test("test rule based on iframe text not matching, plus allowOnly iframe", () => {
+  const config = {
+    "url": "https://oembed.link/https://www.youtube.com/watch?v=aT-Up5Y4uRI",
+    "blockRules": [{
+      "url": "example.com/embed/",
+      "frameTextMatch": "\\\\\"channelId\\\\\":\\\\\"UCrQElMF25VP-1JjhBuFsW_Q\\\\\"",
+      "type": "block"
+    }, {
+      "url": "(youtube.com|example.com)/embed/",
+      "type": "allowOnly",
+      "inFrameUrl": "oembed.link/",
+    }]
+  };
+
+  runCrawl("non-block-5", config);
+
+  expect(doesCDXContain("non-block-5", "\"video/mp4\"")).toBe(true);
+});
+
+test("test block url in frame url", () => {
+  const config = {
+    "url": "https://oembed.link/https://www.youtube.com/watch?v=aT-Up5Y4uRI",
+    "blockRules": [{
+      "url": "maxresdefault.jpg",
+      "type": "block",
+      "inFrameUrl": "youtube.com/embed",
+    }]
+  };
+
+  runCrawl("block-6", config);
+
+  expect(doesCDXContain("block-6", "\"https://i.ytimg.com/vi/aT-Up5Y4uRI/maxresdefault.jpg\"")).toBe(false);
+});
+
+
 
