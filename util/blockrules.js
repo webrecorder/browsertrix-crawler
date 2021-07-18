@@ -26,7 +26,7 @@ class BlockRule
     return `\
 * Rule for URL Regex: ${this.url}
     Type: ${this.type}
-    In Frame Regex: ${this.inFrameUrl : this.inFrameUrl : "any"}
+    In Frame Regex: ${this.inFrameUrl ? this.inFrameUrl : "any"}
     Resource Type: ${this.frameTextMatch ? "frame" : "any"}
 ${this.frameTextMatch ? "Frame Text Regex: " + this.frameTextMatch : ""}
 `;
