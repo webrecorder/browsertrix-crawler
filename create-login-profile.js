@@ -103,10 +103,6 @@ async function main() {
 
   const page = await browser.newPage();
 
-  const target = page.target();
-
-  const targetUrl = `http://localhost:9222/devtools/inspector.html?ws=localhost:9222/devtools/page/${target._targetId}`;
-
   const waitUntil =  ["load", "networkidle2"];
 
   await page.setCacheEnabled(false);
@@ -118,33 +114,7 @@ async function main() {
   console.log("loaded");
 
   if (params.interactive) {
-    console.log("interactive");
-    child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
-
-    const httpServer = http.createServer(async (req, res) => {
-      const pathname = url.parse(req.url).pathname;
-      if (pathname === "/") {
-        res.writeHead(200, {"Content-Type": "text/html"});
-        res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl));
-
-      } else if (pathname === "/createProfile" && req.method === "POST") {
-
-        await createProfile(params, browser, page);
-
-        res.writeHead(200, {"Content-Type": "text/html"});
-        res.end("<html><body>Profile Created! You may now close this window.</body></html>");
-
-        setTimeout(() => process.exit(0), 200);
-
-      } else {
-        res.writeHead(404, {"Content-Type": "text/html"});
-        res.end("Not Found");
-      }
-    });
-
-    const port = 9223;
-    httpServer.listen(port);
-    console.log(`Profile Create Server started on: ${port}`);
+    await handleInteractive(params, browser, page);
     return;
   }
 
@@ -223,6 +193,46 @@ function promptInput(msg, hidden = false) {
       resolve(res);
     });
   });
+}
+
+async function handleInteractive(params, browser, page) {
+  const target = page.target();
+  const targetUrl = `http://localhost:9222/devtools/inspector.html?ws=localhost:9222/devtools/page/${target._targetId}`;
+
+  console.log("Creating Profile Interactively...");
+  child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
+
+  const httpServer = http.createServer(async (req, res) => {
+    const pathname = url.parse(req.url).pathname;
+    if (pathname === "/") {
+      res.writeHead(200, {"Content-Type": "text/html"});
+      res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl));
+
+    } else if (pathname === "/createProfile" && req.method === "POST") {
+
+
+      try {
+        await createProfile(params, browser, page);
+
+        res.writeHead(200, {"Content-Type": "text/html"});
+        res.end("<html><body>Profile Created! You may now close this window.</body></html>");
+      } catch (e) {
+        res.writeHead(500, {"Content-Type": "text/html"});
+        res.end("<html><body>Profile creation failed! See the browsertrix-crawler console for more info");
+        console.log(e);
+      }
+
+      setTimeout(() => process.exit(0), 200);
+
+    } else {
+      res.writeHead(404, {"Content-Type": "text/html"});
+      res.end("Not Found");
+    }
+  });
+
+  const port = 9223;
+  httpServer.listen(port);
+  console.log(`Profile Create Server started on: ${port}`);
 }
 
 main();

@@ -31,10 +31,15 @@ class ScopedSeed
   }
 
   parseUrl(url) {
-    const parsedUrl = new URL(url);
+    let parsedUrl = null;
+    try {
+      parsedUrl = new URL(url);
+    } catch (e) {
+      throw new Error(`Invalid Seed "${url}" - not a valid URL`);
+    }
 
     if (parsedUrl.protocol !== "http:" && parsedUrl.protocol != "https:") {
-      throw new Error("URL must start with http:// or https://");
+      throw new Error(`Invalid Seed "${url}" - URL must start with http:// or https://`);
     }
 
     return parsedUrl;
