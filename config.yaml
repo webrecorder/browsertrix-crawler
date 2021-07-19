@@ -13,6 +13,7 @@ recorder:
   source_coll: live
   cache: always
   rollover_size: ${ROLLOVER_SIZE}
+  enable_put_custom_record: true
 
 #autoindex: 10
 

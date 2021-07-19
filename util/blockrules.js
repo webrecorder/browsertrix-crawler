@@ -37,8 +37,11 @@ ${this.frameTextMatch ? "Frame Text Regex: " + this.frameTextMatch : ""}
 // ===========================================================================
 class BlockRules
 {
-  constructor(blockRules) {
+  constructor(blockRules, blockPutUrl, blockErrMsg) {
     this.rules = [];
+    this.blockPutUrl = blockPutUrl;
+    this.blockErrMsg = blockErrMsg;
+    this.putUrlSet = new Set();
 
     for (const ruleData of blockRules) {
       this.rules.push(new BlockRule(ruleData));
@@ -68,10 +71,11 @@ class BlockRules
       const {done, block} = await this.shouldBlock(rule, request);
 
       if (block) {
-        const frameUrl = request.frame().url();
-        console.log("Blocking/Aborting Request for: " + request.url(), frameUrl);
+        //const frameUrl = request.frame().url();
+        //console.log("Blocking/Aborting Request for: " + request.url());
         // not allowed, abort loading this response
         request.abort();
+        await this.recordBlockMsg(request.url());
         return;
       }
       if (done) {
@@ -130,6 +134,24 @@ class BlockRules
     } catch (e) {
       console.log(e);
     }
+  }
+
+  async recordBlockMsg(url) {
+    if (!this.blockErrMsg || !this.blockPutUrl) {
+      return;
+    }
+
+    if (this.putUrlSet.has(url)) {
+      return;
+    }
+
+    this.putUrlSet.add(url);
+
+    const body = this.blockErrMsg;
+    const putUrl = new URL(this.blockPutUrl);
+    putUrl.searchParams.set("url", url);
+    console.log("put url", putUrl.href);
+    await fetch(putUrl.href, {method: "PUT", headers: {"Content-Type": "text/html"}, body});
   }
 }
 

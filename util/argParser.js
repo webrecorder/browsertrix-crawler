@@ -96,6 +96,11 @@ class ArgParser {
         default: [],
       },
 
+      "blockMessage": {
+        describe: "If specified, when a URL is blocked, a record with this error message is added instead",
+        type: "string",
+      },
+
       "collection": {
         alias: "c",
         describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",

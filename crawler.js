@@ -58,7 +58,8 @@ class Crawler {
 
     console.log("Seeds", this.params.scopedSeeds);
 
-    this.capturePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record/id_/`;
+    this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
+    this.capturePrefix = this.captureBasePrerix + "/id_/";
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
@@ -305,7 +306,7 @@ class Crawler {
     await this.initPages();
 
     if (this.params.blockRules) {
-      this.blockRules = new BlockRules(this.params.blockRules);
+      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
     }
 
     if (this.params.screencastPort) {
