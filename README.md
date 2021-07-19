@@ -47,9 +47,6 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       <summary><b>The Browsertrix Crawler docker image currently accepts the following parameters:</b></summary>
 
 ```
-crawler [options]
-
-Options:
       --help                                Show help                  [boolean]
       --version                             Show version number        [boolean]
       --seeds, --url                        The URL to start crawling from
@@ -87,10 +84,18 @@ Options:
                                             single-page-application crawling or
                                             when different hashtags load dynamic
                                             content
+      --blockRules                          Additional rules for blocking
+                                            certain URLs from being loaded, by
+                                            URL regex and optionally via text
+                                            match in an iframe
+                                                           [array] [default: []]
+      --blockMessage                        If specified, when a URL is blocked,
+                                            a record with this error message is
+                                            added instead               [string]
   -c, --collection                          Collection name to crawl to (replay
                                             will be accessible under this name
                                             in pywb preview)
-                               [string] [default: "capture-2021-07-01T23-43-26"]
+                               [string] [default: "capture-YYYY-MM-DDThh:mm:ss"]
       --headless                            Run in headless mode, otherwise
                                             start xvfb[boolean] [default: false]
       --driver                              JS driver for the crawler
@@ -140,10 +145,9 @@ Options:
                                             an HTTP server with screencast
                                             accessible on this port
                                                            [number] [default: 0]
+      --warcInfo, --warcinfo                Optional fields added to the
+                                            warcinfo record in combined WARCs
       --config                              Path to YAML config file
-      --warcinfo                            Optional fields added to the warcinfo
-                                            record in combined WARCs
-
 ```
 </details>
 
@@ -225,6 +229,34 @@ The available types are:
 
 The `depth` setting also limits how many pages will be crawled for that seed, while the `limit` option sets the total
 number of pages crawled from any seed.
+
+### Block Rules
+
+While scope rules define which pages are to be crawled, it is also possible to block certain URLs in certain pages or frames from being recorded.
+
+This is useful for blocking ads or other content that should not be included.
+
+The block rules can be specified as a list in the `blockRules` field. Each rule can contain one of the following fields:
+
+- `url`: regex for URL to match (required)
+
+- `type`: can be `block` or `allowOnly`. The block rule blocks the specified match, while allowOnly inverts the match and allows only the matched URLs, while blocking all others.
+
+- `inFrameUrl`: if specified, indicates that the rule only applies when `url` is loaded in a specific iframe or top-level frame.
+
+- `frameTextMatch`: if specified, the text of the specified URL is checked for the regex, and the rule applies only if there is an additional match. When specified, this field makes the block rule apply only to frame-level resource, eg. URLs loaded directly in an iframe or top-level frame.
+
+For example, a very simple block rule that blocks all URLs from 'googleanalytics.com' can be added with:
+
+```
+blockRules:
+   - url: googleanalytics.com
+```
+
+For additional examples of block rules, see the [tests/blockrules.test.js](tests/blockrules.test.js) file in the test suite.
+
+If the `--blockMessage` is also specified, a blocked URL is replaced with the specified message (added as a WARC resource record).
+
 
 ### Custom Warcinfo Fields
 

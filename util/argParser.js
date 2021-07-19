@@ -90,6 +90,17 @@ class ArgParser {
         describe: "Allow Hashtag URLs, useful for single-page-application crawling or when different hashtags load dynamic content",
       },
 
+      "blockRules": {
+        describe: "Additional rules for blocking certain URLs from being loaded, by URL regex and optionally via text match in an iframe",
+        type: "array",
+        default: [],
+      },
+
+      "blockMessage": {
+        describe: "If specified, when a URL is blocked, a record with this error message is added instead",
+        type: "string",
+      },
+
       "collection": {
         alias: "c",
         describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",

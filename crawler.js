@@ -29,6 +29,9 @@ const { parseArgs } = require("./util/argParser");
 
 const { BROWSER_BIN, BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
 
+const { BlockRules } = require("./util/blockrules");
+
+
 // ============================================================================
 class Crawler {
   constructor() {
@@ -55,7 +58,8 @@ class Crawler {
 
     console.log("Seeds", this.params.scopedSeeds);
 
-    this.capturePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record/id_/`;
+    this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
+    this.capturePrefix = this.captureBasePrerix + "/id_/";
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
@@ -70,6 +74,9 @@ class Crawler {
 
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
+
+
+    this.blockRules = null;
   }
 
   configureUA() {
@@ -298,6 +305,10 @@ class Crawler {
 
     await this.initPages();
 
+    if (this.params.blockRules) {
+      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
+    }
+
     if (this.params.screencastPort) {
       this.screencaster = new ScreenCaster(this.cluster, this.params.screencastPort);
     }
@@ -376,6 +387,10 @@ class Crawler {
     if (!await this.isHTML(url)) {
       await this.directFetchCapture(url);
       return;
+    }
+
+    if (this.blockRules) {
+      await this.blockRules.initPage(page);
     }
 
     try {
