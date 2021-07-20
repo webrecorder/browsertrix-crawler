@@ -1053,9 +1053,10 @@ browserslist@^4.14.5:
     escalade "^3.1.1"
     node-releases "^1.1.71"
 
-"browsertrix-behaviors@github:webrecorder/browsertrix-behaviors#autofetch-reuse":
+browsertrix-behaviors@^0.2.3:
   version "0.2.3"
-  resolved "https://codeload.github.com/webrecorder/browsertrix-behaviors/tar.gz/9a753a60a8b6785c7e6bcb5c096ba430bdec7d86"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.2.3.tgz#207ddbd88c54f388ad9723406982cabe772bceaf"
+  integrity sha512-4OaELMXU9bljvEsBMJrwWNLnlHsy9OIOL2ZXa0t0rcSQzAUm3HbhIWWNSh+LY0h/76mljbpsqW0kptIqgNJqvg==
 
 bser@2.1.1:
   version "2.1.1"

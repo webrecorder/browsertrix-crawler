@@ -232,7 +232,7 @@ async function handleInteractive(params, browser, page) {
 
   const port = 9223;
   httpServer.listen(port);
-  console.log(`Profile Create Server started on: ${port}`);
+  console.log(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with the browser, click 'Create Profile' when done.`);
 }
 
 main();

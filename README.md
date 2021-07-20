@@ -319,13 +319,13 @@ will start a crawl with 3 workers, and show the screen of each of the workers fr
 Browsertrix Crawler also includes a way to use existing browser profiles when running a crawl. This allows pre-configuring the browser, such as by logging in
 to certain sites or setting other settings, and running a crawl exactly with those settings. By creating a logged in profile, the actual login credentials are not included in the crawl, only (temporary) session cookies.
 
-Browsertrix Crawler currently includes a script to login to a single website with supplied credentials and then save the profile.
-It can also take a screenshot so you can check if the login succeeded. The `--url` parameter should specify the URL of a login page.
+Browsertrix Crawler includes a script to login to a single website with supplied credentials and then save the profile, as well as a new 'interactive' profile creation mode.
+The script profile creation system also take a screenshot so you can check if the login succeeded. The `--url` parameter should specify the URL of a login page.
 
 For example, to create a profile logged in to Twitter, you can run:
 
 ```bash
-docker run -v $PWD/crawls/profiles:/output/ -it webrecorder/browsertrix-crawler create-login-profile --url "https://twitter.com/login"
+docker run -v $PWD/crawls/profiles:/output/ -it webrecorder/browsertrix-crawler:[VERSION] create-login-profile --url "https://twitter.com/login"
 ```
 
 The script will then prompt you for login credentials, attempt to login and create a tar.gz file in `./crawls/profiles/profile.tar.gz`.
@@ -336,7 +336,31 @@ The script will then prompt you for login credentials, attempt to login and crea
 
 - To specify headless mode, add the `--headless` flag. Note that for crawls run with `--headless` flag, it is recommended to also create the profile with `--headless` to ensure the profile is compatible.
 
-The `--profile` flag can then be used to specify a Chrome profile stored as a tarball when running the regular `crawl` command. With this option, it is possible to crawl with the browser already pre-configured. To ensure compatibility, the profile should be created using the following mechanism.
+### Interactive Profile Creation
+
+For creating profiles of more complex sites, or logging in to multiple sites at once, the interactive profile creation mode can be used.
+To use this mode, specify the `--interactive` flag and expose two ports on the Docker container to allow DevTools to connect to the browser and to serve
+a status page.
+
+In this mode, Browsertrix launches a browser connected to DevTools, and allowing the user to use the browser via the devtools device UI.
+
+After interactively logging into desired sites or configuring other settings, the 'Create Profile' should be clicked to initiate profile creation.
+
+Browsertrix Crawler will then create a profile as before using the current state of the browser and disconnect from devtools.
+
+For example, to start in interactive profile creation mode, run:
+
+```
+docker run -p 9222:9222 -p 9223:9223 -v $PWD/crawls/profiles:/output/ -it webrecorder/browsertrix-crawler:0.4.0-beta.3 create-login-profile --interactive --url "https://example.com/"
+```
+
+Then, open a browser pointing to `http://localhost:9223/` and use the embedded browser to log in to any sites or configure any settings as needed.
+Click 'Create Profile at the top when done. The profile will then be created in `./crawls/profiles/profile.tar.gz` containing the settings of this browsing session.
+
+
+### Using Browser Profile
+
+To use a previously created profile with a crawl, use the `--profile` flag or `profile` option. The `--profile` flag can then be used to specify any Chrome profile stored as a tarball. Using profiles created with same or older version of Browsertrix Crawler is recommended to ensure compatibility. This option allows running a crawl with the browser already pre-configured, logged in to certain sites, language settings configured, etc...
 
 After running the above command, you can now run a crawl with the profile, as follows:
 
@@ -377,26 +401,35 @@ You should then be able to run Browsertrix Crawler natively on M1.
 The build arguments specify the base image, version and browser binary. This approach can also be used to install a different browser in general from any Debian-based Docker image.
 
 
-### Example Usage
+### Usage with Docker Compose
 
+Many examples in this README demonstrate running Browsertrix Crawler with `docker run`.
 
-#### With Docker-Compose
+Docker Compose is recommended for building the image and for simple configurations.
 
-The Docker Compose file can simplify building and running a crawl, and includes some required settings for `docker run`, including mounting a volume.
-
-For example, the following commands demonstrate building the image, running a simple crawl with 2 workers:
+For example, to build the latest image, simply run:
 
 ```
 docker-compose build
+```
+
+Docker Compose also simplifies some config options, such as mounting the volume for the crawls.
+
+For example, the following command starts a crawl with 2 workers and generates the CDX.
+
+```
 docker-compose run crawler crawl --url https://webrecorder.net/ --generateCDX --collection wr-net --workers 2
 ```
 
 In this example, the crawl data is written to `./crawls/collections/wr-net` by default.
 
+
 While the crawl is running, the status of the crawl (provide by puppeteer-cluster monitoring) prints the progress to the Docker log.
 
-When done, you can even use the browsertrix-crawler image to also start a local [pywb](https://github.com/webrecorder/pywb) instance
-to preview the crawl:
+
+### Viewing crawled data with pywb
+
+When a crawler is done, another browsertrix-crawler image can be started with a local [pywb](https://github.com/webrecorder/pywb) instance to view crawl:
 
 ```
 docker run -it -v $(pwd)/crawls:/crawls -p 8080:8080 webrecorder/browsertrix-crawler pywb
@@ -404,19 +437,7 @@ docker run -it -v $(pwd)/crawls:/crawls -p 8080:8080 webrecorder/browsertrix-cra
 
 Then, loading the `http://localhost:8080/wr-net/https://webrecorder.net/` should load a recent crawl of the `https://webrecorder.net/` site.
 
-
-#### With `docker run`
-
-Browsertrix Crawler can of course all be run directly with Docker run, but requires a few more options.
-
-In particular, the `--cap-add` and `--shm-size`
-flags are [needed to run Chrome in Docker](https://github.com/puppeteer/puppeteer/blob/v1.0.0/docs/troubleshooting.md#tips).
-
-
-```bash
-docker run -v $PWD/crawls:/crawls --cap-add=SYS_ADMIN --cap-add=NET_ADMIN --shm-size=1g -it webrecorder/browsertrix-crawler --url https://webrecorder.net/ --workers 2
-
-```
+(Previewing crawl results while a crawl its still running should also be possible soon!)
 
 
 Support
