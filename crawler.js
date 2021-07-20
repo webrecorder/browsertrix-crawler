@@ -427,7 +427,6 @@ class Crawler {
       if (linkResults) {
         for (const linkResult of linkResults) {
           for (const link of linkResult.value) {
-            console.log(link);
             results.push(link);
           }
         }

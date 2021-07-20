@@ -47,6 +47,8 @@ function cliOpts() {
 
     "interactive": {
       describe: "Start in interactive mode!",
+      type: "boolean",
+      default: false,
     }
   };
 }
