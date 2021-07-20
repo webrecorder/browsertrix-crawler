@@ -47,9 +47,11 @@ class BlockRules
       this.rules.push(new BlockRule(ruleData));
     }
 
-    console.log("URL Block Rules:\n");
-    for (const rule of this.rules) {
-      console.log(rule.toString());
+    if (this.rules.length) {
+      console.log("URL Block Rules:\n");
+      for (const rule of this.rules) {
+        console.log(rule.toString());
+      }
     }
   }
 
@@ -150,7 +152,7 @@ class BlockRules
     const body = this.blockErrMsg;
     const putUrl = new URL(this.blockPutUrl);
     putUrl.searchParams.set("url", url);
-    console.log("put url", putUrl.href);
+    //console.log("put url", putUrl.href);
     await fetch(putUrl.href, {method: "PUT", headers: {"Content-Type": "text/html"}, body});
   }
 }

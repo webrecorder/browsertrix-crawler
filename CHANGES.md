@@ -1,5 +1,18 @@
 ## CHANGES
 
+v0.4.0
+- YAML based config, specifyable via --config property or via stdin (with '--config stdin')
+- Support for different scope types ('page', 'prefix', 'host', 'any', 'none') + crawl depth at crawl level
+- Per-Seed scoping, including different scope types, or depth and include/exclude rules configurable per seed in 'seeds' list via YAML config
+- Support for 'blockRules' for blocking certain URLs from being stored in WARCs, conditional blocking for iframe based on contents, and iframe URLs (see README for more details)
+- Interactive profile creation: creating profiles by interacting with embedded browser loaded in the browser (see README for more details).
+- Screencasting: streaming the output of each window via websocket-based streaming, configurable with --screencastPort option
+- New 'window' based parallelization: Open each worker in new window in same session
+- Simplified custom driver config, default calls 'loadPage'
+- Refactor arg parsing, other auxiliary functions into separate utils files
+- Image customization: support for customizing browser image, eg. building with Chromium instead of Chrome, support for ARM architecture builds (see README for more details).
+- Update to latest pywb (2.5.0b4), browsertrix-behaviors (0.2.3), py-wacz (0.3.1)
+
 v0.3.2
 - Added a `--urlFile` option: Allows users to specify a .txt file list of exact URLs to crawl (one URL per line).
 
