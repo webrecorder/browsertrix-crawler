@@ -97,7 +97,11 @@ class ScreenCaster
 
       this.sendAll({"msg": "screencast", id, data});
       this.caches.set(id, data);
-      await cdp.send("Page.screencastFrameAck", {sessionId});
+      try {
+        await cdp.send("Page.screencastFrameAck", {sessionId});
+      } catch(e) {
+        console.log("Ack Failed, probably window/tab already closed", e);
+      }
     });
 
     if (this.allWS.size) {
@@ -120,7 +124,11 @@ class ScreenCaster
     this.caches.delete(id);
     this.urls.delete(id);
 
-    await cdp.detach();
+    try {
+      await cdp.detach();
+    } catch (e) {
+      // already detached
+    }
   }
 
   async startCast(cdp) {
@@ -139,7 +147,11 @@ class ScreenCaster
     }
 
     cdp._startedCast = false;
-    await cdp.send("Page.stopScreencast");
+    try {
+      await cdp.send("Page.stopScreencast");
+    } catch (e) {
+      // likely already stopped
+    }
   }
 
   startCastAll() {

@@ -223,6 +223,10 @@ class Crawler {
         await page.emulate(this.emulateDevice);
       }
 
+      if (this.profileDir) {
+        await page._client.send("Network.setBypassServiceWorker", {bypass: true});
+      }
+
       if (this.params.behaviorOpts && !page.__bx_inited) {
         await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
         await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
@@ -405,14 +409,29 @@ class Crawler {
   }
 
   async extractLinks(page, seedId, depth, selector = "a[href]") {
-    let results = [];
+    const results = [];
+
+    const seed = this.params.scopedSeeds[seedId];
+
+    // skip extraction if at max depth
+    if (seed.isAtMaxDepth(depth)) {
+      return;
+    }
 
     try {
-      await Promise.allSettled(page.frames().map(frame => frame.evaluate((selector) => {
+      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate((selector) => {
         /* eslint-disable-next-line no-undef */
         return [...document.querySelectorAll(selector)].map(elem => elem.href);
-      }, selector))).then((linkResults) => {
-        linkResults.forEach((linkResult) => {linkResult.value.forEach(link => results.push(link));});});
+      }, selector)));
+
+      if (linkResults) {
+        for (const linkResult of linkResults) {
+          for (const link of linkResult.value) {
+            results.push(link);
+          }
+        }
+      }
+
     } catch (e) {
       console.warn("Link Extraction failed", e);
       return;

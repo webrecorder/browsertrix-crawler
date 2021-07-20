@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<style>
+html, body, iframe {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+iframe#main {
+  height: calc(100% - 36px);
+}
+div#info {
+  margin: 8px;
+}
+form {
+  display: inline;
+}
+</style>
+</head>
+<body>
+<div id="info">
+<b>Create Profile Interactively</b> -- Load any pages that you want to be part of the profile. When Done, Click <form action="/createProfile" method="post"><button type="submit">Create Profile</button></form>
+</div>
+<iframe id="main" src="$DEVTOOLS_SRC"></iframe>
+</body>
+</html>
