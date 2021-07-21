@@ -8,10 +8,11 @@ const yargs = require("yargs");
 
 const { BROWSER_BIN } = require("./util/constants");
 
+const { loadProfile, saveProfile } = require("./util/profile");
+
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
-const url = require("url");
 const profileHTML = fs.readFileSync(path.join(__dirname, "screencast", "createProfile.html"), {encoding: "utf8"});
 
 function cliOpts() {
@@ -49,7 +50,12 @@ function cliOpts() {
       describe: "Start in interactive mode!",
       type: "boolean",
       default: false,
-    }
+    },
+
+    "profile": {
+      describe: "Path to tar.gz file which will be extracted and used as the browser profile",
+      type: "string",
+    },
   };
 }
 
@@ -77,6 +83,7 @@ async function main() {
   }
 
   //await new Promise(resolve => setTimeout(resolve, 2000));
+  const profileDir = loadProfile(params.profile);
 
   const args = {
     headless: !!params.headless,
@@ -88,9 +95,9 @@ async function main() {
       "--disable-background-media-suspend",
       "--autoplay-policy=no-user-gesture-required",
       "--disable-features=IsolateOrigins,site-per-process",
-      "--user-data-dir=/tmp/profile",
       "--remote-debugging-port=9221",
-    ]
+    ],
+    userDataDir: profileDir
   };
 
   if (!params.user && !params.interactive) {
@@ -163,7 +170,8 @@ async function createProfile(params, browser, page) {
 
   const profileFilename = params.filename || "/output/profile.tar.gz";
 
-  child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {cwd: "/tmp/profile"});
+  saveProfile(profileFilename);
+
   console.log("done");
 }
 
@@ -199,16 +207,17 @@ function promptInput(msg, hidden = false) {
 
 async function handleInteractive(params, browser, page) {
   const target = page.target();
-  const targetUrl = `http://localhost:9222/devtools/inspector.html?ws=localhost:9222/devtools/page/${target._targetId}`;
+  const targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=localhost:9222/devtools/page/${target._targetId}`;
 
   console.log("Creating Profile Interactively...");
   child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
 
   const httpServer = http.createServer(async (req, res) => {
-    const pathname = url.parse(req.url).pathname;
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const pathname = parsedUrl.pathname;
     if (pathname === "/") {
       res.writeHead(200, {"Content-Type": "text/html"});
-      res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl));
+      res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl.replace("$HOST", parsedUrl.hostname)));
 
     } else if (pathname === "/createProfile" && req.method === "POST") {
 

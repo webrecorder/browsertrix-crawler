@@ -2,7 +2,6 @@ const child_process = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const fsp = require("fs/promises");
-const os = require("os");
 
 // to ignore HTTPS error for HEAD check
 const HTTPS_AGENT = require("https").Agent({
@@ -26,6 +25,7 @@ const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/
 const  TextExtract  = require("./util/textextract");
 const { ScreenCaster } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
+const { loadProfile } = require("./util/profile");
 
 const { BROWSER_BIN, BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
 
@@ -50,9 +50,10 @@ class Crawler {
     this.limitHit = false;
 
     this.userAgent = "";
-    this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
-    this.params = parseArgs(this.profileDir);
+    this.profileDir = loadProfile();
+
+    this.params = parseArgs();
 
     this.emulateDevice = this.params.emulateDevice;
 
@@ -223,7 +224,7 @@ class Crawler {
         await page.emulate(this.emulateDevice);
       }
 
-      if (this.profileDir) {
+      if (this.params.profile) {
         await page._client.send("Network.setBypassServiceWorker", {bypass: true});
       }
 

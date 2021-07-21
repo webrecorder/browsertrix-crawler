@@ -1,6 +1,5 @@
 const path = require("path");
 const fs = require("fs");
-const child_process = require("child_process");
 
 const yaml = require("js-yaml");
 const puppeteer = require("puppeteer-core");
@@ -16,10 +15,6 @@ const { ScopedSeed } = require("./seeds");
 
 // ============================================================================
 class ArgParser {
-  constructor(profileDir) {
-    this.profileDir = profileDir;
-  }
-
   get cliOpts() {
     return {
       "seeds": {
@@ -50,7 +45,7 @@ class ArgParser {
 
       "waitUntil": {
         describe: "Puppeteer page.goto() condition to wait for before continuing, can be multiple separate by ','",
-        default: "load,networkidle0",
+        default: "load,networkidle2",
       },
 
       "depth": {
@@ -357,15 +352,10 @@ class ArgParser {
       argv.statsFilename = path.resolve(argv.cwd, argv.statsFilename);
     }
 
-    if (argv.profile) {
-      child_process.execSync("tar xvfz " + argv.profile, {cwd: this.profileDir});
-    }
-
     return true;
   }
 }
 
-
-module.exports.parseArgs = function(profileDir, argv) {
-  return new ArgParser(profileDir).parseArgs(argv);
+module.exports.parseArgs = function(argv) {
+  return new ArgParser().parseArgs(argv);
 };
