@@ -309,7 +309,7 @@ class Crawler {
 
     await this.initPages();
 
-    if (this.params.blockRules) {
+    if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
     }
 
@@ -395,6 +395,10 @@ class Crawler {
 
     if (this.blockRules) {
       await this.blockRules.initPage(page);
+    }
+
+    if (this.params.behaviorsLogDebug) {
+      console.log("behavior debug: *** waiting for initial page load");
     }
 
     try {
