@@ -1,10 +1,10 @@
-ARG BROWSER_VERSION=90
+ARG BROWSER_VERSION=91
 
 ARG BROWSER_IMAGE_BASE=oldwebtoday/chrome
 
 ARG BROWSER_BIN=google-chrome
 
-FROM ${BROWSER_IMAGE_BASE}:${BROWSER_VERSION} as chrome
+FROM ${BROWSER_IMAGE_BASE}:${BROWSER_VERSION} AS browser
 
 FROM ubuntu:bionic
 
@@ -36,8 +36,8 @@ ENV PROXY_HOST=localhost \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=${BROWSER_BIN}
 
-COPY --from=chrome /tmp/*.deb /deb/
-COPY --from=chrome /app/libpepflashplayer.so /app/libpepflashplayer.so
+COPY --from=browser /tmp/*.deb /deb/
+COPY --from=browser /app/libpepflashplayer.so /app/libpepflashplayer.so
 RUN dpkg -i /deb/*.deb; apt-get update; apt-get install -fqqy && \
     rm -rf /var/lib/opts/lists/*
 

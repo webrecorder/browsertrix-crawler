@@ -6,9 +6,7 @@ const child_process = require("child_process");
 const puppeteer = require("puppeteer-core");
 const yargs = require("yargs");
 
-const { BROWSER_BIN } = require("./util/constants");
-
-const { loadProfile, saveProfile } = require("./util/profile");
+const { getBrowserExe, loadProfile, saveProfile } = require("./util/profile");
 
 const fs = require("fs");
 const path = require("path");
@@ -87,7 +85,7 @@ async function main() {
 
   const args = {
     headless: !!params.headless,
-    executablePath: BROWSER_BIN,
+    executablePath: getBrowserExe(),
     ignoreHTTPSErrors: true,
     args: [
       "--no-xshm",

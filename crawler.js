@@ -25,9 +25,10 @@ const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/
 const  TextExtract  = require("./util/textextract");
 const { ScreenCaster } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
-const { loadProfile } = require("./util/profile");
 
-const { BROWSER_BIN, BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
+const { getBrowserExe, loadProfile } = require("./util/browser");
+
+const { BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
 
 const { BlockRules } = require("./util/blockrules");
 
@@ -92,6 +93,8 @@ class Crawler {
       return;
     }
 
+    this.browserExe = getBrowserExe();
+
     // if device set, it overrides the default Chrome UA
     if (this.emulateDevice) {
       this.userAgent = this.emulateDevice.userAgent;
@@ -99,7 +102,7 @@ class Crawler {
       let version = process.env.BROWSER_VERSION;
 
       try {
-        version = child_process.execFileSync(BROWSER_BIN, ["--product-version"], {encoding: "utf8"}).trim();
+        version = child_process.execFileSync(this.browserExe, ["--product-version"], {encoding: "utf8"}).trim();
       } catch(e) {
         console.log(e);
       }
@@ -179,7 +182,7 @@ class Crawler {
     // Puppeter Options
     return {
       headless: this.params.headless,
-      executablePath: BROWSER_BIN,
+      executablePath: this.browserExe,
       ignoreHTTPSErrors: true,
       args: this.chromeArgs,
       userDataDir: this.profileDir,
