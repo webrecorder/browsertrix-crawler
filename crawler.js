@@ -51,9 +51,9 @@ class Crawler {
 
     this.userAgent = "";
 
-    this.profileDir = loadProfile();
-
     this.params = parseArgs();
+
+    this.profileDir = loadProfile(this.params.profile);
 
     this.emulateDevice = this.params.emulateDevice;
 
