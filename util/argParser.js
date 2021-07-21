@@ -195,6 +195,12 @@ class ArgParser {
         type: "string",
       },
 
+      "behaviorTimeout": {
+        describe: "If >0, timeout (in seconds) for in-page behavior will run on each page. If 0, a behavior can run until finish.",
+        default: 90,
+        type: "number",
+      },
+
       "profile": {
         describe: "Path to tar.gz file which will be extracted and used as the browser profile",
         type: "string",
@@ -261,6 +267,9 @@ class ArgParser {
       argv.behaviors = argv.behaviors.split(",");
     }
     argv.behaviors.forEach((x) => behaviorOpts[x] = true);
+    if (argv.behaviorTimeout) {
+      behaviorOpts.timeout = argv.behaviorTimeout *= 1000;
+    }
     if (argv.logging.includes("behaviors")) {
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     } else if (argv.logging.includes("behaviors-debug")) {
