@@ -6,7 +6,7 @@ const child_process = require("child_process");
 const puppeteer = require("puppeteer-core");
 const yargs = require("yargs");
 
-const { getBrowserExe, loadProfile, saveProfile } = require("./util/profile");
+const { getBrowserExe, loadProfile, saveProfile } = require("./util/browser");
 
 const fs = require("fs");
 const path = require("path");
@@ -54,6 +54,12 @@ function cliOpts() {
       describe: "Path to tar.gz file which will be extracted and used as the browser profile",
       type: "string",
     },
+
+    "windowSize": {
+      type: "string",
+      describe: "Browser window dimensions, specified as: width,height",
+      default: "1600,900"
+    }
   };
 }
 
@@ -94,8 +100,10 @@ async function main() {
       "--autoplay-policy=no-user-gesture-required",
       "--disable-features=IsolateOrigins,site-per-process",
       "--remote-debugging-port=9221",
+      `--window-size=${params.windowSize}`
     ],
-    userDataDir: profileDir
+    userDataDir: profileDir,
+    defaultViewport: null,
   };
 
   if (!params.user && !params.interactive) {
@@ -205,7 +213,7 @@ function promptInput(msg, hidden = false) {
 
 async function handleInteractive(params, browser, page) {
   const target = page.target();
-  const targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=localhost:9222/devtools/page/${target._targetId}`;
+  const targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=localhost:9222/devtools/page/${target._targetId}&panel=resources`;
 
   console.log("Creating Profile Interactively...");
   child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
@@ -241,7 +249,7 @@ async function handleInteractive(params, browser, page) {
 
   const port = 9223;
   httpServer.listen(port);
-  console.log(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with the browser, click 'Create Profile' when done.`);
+  console.log(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`);
 }
 
 main();

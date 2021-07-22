@@ -58,6 +58,10 @@ class Crawler {
 
     this.profileDir = loadProfile(this.params.profile);
 
+    if (this.params.profile) {
+      this.statusLog("With Browser Profile: " + this.params.profile);
+    }
+
     this.emulateDevice = this.params.emulateDevice;
 
     this.debugLog("Seeds", this.params.scopedSeeds);
@@ -79,8 +83,11 @@ class Crawler {
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
-
     this.blockRules = null;
+  }
+
+  statusLog(...args) {
+    console.log(...args);
   }
 
   debugLog(...args) {
@@ -357,13 +364,13 @@ class Crawler {
     }
 
     if (this.params.generateCDX) {
-      this.debugLog("Generate CDX");
+      this.statusLog("Generating CDX");
 
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
 
     if (this.params.generateWACZ) {
-      this.debugLog("Generating WACZ");
+      this.statusLog("Generating WACZ");
 
       const archiveDir = path.join(this.collDir, "archive");
 
@@ -377,7 +384,7 @@ class Crawler {
       warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
 
       // Run the wacz create command
-      child_process.spawnSync("wacz" , argument_list);
+      child_process.spawnSync("wacz" , argument_list, {stdio: "inherit"});
       this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
     }
   }
@@ -499,11 +506,11 @@ class Crawler {
       if (createNew) {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
-          this.debugLog("creating pages with full text");
           header["hasText"] = true;
+          this.statusLog("Text Extraction: Enabled");
         } else {
-          this.debugLog("creating pages without full text");
           header["hasText"] = false;
+          this.statusLog("Text Extraction: Disabled");
         }
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
@@ -576,7 +583,7 @@ class Crawler {
   }
 
   async awaitPendingClear() {
-    this.debugLog("Waiting to ensure pending data is written to WARC...");
+    this.statusLog("Waiting to ensure pending data is written to WARCs...");
 
     const redis = new Redis("redis://localhost/0");
 
@@ -612,7 +619,7 @@ class Crawler {
   }
 
   async combineWARC() {
-    this.debugLog("Combining the WARCs");
+    this.statusLog("Generating Combined WARCs");
 
     // Get the list of created Warcs
     const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));

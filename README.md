@@ -346,6 +346,9 @@ The script will then prompt you for login credentials, attempt to login and crea
 
 - To specify headless mode, add the `--headless` flag. Note that for crawls run with `--headless` flag, it is recommended to also create the profile with `--headless` to ensure the profile is compatible.
 
+- To specify the window size for the profile creation embedded browser, specify `--windowSize WIDTH,HEIGHT`. (The default is 1600x900)
+
+
 The current profile creation script is still experimental and the script attempts to detect the username and password fields on a site as generically as possible, but may not work for all sites. Additional profile functionality, such as support for custom profile creation scripts, may be added in the future.
 
 

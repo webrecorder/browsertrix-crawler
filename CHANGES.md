@@ -3,6 +3,7 @@
 v0.4.1
 - BlockRules Optimizations: don't intercept requests if no blockRules
 - Profile Creation: Support extending existing profile by passing a --profile param to load on startup
+- Profile Creation: Set default window size to 1600x900, add --windowSize param for setting custom size
 - Behavior Timeouts: Add --behaviorTimeout to specify custom timeout for behaviors, in seconds (defaulting to 90 seconds)
 - Load Wait Default: Switch to 'load,networkidle2' to speed-up waiting for initial load
 - Multi-platform build: Support building for amd64 and Arm using oldwebtoday/chrome:91 images (check for google-chrome and chromium-browser automatically)
