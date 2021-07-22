@@ -401,29 +401,6 @@ The crawl produces a single pywb collection, at `/crawls/collections/<collection
 
 To access the contents of the crawl, the `/crawls` directory in the container should be mounted to a volume (default in the Docker Compose setup).
 
-### Multi-Platform Build / Support for Apple M1
-
-Browsertrix Crawler uses a browser image which supports amd64 and arm64 (currently `oldwebtoday/chrome:91`).
-
-This means Browsertrix Crawler can be built natively on Apple M1 systems using the default settings. Simply running `docker-compose build` on an Apple M1 should build a native version that should work for development.
-
-On M1 system, the browser used will be Chromium instead of Chrome since there is no Linux build of Chrome for ARM, and this now is handled automatically as part of the build.
-
-
-### Custom Browser Image
-
-It is also possible to build Browsertrix Crawler with a different browser image. Currently, browser images from `oldwebtoday/chrome` and `oldwebtoday/chromium` are supported.
-
-For example, Webrecorder provides the `oldwebtoday/chromium:91-arm` for running Browsertrix Crawler on ARM-based systems.
-
-To build with this specific Chromium image on an Apple M1 machine, run:
-
-```
-docker-compose build --build-arg BROWSER_IMAGE_BASE=oldwebtoday/chromium --build-arg "BROWSER_VERSION=91-arm" --build-arg BROWSER_BIN=chromium-browser
-```
-
-The build arguments specify the base image, version and browser binary. This approach can also be used to install a different browser in general from any Debian-based Docker image. Additional browser images may be added in the future.
-
 
 ### Usage with Docker Compose
 
@@ -450,6 +427,29 @@ In this example, the crawl data is written to `./crawls/collections/wr-net` by d
 
 While the crawl is running, the status of the crawl (provide by puppeteer-cluster monitoring) prints the progress to the Docker log.
 
+
+### Multi-Platform Build / Support for Apple M1
+
+Browsertrix Crawler uses a browser image which supports amd64 and arm64 (currently `oldwebtoday/chrome:91`).
+
+This means Browsertrix Crawler can be built natively on Apple M1 systems using the default settings. Simply running `docker-compose build` on an Apple M1 should build a native version that should work for development.
+
+On M1 system, the browser used will be Chromium instead of Chrome since there is no Linux build of Chrome for ARM, and this now is handled automatically as part of the build.
+
+
+### Custom Browser Image
+
+It is also possible to build Browsertrix Crawler with a different browser image. Currently, browser images from `oldwebtoday/chrome` and `oldwebtoday/chromium` are supported.
+
+For example, Webrecorder provides the `oldwebtoday/chromium:91-arm` for running Browsertrix Crawler on ARM-based systems.
+
+To build with this specific Chromium image on an Apple M1 machine, run:
+
+```
+docker-compose build --build-arg BROWSER_IMAGE_BASE=oldwebtoday/chromium --build-arg "BROWSER_VERSION=91-arm" --build-arg BROWSER_BIN=chromium-browser
+```
+
+The build arguments specify the base image, version and browser binary. This approach can also be used to install a different browser in general from any Debian-based Docker image. Additional browser images may be added in the future.
 
 ### Viewing crawled data with pywb
 
