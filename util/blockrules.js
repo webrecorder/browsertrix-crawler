@@ -56,9 +56,19 @@ class BlockRules
   }
 
   async initPage(page) {
+    if (!this.rules.length) {
+      return;
+    }
+
     await page.setRequestInterception(true);
 
-    page.on("request", (request) => this.handleRequest(request));
+    page.on("request", async (request) => {
+      try {
+        await this.handleRequest(request);
+      } catch (e) {
+        console.warn(e);
+      }
+    });
   }
 
   async handleRequest(request) {

@@ -12,7 +12,7 @@ function getSeeds(config) {
     return orig(name, ...args);
   };
 
-  return parseArgs(null, ["node", "crawler", "--config", "configtest"]).scopedSeeds;
+  return parseArgs(["node", "crawler", "--config", "configtest"]).scopedSeeds;
 }
 
 test("default scope", async () => {

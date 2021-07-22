@@ -1,6 +1,5 @@
 const path = require("path");
 const fs = require("fs");
-const child_process = require("child_process");
 
 const yaml = require("js-yaml");
 const puppeteer = require("puppeteer-core");
@@ -16,10 +15,6 @@ const { ScopedSeed } = require("./seeds");
 
 // ============================================================================
 class ArgParser {
-  constructor(profileDir) {
-    this.profileDir = profileDir;
-  }
-
   get cliOpts() {
     return {
       "seeds": {
@@ -50,7 +45,7 @@ class ArgParser {
 
       "waitUntil": {
         describe: "Puppeteer page.goto() condition to wait for before continuing, can be multiple separate by ','",
-        default: "load,networkidle0",
+        default: "load,networkidle2",
       },
 
       "depth": {
@@ -195,6 +190,12 @@ class ArgParser {
         type: "string",
       },
 
+      "behaviorTimeout": {
+        describe: "If >0, timeout (in seconds) for in-page behavior will run on each page. If 0, a behavior can run until finish.",
+        default: 90,
+        type: "number",
+      },
+
       "profile": {
         describe: "Path to tar.gz file which will be extracted and used as the browser profile",
         type: "string",
@@ -261,6 +262,9 @@ class ArgParser {
       argv.behaviors = argv.behaviors.split(",");
     }
     argv.behaviors.forEach((x) => behaviorOpts[x] = true);
+    if (argv.behaviorTimeout) {
+      behaviorOpts.timeout = argv.behaviorTimeout *= 1000;
+    }
     if (argv.logging.includes("behaviors")) {
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     } else if (argv.logging.includes("behaviors-debug")) {
@@ -277,7 +281,8 @@ class ArgParser {
     case "page":
       argv.newContext = Cluster.CONCURRENCY_PAGE;
       if (argv.screencastPort && argv.workers > 1) {
-        console.warn("Note: Screencast with >1 workers and default page context may only show one page at a time. To fix, add '--newContext window' to open each page in a new window");
+        console.log("Note: to support screencasting with >1 workers, newContext set to 'window' instead of 'page'");
+        argv.newContext = NewWindowPage;
       }
       break;
 
@@ -348,15 +353,10 @@ class ArgParser {
       argv.statsFilename = path.resolve(argv.cwd, argv.statsFilename);
     }
 
-    if (argv.profile) {
-      child_process.execSync("tar xvfz " + argv.profile, {cwd: this.profileDir});
-    }
-
     return true;
   }
 }
 
-
-module.exports.parseArgs = function(profileDir, argv) {
-  return new ArgParser(profileDir).parseArgs(argv);
+module.exports.parseArgs = function(argv) {
+  return new ArgParser().parseArgs(argv);
 };

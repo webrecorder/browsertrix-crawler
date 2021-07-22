@@ -33,7 +33,7 @@ class ScopedSeed
   parseUrl(url) {
     let parsedUrl = null;
     try {
-      parsedUrl = new URL(url);
+      parsedUrl = new URL(url.trim());
     } catch (e) {
       throw new Error(`Invalid Seed "${url}" - not a valid URL`);
     }

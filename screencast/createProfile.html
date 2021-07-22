@@ -7,10 +7,16 @@ html, body, iframe {
   height: 100%;
   margin: 0;
   padding: 0;
+  border: 0;
   overflow: hidden;
+  font-family: sans-serif;
+}
+body {
+  display: flex;
+  flex-direction: column;
 }
 iframe#main {
-  height: calc(100% - 36px);
+ height: calc(100% - 36px);
 }
 div#info {
   margin: 8px;
@@ -18,11 +24,15 @@ div#info {
 form {
   display: inline;
 }
+button {
+  font-weight: bold;
+  font-size: 15px;
+}
 </style>
 </head>
 <body>
 <div id="info">
-<b>Create Profile Interactively</b> -- Load any pages that you want to be part of the profile. When Done, Click <form action="/createProfile" method="post"><button type="submit">Create Profile</button></form>
+Log in to any site(s) that you want to be part of the crawl profile using the embedded browser below. When done, click <form action="/createProfile" method="post"><button type="submit">Create Profile</button></form>
 </div>
 <iframe id="main" src="$DEVTOOLS_SRC"></iframe>
 </body>

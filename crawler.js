@@ -2,7 +2,6 @@ const child_process = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const fsp = require("fs/promises");
-const os = require("os");
 
 // to ignore HTTPS error for HEAD check
 const HTTPS_AGENT = require("https").Agent({
@@ -27,7 +26,9 @@ const  TextExtract  = require("./util/textextract");
 const { ScreenCaster } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 
-const { BROWSER_BIN, BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
+const { getBrowserExe, loadProfile } = require("./util/browser");
+
+const { BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
 
 const { BlockRules } = require("./util/blockrules");
 
@@ -50,13 +51,20 @@ class Crawler {
     this.limitHit = false;
 
     this.userAgent = "";
-    this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
-    this.params = parseArgs(this.profileDir);
+    this.params = parseArgs();
+
+    this.debugLogging = this.params.logging.includes("debug");
+
+    this.profileDir = loadProfile(this.params.profile);
+
+    if (this.params.profile) {
+      this.statusLog("With Browser Profile: " + this.params.profile);
+    }
 
     this.emulateDevice = this.params.emulateDevice;
 
-    console.log("Seeds", this.params.scopedSeeds);
+    this.debugLog("Seeds", this.params.scopedSeeds);
 
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
     this.capturePrefix = this.captureBasePrerix + "/id_/";
@@ -75,8 +83,17 @@ class Crawler {
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
-
     this.blockRules = null;
+  }
+
+  statusLog(...args) {
+    console.log(...args);
+  }
+
+  debugLog(...args) {
+    if (this.debugLogging) {
+      console.log(...args);
+    }
   }
 
   configureUA() {
@@ -91,6 +108,8 @@ class Crawler {
       return;
     }
 
+    this.browserExe = getBrowserExe();
+
     // if device set, it overrides the default Chrome UA
     if (this.emulateDevice) {
       this.userAgent = this.emulateDevice.userAgent;
@@ -98,9 +117,9 @@ class Crawler {
       let version = process.env.BROWSER_VERSION;
 
       try {
-        version = child_process.execFileSync(BROWSER_BIN, ["--product-version"], {encoding: "utf8"}).trim();
+        version = child_process.execFileSync(this.browserExe, ["--product-version"], {encoding: "utf8"}).trim();
       } catch(e) {
-        console.log(e);
+        console.error(e);
       }
 
       this.userAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
@@ -178,7 +197,7 @@ class Crawler {
     // Puppeter Options
     return {
       headless: this.params.headless,
-      executablePath: BROWSER_BIN,
+      executablePath: this.browserExe,
       ignoreHTTPSErrors: true,
       args: this.chromeArgs,
       userDataDir: this.profileDir,
@@ -223,7 +242,7 @@ class Crawler {
         await page.emulate(this.emulateDevice);
       }
 
-      if (this.profileDir) {
+      if (this.params.profile) {
         await page._client.send("Network.setBypassServiceWorker", {bypass: true});
       }
 
@@ -290,7 +309,7 @@ class Crawler {
     try {
       this.driver = require(this.params.driver);
     } catch(e) {
-      console.log(e);
+      console.warn(e);
       return;
     }
 
@@ -309,12 +328,13 @@ class Crawler {
 
     await this.initPages();
 
-    if (this.params.blockRules) {
+    if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
     }
 
     if (this.params.screencastPort) {
       this.screencaster = new ScreenCaster(this.cluster, this.params.screencastPort);
+      this.debugLog(`Screencast Server started on: ${this.params.screencastPort}`);
     }
 
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
@@ -344,13 +364,13 @@ class Crawler {
     }
 
     if (this.params.generateCDX) {
-      console.log("Generate CDX");
+      this.statusLog("Generating CDX");
 
       child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
     }
 
     if (this.params.generateWACZ) {
-      console.log("Generating WACZ");
+      this.statusLog("Generating WACZ");
 
       const archiveDir = path.join(this.collDir, "archive");
 
@@ -364,8 +384,8 @@ class Crawler {
       warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
 
       // Run the wacz create command
-      child_process.spawnSync("wacz" , argument_list);
-      console.log(`WACZ successfully generated and saved to: ${waczPath}`);
+      child_process.spawnSync("wacz" , argument_list, {stdio: "inherit"});
+      this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
     }
   }
 
@@ -400,7 +420,7 @@ class Crawler {
     try {
       await page.goto(url, this.gotoOpts);
     } catch (e) {
-      console.log(`Load timeout for ${url}`, e);
+      console.warn(`Load timeout for ${url}`, e);
     }
 
     if (selector) {
@@ -408,7 +428,7 @@ class Crawler {
     }
   }
 
-  async extractLinks(page, seedId, depth, selector = "a[href]") {
+  async extractLinks(page, seedId, depth, selector = "a[href]", prop = "href", isAttribute = false) {
     const results = [];
 
     const seed = this.params.scopedSeeds[seedId];
@@ -418,11 +438,18 @@ class Crawler {
       return;
     }
 
+    const loadProp = (selector, prop) => {
+      return [...document.querySelectorAll(selector)].map(elem => elem[prop]);
+    };
+
+    const loadAttr = (selector, attr) => {
+      return [...document.querySelectorAll(selector)].map(elem => elem.getAttribute(attr));
+    };
+
+    const loadFunc = isAttribute ? loadAttr : loadProp;
+
     try {
-      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate((selector) => {
-        /* eslint-disable-next-line no-undef */
-        return [...document.querySelectorAll(selector)].map(elem => elem.href);
-      }, selector)));
+      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate(loadFunc, selector, prop)));
 
       if (linkResults) {
         for (const linkResult of linkResults) {
@@ -452,7 +479,7 @@ class Crawler {
         }
       }
     } catch (e) {
-      console.log("Queuing Error: ", e);
+      console.error("Queuing Error: ", e);
     }
   }
 
@@ -486,19 +513,18 @@ class Crawler {
       if (createNew) {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
-          console.log("creating pages with full text");
           header["hasText"] = true;
-        }
-        else{
-          console.log("creating pages without full text");
+          this.statusLog("Text Extraction: Enabled");
+        } else {
           header["hasText"] = false;
+          this.statusLog("Text Extraction: Disabled");
         }
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
       }
 
     } catch(err) {
-      console.log("pages/pages.jsonl creation failed", err);
+      console.error("pages/pages.jsonl creation failed", err);
     }
   }
 
@@ -531,7 +557,7 @@ class Crawler {
         agent: this.resolveAgent
       });
       if (resp.status >= 400) {
-        console.log(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
+        this.debugLog(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
         return true;
       }
 
@@ -564,7 +590,7 @@ class Crawler {
   }
 
   async awaitPendingClear() {
-    console.log("Waiting to ensure pending data is written to WARC...");
+    this.statusLog("Waiting to ensure pending data is written to WARCs...");
 
     const redis = new Redis("redis://localhost/0");
 
@@ -574,7 +600,7 @@ class Crawler {
         break;
       }
 
-      console.log(`Still waiting for ${res} pending requests to finish...`);
+      this.debugLog(`Still waiting for ${res} pending requests to finish...`);
 
       await this.sleep(1000);
     }
@@ -595,17 +621,17 @@ class Crawler {
       const { sites } = await sitemapper.fetch();
       this.queueUrls(seedId, sites, 0);
     } catch(e) {
-      console.log(e);
+      console.warn(e);
     }
   }
 
   async combineWARC() {
-    console.log("Combining the WARCs");
+    this.statusLog("Generating Combined WARCs");
 
     // Get the list of created Warcs
     const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));
 
-    console.log(`Combining ${warcLists.length} WARCs...`);
+    this.debugLog(`Combining ${warcLists.length} WARCs...`);
 
     const fileSizeObjects = []; // Used to sort the created warc by fileSize
 
@@ -674,7 +700,7 @@ class Crawler {
         fh.write(warcBuffer);
       }
 
-      console.log(`Appending WARC ${fileSizeObjects[j].fileName}`);
+      this.debugLog(`Appending WARC ${fileSizeObjects[j].fileName}`);
 
       const reader = fs.createReadStream(fileSizeObjects[j].fileName);
 
@@ -691,7 +717,7 @@ class Crawler {
       await fh.end();
     }
 
-    console.log(`Combined WARCs saved as: ${generatedCombinedWarcs}`);
+    this.debugLog(`Combined WARCs saved as: ${generatedCombinedWarcs}`);
   }
 }
 

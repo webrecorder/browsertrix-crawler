@@ -47,7 +47,6 @@ class ScreenCaster
     });
 
     this.httpServer.listen(port);
-    console.log(`Screencast Server started on: ${port}`);
   }
 
   initWebSocket(ws) {
@@ -65,7 +64,7 @@ class ScreenCaster
     }
 
     ws.on("close", () => {
-      console.log("Screencast WebSocket Disconnected");
+      //console.log("Screencast WebSocket Disconnected");
       this.allWS.delete(ws);
 
       if (this.allWS.size === 0) {
@@ -100,7 +99,7 @@ class ScreenCaster
       try {
         await cdp.send("Page.screencastFrameAck", {sessionId});
       } catch(e) {
-        console.log("Ack Failed, probably window/tab already closed", e);
+        //console.log("Ack Failed, probably window/tab already closed", e);
       }
     });
 
