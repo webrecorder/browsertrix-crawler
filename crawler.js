@@ -428,7 +428,7 @@ class Crawler {
     }
   }
 
-  async extractLinks(page, seedId, depth, selector = "a[href]") {
+  async extractLinks(page, seedId, depth, selector = "a[href]", prop = "href", isAttribute = false) {
     const results = [];
 
     const seed = this.params.scopedSeeds[seedId];
@@ -438,11 +438,18 @@ class Crawler {
       return;
     }
 
+    const loadProp = (selector, prop) => {
+      return [...document.querySelectorAll(selector)].map(elem => elem[prop]);
+    };
+
+    const loadAttr = (selector, attr) => {
+      return [...document.querySelectorAll(selector)].map(elem => elem.getAttribute(attr));
+    };
+
+    const loadFunc = isAttribute ? loadAttr : loadProp;
+
     try {
-      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate((selector) => {
-        /* eslint-disable-next-line no-undef */
-        return [...document.querySelectorAll(selector)].map(elem => elem.href);
-      }, selector)));
+      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate(loadFunc, selector, prop)));
 
       if (linkResults) {
         for (const linkResult of linkResults) {
