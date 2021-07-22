@@ -7,7 +7,7 @@ v0.4.1
 - Behavior Timeouts: Add --behaviorTimeout to specify custom timeout for behaviors, in seconds (defaulting to 90 seconds)
 - Load Wait Default: Switch to 'load,networkidle2' to speed-up waiting for initial load
 - Multi-platform build: Support building for amd64 and Arm using oldwebtoday/chrome:91 images (check for google-chrome and chromium-browser automatically)
-- CI: Builds an amd64 and arm64 images on each release
+- CI: Build a multi-platform (amd64 and arm64) image on each release
 
 v0.4.0
 - YAML based config, specifyable via --config property or via stdin (with '--config stdin')
