@@ -63,7 +63,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --waitUntil                           Puppeteer page.goto() condition to
                                             wait for before continuing, can be
                                             multiple separate by ','
-                                                  [default: "load,networkidle0"]
+                                                  [default: "load,networkidle2"]
       --depth                               The depth of the crawl for all seeds
                                                           [number] [default: -1]
       --limit                               Limit crawl to this number of pages
@@ -138,6 +138,10 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --behaviors                           Which background behaviors to enable
                                             on each page
                            [string] [default: "autoplay,autofetch,siteSpecific"]
+      --behaviorTimeout                     If >0, timeout (in seconds) for
+                                            in-page behavior will run on each
+                                            page. If 0, a behavior can run until
+                                            finish.       [number] [default: 90]
       --profile                             Path to tar.gz file which will be
                                             extracted and used as the browser
                                             profile                     [string]
@@ -152,10 +156,14 @@ Browsertrix Crawler includes a number of additional command-line options, explai
 </details>
 
 
-For the `--waitUntil` flag,  see [page.goto waitUntil options](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options).
+### Waiting for Page Load
 
-The default is `load`, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example),
-while `--waitUntil networkidle0` may make sense for dynamic sites.
+One of the key nuances of browser-based crawling is determining when a page is finished loading. This can be configured with the `--waitUntil` flag.
+
+The default is `load,networkidle2`, which waits until page load and <=2 requests remain, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example). The `--waitUntil networkidle0` may make sense for sites, where absolutely all requests must be waited until before proceeding.
+
+See [page.goto waitUntil options](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options) for more info on the options that can be used with this flag from the Puppeteer docs.
+
 
 ### YAML Crawl Config
 
@@ -288,6 +296,8 @@ and auto-fetch content that is not loaded by default, and also run custom behavi
 Behaviors to run can be specified via a comma-separated list passed to the `--behaviors` option. By default, the auto-scroll behavior is not enabled by default, as it may slow down crawling. To enable this behaviors, you can add
 `--behaviors autoscroll` or to enable all behaviors, add `--behaviors autoscroll,autoplay,autofetch,siteSpecific`.
 
+The site-specific behavior (or autoscroll) will start running after the page is finished its initial load (as defined by the `--waitUntil` settings). The behavior will then run until finished or until the behavior timeout is exceeded. This timeout can be set (in seconds) via the `--behaviorTimeout` flag (90 seconds by default). Setting the timeout to 0 will allow the behavior to run until it is finished.
+
 See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for more info on all of the currently available behaviors.
 
 
@@ -336,6 +346,9 @@ The script will then prompt you for login credentials, attempt to login and crea
 
 - To specify headless mode, add the `--headless` flag. Note that for crawls run with `--headless` flag, it is recommended to also create the profile with `--headless` to ensure the profile is compatible.
 
+The current profile creation script is still experimental and the script attempts to detect the username and password fields on a site as generically as possible, but may not work for all sites. Additional profile functionality, such as support for custom profile creation scripts, may be added in the future.
+
+
 ### Interactive Profile Creation
 
 For creating profiles of more complex sites, or logging in to multiple sites at once, the interactive profile creation mode can be used.
@@ -351,14 +364,19 @@ Browsertrix Crawler will then create a profile as before using the current state
 For example, to start in interactive profile creation mode, run:
 
 ```
-docker run -p 9222:9222 -p 9223:9223 -v $PWD/crawls/profiles:/output/ -it webrecorder/browsertrix-crawler:0.4.0-beta.3 create-login-profile --interactive --url "https://example.com/"
+docker run -p 9222:9222 -p 9223:9223 -v $PWD/profiles:/output/ -it webrecorder/browsertrix-crawler:[VERSION] create-login-profile --interactive --url "https://example.com/"
 ```
 
 Then, open a browser pointing to `http://localhost:9223/` and use the embedded browser to log in to any sites or configure any settings as needed.
 Click 'Create Profile at the top when done. The profile will then be created in `./crawls/profiles/profile.tar.gz` containing the settings of this browsing session.
 
+It is also possible to extend an existing profiles by also passing in an existing profile via the `--profile` flag. In this way, it is possible to build new profiles by extending previous browsing sessions as needed.
 
-### Using Browser Profile
+```
+docker run -p 9222:9222 -p 9223:9223 -v $PWD/profiles:/profiles --filename /profiles/newProfile.tar.gz -it webrecorder/browsertrix-crawler:[VERSION] create-login-profile --interactive --url "https://example.com/ --profile /profiles/oldProfile.tar.gz"
+```
+
+### Using Browser Profile with a Crawl
 
 To use a previously created profile with a crawl, use the `--profile` flag or `profile` option. The `--profile` flag can then be used to specify any Chrome profile stored as a tarball. Using profiles created with same or older version of Browsertrix Crawler is recommended to ensure compatibility. This option allows running a crawl with the browser already pre-configured, logged in to certain sites, language settings configured, etc...
 
@@ -368,9 +386,6 @@ After running the above command, you can now run a crawl with the profile, as fo
 
 docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --profile /crawls/profiles/profile.tar.gz --url https://twitter.com/--generateWACZ --collection test-with-profile
 ```
-
-The current profile creation script is still experimental and the script attempts to detect the usename and password fields on a site as generically as possible, but may not work for all sites. Additional profile functionality, such as support for custom profile creation scripts, may be added in the future.
-
 
 ## Architecture
 
@@ -386,19 +401,28 @@ The crawl produces a single pywb collection, at `/crawls/collections/<collection
 
 To access the contents of the crawl, the `/crawls` directory in the container should be mounted to a volume (default in the Docker Compose setup).
 
-### Building with Custom Browser Image / Building on Apple M1
+### Multi-Platform Build / Support for Apple M1
 
-Browsertrix Crawler can be built on the new ARM M1 chip (for development). However, since there is no Linux build of Chrome for ARM, Chromium can be used instead. Currently, Webrecorder provides the `oldwebtoday/chromium:91-arm` for running Browsertrix Crawler on ARM-based systems.
+Browsertrix Crawler uses a browser image which supports amd64 and arm64 (currently `oldwebtoday/chrome:91`).
 
-For example, to build with this Chromium image on an Apple M1 machine, run:
+This means Browsertrix Crawler can be built natively on Apple M1 systems using the default settings. Simply running `docker-compose build` on an Apple M1 should build a native version that should work for development.
+
+On M1 system, the browser used will be Chromium instead of Chrome since there is no Linux build of Chrome for ARM, and this now is handled automatically as part of the build.
+
+
+### Custom Browser Image
+
+It is also possible to build Browsertrix Crawler with a different browser image. Currently, browser images from `oldwebtoday/chrome` and `oldwebtoday/chromium` are supported.
+
+For example, Webrecorder provides the `oldwebtoday/chromium:91-arm` for running Browsertrix Crawler on ARM-based systems.
+
+To build with this specific Chromium image on an Apple M1 machine, run:
 
 ```
 docker-compose build --build-arg BROWSER_IMAGE_BASE=oldwebtoday/chromium --build-arg "BROWSER_VERSION=91-arm" --build-arg BROWSER_BIN=chromium-browser
 ```
 
-You should then be able to run Browsertrix Crawler natively on M1.
-
-The build arguments specify the base image, version and browser binary. This approach can also be used to install a different browser in general from any Debian-based Docker image.
+The build arguments specify the base image, version and browser binary. This approach can also be used to install a different browser in general from any Debian-based Docker image. Additional browser images may be added in the future.
 
 
 ### Usage with Docker Compose

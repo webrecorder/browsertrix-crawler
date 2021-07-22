@@ -1,6 +1,5 @@
 name: Publish Docker image
 on:
-  push:
   release:
     types: [published]
 
@@ -27,12 +26,7 @@ jobs:
             VERSION=pr-${{ github.event.number }}
           fi
           TAGS="${DOCKER_IMAGE}:${VERSION}"
-          if [ "${{ github.event_name }}" = "push" ]; then
-            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}"
-          fi
-          #echo ::set-output name=version::${VERSION}
           echo ::set-output name=tags::${TAGS}
-          #echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -54,7 +48,7 @@ jobs:
           context: .
           push: ${{ github.event_name == 'published' || github.event_name == 'prereleased' }}
           tags: ${{ steps.prep.outputs.tags }}
-          platforms: "linux/amd64"
+          platforms: "linux/amd64,linux/arm64"
       -
         name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
