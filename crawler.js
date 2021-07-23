@@ -67,7 +67,7 @@ class Crawler {
     this.debugLog("Seeds", this.params.scopedSeeds);
 
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
-    this.capturePrefix = this.captureBasePrerix + "/id_/";
+    this.capturePrefix = this.captureBasePrefix + "/id_/";
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
@@ -405,7 +405,7 @@ class Crawler {
     }
   }
 
-  async loadPage(page, urlData, selector = "a[href]") {
+  async loadPage(page, urlData, {selector="a[href]", extract="href", isAttribute=false} = {}) {
     const {url, seedId, depth} = urlData;
 
     if (!await this.isHTML(url)) {
@@ -423,33 +423,30 @@ class Crawler {
       console.warn(`Load timeout for ${url}`, e);
     }
 
-    if (selector) {
-      await this.extractLinks(page, seedId, depth, selector);
-    }
-  }
-
-  async extractLinks(page, seedId, depth, selector = "a[href]", prop = "href", isAttribute = false) {
-    const results = [];
-
     const seed = this.params.scopedSeeds[seedId];
 
     // skip extraction if at max depth
-    if (seed.isAtMaxDepth(depth)) {
-      return;
+    if (selector && !seed.isAtMaxDepth(depth)) {
+      const links = await this.extractLinks(page, {selector, extract, isAttribute});
+      this.queueInScopeUrls(seedId, links, depth);
     }
+  }
 
-    const loadProp = (selector, prop) => {
-      return [...document.querySelectorAll(selector)].map(elem => elem[prop]);
+  async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}) {
+    const results = [];
+
+    const loadProp = (selector, extract) => {
+      return [...document.querySelectorAll(selector)].map(elem => elem[extract]);
     };
 
-    const loadAttr = (selector, attr) => {
-      return [...document.querySelectorAll(selector)].map(elem => elem.getAttribute(attr));
+    const loadAttr = (selector, extract) => {
+      return [...document.querySelectorAll(selector)].map(elem => elem.getAttribute(extract));
     };
 
     const loadFunc = isAttribute ? loadAttr : loadProp;
 
     try {
-      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate(loadFunc, selector, prop)));
+      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate(loadFunc, selector, extract)));
 
       if (linkResults) {
         for (const linkResult of linkResults) {
@@ -461,12 +458,11 @@ class Crawler {
 
     } catch (e) {
       console.warn("Link Extraction failed", e);
-      return;
     }
-    this.queueUrls(seedId, results, depth);
+    return results;
   }
 
-  queueUrls(seedId, urls, depth) {
+  queueInScopeUrls(seedId, urls, depth) {
     try {
       depth += 1;
       const seed = this.params.scopedSeeds[seedId];
@@ -619,7 +615,7 @@ class Crawler {
 
     try {
       const { sites } = await sitemapper.fetch();
-      this.queueUrls(seedId, sites, 0);
+      this.queueInScopeUrls(seedId, sites, 0);
     } catch(e) {
       console.warn(e);
     }

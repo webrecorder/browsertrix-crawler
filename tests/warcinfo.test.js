@@ -7,7 +7,7 @@ test("check that the warcinfo file works as expected on the command line", async
 
   try{
     const configYaml = fs.readFileSync("tests/fixtures/crawl-2.yaml", "utf8");
-    const proc = child_process.execSync("docker run -i -v $PWD/crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin --limit 1 --collection warcinfo --combineWARC", {input: configYaml, stdin: "inherit", encoding: "utf8"});
+    const proc = child_process.execSync("docker run -i -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin --limit 1 --collection warcinfo --combineWARC", {input: configYaml, stdin: "inherit", encoding: "utf8"});
 
     console.log(proc);
   }
@@ -15,7 +15,7 @@ test("check that the warcinfo file works as expected on the command line", async
     console.log(error);
   }
 
-  const warcData = fs.readFileSync("crawls/collections/warcinfo/warcinfo_0.warc.gz");
+  const warcData = fs.readFileSync("test-crawls/collections/warcinfo/warcinfo_0.warc.gz");
 
   const data = zlib.gunzipSync(warcData);
 
