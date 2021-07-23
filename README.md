@@ -390,6 +390,15 @@ After running the above command, you can now run a crawl with the profile, as fo
 docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --profile /crawls/profiles/profile.tar.gz --url https://twitter.com/--generateWACZ --collection test-with-profile
 ```
 
+## Published Releases / Production Use
+
+When using Browsertrix Crawler in production, it is recommended to use a specific, published version of the image, eg `webrecorder/browsertrix-crawler:[VERSION]` instead of `webrecorder/browsertrix-crawler` where `[VERSION]` corresponds to one of the published release tag.
+
+All releases are available from Docker Hub at: https://hub.docker.com/repository/docker/webrecorder/browsertrix-crawler
+
+Details for each corresponding release tag are also available on GitHub at: https://github.com/webrecorder/browsertrix-crawler/releases
+
+
 ## Architecture
 
 The Docker container provided here packages up several components used in Browsertrix.
