@@ -6,7 +6,7 @@ test("check that the collection name is properly validated", async () => {
   let passed = "";
 
   try{
-    await exec("docker-compose run crawler crawl --url http://www.example.com/ --collection valid_collection-nameisvalid");
+    await exec("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://www.example.com/ --collection valid_collection-nameisvalid");
     passed = true;
   }
   catch (error) {
