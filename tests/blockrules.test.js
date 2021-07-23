@@ -10,8 +10,7 @@ function runCrawl(name, config, commandExtra = "") {
   const configYaml = yaml.dump(config);
 
   try {
-    const version = require("../package.json").version;
-    const proc = child_process.execSync(`docker run -i -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler:${version} crawl --config stdin ${commandExtra}`, {input: configYaml, stdin: "inherit", encoding: "utf8"});
+    const proc = child_process.execSync(`docker run -i -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin ${commandExtra}`, {input: configYaml, stdin: "inherit", encoding: "utf8"});
 
     console.log(proc);
   }

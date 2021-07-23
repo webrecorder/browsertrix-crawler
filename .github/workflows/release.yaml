@@ -25,7 +25,7 @@ jobs:
           elif [[ $GITHUB_REF == refs/pull/* ]]; then
             VERSION=pr-${{ github.event.number }}
           fi
-          TAGS="${DOCKER_IMAGE}:${VERSION}"
+          TAGS="${DOCKER_IMAGE}:${VERSION},latest"
           echo ::set-output name=tags::${TAGS}
       -
         name: Set up QEMU
