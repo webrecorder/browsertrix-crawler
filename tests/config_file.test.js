@@ -8,7 +8,7 @@ test("check yaml config file with seed list is used", async () => {
 
   try{
 
-    await exec("docker-compose run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection configtest --config /tests/fixtures/crawl-1.yaml --depth 0");
+    await exec("docker-compose run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --config /tests/fixtures/crawl-1.yaml --depth 0");
   }
   catch (error) {
     console.log(error);
@@ -55,12 +55,13 @@ test("check yaml config file will be overwritten by command line", async () => {
   const pages = new Set();
 
   for (const line of crawledPages.trim().split("\n")) {
-    pages.add(JSON.parse(line).url);
+    const url = JSON.parse(line).url;
+    if (url) {
+      pages.add(url);
+    }
   }
 
-
-  
   expect(pages.has("https://www.example.com/")).toBe(true);
-
+  expect(pages.size).toBe(1);
 
 });
