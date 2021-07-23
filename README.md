@@ -392,9 +392,9 @@ docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --p
 
 ## Published Releases / Production Use
 
-When using Browsertrix Crawler in production, it is recommended to use a specific, published version of the image, eg `webrecorder/browsertrix-crawler:[VERSION]` instead of `webrecorder/browsertrix-crawler` where `[VERSION]` corresponds to one of the published release tag.
+When using Browsertrix Crawler in production, it is recommended to use a specific, published version of the image, eg. `webrecorder/browsertrix-crawler:[VERSION]` instead of `webrecorder/browsertrix-crawler` where `[VERSION]` corresponds to one of the published release tag.
 
-All releases are available from Docker Hub at: https://hub.docker.com/repository/docker/webrecorder/browsertrix-crawler
+All released Docker Images are available from Docker Hub, listed by release tag here: https://hub.docker.com/r/webrecorder/browsertrix-crawler/tags?page=1&ordering=last_updated
 
 Details for each corresponding release tag are also available on GitHub at: https://github.com/webrecorder/browsertrix-crawler/releases
 
