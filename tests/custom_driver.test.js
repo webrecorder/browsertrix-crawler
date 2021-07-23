@@ -1,4 +1,3 @@
-const yaml = require("js-yaml");
 const child_process = require("child_process");
 const fs = require("fs");
 
@@ -6,7 +5,7 @@ test("ensure custom driver with custom selector crawls JS files as pages", async
   jest.setTimeout(30000);
 
   try {
-    const proc = child_process.execSync("docker run -v $PWD/tests/fixtures:/tests/fixtures -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --collection custom-driver-1 --driver /tests/fixtures/driver-1.js");
+    child_process.execSync("docker run -v $PWD/tests/fixtures:/tests/fixtures -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --collection custom-driver-1 --driver /tests/fixtures/driver-1.js");
   }
   catch (error) {
     console.log(error);

@@ -20,7 +20,7 @@ jobs:
     - name: install requirements
       run: yarn install
     - name: run linter
-      run: yarn run eslint .
+      run: yarn lint
   
   build:
 
@@ -40,8 +40,6 @@ jobs:
       run: yarn install
     - name: build docker
       run: docker-compose build
-    - name: run jest initial crawl
-      run: sudo yarn jest
     - name: run jest
       run: sudo yarn jest
         
