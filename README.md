@@ -169,21 +169,21 @@ See [page.goto waitUntil options](https://github.com/puppeteer/puppeteer/blob/ma
 
 Browsertix Crawler supports the use of a yaml file to set parameters for a crawl. This can be used by passing a valid yaml file to the `--config` option.
 
-The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used. For example, the following should start a crawl with config in `crawl-config.yaml` (where [VERSION] represents the version of browsertrix-crawler image you're working with). The current [VERSION] can be found by checking the package.json file.
+The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used. For example, the following should start a crawl with config in `crawl-config.yaml`.
 
 
 ```
-docker run -v $PWD/crawl-config.yaml:/app/crawl-config.yaml -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl —-config /app/crawl-config.yaml
+docker run -v $PWD/crawl-config.yaml:/app/crawl-config.yaml -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl —-config /app/crawl-config.yaml
 ```
 
 The config can also be passed via stdin, which can simplify the command. Note that this require running `docker run` with the `-i` flag. To read config from stdin, pass `--config stdin`
 
 ```
-cat ./crawl-config.yaml | docker run -i -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl —-config stdin
+cat ./crawl-config.yaml | docker run -i -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl —-config stdin
 ```
 
 
-An example config file might contain:
+An example config file (eg. crawl-config.yaml) might contain:
 
 ```
 seeds:
@@ -202,7 +202,7 @@ The URL seed file should be a text file formatted so that each line of the file 
 The seed file must be passed as a volume to the docker container. To do that, you can format your docker command similar to the following:
 
 ```
-docker run -v $PWD/seedFile.txt:/app/seedFile.txt -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl —-seedFile /app/seedFile.txt
+docker run -v $PWD/seedFile.txt:/app/seedFile.txt -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl —-seedFile /app/seedFile.txt
 ```
 
 #### Per-Seed Settings
@@ -308,7 +308,7 @@ With version 0.4.0, Browsertrix Crawler includes an experimental 'screencasting'
 To enable, add `--screencastPort` command-line option and also map the port on the docker container. An example command might be:
 
 ```
-docker run -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl -p 9037:9037 --url https://www.example.com --screencastPort 9037
+docker run -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl -p 9037:9037 --url https://www.example.com --screencastPort 9037
 ```
 
 Then, you can open `http://localhost:9037/` and watch the crawl.
@@ -318,7 +318,7 @@ Note: If specifying multiple workers, the crawler should additional be instructe
 For example,
 
 ```
-docker run -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler:[VERSION] crawl -p 9037:9037 --url https://www.example.com --screencastPort 9037 --newContext window --workers 3
+docker run -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl -p 9037:9037 --url https://www.example.com --screencastPort 9037 --newContext window --workers 3
 ```
 
 will start a crawl with 3 workers, and show the screen of each of the workers from `http://localhost:9037/`.
@@ -335,7 +335,7 @@ The script profile creation system also take a screenshot so you can check if th
 For example, to create a profile logged in to Twitter, you can run:
 
 ```bash
-docker run -v $PWD/crawls/profiles:/output/ -it webrecorder/browsertrix-crawler:[VERSION] create-login-profile --url "https://twitter.com/login"
+docker run -v $PWD/crawls/profiles:/output/ -it webrecorder/browsertrix-crawler create-login-profile --url "https://twitter.com/login"
 ```
 
 The script will then prompt you for login credentials, attempt to login and create a tar.gz file in `./crawls/profiles/profile.tar.gz`.
@@ -367,7 +367,7 @@ Browsertrix Crawler will then create a profile as before using the current state
 For example, to start in interactive profile creation mode, run:
 
 ```
-docker run -p 9222:9222 -p 9223:9223 -v $PWD/profiles:/output/ -it webrecorder/browsertrix-crawler:[VERSION] create-login-profile --interactive --url "https://example.com/"
+docker run -p 9222:9222 -p 9223:9223 -v $PWD/profiles:/output/ -it webrecorder/browsertrix-crawler create-login-profile --interactive --url "https://example.com/"
 ```
 
 Then, open a browser pointing to `http://localhost:9223/` and use the embedded browser to log in to any sites or configure any settings as needed.
@@ -376,7 +376,7 @@ Click 'Create Profile at the top when done. The profile will then be created in 
 It is also possible to extend an existing profiles by also passing in an existing profile via the `--profile` flag. In this way, it is possible to build new profiles by extending previous browsing sessions as needed.
 
 ```
-docker run -p 9222:9222 -p 9223:9223 -v $PWD/profiles:/profiles --filename /profiles/newProfile.tar.gz -it webrecorder/browsertrix-crawler:[VERSION] create-login-profile --interactive --url "https://example.com/ --profile /profiles/oldProfile.tar.gz"
+docker run -p 9222:9222 -p 9223:9223 -v $PWD/profiles:/profiles --filename /profiles/newProfile.tar.gz -it webrecorder/browsertrix-crawler create-login-profile --interactive --url "https://example.com/ --profile /profiles/oldProfile.tar.gz"
 ```
 
 ### Using Browser Profile with a Crawl

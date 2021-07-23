@@ -2,7 +2,7 @@ version: '3.5'
   
 services:
     crawler:
-        image: webrecorder/browsertrix-crawler:0.4.1
+        image: webrecorder/browsertrix-crawler:latest
         build:
           context: ./
 
@@ -14,3 +14,4 @@ services:
           - SYS_ADMIN
 
         shm_size: 1gb
+
