@@ -9,9 +9,14 @@ Thus far, Browsertrix Crawler supports:
 
 - Single-container, browser based crawling with multiple headless/headful browsers.
 - Support for custom browser behaviors, using [Browsertix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) including autoscroll, video autoplay and site-specific behaviors.
+- YAML-based configuration, passed via file or via stdin.
+- Seed lists and per-seed scoping rules.
+- URL blocking rules to block capture of specific URLs (including by iframe URL and/or by iframe contents).
+- Screencasting: Ability to watch crawling in real-time (experimental).
 - Optimized (non-browser) capture of non-HTML resources.
 - Extensible Puppeteer driver script for customizing behavior per crawl or page.
-- Ability to create and reuse browser profiles with user/password login
+- Ability to create and reuse browser profiles with user/password login or via interactive login through an embedded browser.
+- Multi-platform support -- prebuilt Docker images available for Intel/AMD and Apple (M1) CPUs.
 
 ## Getting Started
 
