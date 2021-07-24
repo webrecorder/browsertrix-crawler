@@ -409,8 +409,12 @@ class Crawler {
     const {url, seedId, depth} = urlData;
 
     if (!await this.isHTML(url)) {
-      await this.directFetchCapture(url);
-      return;
+      try {
+        await this.directFetchCapture(url);
+        return;
+      } catch (e) {
+        // ignore failed direct fetch attempt, do browser-based capture
+      }
     }
 
     if (this.blockRules) {
