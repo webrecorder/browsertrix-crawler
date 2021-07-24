@@ -28,7 +28,7 @@ const { parseArgs } = require("./util/argParser");
 
 const { getBrowserExe, loadProfile } = require("./util/browser");
 
-const { BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
+const { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } = require("./util/constants");
 
 const { BlockRules } = require("./util/blockrules");
 
@@ -405,7 +405,7 @@ class Crawler {
     }
   }
 
-  async loadPage(page, urlData, {selector="a[href]", extract="href", isAttribute=false} = {}) {
+  async loadPage(page, urlData, selectorOptsList = DEFAULT_SELECTORS) {
     const {url, seedId, depth} = urlData;
 
     if (!await this.isHTML(url)) {
@@ -426,8 +426,12 @@ class Crawler {
     const seed = this.params.scopedSeeds[seedId];
 
     // skip extraction if at max depth
-    if (selector && !seed.isAtMaxDepth(depth)) {
-      const links = await this.extractLinks(page, {selector, extract, isAttribute});
+    if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
+      return;
+    }
+
+    for (const opts of selectorOptsList) {
+      const links = await this.extractLinks(page, opts);
       this.queueInScopeUrls(seedId, links, depth);
     }
   }
@@ -450,6 +454,7 @@ class Crawler {
 
       if (linkResults) {
         for (const linkResult of linkResults) {
+          if (!linkResult.value) continue;
           for (const link of linkResult.value) {
             results.push(link);
           }

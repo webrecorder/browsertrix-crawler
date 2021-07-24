@@ -1,5 +1,12 @@
 ## CHANGES
 
+v0.4.2
+- Compose/docs: Build latest image by default, update README to refer to latest image
+- Fix typo in `crawler.capturePrefix` that resulted in `directFetchCapture()` always failing
+- Tests: Update all tests to use `test-crawls` directory
+- extractLinks() just extracts links from default selectors, allows custom driver to filter results
+- loadPage() accepts a list of selector options with selector, extract, and isAttribute settings for further customization of link extraction
+
 v0.4.1
 - BlockRules Optimizations: don't intercept requests if no blockRules
 - Profile Creation: Support extending existing profile by passing a --profile param to load on startup
