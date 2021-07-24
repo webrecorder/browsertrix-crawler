@@ -6,13 +6,13 @@ function getSeeds(config) {
   const orig = fs.readFileSync;
 
   fs.readFileSync = (name, ...args) => {
-    if (name.endsWith("/configtest")) {
+    if (name.endsWith("/stdinconfig")) {
       return config;
     }
     return orig(name, ...args);
   };
 
-  return parseArgs(["node", "crawler", "--config", "configtest"]).scopedSeeds;
+  return parseArgs(["node", "crawler", "--config", "stdinconfig"]).scopedSeeds;
 }
 
 test("default scope", async () => {

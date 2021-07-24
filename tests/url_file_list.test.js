@@ -7,13 +7,13 @@ test("check that all urls in a file list are crawled when the filelisturl param 
 
   try{
 
-    await exec("docker-compose run -v $PWD/tests/fixtures:/tests/fixtures crawler crawl --collection filelisttest --urlFile /tests/fixtures/urlSeedFile.txt --timeout 10000");
+    await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection filelisttest --urlFile /tests/fixtures/urlSeedFile.txt --timeout 10000");
   }
   catch (error) {
     console.log(error);
   }
 
-  let crawled_pages = fs.readFileSync("crawls/collections/filelisttest/pages/pages.jsonl", "utf8");
+  let crawled_pages = fs.readFileSync("test-crawls/collections/filelisttest/pages/pages.jsonl", "utf8");
   let seed_file = fs.readFileSync("tests/fixtures/urlSeedFile.txt", "utf8").split("\n").sort();
 
   let seed_file_list = [];

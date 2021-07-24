@@ -28,7 +28,7 @@ const { parseArgs } = require("./util/argParser");
 
 const { getBrowserExe, loadProfile } = require("./util/browser");
 
-const { BEHAVIOR_LOG_FUNC, HTML_TYPES } = require("./util/constants");
+const { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } = require("./util/constants");
 
 const { BlockRules } = require("./util/blockrules");
 
@@ -67,7 +67,7 @@ class Crawler {
     this.debugLog("Seeds", this.params.scopedSeeds);
 
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
-    this.capturePrefix = this.captureBasePrerix + "/id_/";
+    this.capturePrefix = this.captureBasePrefix + "/id_/";
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
@@ -405,12 +405,16 @@ class Crawler {
     }
   }
 
-  async loadPage(page, urlData, selector = "a[href]") {
+  async loadPage(page, urlData, selectorOptsList = DEFAULT_SELECTORS) {
     const {url, seedId, depth} = urlData;
 
     if (!await this.isHTML(url)) {
-      await this.directFetchCapture(url);
-      return;
+      try {
+        await this.directFetchCapture(url);
+        return;
+      } catch (e) {
+        // ignore failed direct fetch attempt, do browser-based capture
+      }
     }
 
     if (this.blockRules) {
@@ -423,36 +427,38 @@ class Crawler {
       console.warn(`Load timeout for ${url}`, e);
     }
 
-    if (selector) {
-      await this.extractLinks(page, seedId, depth, selector);
-    }
-  }
-
-  async extractLinks(page, seedId, depth, selector = "a[href]", prop = "href", isAttribute = false) {
-    const results = [];
-
     const seed = this.params.scopedSeeds[seedId];
 
     // skip extraction if at max depth
-    if (seed.isAtMaxDepth(depth)) {
+    if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
       return;
     }
 
-    const loadProp = (selector, prop) => {
-      return [...document.querySelectorAll(selector)].map(elem => elem[prop]);
+    for (const opts of selectorOptsList) {
+      const links = await this.extractLinks(page, opts);
+      this.queueInScopeUrls(seedId, links, depth);
+    }
+  }
+
+  async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}) {
+    const results = [];
+
+    const loadProp = (selector, extract) => {
+      return [...document.querySelectorAll(selector)].map(elem => elem[extract]);
     };
 
-    const loadAttr = (selector, attr) => {
-      return [...document.querySelectorAll(selector)].map(elem => elem.getAttribute(attr));
+    const loadAttr = (selector, extract) => {
+      return [...document.querySelectorAll(selector)].map(elem => elem.getAttribute(extract));
     };
 
     const loadFunc = isAttribute ? loadAttr : loadProp;
 
     try {
-      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate(loadFunc, selector, prop)));
+      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate(loadFunc, selector, extract)));
 
       if (linkResults) {
         for (const linkResult of linkResults) {
+          if (!linkResult.value) continue;
           for (const link of linkResult.value) {
             results.push(link);
           }
@@ -461,12 +467,11 @@ class Crawler {
 
     } catch (e) {
       console.warn("Link Extraction failed", e);
-      return;
     }
-    this.queueUrls(seedId, results, depth);
+    return results;
   }
 
-  queueUrls(seedId, urls, depth) {
+  queueInScopeUrls(seedId, urls, depth) {
     try {
       depth += 1;
       const seed = this.params.scopedSeeds[seedId];
@@ -619,7 +624,7 @@ class Crawler {
 
     try {
       const { sites } = await sitemapper.fetch();
-      this.queueUrls(seedId, sites, 0);
+      this.queueInScopeUrls(seedId, sites, 0);
     } catch(e) {
       console.warn(e);
     }
