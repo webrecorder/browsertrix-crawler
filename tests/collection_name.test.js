@@ -21,7 +21,7 @@ test("check that the collection name is not accepted if it doesn't meets our sta
   let passed = "";
 
   try{
-    await exec("docker-compose run crawler crawl --url http://www.example.com/ --collection invalid_c!!ollection-nameisvalid");
+    await exec("docker run webrecorder/browsertrix-crawler crawl --url http://www.example.com/ --collection invalid_c!!ollection-nameisvalid");
     passed = true;
   }
   catch(e){
