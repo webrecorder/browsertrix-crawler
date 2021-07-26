@@ -2,6 +2,8 @@ const fetch = require("node-fetch");
 
 const RULE_TYPES = ["block", "allowOnly"];
 
+const ALWAYS_ALLOW = ["https://pywb.proxy/", "http://pywb.proxy/"];
+
 
 // ===========================================================================
 class BlockRule
@@ -80,12 +82,20 @@ class BlockRules
       return;
     }
 
+    // always allow special pywb proxy script
+    for (const allowUrl of ALWAYS_ALLOW) {
+      if (url.startsWith(allowUrl)) {
+        request.continue();
+        return;
+      }
+    }
+
     for (const rule of this.rules) {
-      const {done, block, frameUrl} = await this.shouldBlock(rule, request);
+      const {done, block, frameUrl} = await this.shouldBlock(rule, request, url);
 
       if (block) {
         request.abort();
-        await this.recordBlockMsg(request.url(), frameUrl);
+        await this.recordBlockMsg(url, frameUrl);
         return;
       }
       if (done) {
@@ -96,9 +106,7 @@ class BlockRules
     request.continue();
   }
 
-  async shouldBlock(rule, request) {
-    const reqUrl = request.url();
-
+  async shouldBlock(rule, request, reqUrl) {
     const {url, inFrameUrl, frameTextMatch} = rule;
 
     const type = rule.type || "block";
