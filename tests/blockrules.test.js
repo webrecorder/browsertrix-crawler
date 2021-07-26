@@ -130,4 +130,35 @@ test("test block url in frame url", () => {
 });
 
 
+test("test block rules complex example, block other iframes, but not youtube", () => {
+  const config = {
+    "seeds": [
+      "https://hdsr.mitpress.mit.edu/pub/xcq8a1v1",
+      "https://hdsr.mitpress.mit.edu/pub/3csmghzj/release/1"
+    ],
+    "depth": "0",
+    "blockRules": [{
+      "url": "(pubpub.org|polyfill.io|typekit.net|hdsr.mitpress.mit.edu|www.youtube.com)",
+      "type": "allowOnly",
+      "inFrameUrl": "hdsr.mitpress.mit.edu"
+    }, {
+      "url": "https://www.youtube.com/embed/",
+      "type": "allowOnly",
+      "frameTextMatch": "(\\\\\"channelId\\\\\":\\\\\"UCl0IFA3-VcWOadMbNiUH2aw\\\\\")"
+    }],
+    "include": "(hdsr.mitpress.mit.edu|assets.pubpub.org)",
+
+    "combineWARC": true,
+
+    "logging": 'stats,debug'
+  };
+
+
+  runCrawl("block-7", config);
+
+  expect(doesCDXContain("block-7", "\"https://mit-harvard.netlify.com/\"")).toBe(false);  
+  expect(doesCDXContain("block-7", "\"video/mp4\"")).toBe(true);
+});
+
+
 
