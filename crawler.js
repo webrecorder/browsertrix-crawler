@@ -329,7 +329,7 @@ class Crawler {
     await this.initPages();
 
     if (this.params.blockRules && this.params.blockRules.length) {
-      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
+      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, (text) => this.debugLog(text));
     }
 
     if (this.params.screencastPort) {
