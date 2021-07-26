@@ -150,7 +150,7 @@ test("test block rules complex example, block other iframes, but not youtube", (
 
     "combineWARC": true,
 
-    "logging": 'stats,debug'
+    "logging": "stats,debug"
   };
 
 
