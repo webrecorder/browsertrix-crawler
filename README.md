@@ -486,7 +486,7 @@ Support
 
 Initial support for development of Browsertrix Crawler, was provided by [Kiwix](https://kiwix.org/). The initial functionality for Browsertrix Crawler was developed to support the [zimit](https://github.com/openzim/zimit) project in a collaboration between. Webrecorder and Kiwix, and this project has been split off from Zimit into a core component of Webrecorder.
 
-Additional support for Browsertrix Crawler, including the development of the including 0.4.x version has been provided by Portico.
+Additional support for Browsertrix Crawler, including the development of features in the including 0.4.x version has been provided by [Portico](https://www.portico.org/).
 
 
 License
