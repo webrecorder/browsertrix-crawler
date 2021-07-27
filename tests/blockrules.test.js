@@ -130,23 +130,24 @@ test("test block url in frame url", () => {
 });
 
 
-test("test block rules complex example, block other iframes, but not youtube", () => {
+test("test block rules complex example, block external urls on main frame, but not on youtube", () => {
   const config = {
     "seeds": [
-      "https://hdsr.mitpress.mit.edu/pub/xcq8a1v1",
-      "https://hdsr.mitpress.mit.edu/pub/3csmghzj/release/1"
+      "https://archiveweb.page/guide/troubleshooting/errors.html",
     ],
     "depth": "0",
     "blockRules": [{
-      "url": "(pubpub.org|polyfill.io|typekit.net|hdsr.mitpress.mit.edu|www.youtube.com)",
+      "url": "(archiveweb.page|www.youtube.com)",
       "type": "allowOnly",
-      "inFrameUrl": "hdsr.mitpress.mit.edu"
+      "inFrameUrl": "archiveweb.page"
+    }, {
+      "url": "https://archiveweb.page/assets/js/vendor/lunr.min.js",
+      "inFrameUrl": "archiveweb.page"
     }, {
       "url": "https://www.youtube.com/embed/",
       "type": "allowOnly",
-      "frameTextMatch": "(\\\\\"channelId\\\\\":\\\\\"UCl0IFA3-VcWOadMbNiUH2aw\\\\\")"
+      "frameTextMatch": "(\\\\\"channelId\\\\\":\\\\\"UCOHO8gYUWpDYFWHXmIwE02g\\\\\")"
     }],
-    "include": "(hdsr.mitpress.mit.edu|assets.pubpub.org)",
 
     "combineWARC": true,
 
@@ -156,7 +157,7 @@ test("test block rules complex example, block other iframes, but not youtube", (
 
   runCrawl("block-7", config);
 
-  expect(doesCDXContain("block-7", "\"https://mit-harvard.netlify.com/\"")).toBe(false);  
+  expect(doesCDXContain("block-7", "\"https://archiveweb.page/assets/js/vendor/lunr.min.js\"")).toBe(false);  
   expect(doesCDXContain("block-7", "\"video/mp4\"")).toBe(true);
 });
 
