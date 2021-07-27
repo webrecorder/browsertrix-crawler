@@ -130,4 +130,36 @@ test("test block url in frame url", () => {
 });
 
 
+test("test block rules complex example, block external urls on main frame, but not on youtube", () => {
+  const config = {
+    "seeds": [
+      "https://archiveweb.page/guide/troubleshooting/errors.html",
+    ],
+    "depth": "0",
+    "blockRules": [{
+      "url": "(archiveweb.page|www.youtube.com)",
+      "type": "allowOnly",
+      "inFrameUrl": "archiveweb.page"
+    }, {
+      "url": "https://archiveweb.page/assets/js/vendor/lunr.min.js",
+      "inFrameUrl": "archiveweb.page"
+    }, {
+      "url": "https://www.youtube.com/embed/",
+      "type": "allowOnly",
+      "frameTextMatch": "(\\\\\"channelId\\\\\":\\\\\"UCOHO8gYUWpDYFWHXmIwE02g\\\\\")"
+    }],
+
+    "combineWARC": true,
+
+    "logging": "stats,debug"
+  };
+
+
+  runCrawl("block-7", config);
+
+  expect(doesCDXContain("block-7", "\"https://archiveweb.page/assets/js/vendor/lunr.min.js\"")).toBe(false);  
+  expect(doesCDXContain("block-7", "\"video/mp4\"")).toBe(true);
+});
+
+
 

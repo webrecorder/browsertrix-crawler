@@ -1,5 +1,10 @@
 ## CHANGES
 
+v0.4.3
+- BlockRules Fixes: When considering the 'inFrameUrl' for a navigation request for an iframe, use URL of parent frame.
+- BlockRules Fixes: Always allow pywb proxy scripts.
+- Logging: Improved debug logging for block rules (log blocked requests and conditional iframe requests) when 'debug' set in 'logging'
+
 v0.4.2
 - Compose/docs: Build latest image by default, update README to refer to latest image
 - Fix typo in `crawler.capturePrefix` that resulted in `directFetchCapture()` always failing

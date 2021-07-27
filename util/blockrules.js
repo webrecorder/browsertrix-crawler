@@ -2,6 +2,8 @@ const fetch = require("node-fetch");
 
 const RULE_TYPES = ["block", "allowOnly"];
 
+const ALWAYS_ALLOW = ["https://pywb.proxy/", "http://pywb.proxy/"];
+
 
 // ===========================================================================
 class BlockRule
@@ -37,10 +39,11 @@ ${this.frameTextMatch ? "Frame Text Regex: " + this.frameTextMatch : ""}
 // ===========================================================================
 class BlockRules
 {
-  constructor(blockRules, blockPutUrl, blockErrMsg) {
+  constructor(blockRules, blockPutUrl, blockErrMsg, debugLog) {
     this.rules = [];
     this.blockPutUrl = blockPutUrl;
     this.blockErrMsg = blockErrMsg;
+    this.debugLog = debugLog;
     this.putUrlSet = new Set();
 
     for (const ruleData of blockRules) {
@@ -48,9 +51,9 @@ class BlockRules
     }
 
     if (this.rules.length) {
-      console.log("URL Block Rules:\n");
+      this.debugLog("URL Block Rules:\n");
       for (const rule of this.rules) {
-        console.log(rule.toString());
+        this.debugLog(rule.toString());
       }
     }
   }
@@ -79,15 +82,20 @@ class BlockRules
       return;
     }
 
+    // always allow special pywb proxy script
+    for (const allowUrl of ALWAYS_ALLOW) {
+      if (url.startsWith(allowUrl)) {
+        request.continue();
+        return;
+      }
+    }
+
     for (const rule of this.rules) {
-      const {done, block} = await this.shouldBlock(rule, request);
+      const {done, block, frameUrl} = await this.shouldBlock(rule, request, url);
 
       if (block) {
-        //const frameUrl = request.frame().url();
-        //console.log("Blocking/Aborting Request for: " + request.url());
-        // not allowed, abort loading this response
         request.abort();
-        await this.recordBlockMsg(request.url());
+        await this.recordBlockMsg(url, frameUrl);
         return;
       }
       if (done) {
@@ -98,24 +106,37 @@ class BlockRules
     request.continue();
   }
 
-  async shouldBlock(rule, request) {
-    const reqUrl = request.url();
-
+  async shouldBlock(rule, request, reqUrl) {
     const {url, inFrameUrl, frameTextMatch} = rule;
 
     const type = rule.type || "block";
     const allowOnly = (type === "allowOnly");
 
-    const frameUrl = request.frame().url();
+    const isNavReq = request.isNavigationRequest();
+
+    const frame = request.frame();
+
+    let frameUrl = null;
+
+    if (isNavReq) {
+      const parentFrame = frame.parentFrame();
+      if (parentFrame) {
+        frameUrl = parentFrame.url();
+      } else {
+        frameUrl = frame.url();
+      }
+    } else {
+      frameUrl = frame.url();
+    }
 
     // ignore initial page
     if (frameUrl === "about:blank") {
-      return {block: false, done: true};
+      return {block: false, done: true, frameUrl};
     }
 
     // not a frame match, skip rule
     if (inFrameUrl && !frameUrl.match(inFrameUrl)) {
-      return {block: false, done: false};
+      return {block: false, done: false, frameUrl};
     }
 
     const urlMatched = (url && reqUrl.match(url));
@@ -123,17 +144,18 @@ class BlockRules
     // if frame text-based rule: if url matched and a frame request
     // frame text-based match: only applies to nav requests, never block otherwise
     if (frameTextMatch) {
-      if (!urlMatched || !request.isNavigationRequest()) {
-        return {block: false, done: false};
+      if (!urlMatched || !isNavReq) {
+        return {block: false, done: false, frameUrl};
       }
 
       const block = await this.isTextMatch(request, reqUrl, frameTextMatch) ? !allowOnly : allowOnly;
-      return {block, done: true};
+      this.debugLog(`iframe ${url} conditionally ${block ? "BLOCKED" : "ALLOWED"}, parent frame ${frameUrl}`);
+      return {block, done: true, frameUrl};
     }
 
     // for non frame text rule, simply match by URL
     const block = urlMatched ? !allowOnly : allowOnly;
-    return {block, done: false};
+    return {block, done: false, frameUrl};
   }
 
   async isTextMatch(request, reqUrl, frameTextMatch) {
@@ -144,11 +166,13 @@ class BlockRules
       return !!text.match(frameTextMatch);
 
     } catch (e) {
-      console.log(e);
+      this.debugLog(e);
     }
   }
 
-  async recordBlockMsg(url) {
+  async recordBlockMsg(url, frameUrl) {
+    this.debugLog(`URL Blocked/Aborted: ${url} in frame ${frameUrl}`);
+
     if (!this.blockErrMsg || !this.blockPutUrl) {
       return;
     }
@@ -162,7 +186,6 @@ class BlockRules
     const body = this.blockErrMsg;
     const putUrl = new URL(this.blockPutUrl);
     putUrl.searchParams.set("url", url);
-    //console.log("put url", putUrl.href);
     await fetch(putUrl.href, {method: "PUT", headers: {"Content-Type": "text/html"}, body});
   }
 }
