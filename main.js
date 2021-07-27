@@ -1,17 +1,37 @@
 #!/usr/bin/env node
 
-process.once("SIGINT", () => {
-  console.log("SIGINT received, exiting");
-  process.exit(1);
+var crawler = null;
+
+var lastSigInt = 0;
+
+process.on("SIGINT", async () => {
+  if (crawler) {
+    try {
+      if (!crawler.crawlState.draining) {
+        console.log("SIGINT received, gracefully finishing current pages...");
+        crawler.cluster.allTargetCount -= (await crawler.crawlState.size());
+        crawler.crawlState.setDrain();
+      } else if ((Date.now() - lastSigInt) > 200) {
+        console.log("SIGINT received, aborting crawl...");
+        await crawler.serializeConfig();
+        process.exit(1);
+      }
+      lastSigInt = Date.now();
+    } catch (e) {
+      console.log(e);
+    }
+  }
 });
 
-process.once("SIGTERM", () => {
+process.on("SIGTERM", () => {
   console.log("SIGTERM received, exiting");
-  process.exit(1);
 });
+
 
 
 const { Crawler } = require("./crawler");
 
-new Crawler().run();
+crawler = new Crawler();
+crawler.run();
+
 

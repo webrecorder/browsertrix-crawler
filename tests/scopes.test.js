@@ -12,7 +12,8 @@ function getSeeds(config) {
     return orig(name, ...args);
   };
 
-  return parseArgs(["node", "crawler", "--config", "stdinconfig"]).scopedSeeds;
+  const res = parseArgs(["node", "crawler", "--config", "stdinconfig"]);
+  return res.parsed.scopedSeeds;
 }
 
 test("default scope", async () => {

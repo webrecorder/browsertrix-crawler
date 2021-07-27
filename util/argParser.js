@@ -211,24 +211,33 @@ class ArgParser {
         alias: ["warcinfo"],
         describe: "Optional fields added to the warcinfo record in combined WARCs",
         type: "object"
+      },
+
+      "stateStore": {
+        describe: "If set, url for remote redis server to store state. Otherwise, using in-memory store",
+        type: "string"
       }
     };
   }
 
   parseArgs(argv) {
     argv = argv || process.argv;
+    let origConfig = {};
 
-    return yargs(hideBin(argv))
+    const parsed = yargs(hideBin(argv))
       .usage("crawler [options]")
       .option(this.cliOpts)
       .config("config", "Path to YAML config file", (configPath) => {
         if (configPath === "/crawls/stdin") {
           configPath = process.stdin.fd;
         }
-        return yaml.load(fs.readFileSync(configPath, "utf8"));
+        origConfig = yaml.load(fs.readFileSync(configPath, "utf8"));
+        return origConfig;
       })
       .check((argv) => this.validateArgs(argv))
       .argv;
+
+    return {parsed, origConfig};
   }
 
 
