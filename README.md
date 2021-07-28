@@ -178,13 +178,13 @@ The YAML file can contain the same parameters as the command-line arguments. If 
 
 
 ```
-docker run -v $PWD/crawl-config.yaml:/app/crawl-config.yaml -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl —-config /app/crawl-config.yaml
+docker run -v $PWD/crawl-config.yaml:/app/crawl-config.yaml -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl --config /app/crawl-config.yaml
 ```
 
 The config can also be passed via stdin, which can simplify the command. Note that this require running `docker run` with the `-i` flag. To read config from stdin, pass `--config stdin`
 
 ```
-cat ./crawl-config.yaml | docker run -i -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl —-config stdin
+cat ./crawl-config.yaml | docker run -i -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl --config stdin
 ```
 
 
@@ -207,7 +207,7 @@ The URL seed file should be a text file formatted so that each line of the file 
 The seed file must be passed as a volume to the docker container. To do that, you can format your docker command similar to the following:
 
 ```
-docker run -v $PWD/seedFile.txt:/app/seedFile.txt -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl —-seedFile /app/seedFile.txt
+docker run -v $PWD/seedFile.txt:/app/seedFile.txt -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl --seedFile /app/seedFile.txt
 ```
 
 #### Per-Seed Settings
