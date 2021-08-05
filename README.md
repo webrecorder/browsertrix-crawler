@@ -313,7 +313,7 @@ With version 0.4.0, Browsertrix Crawler includes an experimental 'screencasting'
 To enable, add `--screencastPort` command-line option and also map the port on the docker container. An example command might be:
 
 ```
-docker run -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl -p 9037:9037 --url https://www.example.com --screencastPort 9037
+docker run -p 9037:9037 -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl  --url https://www.example.com --screencastPort 9037
 ```
 
 Then, you can open `http://localhost:9037/` and watch the crawl.
@@ -323,7 +323,7 @@ Note: If specifying multiple workers, the crawler should additional be instructe
 For example,
 
 ```
-docker run -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl -p 9037:9037 --url https://www.example.com --screencastPort 9037 --newContext window --workers 3
+docker run -p 9037:9037 -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl --url https://www.example.com --screencastPort 9037 --newContext window --workers 3
 ```
 
 will start a crawl with 3 workers, and show the screen of each of the workers from `http://localhost:9037/`.
