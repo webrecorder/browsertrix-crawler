@@ -113,7 +113,7 @@ test("override scope with exclude", async () => {
 
 seeds:
    - url: https://example.com/1
-     scopeType: page
+     scopeType: page-spa
 
    - url: https://example.com/subpath/file.html
      scopeType: prefix
@@ -122,10 +122,10 @@ seeds:
      scopeType: any
 
    - url: https://example.com/3
-     scopeType: none
+     scopeType: page
 
    - url: https://example.com/4
-     scopeType: none
+     scopeType: page
      exclude: ''
 
 exclude:
@@ -137,7 +137,7 @@ exclude:
   expect(seeds.length).toEqual(5);
   const excludeRxs = [/\/search\?/, /q\?/];
 
-  expect(seeds[0].scopeType).toEqual("page");
+  expect(seeds[0].scopeType).toEqual("page-spa");
   expect(seeds[0].url).toEqual("https://example.com/1");
   expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\/1#.+/]);
   expect(seeds[0].exclude).toEqual(excludeRxs);
@@ -152,12 +152,12 @@ exclude:
   expect(seeds[2].include).toEqual([/.*/]);
   expect(seeds[2].exclude).toEqual(excludeRxs);
 
-  expect(seeds[3].scopeType).toEqual("none");
+  expect(seeds[3].scopeType).toEqual("page");
   expect(seeds[3].url).toEqual("https://example.com/3");
   expect(seeds[3].include).toEqual([]);
   expect(seeds[3].exclude).toEqual(excludeRxs);
 
-  expect(seeds[4].scopeType).toEqual("none");
+  expect(seeds[4].scopeType).toEqual("page");
   expect(seeds[4].url).toEqual("https://example.com/4");
   expect(seeds[4].include).toEqual([]);
   expect(seeds[4].exclude).toEqual([]);
