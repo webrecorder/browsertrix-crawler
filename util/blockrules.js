@@ -4,6 +4,13 @@ const RULE_TYPES = ["block", "allowOnly"];
 
 const ALWAYS_ALLOW = ["https://pywb.proxy/", "http://pywb.proxy/"];
 
+const BlockState = {
+  ALLOW: null,
+  BLOCK_PAGE_NAV: "page",
+  BLOCK_IFRAME_NAV: "iframe",
+  BLOCK_OTHER: "resource"
+};
+
 
 // ===========================================================================
 class BlockRule
@@ -44,7 +51,8 @@ class BlockRules
     this.blockPutUrl = blockPutUrl;
     this.blockErrMsg = blockErrMsg;
     this.debugLog = debugLog;
-    this.putUrlSet = new Set();
+
+    this.blockedUrlSet = new Set();
 
     for (const ruleData of blockRules) {
       this.rules.push(new BlockRule(ruleData));
@@ -77,66 +85,92 @@ class BlockRules
   async handleRequest(request) {
     const url = request.url();
 
+    let blockState;
+
+    try {
+      blockState = await this.shouldBlock(request, url);
+
+      if (blockState === BlockState.ALLOW) {
+        await request.continue();
+      } else {
+        await request.abort();
+      }
+
+    } catch (e) {
+      const str = e.toString();
+      if (str.indexOf("Request is already handled") === -1) {
+        this.debugLog(`Block: (${blockState}) Failed On: ${url} Reason: ${str}`);
+      }
+    }
+  }
+
+  async shouldBlock(request, url) {
     if (!url.startsWith("http:") && !url.startsWith("https:")) {
-      request.continue();
-      return;
+      return BlockState.ALLOW;
+    }
+
+    const isNavReq = request.isNavigationRequest();
+
+    const frame = request.frame();
+
+    let frameUrl = "";
+    let blockState;
+
+    if (isNavReq) {
+      const parentFrame = frame.parentFrame();
+      if (parentFrame) {
+        frameUrl = parentFrame.url();
+        blockState = BlockState.BLOCK_IFRAME_NAV;
+      } else {
+        frameUrl = frame.url();
+        blockState = BlockState.BLOCK_PAGE_NAV;
+      }
+    } else {
+      frameUrl = frame ? frame.url() : "";
+      blockState = BlockState.BLOCK_OTHER;
+    }
+
+    // ignore initial page
+    if (frameUrl === "about:blank") {
+      return BlockState.ALLOW;
     }
 
     // always allow special pywb proxy script
     for (const allowUrl of ALWAYS_ALLOW) {
       if (url.startsWith(allowUrl)) {
-        request.continue();
-        return;
+        return BlockState.ALLOW;
       }
     }
 
     for (const rule of this.rules) {
-      const {done, block, frameUrl} = await this.shouldBlock(rule, request, url);
+      const {done, block} = await this.ruleCheck(rule, request, url, frameUrl, isNavReq);
 
       if (block) {
-        request.abort();
-        await this.recordBlockMsg(url, frameUrl);
-        return;
+        if (blockState === BlockState.BLOCK_PAGE_NAV) {
+          console.warn(`Warning: Block rule match for page request "${url}" ignored, set --exclude to block full pages`);
+          return BlockState.ALLOW;
+        }
+        this.debugLog(`URL Blocked/Aborted: ${url} in frame ${frameUrl}`);
+        await this.recordBlockMsg(url);
+        return blockState;
       }
       if (done) {
         break;
       }
     }
 
-    request.continue();
+    return BlockState.ALLOW;
   }
 
-  async shouldBlock(rule, request, reqUrl) {
+  async ruleCheck(rule, request, reqUrl, frameUrl, isNavReq) {
     const {url, inFrameUrl, frameTextMatch} = rule;
 
     const type = rule.type || "block";
     const allowOnly = (type === "allowOnly");
 
-    const isNavReq = request.isNavigationRequest();
-
-    const frame = request.frame();
-
-    let frameUrl = null;
-
-    if (isNavReq) {
-      const parentFrame = frame.parentFrame();
-      if (parentFrame) {
-        frameUrl = parentFrame.url();
-      } else {
-        frameUrl = frame.url();
-      }
-    } else {
-      frameUrl = frame.url();
-    }
-
-    // ignore initial page
-    if (frameUrl === "about:blank") {
-      return {block: false, done: true, frameUrl};
-    }
-
     // not a frame match, skip rule
     if (inFrameUrl && !frameUrl.match(inFrameUrl)) {
-      return {block: false, done: false, frameUrl};
+      return {block: false, done: false};
     }
 
     const urlMatched = (url && reqUrl.match(url));
@@ -145,17 +179,17 @@ class BlockRules
     // frame text-based match: only applies to nav requests, never block otherwise
     if (frameTextMatch) {
       if (!urlMatched || !isNavReq) {
-        return {block: false, done: false, frameUrl};
+        return {block: false, done: false};
       }
 
       const block = await this.isTextMatch(request, reqUrl, frameTextMatch) ? !allowOnly : allowOnly;
       this.debugLog(`iframe ${url} conditionally ${block ? "BLOCKED" : "ALLOWED"}, parent frame ${frameUrl}`);
-      return {block, done: true, frameUrl};
+      return {block, done: true};
     }
 
     // for non frame text rule, simply match by URL
     const block = urlMatched ? !allowOnly : allowOnly;
-    return {block, done: false, frameUrl};
+    return {block, done: false};
   }
 
   async isTextMatch(request, reqUrl, frameTextMatch) {
@@ -170,18 +204,16 @@ class BlockRules
     }
   }
 
-  async recordBlockMsg(url, frameUrl) {
-    this.debugLog(`URL Blocked/Aborted: ${url} in frame ${frameUrl}`);
+  async recordBlockMsg(url) {
+    if (this.blockedUrlSet.has(url)) {
+      return;
+    }
+
+    this.blockedUrlSet.add(url);
 
     if (!this.blockErrMsg || !this.blockPutUrl) {
       return;
     }
-
-    if (this.putUrlSet.has(url)) {
-      return;
-    }
-
-    this.putUrlSet.add(url);
 
     const body = this.blockErrMsg;
     const putUrl = new URL(this.blockPutUrl);

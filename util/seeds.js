@@ -61,6 +61,10 @@ class ScopedSeed
 
     switch (scopeType) {
     case "page":
+      include = [];
+      break;
+
+    case "page-spa":
       // allow scheme-agnostic URLS as likely redirects
       include = [new RegExp("^" + rxEscape(parsedUrl.href).replace(parsedUrl.protocol, "https?:") + "#.+")];
       allowHash = true;
@@ -76,10 +80,6 @@ class ScopedSeed
 
     case "any":
       include = [/.*/];
-      break;
-
-    case "none":
-      include = [];
       break;
 
     default:
