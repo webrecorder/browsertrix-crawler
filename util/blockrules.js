@@ -71,6 +71,10 @@ class BlockRules
       return;
     }
 
+    if (page._btrix_interceptionAdded) {
+      return true;
+    }
+
     await page.setRequestInterception(true);
 
     page.on("request", async (request) => {
@@ -80,6 +84,8 @@ class BlockRules
         console.warn(e);
       }
     });
+
+    page._btrix_interceptionAdded = true;
   }
 
   async handleRequest(request) {
@@ -93,14 +99,11 @@ class BlockRules
       if (blockState === BlockState.ALLOW) {
         await request.continue();
       } else {
-        await request.abort();
+        await request.abort("blockedbyclient");
       }
 
     } catch (e) {
-      const str = e.toString();
-      if (str.indexOf("Request is already handled") === -1) {
-        this.debugLog(`Block: (${blockState}) Failed On: ${url} Reason: ${str}`);
-      }
+      this.debugLog(`Block: (${blockState}) Failed On: ${url} Reason: ${e}`);
     }
   }
 
