@@ -75,6 +75,8 @@ class BlockRules
       return true;
     }
 
+    page._btrix_interceptionAdded = true;
+
     await page.setRequestInterception(true);
 
     page.on("request", async (request) => {
@@ -84,8 +86,6 @@ class BlockRules
         console.warn(e);
       }
     });
-
-    page._btrix_interceptionAdded = true;
   }
 
   async handleRequest(request) {

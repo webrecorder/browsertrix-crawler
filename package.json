@@ -15,7 +15,7 @@
     "js-yaml": "^4.1.0",
     "node-fetch": "^2.6.1",
     "puppeteer-cluster": "^0.22.0",
-    "puppeteer-core": "^10.2.0",
+    "puppeteer-core": "^8.0.0",
     "sitemapper": "^3.1.2",
     "uuid": "8.3.2",
     "ws": "^7.4.4",
