@@ -1,5 +1,14 @@
 ## CHANGES
 
+v0.4.4
+- Page Block Rules Fix: 'request already handled' errors by avoiding adding duplicate handlers to same page.
+- Page Block Rules Fix: await all continue/abort() calls and catch errors.
+- Page Block Rules: Don't apply to top-level page, print warning and recommend scope rules instead.
+- Setup: Attempt to create the crawl working directory (cwd) specified via --cwd if it doesn't exist.
+- Scope Types: Rename 'none' -> 'page' (single page only) and 'page' -> 'page-spa' (page with hashtags).
+- README: Add more scope rule examples, clarify distinction between scope rules and block rules.
+- README: Update old type -> scopeType, list new scope types.
+
 v0.4.3
 - BlockRules Fixes: When considering the 'inFrameUrl' for a navigation request for an iframe, use URL of parent frame.
 - BlockRules Fixes: Always allow pywb proxy scripts.
