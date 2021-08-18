@@ -83,7 +83,7 @@ class ScopedSeed
       break;
 
     default:
-      throw new Error(`Invalid scope type "${scopeType}" specified, valid types are: page, prefix, host`);
+      throw new Error(`Invalid scope type "${scopeType}" specified, valid types are: page, page-spa, prefix, host, any`);
     }
 
     return [include, allowHash];
