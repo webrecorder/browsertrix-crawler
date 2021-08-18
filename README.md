@@ -218,38 +218,84 @@ Certain settings such scope type, scope includes and excludes, and depth can als
 seeds:
   - url: https://webrecorder.net/
     depth: 1
-    type: "prefix"
+    scopeType: "prefix"
 ```
 
-### Scope Types
+### Crawl Scope -- Configuring Pages Included or Excluded from a Crawl
 
 The crawl scope can be configured globally for all seeds, or customized per seed, by specifying the `--scopeType` command-line option or setting the `type` property for each seed.
 
-The scope controls which linked pages are also included in the crawl.
+There is also a `depth` setting also limits how many pages will be crawled for that seed, while the `limit` option sets the total number of pages crawled from any seed.
 
-The available types are:
+The scope controls which linked pages are included and which pages are excluded from the crawl.
 
-- `page` - crawl only this page, but load any links that include different hashtags. Useful for single-page apps that may load different content based on hashtag.
+To make this configuration as simple as possible, there are several predefined scope types. The available types are:
+
+- `page` - crawl only this page and no additional links.
+
+- `page-spa` - crawl only this page, but load any links that include different hashtags. Useful for single-page apps that may load different content based on hashtag.
 
 - `prefix` - crawl any pages in the same directory, eg. starting from `https://example.com/path/page.html`, crawl anything under `https://example.com/path/` (default)
 
 - `host` - crawl pages that share the same host.
 
-- `any` - crawl any and all pages.
+- `any` - crawl any and all pages linked from this page..
 
-- `none` - don't crawl any additional pages besides the seed.
+- `custom` - crawl based on the `--include` regular expression rules.
 
 
-The `depth` setting also limits how many pages will be crawled for that seed, while the `limit` option sets the total
-number of pages crawled from any seed.
+#### Custom Scope Inclusion Rules
 
-### Block Rules
+Instead of setting a scope type, it is possible to instead configure custom scope regex by setting `--include` config to one or more regular expressions.
+If using the YAML config, the `include` field can contain a list of regexes.
 
-While scope rules define which pages are to be crawled, it is also possible to block certain URLs in certain pages or frames from being recorded.
+Extracted links that match the regular expression will be considered 'in scope' and included.
 
-This is useful for blocking ads or other content that should not be included.
+#### Custom Scope Exclusion Rules
 
-The block rules can be specified as a list in the `blockRules` field. Each rule can contain one of the following fields:
+In addition to the inclusion rules, Browsertrix Crawler supports a separate list of exclusion regexes, that if match, override an exclude a URL from the crawl.
+
+The exclusion regexes are often used with a custom scope, but could be used with a predefined scopeType as well.
+
+
+#### Scope Rule Examples
+
+For example, the following seed will start on `https://example.com/startpage.html` and crawl all pages on the `https://example.com/` domain, except pages that match the regexes `example.com/skip.*` or `example.com/search.*`
+
+```
+seeds:
+  - url: https://example.com/startpage.html
+    scopeType: "host"
+    exclude:
+      - example.com/skip.*
+      - example.com/search.*
+
+```
+
+In the following example, the scope include regexes will crawl all page URLs that match `example.com/(crawl-this|crawl-that)`,
+but skip URLs that end with 'skip-me'. For example, `https://example.com/crawl-this/page.html` would be crawled, but `https://example.com/crawl-this/pages/skip` would not be.
+
+```
+seeds:
+  - url: https://example.com/startpage.html
+    include: example.com/crawl-this|crawl-that
+    exclude:
+      - skip$
+```
+
+The `include`, `exclude`, `scopeType` and `depth` settings can be configured per seed, or globally, for the entire crawl.
+
+The per-seed settings override the per-crawl settings, if any.
+
+The test suite [tests/scopes.test.js](tests/scopes.test.js) for additional examples of configuring scope inclusion and exclusion rules.
+
+### Page Resource Block Rules
+
+While scope rules define which pages are to be crawled, it is also possible to block page resources, URLs loaded within a page or within an iframe on a page.
+
+For example, this is useful for blocking ads or other content that is loaded within multiple pages, but should be blocked.
+
+The page rules block rules can be specified as a list in the `blockRules` field. Each rule can contain one of the following fields:
 
 - `url`: regex for URL to match (required)
 
@@ -259,16 +305,36 @@ The block rules can be specified as a list in the `blockRules` field. Each rule 
 
 - `frameTextMatch`: if specified, the text of the specified URL is checked for the regex, and the rule applies only if there is an additional match. When specified, this field makes the block rule apply only to frame-level resource, eg. URLs loaded directly in an iframe or top-level frame.
 
-For example, a very simple block rule that blocks all URLs from 'googleanalytics.com' can be added with:
+For example, a very simple block rule that blocks all URLs from 'googleanalytics.com' on any page can be added with:
 
 ```
 blockRules:
    - url: googleanalytics.com
 ```
 
+To instead block 'googleanalytics.com' only if loaded within pages or iframes that match the regex 'example.com/no-analytics', add:
+
+```
+blockRules:
+   - url: googleanalytics.com
+     inFrameUrl: example.com/no-analytics
+```
+
 For additional examples of block rules, see the [tests/blockrules.test.js](tests/blockrules.test.js) file in the test suite.
 
 If the `--blockMessage` is also specified, a blocked URL is replaced with the specified message (added as a WARC resource record).
+
+#### Page Resource Block Rules vs Scope Rules
+
+If it seems confusing which rules should be used, here is a quick way to determine:
+
+- If you'd like to restrict *the pages that are being crawled*, use the crawl scope rules (defined above).
+
+- If you'd like to restrict *parts of a page* that are being loaded, use the page resource block rules described in this section.
+
+The blockRules add a filter to each URL loaded on a page and incur an extra overhead. They should only be used in advance uses cases where part of a page needs to be blocked.
+
+These rules can not be used to prevent entire pages for loading -- use the scope exclusion rules for that. (A warning will be printed if a page resource block rule matches a top-level page).
 
 
 ### Custom Warcinfo Fields

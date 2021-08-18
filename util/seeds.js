@@ -61,6 +61,10 @@ class ScopedSeed
 
     switch (scopeType) {
     case "page":
+      include = [];
+      break;
+
+    case "page-spa":
       // allow scheme-agnostic URLS as likely redirects
       include = [new RegExp("^" + rxEscape(parsedUrl.href).replace(parsedUrl.protocol, "https?:") + "#.+")];
       allowHash = true;
@@ -78,12 +82,8 @@ class ScopedSeed
       include = [/.*/];
       break;
 
-    case "none":
-      include = [];
-      break;
-
     default:
-      throw new Error(`Invalid scope type "${scopeType}" specified, valid types are: page, prefix, host`);
+      throw new Error(`Invalid scope type "${scopeType}" specified, valid types are: page, page-spa, prefix, host, any`);
     }
 
     return [include, allowHash];

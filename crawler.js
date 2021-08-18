@@ -206,6 +206,8 @@ class Crawler {
   }
 
   async run() {
+    await fsp.mkdir(this.params.cwd, {recursive: true});
+
     this.bootstrap();
 
     try {
