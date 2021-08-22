@@ -358,10 +358,15 @@ class Crawler {
         secretKey: process.env.STORE_SECRET_KEY,
       };
 
-      const user = process.env.STORE_USER;
+      const opts = {
+        crawlId: process.env.CRAWL_ID,
+        webhookUrl: process.env.WEBHOOK_URL,
+        userId: process.env.STORE_USER,
+        filename: process.env.STORE_FILENAME,
+      };
 
       console.log("Initing Storage...");
-      this.storage = new S3StorageSync(storeInfo, user);
+      this.storage = new S3StorageSync(storeInfo, opts);
       await this.storage.init();
     }
 

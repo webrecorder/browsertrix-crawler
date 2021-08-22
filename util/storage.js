@@ -2,11 +2,12 @@ const fs = require("fs");
 const { Transform } = require("stream");
 const { createHash } = require("crypto");
 
+const fetch = require("node-fetch");
 const Minio = require("minio");
 
 class S3StorageSync
 {
-  constructor(urlOrData, userId) {
+  constructor(urlOrData, {filename, webhookUrl, userId, crawlId} = {}) {
     let url;
     let accessKey;
     let secretKey;
@@ -15,11 +16,13 @@ class S3StorageSync
       url = new URL(urlOrData);
       accessKey = url.username;
       secretKey = url.password;
+      this.fullPrefix = urlOrData;
 
     } else {
       url = new URL(urlOrData.endpointUrl);
       accessKey = urlOrData.accessKey;
       secretKey = urlOrData.secretKey;
+      this.fullPrefix = url.href;
     }
 
     this.client = new Minio.Client({
@@ -37,6 +40,15 @@ class S3StorageSync
     this.resources = [];
 
     this.userId = userId;
+    this.crawlId = crawlId;
+    this.webhookUrl = webhookUrl;
+
+    if (!filename) {
+      const ts = new Date().toISOString().replace(/[:TZz.-]/g, "");
+      filename = `${ts}-${this.userId}.wacz`;
+    }
+
+    this.waczFilename = "data/" + filename;
   }
 
   async setPublicPolicy() {
@@ -130,9 +142,6 @@ class S3StorageSync
   }
 
   async uploadCollWACZ(filename) {
-    const ts = new Date().toISOString().replace(/[:TZz.-]/g, "");
-    const relFilename = `data/${ts}-${this.userId}.wacz`;
-
     const origStream = fs.createReadStream(filename);
 
     const hash = createHash("sha256");
@@ -154,10 +163,10 @@ class S3StorageSync
     });
 
     const fsStream = origStream.pipe(hashTrans);
-    const res = await this.client.putObject(this.bucketName, this.objectPrefix + relFilename, fsStream);
+    const res = await this.client.putObject(this.bucketName, this.objectPrefix + this.waczFilename, fsStream);
     console.log(res);
 
-    const resource = {"path": relFilename, "hash": finalHash, "bytes": size};
+    const resource = {"path": this.waczFilename, "hash": finalHash, "bytes": size};
 
     this.resources.push(resource);
 
@@ -171,6 +180,20 @@ class S3StorageSync
 
     // update datapackage.json
     await this.updateDataPackage();
+
+    if (this.webhookUrl) {
+      const body = {
+        id: this.crawlId,
+        user: this.userId,
+
+        filename: `s3://${this.bucketName}/${this.objectPrefix}${this.waczFilename}`,
+
+        hash: resource.hash,
+        size: resource.bytes,
+      };
+
+      await fetch(this.webhookUrl, {method: "POST", body: JSON.stringify(body)});
+    }
   }
 
   async updateDataPackage() {
