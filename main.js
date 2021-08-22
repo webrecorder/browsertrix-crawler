@@ -12,7 +12,7 @@ process.on("SIGINT", async () => {
         crawler.cluster.allTargetCount -= (await crawler.crawlState.size());
         crawler.crawlState.setDrain();
       } else if ((Date.now() - lastSigInt) > 200) {
-        console.log("SIGINT received, aborting crawl...");
+        console.log("SIGINT received, stopping crawl now...");
         await crawler.serializeConfig();
         process.exit(1);
       }
@@ -24,7 +24,8 @@ process.on("SIGINT", async () => {
 });
 
 process.on("SIGTERM", () => {
-  console.log("SIGTERM received, exiting");
+  console.log("SIGTERM received, aborting crawl...");
+  process.exit(1);
 });
 
 
