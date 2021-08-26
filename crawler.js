@@ -229,6 +229,8 @@ class Crawler {
       headless: this.params.headless,
       executablePath: this.browserExe,
       handleSIGINT: false,
+      handleSIGTERM: false,
+      handleSIGHUP: false,
       ignoreHTTPSErrors: true,
       args: this.chromeArgs,
       userDataDir: this.profileDir,
