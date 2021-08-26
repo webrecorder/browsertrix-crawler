@@ -3,29 +3,49 @@
 var crawler = null;
 
 var lastSigInt = 0;
+let forceTerm = false;
+
+
+async function handleTerminate() {
+  if (!crawler) {
+    process.exit(0);
+  }
+
+  try {
+    if (!crawler.crawlState.draining) {
+      console.log("SIGNAL: gracefully finishing current pages...");
+      crawler.cluster.allTargetCount -= (await crawler.crawlState.size());
+      crawler.crawlState.setDrain();
+
+    } else if ((Date.now() - lastSigInt) > 200) {
+      console.log("SIGNAL: stopping crawl now...");
+      await crawler.serializeConfig();
+      process.exit(0);
+    }
+    lastSigInt = Date.now();
+  } catch (e) {
+    console.log(e);
+  }
+}
 
 process.on("SIGINT", async () => {
-  if (crawler) {
-    try {
-      if (!crawler.crawlState.draining) {
-        console.log("SIGINT received, gracefully finishing current pages...");
-        crawler.cluster.allTargetCount -= (await crawler.crawlState.size());
-        crawler.crawlState.setDrain();
-      } else if ((Date.now() - lastSigInt) > 200) {
-        console.log("SIGINT received, stopping crawl now...");
-        await crawler.serializeConfig();
-        process.exit(1);
-      }
-      lastSigInt = Date.now();
-    } catch (e) {
-      console.log(e);
-    }
-  }
+  console.log("SIGINT received...");
+  await handleTerminate();
 });
 
-process.on("SIGTERM", () => {
-  console.log("SIGTERM received, aborting crawl...");
-  process.exit(1);
+process.on("SIGTERM", async () => {
+  if (forceTerm) {
+    console.log("SIGTERM received, exit immediately");
+    process.exit(1);
+  }
+
+  console.log("SIGTERM received...");
+  await handleTerminate();
+});
+
+process.on("SIGABRT", async () => {
+  console.log("SIGABRT received, will force immediate exit on SIGTERM");
+  forceTerm = true;
 });
 
 
