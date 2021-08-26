@@ -1,6 +1,7 @@
 const child_process = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const fsp = require("fs/promises");
 
 // to ignore HTTPS error for HEAD check
@@ -359,7 +360,7 @@ class Crawler {
       };
 
       const opts = {
-        crawlId: process.env.CRAWL_ID,
+        crawlId: process.env.CRAWL_ID || os.hostname(),
         webhookUrl: process.env.WEBHOOK_URL,
         userId: process.env.STORE_USER,
         filename: process.env.STORE_FILENAME,
@@ -458,7 +459,8 @@ class Crawler {
       this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
 
       if (this.storage) {
-        await this.storage.uploadCollWACZ(waczPath);
+        const finished = await this.crawlState.finished();
+        await this.storage.uploadCollWACZ(waczPath, finished);
       }
     }
   }

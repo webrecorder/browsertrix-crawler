@@ -141,7 +141,7 @@ class S3StorageSync
     }
   }
 
-  async uploadCollWACZ(filename) {
+  async uploadCollWACZ(filename, completed = true) {
     const origStream = fs.createReadStream(filename);
 
     const hash = createHash("sha256");
@@ -190,6 +190,8 @@ class S3StorageSync
 
         hash: resource.hash,
         size: resource.bytes,
+
+        completed
       };
 
       await fetch(this.webhookUrl, {method: "POST", body: JSON.stringify(body)});
