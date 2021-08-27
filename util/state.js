@@ -5,11 +5,23 @@ const Job = require("puppeteer-cluster/dist/Job").default;
 class BaseState
 {
   constructor() {
-    this.draining = false;
+    this.drainMax = 0;
   }
 
-  setDrain() {
-    this.draining = true;
+  async setDrain() {
+    this.drainMax = (await this.numPending()) + (await this.numDone());
+  }
+
+  async size() {
+    return this.drainMax ? 0 : await this.realSize();
+  }
+
+  async finished() {
+    return await this.realSize() == 0;
+  }
+
+  async numSeen() {
+    return this.drainMax ? this.drainMax : await this.numRealSeen();
   }
 }
 
@@ -21,7 +33,7 @@ class MemoryCrawlState extends BaseState
     super();
     this.seenList = new Set();
     this.queue = [];
-    this.pending = {};
+    this.pending = new Set();
     this.done = [];
   }
 
@@ -29,19 +41,19 @@ class MemoryCrawlState extends BaseState
     this.queue.unshift(job.data);
   }
 
-  size() {
-    return this.draining ? 0 : this.queue.length;
+  realSize() {
+    return this.queue.length;
   }
 
   shift() {
     const data = this.queue.pop();
     data.started = new Date().toISOString();
     const str = JSON.stringify(data);
-    this.pending[str] = 1;
+    this.pending.add(str);
 
     const callback = {
       resolve: () => {
-        delete this.pending[str];
+        this.pending.delete(str);
         data.finished = new Date().toISOString();
         this.done.unshift(data);
       },
@@ -64,7 +76,7 @@ class MemoryCrawlState extends BaseState
 
   async serialize() {
     const queued = this.queue.map(x => JSON.stringify(x));
-    const pending = Object.keys(this.pending);
+    const pending = Array.from(this.pending.values());
     const done = this.done.map(x => JSON.stringify(x));
 
     return {queued, pending, done};
@@ -92,54 +104,68 @@ class MemoryCrawlState extends BaseState
     return this.seenList.size;
   }
 
+  async numDone() {
+    return this.done.length;
+  }
+
+  async numRealSeen() {
+    return this.seenList.size;
+  }
+
+  async numPending() {
+    return this.pending.size;
+  }
 }
 
 
 // ============================================================================
 class RedisCrawlState extends BaseState
 {
-  constructor(redis, key) {
+  constructor(redis, key, pageTimeout) {
     super();
     this.redis = redis;
 
     this.key = key;
+    this.pageTimeout = pageTimeout / 1000;
 
     this.qkey = this.key + ":q";
     this.pkey = this.key + ":p";
     this.skey = this.key + ":s";
     this.dkey = this.key + ":d";
+
+
+    redis.defineCommand("movestarted", {
+      numberOfKeys: 2,
+      lua: "local val = redis.call('rpop', KEYS[1]); if (val) then local json = cjson.decode(val); json['started'] = ARGV[1]; val = cjson.encode(json); redis.call('sadd', KEYS[2], val); redis.call('expire', KEYS[2], ARGV[2]); end; return val"
+    });
+
+    redis.defineCommand("movefinished", {
+      numberOfKeys: 2,
+      lua: "local val = ARGV[1]; if (redis.call('srem', KEYS[1], val)) then local json = cjson.decode(val); json['finished'] = ARGV[2]; val = cjson.encode(json); redis.call('lpush', KEYS[2], val); end; return val"
+    });
+
   }
 
   async push(job) {
     await this.redis.lpush(this.qkey, JSON.stringify(job.data));
   }
 
-  async size() {
-    // return 0 if draining to avoid pulling any more data
-    if (this.draining) {
-      return 0;
-    }
-
+  async realSize() {
     return await this.redis.llen(this.qkey);
   }
 
   async shift() {
-    //const json = await this.redis.rpoplpush(this.qkey, this.pkey);
-    let json = await this.redis.rpop(this.qkey);
-    const data = JSON.parse(json);
     const started = new Date().toISOString();
-    data.started = started;
-    json = JSON.stringify(data);
-    await this.redis.sadd(this.pkey, json);
+    // atomically move from queue list -> pending set while adding started timestamp
+    // set pending set expire to page timeout
+    const json = await this.redis.movestarted(this.qkey, this.pkey, started, this.pageTimeout);
+    const data = JSON.parse(json);
 
     const callback = {
       resolve: async () => {
-        //await this.redis.lrem(this.pkey, 1, json);
-        await this.redis.srem(this.pkey, json);
-
-        //data.started = started;
-        data.finished = new Date().toISOString();
-        await this.redis.lpush(this.dkey, JSON.stringify(data));
+        const finished = new Date().toISOString();
+        // atomically move from pending set -> done list while adding finished timestamp
+        await this.redis.movefinished(this.pkey, this.dkey, json, finished);
       },
 
       reject: () => {
@@ -170,6 +196,12 @@ class RedisCrawlState extends BaseState
     const seen = [];
     const addToSeen = (json) => seen.push(JSON.parse(json).url);
 
+    // need to delete existing keys, if exist to fully reset state
+    await this.redis.del(this.qkey);
+    await this.redis.del(this.pkey);
+    await this.redis.del(this.dkey);
+    await this.redis.del(this.skey);
+
     for (const json of state.queued) {
       await this.redis.rpush(this.qkey, json);
       addToSeen(json);
@@ -188,8 +220,19 @@ class RedisCrawlState extends BaseState
     await this.redis.sadd(this.skey, seen);
     return seen.length;
   }
+
+  async numDone() {
+    return await this.redis.llen(this.dkey);
+  }
+
+  async numRealSeen() {
+    return await this.redis.scard(this.skey);
+  }
+
+  async numPending() {
+    return await this.redis.scard(this.pkey);
+  }
 }
 
-//module.exports.RedisCrawlState = MemoryCrawlState;
 module.exports.RedisCrawlState = RedisCrawlState;
 module.exports.MemoryCrawlState = MemoryCrawlState;

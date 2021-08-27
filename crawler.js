@@ -142,27 +142,31 @@ class Crawler {
   }
 
   async initCrawlState() {
-    const stateStore = this.params.stateStore;
+    const redisUrl = this.params.stateStoreUrl;
 
-    if (stateStore && stateStore.startsWith("redis://")) {
-      const redis = new Redis(stateStore, {lazyConnect: true});
+    if (redisUrl) {
+      if (!redisUrl.startsWith("redis://")) {
+        throw new Error("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
+      }
+
+      const redis = new Redis(redisUrl, {lazyConnect: true});
 
       try {
         await redis.connect();
       } catch (e) {
-        throw new Error("Unable to connect to state store Redis: " + stateStore);
+        throw new Error("Unable to connect to state store Redis: " + redisUrl);
       }
 
-      this.statusLog("Storing state via Redis: " + stateStore);
+      this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.params.crawlId}"`);
 
-      const crawlId = this.params.collection + "-" + uuidv4();
-
-      this.crawlState = new RedisCrawlState(redis, crawlId);
+      this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout);
     } else {
       this.statusLog("Storing state in memory");
 
       this.crawlState = new MemoryCrawlState();
     }
+
+    return this.crawlState;
   }
 
   bootstrap() {
@@ -242,8 +246,6 @@ class Crawler {
     await fsp.mkdir(this.params.cwd, {recursive: true});
 
     this.bootstrap();
-
-    await this.initCrawlState();
 
     try {
       await this.crawl();
@@ -361,10 +363,11 @@ class Crawler {
       monitor: this.params.logging.includes("stats")
     });
 
-    this.cluster.jobQueue = this.crawlState;
+
+    this.cluster.jobQueue = await this.initCrawlState();
 
     if (this.params.state) {
-      this.cluster.allTargetCount = await this.crawlState.load(this.params.state);
+      await this.crawlState.load(this.params.state);
     }
 
     this.cluster.task((opts) => this.crawlPage(opts));

@@ -14,7 +14,6 @@ async function handleTerminate() {
   try {
     if (!crawler.crawlState.draining) {
       console.log("SIGNAL: gracefully finishing current pages...");
-      crawler.cluster.allTargetCount -= (await crawler.crawlState.size());
       crawler.crawlState.setDrain();
 
     } else if ((Date.now() - lastSigInt) > 200) {

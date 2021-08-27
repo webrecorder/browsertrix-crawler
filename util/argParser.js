@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 
 const yaml = require("js-yaml");
 const puppeteer = require("puppeteer-core");
@@ -10,7 +11,6 @@ const { hideBin } = require("yargs/helpers");
 const { NewWindowPage} = require("./screencaster");
 const { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } = require("./constants");
 const { ScopedSeed } = require("./seeds");
-
 
 
 // ============================================================================
@@ -35,6 +35,13 @@ class ArgParser {
         describe: "The number of workers to run in parallel",
         default: 1,
         type: "number",
+      },
+
+      "crawlId": {
+        alias: "id",
+        describe: "A user provided ID for this crawl or crawl configuration (can also be set via CRAWL_ID env var)",
+        type: "string",
+        default: process.env.CRAWL_ID || os.hostname(),
       },
 
       "newContext": {
@@ -213,7 +220,7 @@ class ArgParser {
         type: "object"
       },
 
-      "stateStore": {
+      "stateStoreUrl": {
         describe: "If set, url for remote redis server to store state. Otherwise, using in-memory store",
         type: "string"
       }
@@ -222,6 +229,11 @@ class ArgParser {
 
   parseArgs(argv) {
     argv = argv || process.argv;
+
+    if (process.env.CRAWL_ARGS) {
+      argv = argv.concat(process.env.CRAWL_ARGS.split(" "));
+    }
+
     let origConfig = {};
 
     const parsed = yargs(hideBin(argv))
