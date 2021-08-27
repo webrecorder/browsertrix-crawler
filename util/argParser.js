@@ -45,9 +45,8 @@ class ArgParser {
       },
 
       "newContext": {
-        describe: "The context that is reused for each new page.",
+        describe: "The context for each new capture, can be a new: page, window, session or browser.",
         default: "page",
-        choices: ["page", "window", "session", "browser"],
         type: "string"
       },
 
