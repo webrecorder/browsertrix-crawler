@@ -45,8 +45,9 @@ class ArgParser {
       },
 
       "newContext": {
-        describe: "The context for each new capture, can be a new: page, window, session or browser.",
+        describe: "The context that is reused for each new page.",
         default: "page",
+        choices: ["page", "window", "session", "browser"],
         type: "string"
       },
 
@@ -74,8 +75,9 @@ class ArgParser {
       },
 
       "scopeType": {
-        describe: "Predefined for which URLs to crawl, can be: prefix, page, host, any, or custom, to use the scopeIncludeRx/scopeExcludeRx",
+        describe: "A predfined scope of the crawl. For more customization, use 'custom' and set scopeIncludeRx regexes",
         type: "string",
+        choices: ["page", "page-spa", "prefix", "host", "any", "custom"]
       },
 
       "scopeIncludeRx": {
@@ -220,9 +222,16 @@ class ArgParser {
         type: "object"
       },
 
-      "stateStoreUrl": {
+      "redisStoreUrl": {
         describe: "If set, url for remote redis server to store state. Otherwise, using in-memory store",
         type: "string"
+      },
+
+      "saveState": {
+        describe: "If the crawl state should be serialized to the crawls/ directory. Defaults to 'partial', only saved when crawl is interrupted",
+        type: "string",
+        default: "partial",
+        choices: ["never", "partial", "always"]
       }
     };
   }

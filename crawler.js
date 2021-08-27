@@ -1,7 +1,6 @@
 const child_process = require("child_process");
 const path = require("path");
 const fs = require("fs");
-const os = require("os");
 const fsp = require("fs/promises");
 
 // to ignore HTTPS error for HEAD check
@@ -142,7 +141,7 @@ class Crawler {
   }
 
   async initCrawlState() {
-    const redisUrl = this.params.stateStoreUrl;
+    const redisUrl = this.params.redisStoreUrl;
 
     if (redisUrl) {
       if (!redisUrl.startsWith("redis://")) {
@@ -772,13 +771,28 @@ class Crawler {
   }
 
   async serializeConfig() {
+    switch (this.params.saveState) {
+    case "never":
+      return;
+
+    case "partial":
+      if (await this.crawlState.finished()) {
+        return;
+      }
+      break;
+
+    case "always":
+    default:
+      break;
+    }
+
     const ts = new Date().toISOString().slice(0,19).replace(/[T:-]/g, "");
 
     const crawlDir = path.join(this.collDir, "crawls");
 
     await fsp.mkdir(crawlDir, {recursive: true});
 
-    const filename = path.join(crawlDir, `crawl-${ts}-${os.hostname()}.yaml`);
+    const filename = path.join(crawlDir, `crawl-${ts}-${this.params.crawlId}.yaml`);
 
     this.statusLog("Saving crawl state to: " + filename);
 
