@@ -438,7 +438,7 @@ Browsertrix Crawler will then create a profile as before using the current state
 For example, to start in interactive profile creation mode, run:
 
 ```
-docker run -p 9222:9222 -p 9223:9223 -v $PWD/profiles:/output/ -it webrecorder/browsertrix-crawler create-login-profile --interactive --url "https://example.com/"
+docker run -p 9222:9222 -p 9223:9223 -v $PWD/crawls/profiles:/output/ -it webrecorder/browsertrix-crawler create-login-profile --interactive --url "https://example.com/"
 ```
 
 Then, open a browser pointing to `http://localhost:9223/` and use the embedded browser to log in to any sites or configure any settings as needed.
@@ -447,7 +447,7 @@ Click 'Create Profile at the top when done. The profile will then be created in 
 It is also possible to extend an existing profiles by also passing in an existing profile via the `--profile` flag. In this way, it is possible to build new profiles by extending previous browsing sessions as needed.
 
 ```
-docker run -p 9222:9222 -p 9223:9223 -v $PWD/profiles:/profiles --filename /profiles/newProfile.tar.gz -it webrecorder/browsertrix-crawler create-login-profile --interactive --url "https://example.com/ --profile /profiles/oldProfile.tar.gz"
+docker run -p 9222:9222 -p 9223:9223 -v $PWD/crawls/profiles:/profiles --filename /profiles/newProfile.tar.gz -it webrecorder/browsertrix-crawler create-login-profile --interactive --url "https://example.com/ --profile /profiles/oldProfile.tar.gz"
 ```
 
 ### Using Browser Profile with a Crawl
@@ -458,7 +458,7 @@ After running the above command, you can now run a crawl with the profile, as fo
 
 ```bash
 
-docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --profile /crawls/profiles/profile.tar.gz --url https://twitter.com/--generateWACZ --collection test-with-profile
+docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --profile /crawls/profiles/profile.tar.gz --url https://twitter.com/ --generateWACZ --collection test-with-profile
 ```
 
 ## Published Releases / Production Use
