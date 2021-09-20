@@ -1,6 +1,6 @@
 ARG BROWSER_VERSION=91
 
-ARG BROWSER_IMAGE_BASE=oldwebtoday/chrome
+ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base
 
 ARG BROWSER_BIN=google-chrome
 
@@ -21,7 +21,7 @@ RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
     && curl -sL https://deb.nodesource.com/setup_16.x -o /tmp/nodesource_setup.sh && bash /tmp/nodesource_setup.sh \
 	&& apt-get update -y && apt-get install -qqy nodejs yarn \
     && curl https://bootstrap.pypa.io/get-pip.py | python3.8 \
-    && pip install -U setuptools
+    && pip install 'setuptools<58.0'
 
 # needed to add args to main build stage
 ARG BROWSER_VERSION
@@ -36,9 +36,8 @@ ENV PROXY_HOST=localhost \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=${BROWSER_BIN}
 
-COPY --from=browser /tmp/*.deb /deb/
-COPY --from=browser /app/libpepflashplayer.so /app/libpepflashplayer.so
-RUN dpkg -i /deb/*.deb; apt-get update; apt-get install -fqqy && \
+COPY --from=browser /deb/*.deb /deb/
+RUN dpkg -i /deb/*.deb; apt-get update; apt-mark hold chromium-browser; apt --fix-broken install -qqy; \
     rm -rf /var/lib/opts/lists/*
 
 WORKDIR /app
