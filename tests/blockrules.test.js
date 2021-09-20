@@ -133,7 +133,7 @@ test("test block url in frame url", () => {
 test("test block rules complex example, block external urls on main frame, but not on youtube", () => {
   const config = {
     "seeds": [
-      "https://archiveweb.page/guide/troubleshooting/errors.html",
+      "https://archiveweb.page/en/troubleshooting/errors/",
     ],
     "depth": "0",
     "blockRules": [{
