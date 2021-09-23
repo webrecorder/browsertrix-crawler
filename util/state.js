@@ -64,9 +64,9 @@ class MemoryCrawlState extends BaseState
         this.done.unshift(data);
       },
 
-      reject: () => {
+      reject: (e) => {
         this.pending.delete(str);
-        console.warn("URL Load Failed: " + data.url);
+        console.warn(`URL Load Failed: ${data.url}, Reason: ${e}`);
         data.failed = true;
         this.done.unshift(data);
       }
@@ -112,7 +112,11 @@ class MemoryCrawlState extends BaseState
 
     for (const json of state.done) {
       const data = JSON.parse(json);
-      this.done.push(data);
+      if (data.failed) {
+        this.queue.push(data);
+      } else {
+        this.done.push(data);
+      }
       this.seenList.add(data.url);
     }
 
@@ -183,8 +187,8 @@ class RedisCrawlState extends BaseState
         await this.redis.movefinished(this.pkey, this.dkey, json, finished, "finished");
       },
 
-      reject: async () => {
-        console.warn("URL Load Failed: " + data.url);
+      reject: async (e) => {
+        console.warn(`URL Load Failed: ${data.url}, Reason: ${e}`);
         await this.redis.movefinished(this.pkey, this.dkey, json, true, "failed");
       }
     };
@@ -210,7 +214,6 @@ class RedisCrawlState extends BaseState
 
   async load(state, seeds, checkScope) {
     const seen = [];
-    const addToSeen = (json) => seen.push(JSON.parse(json).url);
 
     // need to delete existing keys, if exist to fully reset state
     await this.redis.del(this.qkey);
@@ -219,32 +222,37 @@ class RedisCrawlState extends BaseState
     await this.redis.del(this.skey);
 
     for (const json of state.queued) {
+      const data = JSON.parse(json);
       if (checkScope) {
-        const data = JSON.parse(json);
         if (!this.recheckScope(data, seeds)) {
           continue;
         }
       }
  
       await this.redis.rpush(this.qkey, json);
-      addToSeen(json);
+      seen.push(data.url);
     }
 
     for (const json of state.pending) {
+      const data = JSON.parse(json);
       if (checkScope) {
-        const data = JSON.parse(json);
         if (!this.recheckScope(data, seeds)) {
           continue;
         }
       }
 
       await this.redis.rpush(this.qkey, json);
-      addToSeen(json);
+      seen.push(data.url);
     }
 
     for (const json of state.done) {
-      await this.redis.rpush(this.dkey, json);
-      addToSeen(json);
+      const data = JSON.parse(json);
+      if (data.failed) {
+        await this.redis.rpush(this.qkey, json);
+      } else {
+        await this.redis.rpush(this.dkey, json);
+      }
+      seen.push(data.url);
     }
 
     await this.redis.sadd(this.skey, seen);

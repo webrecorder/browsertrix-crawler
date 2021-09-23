@@ -384,7 +384,11 @@ class Crawler {
 
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
-      await this.queueUrl(i, seed.url, 0);
+      if (!await this.queueUrl(i, seed.url, 0)) {
+        if (this.limitHit) {
+          break;
+        }
+      }
 
       if (seed.sitemap) {
         await this.parseSitemap(seed.sitemap, i);
@@ -536,15 +540,20 @@ class Crawler {
   }
 
   async queueUrl(seedId, url, depth) {
+    if (this.limitHit) {
+      return false;
+    }
+
+    if (this.numLinks >= this.params.limit && this.params.limit > 0) {
+      this.limitHit = true;
+      return false;
+    }
+
     if (await this.crawlState.has(url)) {
       return false;
     }
 
     await this.crawlState.add(url);
-    if (this.numLinks >= this.params.limit && this.params.limit > 0) {
-      this.limitHit = true;
-      return false;
-    }
     this.numLinks++;
     this.cluster.queue({url, seedId, depth});
     return true;

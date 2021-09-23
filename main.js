@@ -12,7 +12,7 @@ async function handleTerminate() {
   }
 
   try {
-    if (!crawler.crawlState.draining) {
+    if (!crawler.crawlState.drainMax) {
       console.log("SIGNAL: gracefully finishing current pages...");
       crawler.crawlState.setDrain();
 
