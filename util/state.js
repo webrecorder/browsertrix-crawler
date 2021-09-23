@@ -23,6 +23,12 @@ class BaseState
   async numSeen() {
     return this.drainMax ? this.drainMax : await this.numRealSeen();
   }
+
+  recheckScope(data, seeds) {
+    const seed = seeds[data.seedId];
+
+    return seed.isIncluded(data.url, data.depth);
+  }
 }
 
 
@@ -59,7 +65,10 @@ class MemoryCrawlState extends BaseState
       },
 
       reject: () => {
+        this.pending.delete(str);
         console.warn("URL Load Failed: " + data.url);
+        data.failed = true;
+        this.done.unshift(data);
       }
     };
 
@@ -82,15 +91,21 @@ class MemoryCrawlState extends BaseState
     return {queued, pending, done};
   }
 
-  async load(state) {
+  async load(state, seeds, checkScope=false) {
     for (const json of state.queued) {
       const data = JSON.parse(json);
+      if (checkScope && !this.recheckScope(data, seeds)) {
+        continue;
+      }
       this.queue.push(data);
       this.seenList.add(data.url);
     }
 
     for (const json of state.pending) {
       const data = JSON.parse(json);
+      if (checkScope && !this.recheckScope(data, seeds)) {
+        continue;
+      }
       this.queue.push(data);
       this.seenList.add(data.url);
     }
@@ -141,7 +156,7 @@ class RedisCrawlState extends BaseState
 
     redis.defineCommand("movefinished", {
       numberOfKeys: 2,
-      lua: "local val = ARGV[1]; if (redis.call('srem', KEYS[1], val)) then local json = cjson.decode(val); json['finished'] = ARGV[2]; val = cjson.encode(json); redis.call('lpush', KEYS[2], val); end; return val"
+      lua: "local val = ARGV[1]; if (redis.call('srem', KEYS[1], val)) then local json = cjson.decode(val); json[ARGV[3]] = ARGV[2]; val = cjson.encode(json); redis.call('lpush', KEYS[2], val); end; return val"
     });
 
   }
@@ -165,11 +180,12 @@ class RedisCrawlState extends BaseState
       resolve: async () => {
         const finished = new Date().toISOString();
         // atomically move from pending set -> done list while adding finished timestamp
-        await this.redis.movefinished(this.pkey, this.dkey, json, finished);
+        await this.redis.movefinished(this.pkey, this.dkey, json, finished, "finished");
       },
 
-      reject: () => {
+      reject: async () => {
         console.warn("URL Load Failed: " + data.url);
+        await this.redis.movefinished(this.pkey, this.dkey, json, true, "failed");
       }
     };
 
@@ -192,7 +208,7 @@ class RedisCrawlState extends BaseState
     return {queued, pending, done};
   }
 
-  async load(state) {
+  async load(state, seeds, checkScope) {
     const seen = [];
     const addToSeen = (json) => seen.push(JSON.parse(json).url);
 
@@ -203,11 +219,25 @@ class RedisCrawlState extends BaseState
     await this.redis.del(this.skey);
 
     for (const json of state.queued) {
+      if (checkScope) {
+        const data = JSON.parse(json);
+        if (!this.recheckScope(data, seeds)) {
+          continue;
+        }
+      }
+ 
       await this.redis.rpush(this.qkey, json);
       addToSeen(json);
     }
 
     for (const json of state.pending) {
+      if (checkScope) {
+        const data = JSON.parse(json);
+        if (!this.recheckScope(data, seeds)) {
+          continue;
+        }
+      }
+
       await this.redis.rpush(this.qkey, json);
       addToSeen(json);
     }

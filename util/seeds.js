@@ -5,16 +5,16 @@ class ScopedSeed
     this.url = parsedUrl.href;
     this.include = this.parseRx(include);
     this.exclude = this.parseRx(exclude);
-
-    if (!scopeType) {
-      scopeType = (this.include.length || this.exclude.length) ? "custom" : "prefix";
-    }
-
     this.scopeType = scopeType;
+
+    if (!this.scopeType) {
+      this.scopeType = this.include.length ? "custom" : "prefix";
+    }
 
     if (this.scopeType !== "custom") {
       [this.include, allowHash] = this.scopeFromType(this.scopeType, parsedUrl);
     }
+
     this.sitemap = this.resolveSiteMap(sitemap);
     this.allowHash = allowHash;
     this.maxDepth = depth < 0 ? 99999 : depth;

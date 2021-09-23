@@ -366,7 +366,7 @@ class Crawler {
     this.cluster.jobQueue = await this.initCrawlState();
 
     if (this.params.state) {
-      await this.crawlState.load(this.params.state);
+      await this.crawlState.load(this.params.state, this.params.scopedSeeds, true);
     }
 
     this.cluster.task((opts) => this.crawlPage(opts));
