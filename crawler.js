@@ -293,7 +293,6 @@ class Crawler {
       // run custom driver here
       await this.driver({page, data, crawler: this});
 
-
       const title = await page.title();
       let text = "";
       if (this.params.text) {
@@ -302,7 +301,7 @@ class Crawler {
         text = await new TextExtract(result).parseTextFromDom();
       }
 
-      await this.writePage(data.url, title, this.params.text, text);
+      await this.writePage(data, title, this.params.text, text);
 
       if (this.params.behaviorOpts) {
         await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
@@ -431,7 +430,7 @@ class Crawler {
       // Build the argument list to pass to the wacz create command
       const waczFilename = this.params.collection.concat(".wacz");
       const waczPath = path.join(this.collDir, waczFilename);
-      const argument_list = ["create", "-o", waczPath, "--pages", this.pagesFile, "-f"];
+      const argument_list = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile, "-f"];
       warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
 
       // Run the wacz create command
@@ -589,12 +588,16 @@ class Crawler {
     }
   }
 
-  async writePage(url, title, text, text_content){
+  async writePage({url, depth}, title, text, text_content) {
     const id = uuidv4();
     const row = {"id": id, "url": url, "title": title};
 
-    if (text == true){
-      row["text"] = text_content;
+    if (depth === 0) {
+      row.seed = true;
+    }
+
+    if (text) {
+      row.text = text_content;
     }
 
     const processedRow = JSON.stringify(row).concat("\n");
