@@ -12,7 +12,8 @@ function getSeeds(config) {
     return orig(name, ...args);
   };
 
-  return parseArgs(["node", "crawler", "--config", "stdinconfig"]).scopedSeeds;
+  const res = parseArgs(["node", "crawler", "--config", "stdinconfig"]);
+  return res.parsed.scopedSeeds;
 }
 
 test("default scope", async () => {
@@ -29,6 +30,24 @@ seeds:
   expect(seeds[0].exclude).toEqual([]);
 
 });
+
+test("default scope + exclude", async () => {
+  const seeds = getSeeds(`
+seeds:
+   - https://example.com/
+
+exclude: https://example.com/pathexclude
+
+`);
+
+
+  expect(seeds.length).toEqual(1);
+  expect(seeds[0].scopeType).toEqual("prefix");
+  expect(seeds[0].include).toEqual([/^https:\/\/example\.com\//]);
+  expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
+
+});
+
 
 test("custom scope", async () => {
   const seeds = getSeeds(`

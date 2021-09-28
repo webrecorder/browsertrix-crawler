@@ -13,14 +13,16 @@ const HTTP_AGENT = require("http").Agent();
 const fetch = require("node-fetch");
 const puppeteer = require("puppeteer-core");
 const { Cluster } = require("puppeteer-cluster");
+const { RedisCrawlState, MemoryCrawlState } = require("./util/state");
 const AbortController = require("abort-controller");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 const Redis = require("ioredis");
+const yaml = require("js-yaml");
 
 const warcio = require("warcio");
 
-const behaviors = fs.readFileSync("/app/node_modules/browsertrix-behaviors/dist/behaviors.js", "utf-8");
+const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
 
 const  TextExtract  = require("./util/textextract");
 const { ScreenCaster } = require("./util/screencaster");
@@ -37,7 +39,7 @@ const { BlockRules } = require("./util/blockrules");
 class Crawler {
   constructor() {
     this.headers = {};
-    this.seenList = new Set();
+    this.crawlState = null;
 
     this.emulateDevice = null;
 
@@ -52,7 +54,9 @@ class Crawler {
 
     this.userAgent = "";
 
-    this.params = parseArgs();
+    const res = parseArgs();
+    this.params = res.parsed;
+    this.origConfig = res.origConfig;
 
     this.debugLogging = this.params.logging.includes("debug");
 
@@ -117,7 +121,8 @@ class Crawler {
       let version = process.env.BROWSER_VERSION;
 
       try {
-        version = child_process.execFileSync(this.browserExe, ["--product-version"], {encoding: "utf8"}).trim();
+        version = child_process.execFileSync(this.browserExe, ["--version"], {encoding: "utf8"});
+        version = version.match(/[\d.]+/)[0];
       } catch(e) {
         console.error(e);
       }
@@ -133,6 +138,34 @@ class Crawler {
         this.emulateDevice.userAgent += " " + this.params.userAgentSuffix;
       }
     }
+  }
+
+  async initCrawlState() {
+    const redisUrl = this.params.redisStoreUrl;
+
+    if (redisUrl) {
+      if (!redisUrl.startsWith("redis://")) {
+        throw new Error("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
+      }
+
+      const redis = new Redis(redisUrl, {lazyConnect: true});
+
+      try {
+        await redis.connect();
+      } catch (e) {
+        throw new Error("Unable to connect to state store Redis: " + redisUrl);
+      }
+
+      this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.params.crawlId}"`);
+
+      this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout);
+    } else {
+      this.statusLog("Storing state in memory");
+
+      this.crawlState = new MemoryCrawlState();
+    }
+
+    return this.crawlState;
   }
 
   bootstrap() {
@@ -164,7 +197,7 @@ class Crawler {
       }
     });
 
-    if (!this.params.headless) {
+    if (!this.params.headless && !process.env.NO_XVFB) {
       child_process.spawn("Xvfb", [
         process.env.DISPLAY,
         "-listen",
@@ -198,6 +231,9 @@ class Crawler {
     return {
       headless: this.params.headless,
       executablePath: this.browserExe,
+      handleSIGINT: false,
+      handleSIGTERM: false,
+      handleSIGHUP: false,
       ignoreHTTPSErrors: true,
       args: this.chromeArgs,
       userDataDir: this.profileDir,
@@ -257,7 +293,6 @@ class Crawler {
       // run custom driver here
       await this.driver({page, data, crawler: this});
 
-
       const title = await page.title();
       let text = "";
       if (this.params.text) {
@@ -266,7 +301,7 @@ class Crawler {
         text = await new TextExtract(result).parseTextFromDom();
       }
 
-      await this.writePage(data.url, title, this.params.text, text);
+      await this.writePage(data, title, this.params.text, text);
 
       if (this.params.behaviorOpts) {
         await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
@@ -326,6 +361,13 @@ class Crawler {
       monitor: this.params.logging.includes("stats")
     });
 
+
+    this.cluster.jobQueue = await this.initCrawlState();
+
+    if (this.params.state) {
+      await this.crawlState.load(this.params.state, this.params.scopedSeeds, true);
+    }
+
     this.cluster.task((opts) => this.crawlPage(opts));
 
     await this.initPages();
@@ -341,7 +383,11 @@ class Crawler {
 
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
-      this.queueUrl(i, seed.url, 0);
+      if (!await this.queueUrl(i, seed.url, 0)) {
+        if (this.limitHit) {
+          break;
+        }
+      }
 
       if (seed.sitemap) {
         await this.parseSitemap(seed.sitemap, i);
@@ -350,6 +396,8 @@ class Crawler {
 
     await this.cluster.idle();
     await this.cluster.close();
+
+    await this.serializeConfig();
 
     this.writeStats();
 
@@ -382,7 +430,7 @@ class Crawler {
       // Build the argument list to pass to the wacz create command
       const waczFilename = this.params.collection.concat(".wacz");
       const waczPath = path.join(this.collDir, waczFilename);
-      const argument_list = ["create", "-o", waczPath, "--pages", this.pagesFile, "-f"];
+      const argument_list = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile, "-f"];
       warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
 
       // Run the wacz create command
@@ -395,7 +443,7 @@ class Crawler {
     if (this.params.statsFilename) {
       const total = this.cluster.allTargetCount;
       const workersRunning = this.cluster.workersBusy.length;
-      const numCrawled = total - this.cluster.jobQueue.size() - workersRunning;
+      const numCrawled = total - (await this.cluster.jobQueue.size()) - workersRunning;
       const limit = {max: this.params.limit || 0, hit: this.limitHit};
       const stats = {numCrawled, workersRunning, total, limit};
 
@@ -438,7 +486,7 @@ class Crawler {
 
     for (const opts of selectorOptsList) {
       const links = await this.extractLinks(page, opts);
-      this.queueInScopeUrls(seedId, links, depth);
+      await this.queueInScopeUrls(seedId, links, depth);
     }
   }
 
@@ -473,7 +521,7 @@ class Crawler {
     return results;
   }
 
-  queueInScopeUrls(seedId, urls, depth) {
+  async queueInScopeUrls(seedId, urls, depth) {
     try {
       depth += 1;
       const seed = this.params.scopedSeeds[seedId];
@@ -482,7 +530,7 @@ class Crawler {
         const captureUrl = seed.isIncluded(url, depth);
 
         if (captureUrl) {
-          this.queueUrl(seedId, captureUrl, depth);
+          await this.queueUrl(seedId, captureUrl, depth);
         }
       }
     } catch (e) {
@@ -490,16 +538,21 @@ class Crawler {
     }
   }
 
-  queueUrl(seedId, url, depth) {
-    if (this.seenList.has(url)) {
+  async queueUrl(seedId, url, depth) {
+    if (this.limitHit) {
       return false;
     }
 
-    this.seenList.add(url);
     if (this.numLinks >= this.params.limit && this.params.limit > 0) {
       this.limitHit = true;
       return false;
     }
+
+    if (await this.crawlState.has(url)) {
+      return false;
+    }
+
+    await this.crawlState.add(url);
     this.numLinks++;
     this.cluster.queue({url, seedId, depth});
     return true;
@@ -535,12 +588,16 @@ class Crawler {
     }
   }
 
-  async writePage(url, title, text, text_content){
+  async writePage({url, depth}, title, text, text_content) {
     const id = uuidv4();
     const row = {"id": id, "url": url, "title": title};
 
-    if (text == true){
-      row["text"] = text_content;
+    if (depth === 0) {
+      row.seed = true;
+    }
+
+    if (text) {
+      row.text = text_content;
     }
 
     const processedRow = JSON.stringify(row).concat("\n");
@@ -626,7 +683,7 @@ class Crawler {
 
     try {
       const { sites } = await sitemapper.fetch();
-      this.queueInScopeUrls(seedId, sites, 0);
+      await this.queueInScopeUrls(seedId, sites, 0);
     } catch(e) {
       console.warn(e);
     }
@@ -644,12 +701,10 @@ class Crawler {
 
     // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
     for (let i = 0; i < warcLists.length; i++) {
-      let fileName = path.join(this.collDir, "archive", warcLists[i]);
-      let fileSize = await this.getFileSize(fileName);
+      const fileName = path.join(this.collDir, "archive", warcLists[i]);
+      const fileSize = await this.getFileSize(fileName);
       fileSizeObjects.push({"fileSize": fileSize, "fileName": fileName});
-      fileSizeObjects.sort(function(a, b){
-        return b.fileSize - a.fileSize;
-      });
+      fileSizeObjects.sort((a, b) => b.fileSize - a.fileSize);
     }
 
     const generatedCombinedWarcs = [];
@@ -725,6 +780,41 @@ class Crawler {
     }
 
     this.debugLog(`Combined WARCs saved as: ${generatedCombinedWarcs}`);
+  }
+
+  async serializeConfig() {
+    switch (this.params.saveState) {
+    case "never":
+      return;
+
+    case "partial":
+      if (await this.crawlState.finished()) {
+        return;
+      }
+      break;
+
+    case "always":
+    default:
+      break;
+    }
+
+    const ts = new Date().toISOString().slice(0,19).replace(/[T:-]/g, "");
+
+    const crawlDir = path.join(this.collDir, "crawls");
+
+    await fsp.mkdir(crawlDir, {recursive: true});
+
+    const filename = path.join(crawlDir, `crawl-${ts}-${this.params.crawlId}.yaml`);
+
+    this.statusLog("Saving crawl state to: " + filename);
+
+    const state = await this.crawlState.serialize();
+
+    if (this.origConfig) {
+      this.origConfig.state = state;
+    }
+    const res = yaml.dump(this.origConfig, {lineWidth: -1});
+    fs.writeFileSync(filename, res);
   }
 }
 

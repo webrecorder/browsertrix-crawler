@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 
 const yaml = require("js-yaml");
 const puppeteer = require("puppeteer-core");
@@ -10,7 +11,6 @@ const { hideBin } = require("yargs/helpers");
 const { NewWindowPage} = require("./screencaster");
 const { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } = require("./constants");
 const { ScopedSeed } = require("./seeds");
-
 
 
 // ============================================================================
@@ -35,6 +35,13 @@ class ArgParser {
         describe: "The number of workers to run in parallel",
         default: 1,
         type: "number",
+      },
+
+      "crawlId": {
+        alias: "id",
+        describe: "A user provided ID for this crawl or crawl configuration (can also be set via CRAWL_ID env var)",
+        type: "string",
+        default: process.env.CRAWL_ID || os.hostname(),
       },
 
       "newContext": {
@@ -67,8 +74,9 @@ class ArgParser {
       },
 
       "scopeType": {
-        describe: "Predefined for which URLs to crawl, can be: prefix, page, host, any, or custom, to use the scopeIncludeRx/scopeExcludeRx",
+        describe: "A predfined scope of the crawl. For more customization, use 'custom' and set scopeIncludeRx regexes",
         type: "string",
+        choices: ["page", "page-spa", "prefix", "host", "any", "custom"]
       },
 
       "scopeIncludeRx": {
@@ -211,6 +219,18 @@ class ArgParser {
         alias: ["warcinfo"],
         describe: "Optional fields added to the warcinfo record in combined WARCs",
         type: "object"
+      },
+
+      "redisStoreUrl": {
+        describe: "If set, url for remote redis server to store state. Otherwise, using in-memory store",
+        type: "string"
+      },
+
+      "saveState": {
+        describe: "If the crawl state should be serialized to the crawls/ directory. Defaults to 'partial', only saved when crawl is interrupted",
+        type: "string",
+        default: "partial",
+        choices: ["never", "partial", "always"]
       }
     };
   }
@@ -218,17 +238,26 @@ class ArgParser {
   parseArgs(argv) {
     argv = argv || process.argv;
 
-    return yargs(hideBin(argv))
+    if (process.env.CRAWL_ARGS) {
+      argv = argv.concat(process.env.CRAWL_ARGS.split(" "));
+    }
+
+    let origConfig = {};
+
+    const parsed = yargs(hideBin(argv))
       .usage("crawler [options]")
       .option(this.cliOpts)
       .config("config", "Path to YAML config file", (configPath) => {
         if (configPath === "/crawls/stdin") {
           configPath = process.stdin.fd;
         }
-        return yaml.load(fs.readFileSync(configPath, "utf8"));
+        origConfig = yaml.load(fs.readFileSync(configPath, "utf8"));
+        return origConfig;
       })
       .check((argv) => this.validateArgs(argv))
       .argv;
+
+    return {parsed, origConfig};
   }
 
 

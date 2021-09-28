@@ -61,6 +61,10 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                                                         [string]
   -w, --workers                             The number of workers to run in
                                             parallel       [number] [default: 1]
+      --crawlId, --id                       A user provided ID for this crawl or
+                                            crawl configuration (can also be set
+                                            via CRAWL_ID env var)
+                                              [string] [default: "4dd1535f7800"]
       --newContext                          The context for each new capture,
                                             can be a new: page, window, session
                                             or browser.
@@ -75,11 +79,10 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                                            [number] [default: 0]
       --timeout                             Timeout for each page to load (in
                                             seconds)      [number] [default: 90]
-      --scopeType                           Predefined for which URLs to crawl,
-                                            can be: prefix, page, host, any, or
-                                            custom, to use the
-                                            scopeIncludeRx/scopeExcludeRx
-                                                                        [string]
+      --scopeType                           A predfined scope of the crawl. For
+                                            more customization, use 'custom' and
+                                            set scopeIncludeRx regexes
+       [string] [choices: "page", "page-spa", "prefix", "host", "any", "custom"]
       --scopeIncludeRx, --include           Regex of page URLs that should be
                                             included in the crawl (defaults to
                                             the immediate directory of URL)
@@ -156,6 +159,14 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                                            [number] [default: 0]
       --warcInfo, --warcinfo                Optional fields added to the
                                             warcinfo record in combined WARCs
+      --redisStoreUrl                       If set, url for remote redis server
+                                            to store state. Otherwise, using
+                                            in-memory store             [string]
+      --saveState                           If the crawl state should be
+                                            serialized to the crawls/ directory.
+                                            Defaults to 'partial', only saved
+                                            when crawl is interrupted
+           [string] [choices: "never", "partial", "always"] [default: "partial"]
       --config                              Path to YAML config file
 ```
 </details>
@@ -394,6 +405,20 @@ docker run -p 9037:9037 -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler 
 
 will start a crawl with 3 workers, and show the screen of each of the workers from `http://localhost:9037/`.
 
+## Interrupting and Restarting the Crawl
+
+With version 0.5.0, a crawl can be gracefully interrupted with Ctrl-C (SIGINT) or a SIGTERM.
+When a crawl is interrupted, the current crawl state is written to the `crawls` subdirectory inside the collection directory.
+The crawl state includes the current YAML config, if any, plus the current state of the crawl.
+
+The idea is that this crawl state YAML file can then be used as `--config` option to restart the crawl from where it was left of previously.
+
+By default, the crawl interruption waits for current pages to finish. A subsequent SIGINT will cause the crawl to stop immediately. Any unfinished pages
+are recorded in the `pending` section of the crawl state (if gracefully finished, the section will be empty).
+
+By default, the crawl state is only written when a crawl is only partially done - when it is interrupted. The `--saveState` cli option can be set to `always`
+or `never` respectively, to control when the crawl state file should be written.
+
 
 ## Creating and Using Browser Profiles
 
@@ -517,7 +542,7 @@ Browsertrix Crawler uses a browser image which supports amd64 and arm64 (current
 
 This means Browsertrix Crawler can be built natively on Apple M1 systems using the default settings. Simply running `docker-compose build` on an Apple M1 should build a native version that should work for development.
 
-On M1 system, the browser used will be Chromium instead of Chrome since there is no Linux build of Chrome for ARM, and this now is handled automatically as part of the build.
+On M1 system, the browser used will be Chromium instead of Chrome since there is no Linux build of Chrome for ARM, and this now is handled automatically as part of the build. Note that Chromium is different than Chrome, and for example, some video codecs may not be supported in the ARM / Chromium-based version that would be in the amd64 / Chrome version. For production crawling, it is recommended to run on an amd64 Linux environment.
 
 
 ### Custom Browser Image
