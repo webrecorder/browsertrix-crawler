@@ -1,9 +1,12 @@
 const fs = require("fs");
+const os = require("os");
 const { Transform } = require("stream");
 const { createHash } = require("crypto");
 
 const fetch = require("node-fetch");
 const Minio = require("minio");
+
+const { initRedis } = require("./redis");
 
 class S3StorageSync
 {
@@ -16,7 +19,9 @@ class S3StorageSync
       url = new URL(urlOrData);
       accessKey = url.username;
       secretKey = url.password;
-      this.fullPrefix = urlOrData;
+      url.username = "";
+      url.password = "";
+      this.fullPrefix = url.href;
 
     } else {
       url = new URL(urlOrData.endpointUrl);
@@ -43,10 +48,11 @@ class S3StorageSync
     this.crawlId = crawlId;
     this.webhookUrl = webhookUrl;
 
-    if (!filename) {
-      const ts = new Date().toISOString().replace(/[:TZz.-]/g, "");
-      filename = `${ts}-${this.userId}.wacz`;
-    }
+    filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.-]/g, ""));
+    filename = filename.replace("@hostname", os.hostname());
+    filename = filename.replace("@id", this.crawlId);
+
+    console.log(filename);
 
     this.waczFilename = "data/" + filename;
   }
@@ -73,7 +79,14 @@ class S3StorageSync
   }
 
   async init() {
-    await this.setPublicPolicy();
+    //await this.setPublicPolicy();
+
+    if (this.userId) {
+      await this.initUserLog();
+    }
+  }
+
+  async initUserLog() {
     this.userBuffer = await this.syncUserLog(this.userId);
     if (!this.userBuffer) {
       this.userBuffer = JSON.stringify({"op": "new-contributor", "id": this.userId, "ts": new Date().getTime()});
@@ -168,25 +181,28 @@ class S3StorageSync
 
     const resource = {"path": this.waczFilename, "hash": finalHash, "bytes": size};
 
-    this.resources.push(resource);
+    if (this.userId) {
+      this.resources.push(resource);
 
-    this.userBuffer += "\n" + JSON.stringify({"op": "upload", ...resource});
-    console.log(this.userBuffer);
+      this.userBuffer += "\n" + JSON.stringify({"op": "upload", ...resource});
+      console.log(this.userBuffer);
 
-    // update user log
-    await this.client.putObject(this.bucketName, this.objectPrefix + "contributors/" + this.userId + ".jsonl", this.userBuffer);
+      // update user log
+      await this.client.putObject(this.bucketName, this.objectPrefix + "contributors/" + this.userId + ".jsonl", this.userBuffer);
 
-    await this.readOtherUserLogs();
+      await this.readOtherUserLogs();
 
-    // update datapackage.json
-    await this.updateDataPackage();
+      // update datapackage.json
+      await this.updateDataPackage();
+    }
 
     if (this.webhookUrl) {
       const body = {
         id: this.crawlId,
         user: this.userId,
 
-        filename: `s3://${this.bucketName}/${this.objectPrefix}${this.waczFilename}`,
+        //filename: `s3://${this.bucketName}/${this.objectPrefix}${this.waczFilename}`,
+        filename: this.fullPrefix + this.waczFilename,
 
         hash: resource.hash,
         size: resource.bytes,
@@ -194,7 +210,18 @@ class S3StorageSync
         completed
       };
 
-      await fetch(this.webhookUrl, {method: "POST", body: JSON.stringify(body)});
+      console.log("Pinging Webhook: " + this.webhookUrl);
+
+      if (this.webhookUrl.startsWith("http://") || this.webhookUrl.startsWith("https://")) {
+        await fetch(this.webhookUrl, {method: "POST", body: JSON.stringify(body)});
+      } else if (this.webhookUrl.startsWith("redis://")) {
+        const parts = this.webhookUrl.split("/");
+        if (parts.length !== 5) {
+          throw new Error("redis webhook url must be in format: redis://<host>:<port>/<db>/<key>");
+        }
+        const redis = await initRedis(parts.slice(0, 4).join("/"));
+        await redis.rpush(parts[4], JSON.stringify(body));
+      }
     }
   }
 

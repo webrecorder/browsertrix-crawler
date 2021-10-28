@@ -14,7 +14,7 @@
   }
 </style>
 <script>
-  const ws = new WebSocket(window.location.origin.replace("http", "ws") + "/ws");
+  const ws = new WebSocket(window.location.href.replace("http", "ws") + "ws");
   ws.addEventListener("message", (event) => handleMessage(event.data));
 
   const unusedElems = [];

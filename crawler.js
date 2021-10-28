@@ -18,7 +18,6 @@ const { RedisCrawlState, MemoryCrawlState } = require("./util/state");
 const AbortController = require("abort-controller");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
-const Redis = require("ioredis");
 const yaml = require("js-yaml");
 
 const warcio = require("warcio");
@@ -29,6 +28,7 @@ const  TextExtract  = require("./util/textextract");
 const { S3StorageSync } = require("./util/storage");
 const { ScreenCaster } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
+const { initRedis } = require("./util/redis");
 
 const { getBrowserExe, loadProfile } = require("./util/browser");
 
@@ -44,9 +44,6 @@ class Crawler {
     this.crawlState = null;
 
     this.emulateDevice = null;
-
-    // links crawled counter
-    this.numLinks = 0;
 
     // pages file
     this.pagesFH = null;
@@ -150,10 +147,10 @@ class Crawler {
         throw new Error("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
       }
 
-      const redis = new Redis(redisUrl, {lazyConnect: true});
+      let redis;
 
       try {
-        await redis.connect();
+        redis = await initRedis(redisUrl);
       } catch (e) {
         throw new Error("Unable to connect to state store Redis: " + redisUrl);
       }
@@ -353,8 +350,9 @@ class Crawler {
     }
 
     if (this.params.generateWACZ && process.env.STORE_ENDPOINT_URL) {
+      const endpointUrl = process.env.STORE_ENDPOINT_URL + (process.env.STORE_PATH || "");
       const storeInfo = {
-        endpointUrl: process.env.STORE_ENDPOINT_URL,
+        endpointUrl,
         accessKey: process.env.STORE_ACCESS_KEY,
         secretKey: process.env.STORE_SECRET_KEY,
       };
@@ -363,7 +361,7 @@ class Crawler {
         crawlId: process.env.CRAWL_ID || os.hostname(),
         webhookUrl: process.env.WEBHOOK_URL,
         userId: process.env.STORE_USER,
-        filename: process.env.STORE_FILENAME,
+        filename: process.env.STORE_FILENAME || "@ts-@id.wacz",
       };
 
       console.log("Initing Storage...");
@@ -375,7 +373,7 @@ class Crawler {
     this.cluster = await Cluster.launch({
       concurrency: this.params.newContext,
       maxConcurrency: this.params.workers,
-      skipDuplicateUrls: true,
+      skipDuplicateUrls: false,
       timeout: this.params.timeout * 2,
       puppeteerOptions: this.puppeteerArgs,
       puppeteer,
@@ -569,7 +567,7 @@ class Crawler {
       return false;
     }
 
-    if (this.numLinks >= this.params.limit && this.params.limit > 0) {
+    if (this.params.limit > 0 && (await this.crawlState.numRealSeen() >= this.params.limit)) {
       this.limitHit = true;
       return false;
     }
@@ -579,7 +577,6 @@ class Crawler {
     }
 
     await this.crawlState.add(url);
-    this.numLinks++;
     this.cluster.queue({url, seedId, depth});
     return true;
   }
@@ -682,7 +679,7 @@ class Crawler {
   async awaitPendingClear() {
     this.statusLog("Waiting to ensure pending data is written to WARCs...");
 
-    const redis = new Redis("redis://localhost/0");
+    const redis = await initRedis("redis://localhost/0");
 
     while (true) {
       const res = await redis.get(`pywb:${this.params.collection}:pending`);
