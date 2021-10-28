@@ -354,7 +354,7 @@ class Crawler {
     this.cluster = await Cluster.launch({
       concurrency: this.params.newContext,
       maxConcurrency: this.params.workers,
-      skipDuplicateUrls: true,
+      skipDuplicateUrls: false,
       timeout: this.params.timeout * 2,
       puppeteerOptions: this.puppeteerArgs,
       puppeteer,
