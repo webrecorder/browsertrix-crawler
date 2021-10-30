@@ -32,4 +32,3 @@ test("ensure custom driver with custom selector crawls JS files as pages", async
   expect(pages).toEqual(expectedPages);
 
 });
- 

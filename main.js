@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --experimental-global-webcrypto
 
 import { Crawler } from "./crawler.js";
 
