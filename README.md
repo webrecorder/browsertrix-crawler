@@ -88,6 +88,8 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                             the immediate directory of URL)
       --scopeExcludeRx, --exclude           Regex of page URLs that should be
                                             excluded from the crawl.
+      --screenshot, Screenshot              Saves a screenshot of the page into a
+                                            warc in the screenshot folder.
       --allowHashUrls                       Allow Hashtag URLs, useful for
                                             single-page-application crawling or
                                             when different hashtags load dynamic

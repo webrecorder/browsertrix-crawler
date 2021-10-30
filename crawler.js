@@ -25,6 +25,8 @@ const warcio = require("warcio");
 const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
 
 const  TextExtract  = require("./util/textextract");
+const  Screenshots = require("./util/screenshots");
+
 const { ScreenCaster } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 
@@ -212,6 +214,15 @@ class Crawler {
     }
   }
 
+  initScreenshots() {
+    if (this.params.screenshot) {
+      this.screenShotDir = path.join(this.collDir, "screenshots");
+      if (!fs.existsSync(this.screenShotDir)) {
+        fs.mkdirSync(this.screenShotDir);
+      }
+    }
+  }
+
   get chromeArgs() {
     // Chrome Flags, including proxy server
     return [
@@ -294,6 +305,12 @@ class Crawler {
       await this.driver({page, data, crawler: this});
 
       const title = await page.title();
+
+      if (this.params.screenshot) {
+        const pageID = uuidv4();
+        await new Screenshots({page, id: pageID, url: data.url, directory: this.screenShotDir}).take();
+      }
+
       let text = "";
       if (this.params.text) {
         const client = await page.target().createCDPSession();
@@ -329,7 +346,7 @@ class Crawler {
       "software": `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`,
       "format": "WARC File Format 1.0"
     };
-    
+
     const warcInfo = {...info, ...this.params.warcInfo, };
     const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, warcInfo);
     const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
@@ -371,6 +388,7 @@ class Crawler {
     this.cluster.task((opts) => this.crawlPage(opts));
 
     await this.initPages();
+    await this.initScreenshots();
 
     if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, (text) => this.debugLog(text));

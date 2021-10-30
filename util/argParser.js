@@ -24,6 +24,13 @@ class ArgParser {
         default: [],
       },
 
+      "screenshot": {
+        alias: ["Screenshot"],
+        describe: "If set, take screenshots of the page (initially visible area and full page), wrap them into WARC files and place them in the folder screenshots/",
+        type: "boolean",
+        default: false,
+      },
+
       "seedFile": {
         alias: ["urlFile"],
         describe: "If set, read a list of seed urls, one per line, from the specified",
