@@ -366,7 +366,6 @@ class Crawler {
 
       console.log("Initing Storage...");
       this.storage = new S3StorageSync(storeInfo, opts);
-      await this.storage.init();
     }
 
     // Puppeteer Cluster init and options
