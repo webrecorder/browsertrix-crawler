@@ -22,10 +22,12 @@ test("ensure custom driver with custom selector crawls JS files as pages", async
     pages.add(url);
   }
 
+  console.log(pages);
+
   const expectedPages = new Set([
     "https://www.iana.org/",
-    "https://www.iana.org/_js/2013.1/jquery.js",
-    "https://www.iana.org/_js/2013.1/iana.js"
+    "https://www.iana.org/_js/jquery.js",
+    "https://www.iana.org/_js/iana.js"
   ]);
 
   expect(pages).toEqual(expectedPages);
