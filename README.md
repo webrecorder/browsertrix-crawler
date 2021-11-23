@@ -405,6 +405,45 @@ docker run -p 9037:9037 -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler 
 
 will start a crawl with 3 workers, and show the screen of each of the workers from `http://localhost:9037/`.
 
+### Uploading crawl output to S3-Compatible Storage
+
+Browsertrix Crawler also includes support for uploading WACZ files to S3-compatible storage, and notifying a webhook when the upload succeeds.
+
+(At this time, S3 upload is supported only when WACZ output is enabled, but WARC uploads may be added in the future).
+
+This feature can currently be enabled by setting environment variables (for security reasons, these settings are not passed in as part of the command-line or YAML config at this time).
+
+<details>
+
+<summary>Environment variables for S3-uploads include:</summary>
+
+- `STORE_ACCESS_KEY` / `STORE_SECRET_KEY` - S3 credentials
+- `STORE_ENDPOINT_URL` - S3 endpoint URL
+- `STORE_PATH` - optional path appended to endpoint, if provided
+- `STORE_FILENAME` - filename or template for filename to put on S3
+- `STORE_USER` - optional username to pass back as part of the webhook callback
+- `CRAWL_ID` - unique crawl id (defaults to container hostname)
+- `WEBHOOK_URL` - the URL of the webhook (can be http://, https:// or redis://)
+
+</details>
+
+#### Webhook Notification
+
+The webhook URL can be an HTTP URL which receives a JSON POST request OR a Redis URL, which specifies a redis list key to which the JSON data is pushed as a string.
+
+<details>
+
+<summary>Webhook notification JSON includes:</summary>
+
+- `id` - crawl id (value of `CRAWL_ID`)
+- `userId` - user id (value of `STORE_USER`)
+- `filename` - bucket path + filename of the file
+- `size` - size of WACZ file
+- `hash` - SHA-256 of WACZ file
+- `completed` - boolean of whether crawl fully completed or partially (due to interrupt signal or other error).
+
+</details>
+
 ## Interrupting and Restarting the Crawl
 
 With version 0.5.0, a crawl can be gracefully interrupted with Ctrl-C (SIGINT) or a SIGTERM.

@@ -1,6 +1,7 @@
 const child_process = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const fsp = require("fs/promises");
 
 // to ignore HTTPS error for HEAD check
@@ -17,7 +18,6 @@ const { RedisCrawlState, MemoryCrawlState } = require("./util/state");
 const AbortController = require("abort-controller");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
-const Redis = require("ioredis");
 const yaml = require("js-yaml");
 
 const warcio = require("warcio");
@@ -25,8 +25,10 @@ const warcio = require("warcio");
 const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
 
 const  TextExtract  = require("./util/textextract");
+const { S3StorageSync } = require("./util/storage");
 const { ScreenCaster } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
+const { initRedis } = require("./util/redis");
 
 const { getBrowserExe, loadProfile } = require("./util/browser");
 
@@ -42,9 +44,6 @@ class Crawler {
     this.crawlState = null;
 
     this.emulateDevice = null;
-
-    // links crawled counter
-    this.numLinks = 0;
 
     // pages file
     this.pagesFH = null;
@@ -148,10 +147,10 @@ class Crawler {
         throw new Error("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
       }
 
-      const redis = new Redis(redisUrl, {lazyConnect: true});
+      let redis;
 
       try {
-        await redis.connect();
+        redis = await initRedis(redisUrl);
       } catch (e) {
         throw new Error("Unable to connect to state store Redis: " + redisUrl);
       }
@@ -350,6 +349,25 @@ class Crawler {
       return;
     }
 
+    if (this.params.generateWACZ && process.env.STORE_ENDPOINT_URL) {
+      const endpointUrl = process.env.STORE_ENDPOINT_URL + (process.env.STORE_PATH || "");
+      const storeInfo = {
+        endpointUrl,
+        accessKey: process.env.STORE_ACCESS_KEY,
+        secretKey: process.env.STORE_SECRET_KEY,
+      };
+
+      const opts = {
+        crawlId: process.env.CRAWL_ID || os.hostname(),
+        webhookUrl: process.env.WEBHOOK_URL,
+        userId: process.env.STORE_USER,
+        filename: process.env.STORE_FILENAME || "@ts-@id.wacz",
+      };
+
+      console.log("Initing Storage...");
+      this.storage = new S3StorageSync(storeInfo, opts);
+    }
+
     // Puppeteer Cluster init and options
     this.cluster = await Cluster.launch({
       concurrency: this.params.newContext,
@@ -436,6 +454,11 @@ class Crawler {
       // Run the wacz create command
       child_process.spawnSync("wacz" , argument_list, {stdio: "inherit"});
       this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
+
+      if (this.storage) {
+        const finished = await this.crawlState.finished();
+        await this.storage.uploadCollWACZ(waczPath, finished);
+      }
     }
   }
 
@@ -543,7 +566,7 @@ class Crawler {
       return false;
     }
 
-    if (this.numLinks >= this.params.limit && this.params.limit > 0) {
+    if (this.params.limit > 0 && (await this.crawlState.numRealSeen() >= this.params.limit)) {
       this.limitHit = true;
       return false;
     }
@@ -553,7 +576,6 @@ class Crawler {
     }
 
     await this.crawlState.add(url);
-    this.numLinks++;
     this.cluster.queue({url, seedId, depth});
     return true;
   }
@@ -656,7 +678,7 @@ class Crawler {
   async awaitPendingClear() {
     this.statusLog("Waiting to ensure pending data is written to WARCs...");
 
-    const redis = new Redis("redis://localhost/0");
+    const redis = await initRedis("redis://localhost/0");
 
     while (true) {
       const res = await redis.get(`pywb:${this.params.collection}:pending`);
