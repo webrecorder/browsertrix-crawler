@@ -231,14 +231,6 @@ class ArgParser {
         type: "string",
         default: "partial",
         choices: ["never", "partial", "always"]
-      },
-
-      "storageApi": {
-        type: "string",
-      },
-
-      "storageUser": {
-        type: "string",
       }
     };
   }
