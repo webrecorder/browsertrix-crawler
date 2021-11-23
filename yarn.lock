@@ -1065,9 +1065,10 @@ browserslist@^4.14.5:
     escalade "^3.1.1"
     node-releases "^1.1.71"
 
-"browsertrix-behaviors@github:webrecorder/browsertrix-behaviors#skip-mp4-video":
+browsertrix-behaviors@^0.2.4:
   version "0.2.4"
-  resolved "https://codeload.github.com/webrecorder/browsertrix-behaviors/tar.gz/50a0538f0a19fba786a7af62ef6c0946e21038b4"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.2.4.tgz#171705e264c094927026cc7d47bc2a4ba817ebcc"
+  integrity sha512-jOtI1mJ/57PXk+JaHvvxbR8D+20lsVWkemkFlb5hpqJve22UuUYyJcS7aopoyCIYFsNnavdx41nM+aAe6pZWZg==
 
 bser@2.1.1:
   version "2.1.1"
