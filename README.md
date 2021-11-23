@@ -405,22 +405,7 @@ docker run -p 9037:9037 -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler 
 
 will start a crawl with 3 workers, and show the screen of each of the workers from `http://localhost:9037/`.
 
-## Interrupting and Restarting the Crawl
-
-With version 0.5.0, a crawl can be gracefully interrupted with Ctrl-C (SIGINT) or a SIGTERM.
-When a crawl is interrupted, the current crawl state is written to the `crawls` subdirectory inside the collection directory.
-The crawl state includes the current YAML config, if any, plus the current state of the crawl.
-
-The idea is that this crawl state YAML file can then be used as `--config` option to restart the crawl from where it was left of previously.
-
-By default, the crawl interruption waits for current pages to finish. A subsequent SIGINT will cause the crawl to stop immediately. Any unfinished pages
-are recorded in the `pending` section of the crawl state (if gracefully finished, the section will be empty).
-
-By default, the crawl state is only written when a crawl is only partially done - when it is interrupted. The `--saveState` cli option can be set to `always`
-or `never` respectively, to control when the crawl state file should be written.
-
-
-## Uploading to S3-Compatilbe Storage
+### Uploading crawl output to S3-Compatible Storage
 
 Browsertrix Crawler also includes support for uploading WACZ files to S3-compatible storage, and notifying a webhook when the upload succeeds.
 
@@ -442,7 +427,7 @@ This feature can currently be enabled by setting environment variables (for secu
 
 </details>
 
-### Webhook Notification
+#### Webhook Notification
 
 The webhook URL can be an HTTP URL which receives a JSON POST request OR a Redis URL, which specifies a redis list key to which the JSON data is pushed as a string.
 
@@ -458,6 +443,20 @@ The webhook URL can be an HTTP URL which receives a JSON POST request OR a Redis
 - `completed` - boolean of whether crawl fully completed or partially (due to interrupt signal or other error).
 
 </details>
+
+## Interrupting and Restarting the Crawl
+
+With version 0.5.0, a crawl can be gracefully interrupted with Ctrl-C (SIGINT) or a SIGTERM.
+When a crawl is interrupted, the current crawl state is written to the `crawls` subdirectory inside the collection directory.
+The crawl state includes the current YAML config, if any, plus the current state of the crawl.
+
+The idea is that this crawl state YAML file can then be used as `--config` option to restart the crawl from where it was left of previously.
+
+By default, the crawl interruption waits for current pages to finish. A subsequent SIGINT will cause the crawl to stop immediately. Any unfinished pages
+are recorded in the `pending` section of the crawl state (if gracefully finished, the section will be empty).
+
+By default, the crawl state is only written when a crawl is only partially done - when it is interrupted. The `--saveState` cli option can be set to `always`
+or `never` respectively, to control when the crawl state file should be written.
 
 
 ## Creating and Using Browser Profiles
