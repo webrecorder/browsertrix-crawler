@@ -214,6 +214,7 @@ class Crawler {
   get chromeArgs() {
     // Chrome Flags, including proxy server
     return [
+      ...(process.env.CHROME_FLAGS ?? '').split(' ').filter(Boolean),
       "--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
       `--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`,
       "--no-sandbox",
