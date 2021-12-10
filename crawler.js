@@ -19,6 +19,8 @@ const AbortController = require("abort-controller");
 const Sitemapper = require("sitemapper");
 const { v4: uuidv4 } = require("uuid");
 const yaml = require("js-yaml");
+const { DownloaderHelper } = require('node-downloader-helper');
+const ping = require ("net-ping");
 
 const warcio = require("warcio");
 
@@ -52,6 +54,10 @@ class Crawler {
     this.limitHit = false;
 
     this.userAgent = "";
+
+    this.downloadPDFS = false;
+
+    this.seenPDFS = new Set();
 
     const res = parseArgs();
     this.params = res.parsed;
@@ -272,29 +278,61 @@ class Crawler {
     }
   }
 
+
+
   async crawlPage({page, data}) {
     try {
+
+
       if (this.screencaster) {
         await this.screencaster.newTarget(page.target());
       }
 
 
       if (this.params.download){
+
         page.on('response', async (response) => {
-        const url = new URL(response.url());
-        let filePath = path.join(this.downloadDir, url.pathname);
 
-        if (path.extname(url.pathname).trim() === '') {
-        filePath = `${filePath}/index.html`;
+        const status = response.status()
+
+        if ((status >= 300) && (status <= 399)) {
+          console.log('Redirect from', response.url(), 'to', response.headers()['location'])
         }
 
-        const dirPath = filePath.split("/").slice(0, -1).join("/")
-        if ( fs.existsSync(dirPath) != true){
-        fs.mkdir(dirPath, { recursive: true }, (err) => {
-        if (err) throw err;
-        });
+        else{
+          try {
+            const url = new URL(response.url());
+
+            let filePath = path.join(this.downloadDir, url.pathname);
+
+            if (path.extname(url.pathname).trim() === '') {
+              filePath = `${filePath}/index.html`;
+            }
+
+            var dirPath = filePath.split("/").slice(0, -1).join("/")
+
+            if ( fs.existsSync(dirPath) != true){
+              if (dirPath.includes(';base64')){
+                const split_path = dirPath.split(";base64")
+                dirPath = path.join(split_path[0], uuidv4())
+                const image_type = split_path[0].split("/").pop()
+                filePath = path.join(dirPath, image_type)
+              }
+              fs.mkdir(path.join(dirPath, "/"), { recursive: true }, (err) => {
+            });
+            }
+
+            if  (fs.existsSync(dirPath)){
+              await fs.writeFileSync(filePath, await response.buffer());
+            }
+
+          }
+          catch(error){
+            console.log("donwload error i guess idk")
+            console.log(error)
+          }
         }
-        await fs.writeFileSync(filePath, await response.buffer());
+
         });
       }
 
@@ -315,6 +353,47 @@ class Crawler {
       // run custom driver here
       await this.driver({page, data, crawler: this});
       const title = await page.title();
+
+      if (this.params.download){
+        const hrefs = await page.$$eval('a', as => as.map(a => a.href));
+        for (var i = 0; i < hrefs.length; i++){
+          const file_format = hrefs[i].split('/').pop()
+
+          if (file_format.includes('pdf')){
+            this.downloadPDFS = true;
+            if (this.downloadPDFS == true && fs.existsSync(path.join(this.downloadDir, "pdf")) != true){
+              console.log("Creating a pdf folder for downloads")
+              fs.mkdir(path.join(this.downloadDir, "pdf"), { recursive: true }, (err) => {});
+            }
+            const resp = await fetch(hrefs[i], {
+              method: "HEAD",
+              headers: this.headers,
+              agent: this.resolveAgent
+            });
+
+            if (resp.status != 200 ) {
+              console.log(`Url for ${hrefs[i]} returned a ${resp.status} code. The pdf will not be downloaded`);
+            }
+
+            if ( resp.status == 200 && fs.existsSync(path.join(this.downloadDir, "pdf", file_format)) != true){
+
+              
+                const dl = new DownloaderHelper(hrefs[i], path.join(this.downloadDir, "pdf"));
+
+            dl.on('end', () => console.log(`Download of ${file_format} Completed`))
+
+            dl.on("error", (error) => {
+            console.log(error);
+            });
+
+            dl.start().catch((error) => {
+            console.log(error);
+            });
+            }
+
+          }
+        }
+      }
 
       let text = "";
       if (this.params.text) {
@@ -421,6 +500,7 @@ class Crawler {
     if ( this.params.download && fs.existsSync(this.downloadDir) != true){
       console.log("making a download dir")
       await fsp.mkdir(this.downloadDir);
+
     }
 
     if (this.params.blockRules && this.params.blockRules.length) {
@@ -516,6 +596,7 @@ class Crawler {
 
     if (!await this.isHTML(url)) {
       try {
+
         await this.directFetchCapture(url);
         return;
       } catch (e) {
@@ -529,6 +610,7 @@ class Crawler {
 
     try {
       await page.goto(url, this.gotoOpts);
+
     } catch (e) {
       console.warn(`Load timeout for ${url}`, e);
     }

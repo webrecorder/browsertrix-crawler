@@ -17,10 +17,13 @@
     "node-fetch": "^2.6.1",
     "puppeteer-cluster": "github:ikreymer/puppeteer-cluster#async-job-queue",
     "puppeteer-core": "^8.0.0",
+    "request-promise-native": "^1.0.9",
     "sitemapper": "^3.1.2",
     "uuid": "8.3.2",
     "ws": "^7.4.4",
-    "yargs": "^16.0.3"
+    "yargs": "^16.0.3",
+    "node-downloader-helper": "^1.0.19",
+    "net-ping": "^1.2.3"
   },
   "devDependencies": {
     "eslint": "^7.20.0",
