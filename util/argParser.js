@@ -17,6 +17,10 @@ const { ScopedSeed } = require("./seeds");
 class ArgParser {
   get cliOpts() {
     return {
+      "download": {
+        describe: "download all of the html files and assets as unzipped objects",
+        type: "stringify",
+      },
       "seeds": {
         alias: "url",
         describe: "The URL to start crawling from",

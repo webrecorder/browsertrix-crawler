@@ -83,6 +83,9 @@ class Crawler {
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
 
+    // download directory
+    this.downloadDir = path.join(this.collDir, "download");
+
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
@@ -275,6 +278,26 @@ class Crawler {
         await this.screencaster.newTarget(page.target());
       }
 
+
+      if (this.params.download){
+        page.on('response', async (response) => {
+        const url = new URL(response.url());
+        let filePath = path.join(this.downloadDir, url.pathname);
+
+        if (path.extname(url.pathname).trim() === '') {
+        filePath = `${filePath}/index.html`;
+        }
+
+        const dirPath = filePath.split("/").slice(0, -1).join("/")
+        if ( fs.existsSync(dirPath) != true){
+        fs.mkdir(dirPath, { recursive: true }, (err) => {
+        if (err) throw err;
+        });
+        }
+        await fs.writeFileSync(filePath, await response.buffer());
+        });
+      }
+
       if (this.emulateDevice) {
         await page.emulate(this.emulateDevice);
       }
@@ -291,8 +314,8 @@ class Crawler {
 
       // run custom driver here
       await this.driver({page, data, crawler: this});
-
       const title = await page.title();
+
       let text = "";
       if (this.params.text) {
         const client = await page.target().createCDPSession();
@@ -328,7 +351,7 @@ class Crawler {
       "software": `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`,
       "format": "WARC File Format 1.0"
     };
-    
+
     const warcInfo = {...info, ...this.params.warcInfo, };
     const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, warcInfo);
     const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
@@ -381,14 +404,24 @@ class Crawler {
 
 
     this.cluster.jobQueue = await this.initCrawlState();
-
     if (this.params.state) {
       await this.crawlState.load(this.params.state, this.params.scopedSeeds, true);
     }
-
     this.cluster.task((opts) => this.crawlPage(opts));
 
     await this.initPages();
+
+    // create pages dir if doesn't exist and write pages.jsonl header
+    if ( fs.existsSync(this.pagesDir) != true){
+      await fsp.mkdir(this.pagesDir);
+      createNew = true;
+    }
+
+    // create download dir if doesn't exist
+    if ( this.params.download && fs.existsSync(this.downloadDir) != true){
+      console.log("making a download dir")
+      await fsp.mkdir(this.downloadDir);
+    }
 
     if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, (text) => this.debugLog(text));
@@ -576,6 +609,7 @@ class Crawler {
     }
 
     await this.crawlState.add(url);
+
     this.cluster.queue({url, seedId, depth});
     return true;
   }
