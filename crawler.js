@@ -509,15 +509,12 @@ class Crawler {
 
     for (const opts of selectorOptsList) {
       const links = await this.extractLinks(page, opts);
-      console.log("links", links);
       await this.queueInScopeUrls(seedId, links, depth, extraHops);
     }
   }
 
   async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}) {
     const results = [];
-
-    console.log("url", page.url());
 
     const loadProp = (selector, extract) => {
       return [...document.querySelectorAll(selector)].map(elem => elem[extract]);
