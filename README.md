@@ -254,6 +254,7 @@ To make this configuration as simple as possible, there are several predefined s
 
 - `custom` - crawl based on the `--include` regular expression rules.
 
+
 #### Custom Scope Inclusion Rules
 
 Instead of setting a scope type, it is possible to instead configure custom scope regex by setting `--include` config to one or more regular expressions.
