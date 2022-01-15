@@ -1,6 +1,6 @@
 {
   "name": "browsertrix-crawler",
-  "version": "0.5.0-beta.1",
+  "version": "0.5.0-beta.2",
   "main": "browsertrix-crawler",
   "repository": "https://github.com/webrecorder/browsertrix-crawler",
   "author": "Ilya Kreymer <ikreymer@gmail.com>, Webrecorder Software",
@@ -27,6 +27,6 @@
     "eslint-plugin-react": "^7.22.0",
     "jest": "^26.6.3",
     "md5": "^2.3.0",
-    "warcio": "^1.4.3"
+    "warcio": "^1.5.0"
   }
 }

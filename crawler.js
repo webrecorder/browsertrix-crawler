@@ -401,7 +401,7 @@ class Crawler {
 
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
-      if (!await this.queueUrl(i, seed.url, 0)) {
+      if (!await this.queueUrl(i, seed.url, 0, 0)) {
         if (this.limitHit) {
           break;
         }
@@ -479,7 +479,7 @@ class Crawler {
   }
 
   async loadPage(page, urlData, selectorOptsList = DEFAULT_SELECTORS) {
-    const {url, seedId, depth} = urlData;
+    const {url, seedId, depth, extraHops = 0} = urlData;
 
     if (!await this.isHTML(url)) {
       try {
@@ -509,12 +509,15 @@ class Crawler {
 
     for (const opts of selectorOptsList) {
       const links = await this.extractLinks(page, opts);
-      await this.queueInScopeUrls(seedId, links, depth);
+      console.log("links", links);
+      await this.queueInScopeUrls(seedId, links, depth, extraHops);
     }
   }
 
   async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}) {
     const results = [];
+
+    console.log("url", page.url());
 
     const loadProp = (selector, extract) => {
       return [...document.querySelectorAll(selector)].map(elem => elem[extract]);
@@ -544,16 +547,25 @@ class Crawler {
     return results;
   }
 
-  async queueInScopeUrls(seedId, urls, depth) {
+  async queueInScopeUrls(seedId, urls, depth, extraHops = 0) {
     try {
       depth += 1;
       const seed = this.params.scopedSeeds[seedId];
 
-      for (const url of urls) {
-        const captureUrl = seed.isIncluded(url, depth);
+      // new number of extra hops, set if this hop is out-of-scope (oos)
+      const newExtraHops = extraHops + 1;
 
-        if (captureUrl) {
-          await this.queueUrl(seedId, captureUrl, depth);
+      for (const possibleUrl of urls) {
+        const res = seed.isIncluded(possibleUrl, depth, newExtraHops);
+
+        if (!res) {
+          continue;
+        }
+
+        const {url, isOOS} = res;
+
+        if (url) {
+          await this.queueUrl(seedId, url, depth, isOOS ? newExtraHops : extraHops);
         }
       }
     } catch (e) {
@@ -561,7 +573,7 @@ class Crawler {
     }
   }
 
-  async queueUrl(seedId, url, depth) {
+  async queueUrl(seedId, url, depth, extraHops = 0) {
     if (this.limitHit) {
       return false;
     }
@@ -576,7 +588,11 @@ class Crawler {
     }
 
     await this.crawlState.add(url);
-    this.cluster.queue({url, seedId, depth});
+    const urlData = {url, seedId, depth};
+    if (extraHops) {
+      urlData.extraHops = extraHops;
+    }
+    this.cluster.queue(urlData);
     return true;
   }
 

@@ -1,6 +1,6 @@
 class ScopedSeed
 {
-  constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false} = {}) {
+  constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} = {}) {
     const parsedUrl = this.parseUrl(url);
     this.url = parsedUrl.href;
     this.include = this.parseRx(include);
@@ -17,6 +17,7 @@ class ScopedSeed
 
     this.sitemap = this.resolveSiteMap(sitemap);
     this.allowHash = allowHash;
+    this.maxExtraHops = extraHops;
     this.maxDepth = depth < 0 ? 99999 : depth;
   }
 
@@ -93,7 +94,7 @@ class ScopedSeed
     return depth >= this.maxDepth;
   }
 
-  isIncluded(url, depth) {
+  isIncluded(url, depth, extraHops = 0) {
     if (depth > this.maxDepth) {
       return false;
     }
@@ -125,9 +126,15 @@ class ScopedSeed
       }
     }
 
+    let isOOS = false;
+
     if (!inScope) {
-      //console.log(`Not in scope ${url} ${this.include}`);
-      return false;
+      if (this.maxExtraHops && extraHops <= this.maxExtraHops) {
+        isOOS = true;
+      } else {
+        //console.log(`Not in scope ${url} ${this.include}`);
+        return false;
+      }
     }
 
     // check exclusions
@@ -138,7 +145,7 @@ class ScopedSeed
       }
     }
 
-    return url;
+    return {url, isOOS};
   }
 }
 

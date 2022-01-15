@@ -254,7 +254,6 @@ To make this configuration as simple as possible, there are several predefined s
 
 - `custom` - crawl based on the `--include` regular expression rules.
 
-
 #### Custom Scope Inclusion Rules
 
 Instead of setting a scope type, it is possible to instead configure custom scope regex by setting `--include` config to one or more regular expressions.
@@ -267,6 +266,15 @@ Extracted links that match the regular expression will be considered 'in scope' 
 In addition to the inclusion rules, Browsertrix Crawler supports a separate list of exclusion regexes, that if match, override an exclude a URL from the crawl.
 
 The exclusion regexes are often used with a custom scope, but could be used with a predefined scopeType as well.
+
+
+#### Extra Out-of-Scope Depth
+
+Occasionally, it may be useful to augment the scope by allowing extra links N 'hops' beyond the current scope. For example, this is most useful when crawling a single host,
+but also including one hop out - any link beyond the current host. This is now possible with the `extraHops` setting, which defaults to 0, but can be set to a higher value N (usually 1) to go beyond the current depth. The `--extraHops` setting can be set globally or per seed to allow expanding the current inclusion scope N 'hops' beyond the configured scope.
+
+Note that this mechanism only expands the inclusion list, but any exclusion rules are still applied. If a URL is to be excluded via the exclusion rules,
+that will take precedence over the `--extraHops`.
 
 
 #### Scope Rule Examples
