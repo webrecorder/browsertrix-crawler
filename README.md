@@ -269,12 +269,13 @@ In addition to the inclusion rules, Browsertrix Crawler supports a separate list
 The exclusion regexes are often used with a custom scope, but could be used with a predefined scopeType as well.
 
 
-#### Extra Out-of-Scope Depth
+#### Extra 'Hops' Beyond Current Scope
 
-Occasionally, it may be useful to augment the scope by allowing extra links N 'hops' beyond the current scope. For example, this is most useful when crawling a single host,
-but also including one hop out - any link beyond the current host. This is now possible with the `extraHops` setting, which defaults to 0, but can be set to a higher value N (usually 1) to go beyond the current depth. The `--extraHops` setting can be set globally or per seed to allow expanding the current inclusion scope N 'hops' beyond the configured scope.
+Occasionally, it may be useful to augment the scope by allowing extra links N 'hops' beyond the current scope.
 
-Note that this mechanism only expands the inclusion list, but any exclusion rules are still applied. If a URL is to be excluded via the exclusion rules,
+For example, this is most useful when crawling with a `host` or `prefix` scope, but also wanting to include 'one extra hop' - any link to external pages beyond the current host, but not following those links. This is now possible with the `extraHops` setting, which defaults to 0, but can be set to a higher value N (usually 1) to go beyond the current scope.
+
+The `--extraHops` setting can be set globally or per seed to allow expanding the current inclusion scope N 'hops' beyond the configured scope. Note that this mechanism only expands the inclusion scope, and any exclusion rules are still applied. If a URL is to be excluded via the exclusion rules,
 that will take precedence over the `--extraHops`.
 
 
