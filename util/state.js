@@ -27,7 +27,7 @@ class BaseState
   recheckScope(data, seeds) {
     const seed = seeds[data.seedId];
 
-    return seed.isIncluded(data.url, data.depth);
+    return seed.isIncluded(data.url, data.depth, data.extraHops);
   }
 }
 

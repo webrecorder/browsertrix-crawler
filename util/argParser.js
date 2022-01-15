@@ -61,6 +61,12 @@ class ArgParser {
         type: "number",
       },
 
+      "extraHops": {
+        describe: "Number of extra 'hops' to follow, beyond the current scope",
+        default: 0,
+        type: "number"
+      },
+
       "limit": {
         describe: "Limit crawl to this number of pages",
         default: 0,
@@ -366,6 +372,7 @@ class ArgParser {
       include: argv.include,
       exclude: argv.exclude,
       depth: argv.depth,
+      extraHops: argv.extraHops,
     };
 
     argv.scopedSeeds = [];

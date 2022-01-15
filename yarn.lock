@@ -1152,9 +1152,9 @@ camelcase@^6.0.0:
   integrity sha512-c7wVvbw3f37nuobQNtgsgG9POC9qMbNuMQmTCqZv23b6MIz0fcYpBiOlv9gEN/hdLdnZTDQhg6e9Dq5M1vKvfg==
 
 caniuse-lite@^1.0.30001219:
-  version "1.0.30001228"
-  resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001228.tgz#bfdc5942cd3326fa51ee0b42fbef4da9d492a7fa"
-  integrity sha512-QQmLOGJ3DEgokHbMSA8cj2a+geXqmnpyOFT0lhQV6P3/YOJvGDEwoedcwxEQ30gJIwIIunHIicunJ2rzK5gB2A==
+  version "1.0.30001299"
+  resolved "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001299.tgz"
+  integrity sha512-iujN4+x7QzqA2NCSrS5VUy+4gLmRd4xv6vbBBsmfVqTx8bLAD8097euLqQgKxSVLvxjSDcvF1T/i9ocgnUFexw==
 
 capture-exit@^2.0.0:
   version "2.0.0"
@@ -3414,7 +3414,7 @@ nice-try@^1.0.4:
   resolved "https://registry.yarnpkg.com/nice-try/-/nice-try-1.0.5.tgz#a3378a7696ce7d223e88fc9b764bd7ef1089e366"
   integrity sha512-1nh45deeb5olNY7eX82BkPO7SSxR5SSYJiPTrTdFUVYwAl8CKMA5N9PjTYkHiRjisVcxcQ1HXdLhx2qxxJzLNQ==
 
-node-fetch@^2.6.0, node-fetch@^2.6.1:
+node-fetch@^2.6.1:
   version "2.6.1"
   resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.1.tgz#045bd323631f76ed2e2b55573394416b639a0052"
   integrity sha512-V4aYg89jEoVRxRb2fJdAg8FHvI7cEyYdVAh94HH0UIK8oJxUfkjlDQN9RbMx+bEjP7+ggMiFRprSti032Oipxw==
@@ -4811,15 +4811,15 @@ walker@^1.0.7, walker@~1.0.5:
   dependencies:
     makeerror "1.0.x"
 
-warcio@^1.4.3:
-  version "1.4.5"
-  resolved "https://registry.yarnpkg.com/warcio/-/warcio-1.4.5.tgz#24ca61f799185c5d88cdd0a65d279f376b4f9a63"
-  integrity sha512-VwFBdmEQhWHmxsdyiLM0INHD1KZ2+EGYzslZXFe6JdbuTfSF/dYRQ/wEdvp+m28mydphROF6D32KfkIMRU1NZw==
+warcio@^1.5.0:
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/warcio/-/warcio-1.5.0.tgz#da80805f36b26c68c3b79e9d1d334f8df746df3e"
+  integrity sha512-80X3IJ0L5OZYRI/5gIjrLzivP/GVWtWrWsNexvSkfeSafoMsXxViywAuotMh4+WzjrcgDA9SGR1Gpg/uXl/9Fw==
   dependencies:
     "@peculiar/webcrypto" "^1.1.1"
     esm "^3.2.25"
     hi-base32 "^0.5.0"
-    node-fetch "^2.6.0"
+    node-fetch "^2.6.1"
     pako "^1.0.11"
     uuid-random "^1.3.0"
     yargs "^15.3.1"
