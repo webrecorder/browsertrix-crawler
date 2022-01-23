@@ -1,5 +1,16 @@
 ## CHANGES
 
+v0.5.0
+- State: Support for serialization and reloading of crawl state to config.yaml
+- State: Graceful saving of crawl state on ctrl+c interrupt
+- State: Memory or Redis based crawl state
+- Config: Aadditional crawl config via env var
+- WACZ Upload: Support for S3 upload of WACZ upon crawl completion
+- WACZ Upload: HTTP/Redis webhook to notify of upload completion
+- Crawl Scope: Support for `extraHops` to optionally crawl an extra hop beyond scope
+- Signing: Support for optional signing of WACZ
+- Dependencies: update to latest pywb and wacz packages
+
 v0.4.4
 - Page Block Rules Fix: 'request already handled' errors by avoiding adding duplicate handlers to same page.
 - Page Block Rules Fix: await all continue/abort() calls and catch errors.

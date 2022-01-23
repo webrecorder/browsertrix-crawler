@@ -1,4 +1,3 @@
 pywb>=2.6.3
 uwsgi
-#wacz>=0.3.2
-git+https://github.com/webrecorder/py-wacz@sign-verify-work
+wacz>=0.4.0
