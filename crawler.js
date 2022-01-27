@@ -449,11 +449,20 @@ class Crawler {
       // Build the argument list to pass to the wacz create command
       const waczFilename = this.params.collection.concat(".wacz");
       const waczPath = path.join(this.collDir, waczFilename);
-      const argument_list = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile, "-f"];
-      warcFileList.forEach((val, index) => argument_list.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
+      const waczArgList = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile, "-f"];
+      if (process.env.WACZ_SIGN_URL) {
+        waczArgList.push("--signing-url");
+        waczArgList.push(process.env.WACZ_SIGN_URL);
+        if (process.env.WACZ_SIGN_TOKEN) {
+          waczArgList.push("--signing-token");
+          waczArgList.push(process.env.WACZ_SIGN_TOKEN);
+        }
+      }
+
+      warcFileList.forEach((val, index) => waczArgList.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
 
       // Run the wacz create command
-      child_process.spawnSync("wacz" , argument_list, {stdio: "inherit"});
+      child_process.spawnSync("wacz" , waczArgList, {stdio: "inherit"});
       this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
 
       if (this.storage) {

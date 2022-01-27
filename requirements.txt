@@ -1,4 +1,3 @@
-pywb>=2.6.3
-#git+https://github.com/webrecorder/pywb@twitter-rw
+pywb>=2.6.4
 uwsgi
-wacz>=0.3.2
+wacz>=0.4.0
