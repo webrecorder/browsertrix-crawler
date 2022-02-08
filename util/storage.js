@@ -1,6 +1,7 @@
 const fs = require("fs");
+const fsp = require("fs/promises");
+
 const os = require("os");
-const { Transform } = require("stream");
 const { createHash } = require("crypto");
 
 const fetch = require("node-fetch");
@@ -8,6 +9,8 @@ const Minio = require("minio");
 
 const { initRedis } = require("./redis");
 
+
+// ===========================================================================
 class S3StorageSync
 {
   constructor(urlOrData, {filename, webhookUrl, userId, crawlId} = {}) {
@@ -35,8 +38,11 @@ class S3StorageSync
       port: Number(url.port) || (url.protocol === "https:" ? 443 : 80),
       useSSL: url.protocol === "https:",
       accessKey,
-      secretKey
+      secretKey,
+      partSize: 100*1024*1024
     });
+
+    this.client.enableSHA256 = true;
 
     this.bucketName = url.pathname.slice(1).split("/")[0];
 
@@ -56,31 +62,13 @@ class S3StorageSync
   }
 
   async uploadCollWACZ(filename, completed = true) {
-    const origStream = fs.createReadStream(filename);
+    await this.client.fPutObject(this.bucketName, this.objectPrefix + this.waczFilename, filename);
 
-    const hash = createHash("sha256");
-    let size = 0;
-    let finalHash;
+    const finalHash = await checksumFile("sha256", filename);
 
-    const hashTrans = new Transform({
-      transform(chunk, encoding, callback) {
-        size += chunk.length;
-        hash.update(chunk);
-        this.push(chunk);
-        callback();
-      },
-
-      flush(callback) {
-        finalHash = "sha256:" + hash.digest("hex");
-        callback();
-      }
-    });
-
-    const fsStream = origStream.pipe(hashTrans);
-    const res = await this.client.putObject(this.bucketName, this.objectPrefix + this.waczFilename, fsStream);
-    console.log(res);
-
+    const size = await getFileSize(filename);
     const resource = {"path": this.waczFilename, "hash": finalHash, "bytes": size};
+    console.log(resource);
 
     if (this.webhookUrl) {
       const body = {
@@ -112,4 +100,22 @@ class S3StorageSync
   }
 }
 
+async function getFileSize(filename) {
+  const stats = await fsp.stat(filename);
+  return stats.size;
+}
+
+function checksumFile(hashName, path) {
+  return new Promise((resolve, reject) => {
+    const hash = createHash(hashName);
+    const stream = fs.createReadStream(path);
+    stream.on("error", err => reject(err));
+    stream.on("data", chunk => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+}
+
 module.exports.S3StorageSync = S3StorageSync;
+module.exports.getFileSize = getFileSize;
+
+

@@ -25,7 +25,7 @@ const warcio = require("warcio");
 const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
 
 const  TextExtract  = require("./util/textextract");
-const { S3StorageSync } = require("./util/storage");
+const { S3StorageSync, getFileSize } = require("./util/storage");
 const { ScreenCaster } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
@@ -336,11 +336,6 @@ class Crawler {
     return buffer;
   }
 
-  async getFileSize(filename) {
-    const stats = await fsp.stat(filename);
-    return stats.size;
-  }
-
   async crawl() {
 
     try {
@@ -439,36 +434,67 @@ class Crawler {
     }
 
     if (this.params.generateWACZ) {
-      this.statusLog("Generating WACZ");
+      await this.generateWACZ();
+    }
+  }
 
-      const archiveDir = path.join(this.collDir, "archive");
+  async generateWACZ() {
+    this.statusLog("Generating WACZ");
 
-      // Get a list of the warcs inside
-      const warcFileList = await fsp.readdir(archiveDir);
+    const archiveDir = path.join(this.collDir, "archive");
 
-      // Build the argument list to pass to the wacz create command
-      const waczFilename = this.params.collection.concat(".wacz");
-      const waczPath = path.join(this.collDir, waczFilename);
-      const waczArgList = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile, "-f"];
-      if (process.env.WACZ_SIGN_URL) {
-        waczArgList.push("--signing-url");
-        waczArgList.push(process.env.WACZ_SIGN_URL);
-        if (process.env.WACZ_SIGN_TOKEN) {
-          waczArgList.push("--signing-token");
-          waczArgList.push(process.env.WACZ_SIGN_TOKEN);
-        }
+    // Get a list of the warcs inside
+    const warcFileList = await fsp.readdir(archiveDir);
+
+    console.log(`Num WARC Files: ${warcFileList.length}`);
+    if (!warcFileList.length) {
+      throw new Error("No WARC Files, assuming crawl failed");
+    }
+
+    // Build the argument list to pass to the wacz create command
+    const waczFilename = this.params.collection.concat(".wacz");
+    const waczPath = path.join(this.collDir, waczFilename);
+
+    const createArgs = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile];
+    const validateArgs = ["validate"];
+
+    if (process.env.WACZ_SIGN_URL) {
+      createArgs.push("--signing-url");
+      createArgs.push(process.env.WACZ_SIGN_URL);
+      if (process.env.WACZ_SIGN_TOKEN) {
+        createArgs.push("--signing-token");
+        createArgs.push(process.env.WACZ_SIGN_TOKEN);
       }
+    }
 
-      warcFileList.forEach((val, index) => waczArgList.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
+    createArgs.push("-f");
+    validateArgs.push("-f");
 
-      // Run the wacz create command
-      child_process.spawnSync("wacz" , waczArgList, {stdio: "inherit"});
-      this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
+    warcFileList.forEach((val, index) => createArgs.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
 
-      if (this.storage) {
-        const finished = await this.crawlState.finished();
-        await this.storage.uploadCollWACZ(waczPath, finished);
-      }
+    // create WACZ
+    const waczResult = child_process.spawnSync("wacz" , createArgs, {stdio: "inherit"});
+
+    if (waczResult.status !== 0) {
+      console.log("create result", waczResult);
+      throw new Error("Unable to write WACZ successfully");
+    }
+
+    this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
+
+    // Verify WACZ
+    validateArgs.push(waczPath);
+
+    const waczVerifyResult = child_process.spawnSync("wacz", validateArgs, {stdio: "inherit"});
+
+    if (waczVerifyResult.status !== 0) {
+      console.log("validate", waczVerifyResult);
+      throw new Error("Unable to verify WACZ created successfully");
+    }
+
+    if (this.storage) {
+      const finished = await this.crawlState.finished();
+      await this.storage.uploadCollWACZ(waczPath, finished);
     }
   }
 
@@ -747,7 +773,7 @@ class Crawler {
     // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
     for (let i = 0; i < warcLists.length; i++) {
       const fileName = path.join(this.collDir, "archive", warcLists[i]);
-      const fileSize = await this.getFileSize(fileName);
+      const fileSize = await getFileSize(fileName);
       fileSizeObjects.push({"fileSize": fileSize, "fileName": fileName});
       fileSizeObjects.sort((a, b) => b.fileSize - a.fileSize);
     }
@@ -774,7 +800,7 @@ class Crawler {
         doRollover = true;
       } else {
         // Check the size of the existing combined warc.
-        const currentCombinedWarcSize = await this.getFileSize(combinedWarcFullPath);
+        const currentCombinedWarcSize = await getFileSize(combinedWarcFullPath);
 
         //  If adding the current warc to the existing combined file creates a file smaller than the rollover size add the data to the combinedWarc
         const proposedWarcSize = fileSizeObjects[j].fileSize + currentCombinedWarcSize;

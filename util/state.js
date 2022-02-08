@@ -33,6 +33,43 @@ class BaseState
 
 
 // ============================================================================
+class MemTaskCallbacks
+{
+  constructor(data, state) {
+    this.data = data;
+    this.state = state;
+
+    this.json = JSON.stringify(this.data);
+    this.state.pending.add(this.json);
+  }
+
+  start() {
+    this.state.pending.delete(this.json);
+
+    this.data.started = new Date().toISOString();
+    this.json = JSON.stringify(this.data);
+
+    this.state.pending.add(this.json);
+  }
+
+  resolve() {
+    this.state.pending.delete(this.json);
+
+    this.data.finished = new Date().toISOString();
+
+    this.state.done.unshift(this.data);
+  }
+
+  reject(e) {
+    this.state.pending.delete(this.json);
+    console.warn(`URL Load Failed: ${this.data.url}, Reason: ${e}`);
+    this.data.failed = true;
+    this.state.done.unshift(this.data);
+  }
+}
+
+
+// ============================================================================
 class MemoryCrawlState extends BaseState
 {
   constructor() {
@@ -44,6 +81,7 @@ class MemoryCrawlState extends BaseState
   }
 
   push(job) {
+    this.pending.delete(JSON.stringify(job.data));
     this.queue.unshift(job.data);
   }
 
@@ -53,24 +91,8 @@ class MemoryCrawlState extends BaseState
 
   shift() {
     const data = this.queue.pop();
-    data.started = new Date().toISOString();
-    const str = JSON.stringify(data);
-    this.pending.add(str);
 
-    const callback = {
-      resolve: () => {
-        this.pending.delete(str);
-        data.finished = new Date().toISOString();
-        this.done.unshift(data);
-      },
-
-      reject: (e) => {
-        this.pending.delete(str);
-        console.warn(`URL Load Failed: ${data.url}, Reason: ${e}`);
-        data.failed = true;
-        this.done.unshift(data);
-      }
-    };
+    const callback = new MemTaskCallbacks(data, this);
 
     return new Job(data, undefined, callback);
   }
@@ -136,6 +158,32 @@ class MemoryCrawlState extends BaseState
   }
 }
 
+// ============================================================================
+class RedisTaskCallbacks
+{
+  constructor(json, state) {
+    this.state = state;
+    this.json = json;
+    this.data = JSON.parse(json);
+  }
+
+  async start() {
+    console.log("Start");
+    this.json = await this.state._markStarted(this.json);
+    console.log("Started: " + this.json);
+  }
+
+  async resolve() {
+    // atomically move from pending set -> done list while adding finished timestamp
+    await this.state._finish(this.json);
+  }
+
+  async reject(e) {
+    console.warn(`URL Load Failed: ${this.data.url}, Reason: ${e}`);
+    await this.state._fail(this.json);
+  }
+}
+
 
 // ============================================================================
 class RedisCrawlState extends BaseState
@@ -152,21 +200,52 @@ class RedisCrawlState extends BaseState
     this.skey = this.key + ":s";
     this.dkey = this.key + ":d";
 
-
-    redis.defineCommand("movestarted", {
+    redis.defineCommand("addqueue", {
       numberOfKeys: 2,
-      lua: "local val = redis.call('rpop', KEYS[1]); if (val) then local json = cjson.decode(val); json['started'] = ARGV[1]; val = cjson.encode(json); redis.call('sadd', KEYS[2], val); redis.call('expire', KEYS[2], ARGV[2]); end; return val"
+      lua: "redis.call('srem', KEYS[1], ARGV[1]); redis.call('lpush', KEYS[2], ARGV[1])"
+    });
+
+
+    redis.defineCommand("markpending", {
+      numberOfKeys: 2,
+      lua: "local json = redis.call('rpop', KEYS[1]); redis.call('sadd', KEYS[2], json); return json"
+    });
+
+    redis.defineCommand("markstarted", {
+      numberOfKeys: 1,
+      lua: "local json = ARGV[1]; if (redis.call('srem', KEYS[1], json)) then local data = cjson.decode(json); data['started'] = ARGV[2]; json = cjson.encode(data); redis.call('sadd', KEYS[1], json); end; return json"
     });
 
     redis.defineCommand("movefinished", {
       numberOfKeys: 2,
-      lua: "local val = ARGV[1]; if (redis.call('srem', KEYS[1], val)) then local json = cjson.decode(val); json[ARGV[3]] = ARGV[2]; val = cjson.encode(json); redis.call('lpush', KEYS[2], val); end; return val"
+      lua: "local json = ARGV[1]; if (redis.call('srem', KEYS[1], json)) then local data = cjson.decode(json); data[ARGV[3]] = ARGV[2]; json = cjson.encode(data); redis.call('lpush', KEYS[2], json); end; return json"
     });
 
   }
 
+  async _markPending() {
+    return await this.redis.markpending(this.qkey, this.pkey);
+  }
+
+  async _markStarted(json) {
+    const started = new Date().toISOString();
+
+    return await this.redis.markstarted(this.pkey, json, started);
+  }
+
+  async _finish(json) {
+    const finished = new Date().toISOString();
+
+    return await this.redis.movefinished(this.pkey, this.dkey, json, finished, "finished");
+  }
+
+  async _fail(json) {
+    return await this.redis.movefinished(this.pkey, this.dkey, json, true, "failed");
+  }
+
   async push(job) {
-    await this.redis.lpush(this.qkey, JSON.stringify(job.data));
+    //await this.redis.lpush(this.qkey, JSON.stringify(job.data));
+    await this.redis.addqueue(this.pkey, this.qkey, JSON.stringify(job.data));
   }
 
   async realSize() {
@@ -174,26 +253,11 @@ class RedisCrawlState extends BaseState
   }
 
   async shift() {
-    const started = new Date().toISOString();
-    // atomically move from queue list -> pending set while adding started timestamp
-    // set pending set expire to page timeout
-    const json = await this.redis.movestarted(this.qkey, this.pkey, started, this.pageTimeout);
-    const data = JSON.parse(json);
+    const json = await this._markPending();
 
-    const callback = {
-      resolve: async () => {
-        const finished = new Date().toISOString();
-        // atomically move from pending set -> done list while adding finished timestamp
-        await this.redis.movefinished(this.pkey, this.dkey, json, finished, "finished");
-      },
+    const callback = new RedisTaskCallbacks(json, this);
 
-      reject: async (e) => {
-        console.warn(`URL Load Failed: ${data.url}, Reason: ${e}`);
-        await this.redis.movefinished(this.pkey, this.dkey, json, true, "failed");
-      }
-    };
-
-    return new Job(data, undefined, callback);
+    return new Job(callback.data, undefined, callback);
   }
 
   async has(url) {
