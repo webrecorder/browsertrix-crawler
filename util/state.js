@@ -33,55 +33,18 @@ class BaseState
 
 
 // ============================================================================
-class MemTaskCallbacks
-{
-  constructor(data, state) {
-    this.data = data;
-    this.state = state;
-
-    this.json = JSON.stringify(this.data);
-    this.state.pending.add(this.json);
-  }
-
-  start() {
-    this.state.pending.delete(this.json);
-
-    this.data.started = new Date().toISOString();
-    this.json = JSON.stringify(this.data);
-
-    this.state.pending.add(this.json);
-  }
-
-  resolve() {
-    this.state.pending.delete(this.json);
-
-    this.data.finished = new Date().toISOString();
-
-    this.state.done.unshift(this.data);
-  }
-
-  reject(e) {
-    this.state.pending.delete(this.json);
-    console.warn(`URL Load Failed: ${this.data.url}, Reason: ${e}`);
-    this.data.failed = true;
-    this.state.done.unshift(this.data);
-  }
-}
-
-
-// ============================================================================
 class MemoryCrawlState extends BaseState
 {
   constructor() {
     super();
     this.seenList = new Set();
     this.queue = [];
-    this.pending = new Set();
+    this.pending = new Map();
     this.done = [];
   }
 
   push(job) {
-    this.pending.delete(JSON.stringify(job.data));
+    this.pending.delete(job.data.url);
     this.queue.unshift(job.data);
   }
 
@@ -92,9 +55,39 @@ class MemoryCrawlState extends BaseState
   shift() {
     const data = this.queue.pop();
 
-    const callback = new MemTaskCallbacks(data, this);
+    const url = data.url;
 
-    return new Job(data, undefined, callback);
+    const state = this;
+
+    state.pending.set(url, data);
+
+    const callbacks = {
+      start() {
+        data.started = new Date().toISOString();
+
+        state.pending.set(url, data);
+      },
+
+      resolve() {
+        state.pending.delete(url);
+
+        data.finished = new Date().toISOString();
+
+        state.done.unshift(data);
+      },
+
+      reject(e) {
+        console.warn(`URL Load Failed: ${url}, Reason: ${e}`);
+
+        state.pending.delete(url);
+
+        data.failed = true;
+
+        state.done.unshift(data);
+      }
+    };
+
+    return new Job(data, undefined, callbacks);
   }
 
   has(url) {
@@ -107,7 +100,7 @@ class MemoryCrawlState extends BaseState
 
   async serialize() {
     const queued = this.queue.map(x => JSON.stringify(x));
-    const pending = Array.from(this.pending.values());
+    const pending = Array.from(this.pending.values()).map(x => JSON.stringify(x));
     const done = this.done.map(x => JSON.stringify(x));
 
     return {queued, pending, done};
@@ -158,32 +151,6 @@ class MemoryCrawlState extends BaseState
   }
 }
 
-// ============================================================================
-class RedisTaskCallbacks
-{
-  constructor(json, state) {
-    this.state = state;
-    this.json = json;
-    this.data = JSON.parse(json);
-  }
-
-  async start() {
-    console.log("Start");
-    this.json = await this.state._markStarted(this.json);
-    console.log("Started: " + this.json);
-  }
-
-  async resolve() {
-    // atomically move from pending set -> done list while adding finished timestamp
-    await this.state._finish(this.json);
-  }
-
-  async reject(e) {
-    console.warn(`URL Load Failed: ${this.data.url}, Reason: ${e}`);
-    await this.state._fail(this.json);
-  }
-}
-
 
 // ============================================================================
 class RedisCrawlState extends BaseState
@@ -191,6 +158,8 @@ class RedisCrawlState extends BaseState
   constructor(redis, key, pageTimeout) {
     super();
     this.redis = redis;
+
+    this._lastSize = 0;
 
     this.key = key;
     this.pageTimeout = pageTimeout / 1000;
@@ -202,62 +171,125 @@ class RedisCrawlState extends BaseState
 
     redis.defineCommand("addqueue", {
       numberOfKeys: 2,
-      lua: "redis.call('srem', KEYS[1], ARGV[1]); redis.call('lpush', KEYS[2], ARGV[1])"
+      lua: `
+redis.call('lpush', KEYS[2], ARGV[2]);
+redis.call('hdel', KEYS[1], ARGV[1]);
+`
     });
 
-
-    redis.defineCommand("markpending", {
+    redis.defineCommand("getnext", {
       numberOfKeys: 2,
-      lua: "local json = redis.call('rpop', KEYS[1]); redis.call('sadd', KEYS[2], json); return json"
+      lua: `
+local json = redis.call('rpop', KEYS[1]);
+
+local data = cjson.decode(json);
+
+redis.call('hset', KEYS[2], data.url, json);
+
+return json;
+`
     });
 
     redis.defineCommand("markstarted", {
-      numberOfKeys: 1,
-      lua: "local json = ARGV[1]; if (redis.call('srem', KEYS[1], json)) then local data = cjson.decode(json); data['started'] = ARGV[2]; json = cjson.encode(data); redis.call('sadd', KEYS[1], json); end; return json"
-    });
-
-    redis.defineCommand("movefinished", {
       numberOfKeys: 2,
-      lua: "local json = ARGV[1]; if (redis.call('srem', KEYS[1], json)) then local data = cjson.decode(json); data[ARGV[3]] = ARGV[2]; json = cjson.encode(data); redis.call('lpush', KEYS[2], json); end; return json"
+      lua: `
+local json = redis.call('hget', KEYS[1], ARGV[1]);
+
+if json then
+  local data = cjson.decode(json);
+  data['started'] = ARGV[2];
+  json = cjson.encode(data);
+  redis.call('hset', KEYS[1], ARGV[1], json);
+  redis.call('setex', KEYS[2], ARGV[3], "1");
+end
+
+`
+    });
+
+    redis.defineCommand("movedone", {
+      numberOfKeys: 2,
+      lua: `
+local json = redis.call('hget', KEYS[1], ARGV[1]);
+
+if json then
+  local data = cjson.decode(json);
+  data[ARGV[3]] = ARGV[2];
+  json = cjson.encode(data);
+
+  redis.call('lpush', KEYS[2], json);
+  redis.call('hdel', KEYS[1], ARGV[1]);
+end
+
+`
+    });
+
+    redis.defineCommand("requeue", {
+      numberOfKeys: 3,
+      lua: `
+local res = redis.call('get', KEYS[3]);
+if not res then
+  local json = redis.call('hget', KEYS[1], ARGV[1]);
+  if json then
+    redis.call('lpush', KEYS[2], json);
+    redis.call('hdel', KEYS[1], ARGV[1]);
+    return 1
+  end
+end
+return 0;
+`
     });
 
   }
 
-  async _markPending() {
-    return await this.redis.markpending(this.qkey, this.pkey);
+  async _getNext() {
+    return await this.redis.getnext(this.qkey, this.pkey);
   }
 
-  async _markStarted(json) {
+  async _markStarted(url) {
     const started = new Date().toISOString();
 
-    return await this.redis.markstarted(this.pkey, json, started);
+    return await this.redis.markstarted(this.pkey, this.pkey + ":" + url, url, started, this.pageTimeout);
   }
 
-  async _finish(json) {
+  async _finish(url) {
     const finished = new Date().toISOString();
 
-    return await this.redis.movefinished(this.pkey, this.dkey, json, finished, "finished");
+    return await this.redis.movedone(this.pkey, this.dkey, url, finished, "finished");
   }
 
-  async _fail(json) {
-    return await this.redis.movefinished(this.pkey, this.dkey, json, true, "failed");
+  async _fail(url) {
+    return await this.redis.movedone(this.pkey, this.dkey, url, "1", "failed");
   }
 
   async push(job) {
-    //await this.redis.lpush(this.qkey, JSON.stringify(job.data));
-    await this.redis.addqueue(this.pkey, this.qkey, JSON.stringify(job.data));
-  }
-
-  async realSize() {
-    return await this.redis.llen(this.qkey);
+    await this.redis.addqueue(this.pkey, this.qkey, job.data.url, JSON.stringify(job.data));
   }
 
   async shift() {
-    const json = await this._markPending();
+    const json = await this._getNext();
 
-    const callback = new RedisTaskCallbacks(json, this);
+    const data = JSON.parse(json);
 
-    return new Job(callback.data, undefined, callback);
+    const url = data.url;
+
+    const state = this;
+
+    const callbacks = {
+      async start() {
+        await state._markStarted(url);
+      },
+
+      async resolve() {
+        await state._finish(url);
+      },
+
+      async reject(e) {
+        console.warn(`URL Load Failed: ${url}, Reason: ${e}`);
+        await state._fail(url);
+      }
+    };
+
+    return new Job(data, undefined, callbacks);
   }
 
   async has(url) {
@@ -270,7 +302,7 @@ class RedisCrawlState extends BaseState
 
   async serialize() {
     const queued = await this.redis.lrange(this.qkey, 0, -1);
-    const pending = await this.redis.smembers(this.pkey);
+    const pending = await this.redis.hvals(this.pkey);
     const done = await this.redis.lrange(this.dkey, 0, -1);
 
     return {queued, pending, done};
@@ -332,7 +364,29 @@ class RedisCrawlState extends BaseState
   }
 
   async numPending() {
-    return await this.redis.scard(this.pkey);
+    const res = await this.redis.hlen(this.pkey);
+
+    // reset pendings
+    if (res > 0 && !this._lastSize) {
+      await this.resetPendings();
+    }
+
+    return res;
+  }
+
+  async resetPendings() {
+    const pendingUrls = await this.redis.hkeys(this.pkey);
+
+    for (const url of pendingUrls) {
+      if (await this.redis.requeue(this.pkey, this.qkey, this.pkey + ":" + url, url)) {
+        console.log("Requeued: " + url);
+      }
+    }
+  }
+
+  async realSize() {
+    this._lastSize = await this.redis.llen(this.qkey);
+    return this._lastSize;
   }
 }
 
