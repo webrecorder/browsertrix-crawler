@@ -359,9 +359,9 @@ class ArgParser {
       }
     }
 
-    if (argv.include || argv.exclude) {
+    if (argv.include) {
       if (argv.scopeType && argv.scopeType !== "custom") {
-        console.warn("You've specified a --scopeType and a --scopeIncludeRx or --scopeExcludeRx regex. The custom scope regex will take precedence, overriding the scopeType");
+        console.warn("You've specified a --scopeType and a --scopeIncludeRx / --include regex. The custom scope regex will take precedence, overriding the scopeType");
         argv.scopeType = "custom";
       }
     }

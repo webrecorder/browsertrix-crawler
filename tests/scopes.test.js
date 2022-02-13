@@ -49,6 +49,44 @@ exclude: https://example.com/pathexclude
 });
 
 
+test("prefix scope global + exclude", async () => {
+  const seeds = getSeeds(`
+seeds:
+   - https://example.com/
+
+scopeType: prefix
+exclude: https://example.com/pathexclude
+
+`);
+
+
+  expect(seeds.length).toEqual(1);
+  expect(seeds[0].scopeType).toEqual("prefix");
+  expect(seeds[0].include).toEqual([/^https:\/\/example\.com\//]);
+  expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
+
+});
+
+
+test("prefix scope per seed + exclude", async () => {
+  const seeds = getSeeds(`
+seeds:
+   - url: https://example.com/
+     scopeType: prefix
+
+exclude: https://example.com/pathexclude
+
+`);
+
+
+  expect(seeds.length).toEqual(1);
+  expect(seeds[0].scopeType).toEqual("prefix");
+  expect(seeds[0].include).toEqual([/^https:\/\/example\.com\//]);
+  expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
+
+});
+
+
 test("custom scope", async () => {
   const seeds = getSeeds(`
 seeds:
