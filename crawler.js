@@ -30,7 +30,7 @@ const { ScreenCaster } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
 
-const { getBrowserExe, loadProfile } = require("./util/browser");
+const { getBrowserExe, loadProfile, evaluateWithCLI } = require("./util/browser");
 
 const { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } = require("./util/constants");
 
@@ -304,7 +304,8 @@ class Crawler {
       await this.writePage(data, title, this.params.text, text);
 
       if (this.params.behaviorOpts) {
-        await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
+        //await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
+        await Promise.allSettled(page.frames().map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();")));
       }
 
       await this.writeStats();
