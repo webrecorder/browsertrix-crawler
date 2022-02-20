@@ -13,6 +13,9 @@ const path = require("path");
 const http = require("http");
 const profileHTML = fs.readFileSync(path.join(__dirname, "screencast", "createProfile.html"), {encoding: "utf8"});
 
+const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
+
+
 function cliOpts() {
   return {
     "url": {
@@ -121,6 +124,11 @@ async function main() {
   const waitUntil =  ["load", "networkidle2"];
 
   await page.setCacheEnabled(false);
+
+  if (params.interactive) {
+    // for testing, inject browsertrix-behaviors
+    await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init();`);
+  }
 
   console.log("loading");
 

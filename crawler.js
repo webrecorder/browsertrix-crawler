@@ -304,7 +304,6 @@ class Crawler {
       await this.writePage(data, title, this.params.text, text);
 
       if (this.params.behaviorOpts) {
-        //await Promise.allSettled(page.frames().map(frame => frame.evaluate("self.__bx_behaviors.run();")));
         await Promise.allSettled(page.frames().map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();")));
       }
 
