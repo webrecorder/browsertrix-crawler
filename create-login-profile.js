@@ -127,7 +127,7 @@ async function main() {
 
   if (params.interactive) {
     // for testing, inject browsertrix-behaviors
-    await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init();`);
+    await page.evaluateOnNewDocument(behaviors + ";\nself.__bx_behaviors.init();");
   }
 
   console.log("loading");
