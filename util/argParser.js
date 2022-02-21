@@ -221,6 +221,12 @@ class ArgParser {
         default: 0
       },
 
+      "screencastRedis": {
+        describe: "If set, will use the state store redis pubsub for screencasting. Requires --redisStoreUrl to be set",
+        type: "boolean",
+        default: false
+      },
+
       "warcInfo": {
         alias: ["warcinfo"],
         describe: "Optional fields added to the warcinfo record in combined WARCs",

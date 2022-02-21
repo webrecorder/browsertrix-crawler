@@ -26,7 +26,7 @@ const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsert
 
 const  TextExtract  = require("./util/textextract");
 const { S3StorageSync, getFileSize } = require("./util/storage");
-const { ScreenCaster } = require("./util/screencaster");
+const { ScreenCaster, WSTransport, RedisPubSubTransport } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
 
@@ -87,6 +87,9 @@ class Crawler {
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
     this.blockRules = null;
+
+    // state redis, if any
+    this.redis = null;
   }
 
   statusLog(...args) {
@@ -158,6 +161,9 @@ class Crawler {
       this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.params.crawlId}"`);
 
       this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout);
+
+      this.redis = redis;
+
     } else {
       this.statusLog("Storing state in memory");
 
@@ -165,6 +171,25 @@ class Crawler {
     }
 
     return this.crawlState;
+  }
+
+  initScreenCaster() {
+    let transport;
+
+    if (this.params.screencastPort) {
+      transport = new WSTransport(this.params.screencastPort);
+      this.debugLog(`Screencast server started on: ${this.params.screencastPort}`);
+    } else if (this.redis && this.params.screencastRedis) {
+      const crawlId = process.env.CRAWL_ID || os.hostname();
+      transport = new RedisPubSubTransport(this.redis, crawlId);
+      this.debugLog("Screencast enabled via redis pubsub");
+    }
+
+    if (!transport) {
+      return null;
+    }
+
+    return new ScreenCaster(transport);
   }
 
   bootstrap() {
@@ -390,10 +415,7 @@ class Crawler {
       this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, (text) => this.debugLog(text));
     }
 
-    if (this.params.screencastPort) {
-      this.screencaster = new ScreenCaster(this.cluster, this.params.screencastPort);
-      this.debugLog(`Screencast Server started on: ${this.params.screencastPort}`);
-    }
+    this.screencaster = this.initScreenCaster();
 
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
