@@ -7,7 +7,7 @@ let forceTerm = false;
 
 
 async function handleTerminate() {
-  if (!crawler) {
+  if (!crawler || !crawler.crawlState) {
     process.exit(0);
   }
 

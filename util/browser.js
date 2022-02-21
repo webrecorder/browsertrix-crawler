@@ -29,5 +29,29 @@ module.exports.getBrowserExe = function() {
 };
 
 
+module.exports.evaluateWithCLI = async (frame, funcString) => {
+  const context = await frame.executionContext();
 
+  // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
+  const contextId = context._contextId;
+  const expression = funcString + "\n//# sourceURL=__puppeteer_evaluation_script__";
+
+  const { exceptionDetails, result: remoteObject } = await context._client
+    .send("Runtime.evaluate", {
+      expression,
+      contextId,
+      returnByValue: true,
+      awaitPromise: true,
+      userGesture: true,
+      includeCommandLineAPI: true,
+    });
+
+  if (exceptionDetails) {
+    throw new Error(
+      "Behavior Evaluation Failed" + exceptionDetails.text
+    );
+  }
+
+  return remoteObject.value;
+};
 
