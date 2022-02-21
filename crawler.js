@@ -87,9 +87,6 @@ class Crawler {
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
     this.blockRules = null;
-
-    // state redis, if any
-    this.redis = null;
   }
 
   statusLog(...args) {
@@ -162,8 +159,6 @@ class Crawler {
 
       this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout);
 
-      this.redis = redis;
-
     } else {
       this.statusLog("Storing state in memory");
 
@@ -173,15 +168,16 @@ class Crawler {
     return this.crawlState;
   }
 
-  initScreenCaster() {
+  async initScreenCaster() {
     let transport;
 
     if (this.params.screencastPort) {
       transport = new WSTransport(this.params.screencastPort);
       this.debugLog(`Screencast server started on: ${this.params.screencastPort}`);
-    } else if (this.redis && this.params.screencastRedis) {
+    } else if (this.params.redisStoreUrl && this.params.screencastRedis) {
       const crawlId = process.env.CRAWL_ID || os.hostname();
-      transport = new RedisPubSubTransport(this.redis, crawlId);
+      const redis = await initRedis(this.params.redisStoreUrl);
+      transport = new RedisPubSubTransport(redis, crawlId);
       this.debugLog("Screencast enabled via redis pubsub");
     }
 
@@ -415,7 +411,7 @@ class Crawler {
       this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, (text) => this.debugLog(text));
     }
 
-    this.screencaster = this.initScreenCaster();
+    this.screencaster = await this.initScreenCaster();
 
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
