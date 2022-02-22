@@ -9,7 +9,7 @@ const { initRedis } = require("./redis");
 
 const SingleBrowserImplementation = require("puppeteer-cluster/dist/concurrency/SingleBrowserImplementation").default;
 
-const indexHTML = fs.readFileSync(path.join(__dirname, "..", "screencast", "index.html"), {encoding: "utf8"});
+const indexHTML = fs.readFileSync(path.join(__dirname, "..", "html", "index.html"), {encoding: "utf8"});
 
 
 // ===========================================================================
@@ -155,7 +155,7 @@ class ScreenCaster
   }
 
   *iterCachedData() {
-    const msg = "newTarget";
+    const msg = "screencast";
     for (const id of this.caches.keys()) {
       const data = this.caches.get(id);
       const url = this.urls.get(id);
@@ -167,12 +167,11 @@ class ScreenCaster
   async newTarget(target) {
     const cdp = await target.createCDPSession();
     const id = target._targetId;
-    const url = target.url();
 
     this.targets.set(id, cdp);
-    this.urls.set(id, url);
+    this.urls.set(id, target.url());
 
-    this.transport.sendAll({msg: "newTarget", id, url});
+    const msg = "screencast";
 
     cdp.on("Page.screencastFrame", async (resp) => {
       const data = resp.data;
@@ -180,7 +179,9 @@ class ScreenCaster
 
       this.caches.set(id, data);
 
-      this.transport.sendAll({msg: "screencast", id, data});
+      const url = target.url();
+
+      this.transport.sendAll({msg, id, data, url});
 
       try {
         await cdp.send("Page.screencastFrameAck", {sessionId});
@@ -206,7 +207,7 @@ class ScreenCaster
     this.caches.delete(id);
     this.urls.delete(id);
 
-    this.transport.sendAll({msg: "endTarget", id});
+    this.transport.sendAll({msg: "close", id});
 
     this.targets.delete(id);
 

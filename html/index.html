@@ -23,7 +23,6 @@
     resp = JSON.parse(resp);
 
     switch (resp.msg) {
-      case "newTarget":
       case "screencast":
         img = createImage(resp.id);
         if (resp.data) {
@@ -31,7 +30,7 @@
         }
         break;
 
-      case "endTarget":
+      case "close":
         img = unuseImage(resp.id);
         break;
     }
