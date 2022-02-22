@@ -4,6 +4,9 @@ const url = require("url");
 const fs = require("fs");
 const path = require("path");
 
+const { initRedis } = require("./redis");
+
+
 const SingleBrowserImplementation = require("puppeteer-cluster/dist/concurrency/SingleBrowserImplementation").default;
 
 const indexHTML = fs.readFileSync(path.join(__dirname, "..", "screencast", "index.html"), {encoding: "utf8"});
@@ -85,20 +88,23 @@ class WSTransport
 // ===========================================================================
 class RedisPubSubTransport
 {
-  constructor(redis, crawlId) {
-    this.redis = redis;
-    this.castChannel = `c:${crawlId}:cast`;
-    const ctrlChannel = `c:${crawlId}:ctrl`;
-
+  constructor(redisUrl, crawlId) {
     this.numConnections = 0;
+    this.castChannel = `c:${crawlId}:cast`;
+    this.ctrlChannel = `c:${crawlId}:ctrl`;
 
-    this.handleCtrlChannel(ctrlChannel);
+    this.init(redisUrl);
   }
 
-  async handleCtrlChannel(ctrlChannel) {
-    await this.redis.subscribe(ctrlChannel);
-    this.redis.on("message", (channel, message) => {
-      if (channel !== ctrlChannel) {
+  async init(redisUrl) {
+    this.redis = await initRedis(redisUrl);
+
+    const subRedis = await initRedis(redisUrl);
+
+    await subRedis.subscribe(this.ctrlChannel);
+
+    subRedis.on("message", (channel, message) => {
+      if (channel !== this.ctrlChannel) {
         return;
       }
 
