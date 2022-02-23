@@ -9,7 +9,7 @@ const { initRedis } = require("./redis");
 
 const SingleBrowserImplementation = require("puppeteer-cluster/dist/concurrency/SingleBrowserImplementation").default;
 
-const indexHTML = fs.readFileSync(path.join(__dirname, "..", "html", "index.html"), {encoding: "utf8"});
+const indexHTML = fs.readFileSync(path.join(__dirname, "..", "html", "screencast.html"), {encoding: "utf8"});
 
 
 // ===========================================================================
@@ -152,6 +152,10 @@ class ScreenCaster
     this.urls = new Map();
 
     this.targets = new Map();
+
+    // todo: make customizable
+    this.maxWidth = 640;
+    this.maxHeight = 480;
   }
 
   *iterCachedData() {
@@ -176,12 +180,14 @@ class ScreenCaster
     cdp.on("Page.screencastFrame", async (resp) => {
       const data = resp.data;
       const sessionId = resp.sessionId;
-
-      this.caches.set(id, data);
-
       const url = target.url();
 
-      this.transport.sendAll({msg, id, data, url});
+      this.caches.set(id, data);
+      this.urls.set(id, url);
+
+      if (url !== "about:blank") {
+        this.transport.sendAll({msg, id, data, url});
+      }
 
       try {
         await cdp.send("Page.screencastFrameAck", {sessionId});
@@ -225,7 +231,7 @@ class ScreenCaster
 
     cdp._startedCast = true;
 
-    await cdp.send("Page.startScreencast", {format: "png", everyNthFrame: 1, maxWidth: 1024, maxHeight: 768});
+    await cdp.send("Page.startScreencast", {format: "png", everyNthFrame: 1, maxWidth: this.maxWidth, maxHeight: this.maxHeight});
   }
 
   async stopCast(cdp) {
