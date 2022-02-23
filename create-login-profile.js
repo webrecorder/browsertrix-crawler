@@ -11,7 +11,7 @@ const { getBrowserExe, loadProfile, saveProfile } = require("./util/browser");
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
-const profileHTML = fs.readFileSync(path.join(__dirname, "screencast", "createProfile.html"), {encoding: "utf8"});
+const profileHTML = fs.readFileSync(path.join(__dirname, "html", "createProfile.html"), {encoding: "utf8"});
 
 const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
 

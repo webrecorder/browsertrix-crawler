@@ -56,7 +56,7 @@ ADD uwsgi.ini /app/
 ADD *.js /app/
 ADD util/*.js /app/util/
 COPY config.yaml /app/
-ADD screencast/ /app/screencast/
+ADD html/ /app/html/
 
 RUN ln -s /app/main.js /usr/bin/crawl
 RUN ln -s /app/create-login-profile.js /usr/bin/create-login-profile

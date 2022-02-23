@@ -4,38 +4,27 @@ const url = require("url");
 const fs = require("fs");
 const path = require("path");
 
+const { initRedis } = require("./redis");
+
+
 const SingleBrowserImplementation = require("puppeteer-cluster/dist/concurrency/SingleBrowserImplementation").default;
 
-const indexHTML = fs.readFileSync(path.join(__dirname, "..", "screencast", "index.html"), {encoding: "utf8"});
+const indexHTML = fs.readFileSync(path.join(__dirname, "..", "html", "index.html"), {encoding: "utf8"});
 
 
 // ===========================================================================
-class ScreenCaster
+class WSTransport
 {
-  constructor(cluster, port) {
-    this.cluster = cluster;
-
-    this.httpServer = http.createServer((req, res) => {
-      const pathname = url.parse(req.url).pathname;
-      if (pathname === "/") {
-        res.writeHead(200, {"Content-Type": "text/html"});
-        res.end(indexHTML);
-      } else {
-        res.writeHead(404, {"Content-Type": "text/html"});
-        res.end("Not Found");
-      }
-    });
-
+  constructor(port) {
     this.allWS = new Set();
 
-    this.targets = new Map();
-    this.caches = new Map();
-    this.urls = new Map();
+    this.caster = null;
 
     this.wss = new ws.Server({ noServer: true });
 
     this.wss.on("connection", (ws) => this.initWebSocket(ws));
 
+    this.httpServer = http.createServer((...args) => this.handleRequest(...args));
     this.httpServer.on("upgrade", (request, socket, head) => {
       const pathname = url.parse(request.url).pathname;
 
@@ -49,18 +38,28 @@ class ScreenCaster
     this.httpServer.listen(port);
   }
 
+  async handleRequest(req, res) {
+    const pathname = url.parse(req.url).pathname;
+    switch (pathname) {
+    case "/":
+      res.writeHead(200, {"Content-Type": "text/html"});
+      res.end(indexHTML);
+      return;
+    }
+
+    res.writeHead(404, {"Content-Type": "text/html"});
+    res.end("Not Found");
+  }
+
   initWebSocket(ws) {
-    for (const id of this.targets.keys()) {
-      const data = this.caches.get(id);
-      const url = this.urls.get(id);
-      const msg = {"msg": "newTarget", id, url, data};
-      ws.send(JSON.stringify(msg));
+    for (const packet of this.caster.iterCachedData()) {
+      ws.send(JSON.stringify(packet));
     }
 
     this.allWS.add(ws);
 
     if (this.allWS.size === 1) {
-      this.startCastAll();
+      this.caster.startCastAll();
     }
 
     ws.on("close", () => {
@@ -68,34 +67,122 @@ class ScreenCaster
       this.allWS.delete(ws);
 
       if (this.allWS.size === 0) {
-        this.stopCastAll();
+        this.caster.stopCastAll();
       }
     });
   }
 
-  sendAll(msg) {
-    msg = JSON.stringify(msg);
+  sendAll(packet) {
+    packet = JSON.stringify(packet);
     for (const ws of this.allWS) {
-      ws.send(msg);
+      ws.send(packet);
     }
   }
+
+  isActive() {
+    return this.allWS.size;
+  }
+}
+
+
+// ===========================================================================
+class RedisPubSubTransport
+{
+  constructor(redisUrl, crawlId) {
+    this.numConnections = 0;
+    this.castChannel = `c:${crawlId}:cast`;
+    this.ctrlChannel = `c:${crawlId}:ctrl`;
+
+    this.init(redisUrl);
+  }
+
+  async init(redisUrl) {
+    this.redis = await initRedis(redisUrl);
+
+    const subRedis = await initRedis(redisUrl);
+
+    await subRedis.subscribe(this.ctrlChannel);
+
+    subRedis.on("message", (channel, message) => {
+      if (channel !== this.ctrlChannel) {
+        return;
+      }
+
+      switch (message) {
+      case "connect":
+        this.numConnections++;
+        if (this.numConnections === 1) {
+          this.caster.startCastAll();
+        } else {
+          for (const packet of this.caster.iterCachedData()) {
+            this.sendAll(packet);
+          }
+        }
+        break;
+
+      case "disconnect":
+        this.numConnections--;
+        if (this.numConnections === 0) {
+          this.caster.startCastAll();
+        }
+        break;
+      }
+    });
+  }
+
+  sendAll(packet) {
+    this.redis.publish(this.castChannel, JSON.stringify(packet));
+  }
+
+  async isActive() {
+    const result = await this.redis.pubsub("numsub", this.castChannel);
+    return (result.length > 1 ? result[1] > 0: false);
+  }
+}
+
+
+// ===========================================================================
+class ScreenCaster
+{
+  constructor(transport) {
+    this.transport = transport;
+    this.transport.caster = this;
+
+    this.caches = new Map();
+    this.urls = new Map();
+
+    this.targets = new Map();
+  }
+
+  *iterCachedData() {
+    const msg = "screencast";
+    for (const id of this.caches.keys()) {
+      const data = this.caches.get(id);
+      const url = this.urls.get(id);
+      yield {msg, id, url, data};
+    }
+  }
+
 
   async newTarget(target) {
     const cdp = await target.createCDPSession();
     const id = target._targetId;
-    const url = target.url();
 
     this.targets.set(id, cdp);
-    this.urls.set(id, url);
+    this.urls.set(id, target.url());
 
-    this.sendAll({"msg": "newTarget", id, url});
+    const msg = "screencast";
 
     cdp.on("Page.screencastFrame", async (resp) => {
       const data = resp.data;
       const sessionId = resp.sessionId;
 
-      this.sendAll({"msg": "screencast", id, data});
       this.caches.set(id, data);
+
+      const url = target.url();
+
+      this.transport.sendAll({msg, id, data, url});
+
       try {
         await cdp.send("Page.screencastFrameAck", {sessionId});
       } catch(e) {
@@ -103,7 +190,7 @@ class ScreenCaster
       }
     });
 
-    if (this.allWS.size) {
+    if (await this.transport.isActive()) {
       await this.startCast(cdp);
     }
   }
@@ -117,11 +204,12 @@ class ScreenCaster
 
     await this.stopCast(cdp);
 
-    this.sendAll({"msg": "endTarget", id});
-
-    this.targets.delete(id);
     this.caches.delete(id);
     this.urls.delete(id);
+
+    this.transport.sendAll({msg: "close", id});
+
+    this.targets.delete(id);
 
     try {
       await cdp.detach();
@@ -236,4 +324,4 @@ class NewWindowPage extends SingleBrowserImplementation {
 
 
 
-module.exports = { ScreenCaster, NewWindowPage };
+module.exports = { ScreenCaster, NewWindowPage, WSTransport, RedisPubSubTransport };
