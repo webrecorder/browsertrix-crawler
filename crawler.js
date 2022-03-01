@@ -184,7 +184,7 @@ class Crawler {
       return null;
     }
 
-    return new ScreenCaster(transport);
+    return new ScreenCaster(transport, this.params.workers);
   }
 
   bootstrap() {
