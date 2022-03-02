@@ -329,12 +329,17 @@ class Crawler {
 
       await this.writeStats();
 
-      if (this.screencaster) {
-        await this.screencaster.endTarget(page.target());
-      }
-
     } catch (e) {
       console.warn(e);
+    } finally {
+
+      try {
+        if (this.screencaster) {
+          await this.screencaster.endTarget(page.target());
+        }
+      } catch (e) {
+        console.warn(e);
+      }
     }
   }
 
