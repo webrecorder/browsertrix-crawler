@@ -301,11 +301,23 @@ return 0;
   }
 
   async serialize() {
-    const queued = await this.redis.lrange(this.qkey, 0, -1);
+    const queued = await this._iterListKeys(this.qkey);
+    const done = await this._iterListKeys(this.dkey);
     const pending = await this.redis.hvals(this.pkey);
-    const done = await this.redis.lrange(this.dkey, 0, -1);
 
     return {queued, pending, done};
+  }
+
+  async _iterListKeys(key, inc = 100) {
+    const results = [];
+
+    const len = await this.redis.llen(key);
+
+    for (let i = 0; i < len; i += inc) {
+      const someResults = await this.redis.lrange(key, i, i + inc - 1);
+      results.push(...someResults);
+    }
+    return results;
   }
 
   async load(state, seeds, checkScope) {

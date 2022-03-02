@@ -103,7 +103,7 @@ class RedisPubSubTransport
 
     await subRedis.subscribe(this.ctrlChannel);
 
-    subRedis.on("message", (channel, message) => {
+    subRedis.on("message", async (channel, message) => {
       if (channel !== this.ctrlChannel) {
         return;
       }
@@ -115,7 +115,7 @@ class RedisPubSubTransport
           this.caster.startCastAll();
         } else {
           for (const packet of this.caster.iterCachedData()) {
-            this.sendAll(packet);
+            await this.sendAll(packet);
           }
         }
         break;
@@ -123,15 +123,15 @@ class RedisPubSubTransport
       case "disconnect":
         this.numConnections--;
         if (this.numConnections === 0) {
-          this.caster.startCastAll();
+          this.caster.stopCastAll();
         }
         break;
       }
     });
   }
 
-  sendAll(packet) {
-    this.redis.publish(this.castChannel, JSON.stringify(packet));
+  async sendAll(packet) {
+    await this.redis.publish(this.castChannel, JSON.stringify(packet));
   }
 
   async isActive() {
@@ -144,7 +144,7 @@ class RedisPubSubTransport
 // ===========================================================================
 class ScreenCaster
 {
-  constructor(transport) {
+  constructor(transport, numWorkers) {
     this.transport = transport;
     this.transport.caster = this;
 
@@ -156,9 +156,17 @@ class ScreenCaster
     // todo: make customizable
     this.maxWidth = 640;
     this.maxHeight = 480;
+
+    this.initMsg = {
+      msg: "init",
+      width: this.maxWidth,
+      height: this.maxHeight,
+      browsers: numWorkers
+    };
   }
 
   *iterCachedData() {
+    yield this.initMsg;
     const msg = "screencast";
     for (const id of this.caches.keys()) {
       const data = this.caches.get(id);
@@ -185,9 +193,9 @@ class ScreenCaster
       this.caches.set(id, data);
       this.urls.set(id, url);
 
-      if (url !== "about:blank") {
-        this.transport.sendAll({msg, id, data, url});
-      }
+      //if (url !== "about:blank") {
+      await this.transport.sendAll({msg, id, data, url});
+      //}
 
       try {
         await cdp.send("Page.screencastFrameAck", {sessionId});
@@ -213,7 +221,7 @@ class ScreenCaster
     this.caches.delete(id);
     this.urls.delete(id);
 
-    this.transport.sendAll({msg: "close", id});
+    await this.transport.sendAll({msg: "close", id});
 
     this.targets.delete(id);
 
@@ -231,7 +239,7 @@ class ScreenCaster
 
     cdp._startedCast = true;
 
-    await cdp.send("Page.startScreencast", {format: "png", everyNthFrame: 1, maxWidth: this.maxWidth, maxHeight: this.maxHeight});
+    await cdp.send("Page.startScreencast", {format: "png", everyNthFrame: 2, maxWidth: this.maxWidth, maxHeight: this.maxHeight});
   }
 
   async stopCast(cdp) {
