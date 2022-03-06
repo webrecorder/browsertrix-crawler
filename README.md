@@ -82,7 +82,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --scopeType                           A predfined scope of the crawl. For
                                             more customization, use 'custom' and
                                             set scopeIncludeRx regexes
-       [string] [choices: "page", "page-spa", "prefix", "host", "any", "custom"]
+       [string] [choices: "page", "page-spa", "prefix", "host", "domain", "any", "custom"]
       --scopeIncludeRx, --include           Regex of page URLs that should be
                                             included in the crawl (defaults to
                                             the immediate directory of URL)
@@ -250,9 +250,14 @@ To make this configuration as simple as possible, there are several predefined s
 
 - `host` - crawl pages that share the same host.
 
+- `domain` - crawl pages that share the same domain and subdomains, eg. given `https://example.com/` will also crawl `https://anysubdomain.example.com/`
+
 - `any` - crawl any and all pages linked from this page..
 
 - `custom` - crawl based on the `--include` regular expression rules.
+
+The scope settings for multi-page crawls (page-spa, prefix, host, domain) also include http/https versions, eg. given a prefix of `http://example.com/path/`,
+`https://example.com/path/` is also included.
 
 
 #### Custom Scope Inclusion Rules
