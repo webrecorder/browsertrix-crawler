@@ -158,7 +158,7 @@ function rxEscape(string) {
 }
 
 function urlRxEscape(url, parsedUrl) {
-  return rxEscape(url).replace(parsedUrl.protocol, "https?:")
+  return rxEscape(url).replace(parsedUrl.protocol, "https?:");
 }
 
 
