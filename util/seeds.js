@@ -67,16 +67,20 @@ class ScopedSeed
 
     case "page-spa":
       // allow scheme-agnostic URLS as likely redirects
-      include = [new RegExp("^" + rxEscape(parsedUrl.href).replace(parsedUrl.protocol, "https?:") + "#.+")];
+      include = [new RegExp("^" + urlRxEscape(parsedUrl.href, parsedUrl) + "#.+")];
       allowHash = true;
       break;
 
     case "prefix":
-      include = [new RegExp("^" + rxEscape(parsedUrl.origin + parsedUrl.pathname.slice(0, parsedUrl.pathname.lastIndexOf("/") + 1)))];
+      include = [new RegExp("^" + urlRxEscape(parsedUrl.origin + parsedUrl.pathname.slice(0, parsedUrl.pathname.lastIndexOf("/") + 1), parsedUrl))];
       break;
 
     case "host":
-      include = [new RegExp("^" + rxEscape(parsedUrl.origin + "/"))];
+      include = [new RegExp("^" + urlRxEscape(parsedUrl.origin + "/", parsedUrl))];
+      break;
+
+    case "domain":
+      include = [new RegExp("^" + urlRxEscape(parsedUrl.origin + "/", parsedUrl).replace("\\/\\/", "\\/\\/([^/]+\\.)*"))];
       break;
 
     case "any":
@@ -84,7 +88,7 @@ class ScopedSeed
       break;
 
     default:
-      throw new Error(`Invalid scope type "${scopeType}" specified, valid types are: page, page-spa, prefix, host, any`);
+      throw new Error(`Invalid scope type "${scopeType}" specified, valid types are: page, page-spa, prefix, host, domain, any`);
     }
 
     return [include, allowHash];
@@ -151,6 +155,10 @@ class ScopedSeed
 
 function rxEscape(string) {
   return string.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+}
+
+function urlRxEscape(url, parsedUrl) {
+  return rxEscape(url).replace(parsedUrl.protocol, "https?:");
 }
 
 
