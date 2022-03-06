@@ -26,7 +26,7 @@ seeds:
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("prefix");
-  expect(seeds[0].include).toEqual([/^https:\/\/example\.com\//]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
   expect(seeds[0].exclude).toEqual([]);
 
 });
@@ -43,7 +43,7 @@ exclude: https://example.com/pathexclude
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("prefix");
-  expect(seeds[0].include).toEqual([/^https:\/\/example\.com\//]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
   expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
 
 });
@@ -62,7 +62,7 @@ exclude: https://example.com/pathexclude
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("prefix");
-  expect(seeds[0].include).toEqual([/^https:\/\/example\.com\//]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
   expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
 
 });
@@ -81,25 +81,54 @@ exclude: https://example.com/pathexclude
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("prefix");
-  expect(seeds[0].include).toEqual([/^https:\/\/example\.com\//]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
   expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
 
 });
+
+
+test("host scope and domain scope", async () => {
+  const seeds = getSeeds(`
+
+seeds:
+   - url: https://example.com/
+     scopeType: domain
+
+   - url: https://example.org/
+     scopeType: host
+`);
+
+  expect(seeds.length).toEqual(2);
+  expect(seeds[0].scopeType).toEqual("domain");
+  expect(seeds[0].include).toEqual([/^https?:\/\/([^/]+\.)*example\.com\//]);
+  expect(!!seeds[0].include[0].exec("https://example.com/")).toEqual(true);
+  expect(!!seeds[0].include[0].exec("https://example.com/path")).toEqual(true);
+  expect(!!seeds[0].include[0].exec("https://sub.example.com/path")).toEqual(true);
+  expect(!!seeds[0].include[0].exec("https://sub.domain.example.com/path")).toEqual(true);
+  expect(!!seeds[0].include[0].exec("https://notsub.domainexample.com/path")).toEqual(false);
+
+  expect(seeds[1].scopeType).toEqual("host");
+  expect(seeds[1].include).toEqual([/^https?:\/\/example\.org\//]);
+  expect(!!seeds[1].include[0].exec("https://example.org/")).toEqual(true);
+  expect(!!seeds[1].include[0].exec("https://example.org/path")).toEqual(true);
+  expect(!!seeds[1].include[0].exec("https://sub.example.com/path")).toEqual(false);
+});
+
 
 
 test("custom scope", async () => {
   const seeds = getSeeds(`
 seeds:
    - url: https://example.com/
-     include: https://example.com/(path|other)
-     exclude: https://example.com/pathexclude
+     include: https?://example.com/(path|other)
+     exclude: https?://example.com/pathexclude
 `);
 
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("custom");
-  expect(seeds[0].include).toEqual([/https:\/\/example.com\/(path|other)/]);
-  expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
+  expect(seeds[0].include).toEqual([/https?:\/\/example.com\/(path|other)/]);
+  expect(seeds[0].exclude).toEqual([/https?:\/\/example.com\/pathexclude/]);
 });
 
 
@@ -110,7 +139,7 @@ seeds:
    - url: https://example.com/1
    - url: https://example.com/2
 
-include: https://example.com/(path|other)
+include: https?://example.com/(path|other)
 exclude: https://example.com/pathexclude
 `);
 
@@ -119,12 +148,12 @@ exclude: https://example.com/pathexclude
 
   expect(seeds[0].scopeType).toEqual("custom");
   expect(seeds[0].url).toEqual("https://example.com/1");
-  expect(seeds[0].include).toEqual([/https:\/\/example.com\/(path|other)/]);
+  expect(seeds[0].include).toEqual([/https?:\/\/example.com\/(path|other)/]);
   expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
 
   expect(seeds[1].scopeType).toEqual("custom");
   expect(seeds[1].url).toEqual("https://example.com/2");
-  expect(seeds[1].include).toEqual([/https:\/\/example.com\/(path|other)/]);
+  expect(seeds[1].include).toEqual([/https?:\/\/example.com\/(path|other)/]);
   expect(seeds[1].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
 
 });
@@ -159,7 +188,7 @@ include: https://example.com/onlythispath
 
   expect(seeds[2].scopeType).toEqual("prefix");
   expect(seeds[2].url).toEqual("https://example.com/subpath/file.html");
-  expect(seeds[2].include).toEqual([/^https:\/\/example\.com\/subpath\//]);
+  expect(seeds[2].include).toEqual([/^https?:\/\/example\.com\/subpath\//]);
   expect(seeds[2].exclude).toEqual([]);
 
 });
@@ -201,7 +230,7 @@ exclude:
 
   expect(seeds[1].scopeType).toEqual("prefix");
   expect(seeds[1].url).toEqual("https://example.com/subpath/file.html");
-  expect(seeds[1].include).toEqual([/^https:\/\/example\.com\/subpath\//]);
+  expect(seeds[1].include).toEqual([/^https?:\/\/example\.com\/subpath\//]);
   expect(seeds[1].exclude).toEqual(excludeRxs);
 
   expect(seeds[2].scopeType).toEqual("any");
