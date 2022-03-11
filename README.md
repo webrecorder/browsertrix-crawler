@@ -304,7 +304,7 @@ but skip URLs that end with 'skip-me'. For example, `https://example.com/crawl-t
 ```
 seeds:
   - url: https://example.com/startpage.html
-    include: example.com/crawl-this|crawl-that
+    include: example.com/(crawl-this|crawl-that)
     exclude:
       - skip$
 ```
