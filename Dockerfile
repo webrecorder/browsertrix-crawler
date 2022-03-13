@@ -8,6 +8,10 @@ FROM ${BROWSER_IMAGE_BASE}:${BROWSER_VERSION} AS browser
 
 FROM ubuntu:bionic
 
+# http://bugs.python.org/issue19846
+# > At the moment, setting "LANG=C" on a Linux system *fundamentally breaks Python 3*, and that's not OK.
+ENV LANG C.UTF-8
+
 RUN apt-get update -y && apt-get install --no-install-recommends -qqy software-properties-common \
     && add-apt-repository -y ppa:deadsnakes \
     && apt-get update -y \
