@@ -243,6 +243,18 @@ class ArgParser {
         type: "string",
         default: "partial",
         choices: ["never", "partial", "always"]
+      },
+
+      "saveStateInterval": {
+        describe: "If save state is set to 'always', also save state during the crawl at this interval (in seconds)",
+        type: "number",
+        default: 300,
+      },
+
+      "saveStateHistory": {
+        describe: "Number of save states to keep during the duration of a crawl",
+        type: "number",
+        default: 5,
       }
     };
   }
