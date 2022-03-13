@@ -459,6 +459,35 @@ The webhook URL can be an HTTP URL which receives a JSON POST request OR a Redis
 
 </details>
 
+### Configuring chromium / puppeteer / pywb
+
+There is a few environment variables you can set to configure chromium and pywb:
+
+- CHROME_FLAGS will be split by spaces and passed to chromium (via `args` in puppeteer). Note that setting some options is not supported such as `--proxy-server` since they are set by browsertrix itself.
+- SOCKS_HOST and SOCKS_PORT are read by pywb0 to proxy upstream traffic
+
+Here's some examples use cases:
+
+**Set a socks proxy so outgoing traffic is routed via ssh**
+
+The SOCKS_HOST and SOCKS_PORT env variables are read by [pywb](https://pywb.readthedocs.io/en/latest/manual/configuring.html?highlight=SOCKS#socks-proxy-for-live-web).
+
+```bash
+ssh proxy-server -N -D 15000
+docker run -e SOCKS_HOST=localhost SOCKS_PORT=15000 ...
+```
+
+**Install uBlock Origin adblocker or any other browser extension**
+
+```bash
+wget https://github.com/gorhill/uBlock/releases/download/1.41.8/uBlock0_1.41.8.chromium.zip
+unzip uBlock0_1.41.8.chromium.zip
+docker run -e CHROME_FLAGS="--disable-extensions-except=/ext/ublock --load-extension=/ext/ublock" -v $PWD/uBlock0.chromium:/ext/ublock ...
+```
+
+You can also directly use extensions from an existing chrome-profile by using e.g. `~/.config/chromium/Default/Extensions/cjpalhdlnbpafiamejdnhcphjbkeiagm/1.41.8_0/` as the path.
+
+
 ## Interrupting and Restarting the Crawl
 
 With version 0.5.0, a crawl can be gracefully interrupted with Ctrl-C (SIGINT) or a SIGTERM.
