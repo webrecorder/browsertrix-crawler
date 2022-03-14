@@ -77,7 +77,7 @@ class MemoryCrawlState extends BaseState
       },
 
       reject(e) {
-        console.warn(`URL Load Failed: ${url}, Reason: ${e}`);
+        console.warn(`Page Load Failed: ${url}, Reason: ${e}`);
 
         state.pending.delete(url);
 
@@ -284,7 +284,7 @@ return 0;
       },
 
       async reject(e) {
-        console.warn(`URL Load Failed: ${url}, Reason: ${e}`);
+        console.warn(`Page Load Failed: ${url}, Reason: ${e}`);
         await state._fail(url);
       }
     };

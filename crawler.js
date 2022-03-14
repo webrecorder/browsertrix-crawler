@@ -553,14 +553,30 @@ class Crawler {
       await this.blockRules.initPage(page);
     }
 
+    let ignoreAbort = false;
+
+    // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
+    // if so, don't report as an error
+    page.on("requestfailed", (req) => {
+      const failure = req.failure().errorText;
+      if (failure === "net::ERR_ABORTED" && req.resourceType() === "document") {
+        const resp = req.response();
+        if (resp) {
+          const content_type = resp.headers()["content_type"];
+          if ((content_type && content_type.startsWith("text/")) || resp.headers()["content-disposition"]) {
+            ignoreAbort = true;
+          }
+        }
+      }
+    });
+
     try {
       await page.goto(url, this.gotoOpts);
     } catch (e) {
       let msg = e.message || "";
-      if (msg && msg.startsWith("net::ERR_ABORTED")) {
-        msg += " - this may occur if the URL is not an HTML page";
+      if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
+        this.statusLog(`ERROR: ${url}: ${msg}`);
       }
-      this.statusLog(msg);
     }
 
     const seed = this.params.scopedSeeds[seedId];
