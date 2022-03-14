@@ -57,6 +57,10 @@ class Crawler {
     this.params = res.parsed;
     this.origConfig = res.origConfig;
 
+    this.saveStateFiles = [];
+    this.lastSaveTime = 0;
+    this.saveStateInterval = this.params.saveStateInterval * 1000;
+
     this.debugLogging = this.params.logging.includes("debug");
 
     this.profileDir = loadProfile(this.params.profile);
@@ -163,6 +167,10 @@ class Crawler {
       this.statusLog("Storing state in memory");
 
       this.crawlState = new MemoryCrawlState();
+    }
+
+    if (this.params.saveState === "always" && this.params.saveStateInterval) {
+      this.statusLog(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`);
     }
 
     return this.crawlState;
@@ -321,13 +329,15 @@ class Crawler {
         text = await new TextExtract(result).parseTextFromDom();
       }
 
-      await this.writePage(data, title, this.params.text, text);
+      await this.writePage(data, title, this.params.text ? text : null);
 
       if (this.params.behaviorOpts) {
         await Promise.allSettled(page.frames().map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();")));
       }
 
       await this.writeStats();
+
+      await this.serializeConfig();
 
     } catch (e) {
       console.warn(e);
@@ -433,7 +443,7 @@ class Crawler {
     await this.cluster.idle();
     await this.cluster.close();
 
-    await this.serializeConfig();
+    await this.serializeConfig(true);
 
     this.writeStats();
 
@@ -681,7 +691,7 @@ class Crawler {
     }
   }
 
-  async writePage({url, depth}, title, text, text_content) {
+  async writePage({url, depth}, title, text) {
     const id = uuidv4();
     const row = {"id": id, "url": url, "title": title};
 
@@ -689,15 +699,14 @@ class Crawler {
       row.seed = true;
     }
 
-    if (text) {
-      row.text = text_content;
+    if (text !== null) {
+      row.text = text;
     }
 
-    const processedRow = JSON.stringify(row).concat("\n");
+    const processedRow = JSON.stringify(row) + "\n";
     try {
-      this.pagesFH.writeFile(processedRow);
-    }
-    catch (err) {
+      await this.pagesFH.writeFile(processedRow);
+    } catch (err) {
       console.warn("pages/pages.jsonl append failed", err);
     }
   }
@@ -875,12 +884,15 @@ class Crawler {
     this.debugLog(`Combined WARCs saved as: ${generatedCombinedWarcs}`);
   }
 
-  async serializeConfig() {
+  async serializeConfig(done = false) {
     switch (this.params.saveState) {
     case "never":
       return;
 
     case "partial":
+      if (!done) {
+        return;
+      }
       if (await this.crawlState.finished()) {
         return;
       }
@@ -891,7 +903,18 @@ class Crawler {
       break;
     }
 
-    const ts = new Date().toISOString().slice(0,19).replace(/[T:-]/g, "");
+    const now = new Date();
+
+    if (!done) {
+      // if not done, save state only after specified interval has elapsed
+      if ((now.getTime() - this.lastSaveTime) < this.saveStateInterval) {
+        return;
+      }
+    }
+
+    this.lastSaveTime = now.getTime();
+
+    const ts = now.toISOString().slice(0,19).replace(/[T:-]/g, "");
 
     const crawlDir = path.join(this.collDir, "crawls");
 
@@ -899,15 +922,31 @@ class Crawler {
 
     const filename = path.join(crawlDir, `crawl-${ts}-${this.params.crawlId}.yaml`);
 
-    this.statusLog("Saving crawl state to: " + filename);
-
     const state = await this.crawlState.serialize();
 
     if (this.origConfig) {
       this.origConfig.state = state;
     }
     const res = yaml.dump(this.origConfig, {lineWidth: -1});
-    fs.writeFileSync(filename, res);
+    try {
+      this.statusLog("Saving crawl state to: " + filename);
+      await fsp.writeFile(filename, res);
+    } catch (e) {
+      console.error(`Failed to write save state file: ${filename}`, e);
+      return;
+    }
+
+    this.saveStateFiles.push(filename);
+
+    if (this.saveStateFiles.length > this.params.saveStateHistory) {
+      const oldFilename = this.saveStateFiles.shift();
+      this.statusLog(`Removing old save-state: ${oldFilename}`);
+      try {
+        await fsp.unlink(oldFilename);
+      } catch (e) {
+        console.error(`Failed to delete old save state file: ${oldFilename}`);
+      }
+    }
   }
 }
 

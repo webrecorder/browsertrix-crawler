@@ -488,7 +488,7 @@ docker run -e CHROME_FLAGS="--disable-extensions-except=/ext/ublock --load-exten
 You can also directly use extensions from an existing chrome-profile by using e.g. `~/.config/chromium/Default/Extensions/cjpalhdlnbpafiamejdnhcphjbkeiagm/1.41.8_0/` as the path.
 
 
-## Interrupting and Restarting the Crawl
+## Saving Crawl State: Interrupting and Restarting the Crawl
 
 With version 0.5.0, a crawl can be gracefully interrupted with Ctrl-C (SIGINT) or a SIGTERM.
 When a crawl is interrupted, the current crawl state is written to the `crawls` subdirectory inside the collection directory.
@@ -501,6 +501,11 @@ are recorded in the `pending` section of the crawl state (if gracefully finished
 
 By default, the crawl state is only written when a crawl is only partially done - when it is interrupted. The `--saveState` cli option can be set to `always`
 or `never` respectively, to control when the crawl state file should be written.
+
+### Periodic State Saving
+
+When the `--saveState` is set to always, Browsertrix Crawler will also save the state automatically during the crawl, as set by the `--saveStateInterval` setting.
+When The crawler will keep the last `--saveStateHistory` save states and delete older ones. This provides extra backup, in case the crawl fails unexpectedly, or is not terminated via Ctrl-C, several previous crawl states are still available.
 
 
 ## Creating and Using Browser Profiles
