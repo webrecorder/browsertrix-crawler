@@ -6,6 +6,16 @@ const os = require("os");
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
 module.exports.loadProfile = function(profileFilename) {
+  if (profileFilename &&
+      (profileFilename.startsWith("http:") || profileFilename.startsWith("https:"))) {
+    request.get(profileFilename).on("error", (err) => {
+      console.error(err);
+      throw Error("Unable to load profile: " + profileFilename);
+    }).pipe(fs.createWriteStream("/tmp/profile.tar.gz"));
+
+    profileFilename = "/tmp/profile.tar.gz";
+  }
+
   if (profileFilename) {
     child_process.execSync("tar xvfz " + profileFilename, {cwd: profileDir});
   }
