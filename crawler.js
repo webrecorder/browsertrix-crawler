@@ -541,8 +541,9 @@ class Crawler {
 
     if (!await this.isHTML(url)) {
       try {
-        await this.directFetchCapture(url);
-        return;
+        if (await this.directFetchCapture(url)) {
+          return;
+        }
       } catch (e) {
         // ignore failed direct fetch attempt, do browser-based capture
       }
@@ -555,7 +556,11 @@ class Crawler {
     try {
       await page.goto(url, this.gotoOpts);
     } catch (e) {
-      console.warn(`Load timeout for ${url}`, e);
+      let msg = e.message || "";
+      if (msg && msg.startsWith("net::ERR_ABORTED")) {
+        msg += " - this may occur if the URL is not an HTML page";
+      }
+      this.statusLog(msg);
     }
 
     const seed = this.params.scopedSeeds[seedId];
@@ -713,7 +718,7 @@ class Crawler {
         headers: this.headers,
         agent: this.resolveAgent
       });
-      if (resp.status >= 400) {
+      if (resp.status >= 300) {
         this.debugLog(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
         return true;
       }
@@ -742,8 +747,9 @@ class Crawler {
     //console.log(`Direct capture: ${this.capturePrefix}${url}`);
     const abort = new AbortController();
     const signal = abort.signal;
-    await fetch(this.capturePrefix + url, {signal, headers: this.headers});
+    const resp = await fetch(this.capturePrefix + url, {signal, headers: this.headers, redirect: "manual"});
     abort.abort();
+    return resp.status === 200 && !resp.headers.get("set-cookie");
   }
 
   async awaitPendingClear() {
