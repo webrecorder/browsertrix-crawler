@@ -559,14 +559,20 @@ class Crawler {
     // if so, don't report as an error
     page.on("requestfailed", (req) => {
       const failure = req.failure().errorText;
-      if (failure === "net::ERR_ABORTED" && req.resourceType() === "document") {
-        const resp = req.response();
-        if (resp) {
-          const content_type = resp.headers()["content_type"];
-          if ((content_type && content_type.startsWith("text/")) || resp.headers()["content-disposition"]) {
-            ignoreAbort = true;
-          }
-        }
+      if (failure !== "net::ERR_ABORTED" || req.resourceType() !== "document") {
+        return;
+      }
+
+      const resp = req.response();
+      const headers = resp && resp.headers();
+
+      if (!headers) {
+        return;
+      }
+
+      if (headers["content-disposition"] || 
+         (headers["content-type"] && !headers["content-type"].startsWith("text/"))) {
+        ignoreAbort = true;
       }
     });
 
