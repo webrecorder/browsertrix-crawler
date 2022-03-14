@@ -718,7 +718,7 @@ class Crawler {
         headers: this.headers,
         agent: this.resolveAgent
       });
-      if (resp.status >= 300) {
+      if (resp.status !== 200) {
         this.debugLog(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
         return true;
       }
