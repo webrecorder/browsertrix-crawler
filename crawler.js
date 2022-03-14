@@ -568,22 +568,7 @@ class Crawler {
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
     // if so, don't report as an error
     page.on("requestfailed", (req) => {
-      const failure = req.failure().errorText;
-      if (failure !== "net::ERR_ABORTED" || req.resourceType() !== "document") {
-        return;
-      }
-
-      const resp = req.response();
-      const headers = resp && resp.headers();
-
-      if (!headers) {
-        return;
-      }
-
-      if (headers["content-disposition"] || 
-         (headers["content-type"] && !headers["content-type"].startsWith("text/"))) {
-        ignoreAbort = true;
-      }
+      ignoreAbort = shouldIgnoreAbort(req);
     });
 
     try {
@@ -975,6 +960,29 @@ class Crawler {
         console.error(`Failed to delete old save state file: ${oldFilename}`);
       }
     }
+  }
+}
+
+function shouldIgnoreAbort(req) {
+  try {
+    const failure = req.failure() && req.failure().errorText;
+    if (failure !== "net::ERR_ABORTED" || req.resourceType() !== "document") {
+      return false;
+    }
+
+    const resp = req.response();
+    const headers = resp && resp.headers();
+
+    if (!headers) {
+      return false;
+    }
+
+    if (headers["content-disposition"] || 
+       (headers["content-type"] && !headers["content-type"].startsWith("text/"))) {
+      return true;
+    }
+  } catch (e) {
+    return false;
   }
 }
 
