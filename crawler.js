@@ -551,8 +551,9 @@ class Crawler {
 
     if (!await this.isHTML(url)) {
       try {
-        await this.directFetchCapture(url);
-        return;
+        if (await this.directFetchCapture(url)) {
+          return;
+        }
       } catch (e) {
         // ignore failed direct fetch attempt, do browser-based capture
       }
@@ -562,10 +563,36 @@ class Crawler {
       await this.blockRules.initPage(page);
     }
 
+    let ignoreAbort = false;
+
+    // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
+    // if so, don't report as an error
+    page.on("requestfailed", (req) => {
+      const failure = req.failure().errorText;
+      if (failure !== "net::ERR_ABORTED" || req.resourceType() !== "document") {
+        return;
+      }
+
+      const resp = req.response();
+      const headers = resp && resp.headers();
+
+      if (!headers) {
+        return;
+      }
+
+      if (headers["content-disposition"] || 
+         (headers["content-type"] && !headers["content-type"].startsWith("text/"))) {
+        ignoreAbort = true;
+      }
+    });
+
     try {
       await page.goto(url, this.gotoOpts);
     } catch (e) {
-      console.warn(`Load timeout for ${url}`, e);
+      let msg = e.message || "";
+      if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
+        this.statusLog(`ERROR: ${url}: ${msg}`);
+      }
     }
 
     const seed = this.params.scopedSeeds[seedId];
@@ -722,7 +749,7 @@ class Crawler {
         headers: this.headers,
         agent: this.resolveAgent
       });
-      if (resp.status >= 400) {
+      if (resp.status !== 200) {
         this.debugLog(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
         return true;
       }
@@ -751,8 +778,9 @@ class Crawler {
     //console.log(`Direct capture: ${this.capturePrefix}${url}`);
     const abort = new AbortController();
     const signal = abort.signal;
-    await fetch(this.capturePrefix + url, {signal, headers: this.headers});
+    const resp = await fetch(this.capturePrefix + url, {signal, headers: this.headers, redirect: "manual"});
     abort.abort();
+    return resp.status === 200 && !resp.headers.get("set-cookie");
   }
 
   async awaitPendingClear() {
