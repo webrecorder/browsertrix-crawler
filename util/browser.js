@@ -2,12 +2,36 @@ const child_process = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const request = require("request");
 
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
-module.exports.loadProfile = function(profileFilename) {
+module.exports.loadProfile = async function(profileFilename) {
+  if (profileFilename &&
+      (profileFilename.startsWith("http:") || profileFilename.startsWith("https:"))) {
+
+    const targetFilename = "/tmp/profile.tar.gz";
+
+    console.log(`Downloading ${profileFilename} to ${targetFilename}`);
+
+    const p = new Promise((resolve, reject) => {
+      request.get(profileFilename).
+        on("error", (err) => reject(err)).
+        pipe(fs.createWriteStream(targetFilename)).
+        on("finish", () => resolve());
+    });
+
+    await p;
+      
+    profileFilename = targetFilename;
+  }
+
   if (profileFilename) {
-    child_process.execSync("tar xvfz " + profileFilename, {cwd: profileDir});
+    try {
+      child_process.execSync("tar xvfz " + profileFilename, {cwd: profileDir});
+    } catch (e) {
+      console.error(`Profile filename ${profileFilename} not a valid tar.gz`);
+    }
   }
 
   return profileDir;

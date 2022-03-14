@@ -63,8 +63,6 @@ class Crawler {
 
     this.debugLogging = this.params.logging.includes("debug");
 
-    this.profileDir = loadProfile(this.params.profile);
-
     if (this.params.profile) {
       this.statusLog("With Browser Profile: " + this.params.profile);
     }
@@ -372,6 +370,7 @@ class Crawler {
   }
 
   async crawl() {
+    this.profileDir = await loadProfile(this.params.profile);
 
     try {
       this.driver = require(this.params.driver);
