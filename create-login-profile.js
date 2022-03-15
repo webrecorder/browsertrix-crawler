@@ -126,7 +126,7 @@ async function main() {
   await page.setCacheEnabled(false);
 
   if (params.interactive) {
-    await page.evaluateOnNewDocument('Object.defineProperty(navigator, "webdriver", {value: false});');
+    await page.evaluateOnNewDocument("Object.defineProperty(navigator, \"webdriver\", {value: false});");
     // for testing, inject browsertrix-behaviors
     await page.evaluateOnNewDocument(behaviors + ";\nself.__bx_behaviors.init();");
   }

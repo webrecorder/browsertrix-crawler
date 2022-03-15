@@ -310,6 +310,8 @@ class Crawler {
         await page._client.send("Network.setBypassServiceWorker", {bypass: true});
       }
 
+      await page.evaluateOnNewDocument("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+
       if (this.params.behaviorOpts && !page.__bx_inited) {
         await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
         await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
@@ -581,6 +583,8 @@ class Crawler {
 
     const seed = this.params.scopedSeeds[seedId];
 
+    await this.checkCF(page);
+
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
       return;
@@ -646,6 +650,17 @@ class Crawler {
       }
     } catch (e) {
       console.error("Queuing Error: ", e);
+    }
+  }
+
+  async checkCF(page) {
+    try {
+      while (await page.$("div.cf-browser-verification.cf-im-under-attack")) {
+        this.statusLog("Cloudflare Check Detected, waiting for reload...");
+        await this.sleep(5500);
+      }
+    } catch (e) {
+      console.warn(e);
     }
   }
 
