@@ -90,7 +90,7 @@ async function main() {
   }
 
   //await new Promise(resolve => setTimeout(resolve, 2000));
-  const profileDir = loadProfile(params.profile);
+  const profileDir = await loadProfile(params.profile);
 
   const args = {
     headless: !!params.headless,
@@ -126,6 +126,7 @@ async function main() {
   await page.setCacheEnabled(false);
 
   if (params.interactive) {
+    await page.evaluateOnNewDocument('Object.defineProperty(navigator, "webdriver", {value: false});');
     // for testing, inject browsertrix-behaviors
     await page.evaluateOnNewDocument(behaviors + ";\nself.__bx_behaviors.init();");
   }
@@ -221,7 +222,7 @@ function promptInput(msg, hidden = false) {
 
 async function handleInteractive(params, browser, page) {
   const target = page.target();
-  const targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=localhost:9222/devtools/page/${target._targetId}&panel=resources`;
+  const targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${target._targetId}&panel=resources`;
 
   console.log("Creating Profile Interactively...");
   child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
@@ -231,7 +232,7 @@ async function handleInteractive(params, browser, page) {
     const pathname = parsedUrl.pathname;
     if (pathname === "/") {
       res.writeHead(200, {"Content-Type": "text/html"});
-      res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl.replace("$HOST", parsedUrl.hostname)));
+      res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl.replaceAll("$HOST", parsedUrl.hostname)));
 
     } else if (pathname === "/createProfile" && req.method === "POST") {
 
