@@ -90,7 +90,7 @@ async function main() {
   }
 
   //await new Promise(resolve => setTimeout(resolve, 2000));
-  const profileDir = loadProfile(params.profile);
+  const profileDir = await loadProfile(params.profile);
 
   const args = {
     headless: !!params.headless,
