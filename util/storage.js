@@ -54,9 +54,7 @@ class S3StorageSync
     this.crawlId = crawlId;
     this.webhookUrl = webhookUrl;
 
-    filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.]/g, ""));
-    filename = filename.replace("@hostname", os.hostname());
-    filename = filename.replace("@id", this.crawlId);
+    filename = interpolateFilename(filename, this.crawlId);
 
     this.waczFilename = "data/" + filename;
   }
@@ -115,7 +113,16 @@ function checksumFile(hashName, path) {
   });
 }
 
+function interpolateFilename(filename, crawlId) {
+  filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.]/g, ""));
+  filename = filename.replace("@hostname", os.hostname());
+  filename = filename.replace("@id", crawlId);
+  return filename;
+}
+
+
 module.exports.S3StorageSync = S3StorageSync;
 module.exports.getFileSize = getFileSize;
+module.exports.interpolateFilename = interpolateFilename;
 
 
