@@ -216,7 +216,12 @@ class Crawler {
 
     subprocesses.push(child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts));
 
-    process.on("exit", () => {
+    process.on("exit", (code) => {
+      if (this.params.deleteOnExit && (code === 0 || code === 1)) {
+        console.log(`Deleting ${this.collDir} before exit`);
+        fs.rmSync(this.collDir, { recursive: true, force: true });
+      }
+
       for (const proc of subprocesses) {
         proc.kill();
       }

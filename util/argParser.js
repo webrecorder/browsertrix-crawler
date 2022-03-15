@@ -114,7 +114,7 @@ class ArgParser {
         alias: "c",
         describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",
         type: "string",
-        default: `capture-${new Date().toISOString().slice(0,19)}`.replace(/:/g, "-")
+        default: process.env.CRAWL_ID || `capture-${new Date().toISOString().slice(0,19)}`.replace(/:/g, "-")
       },
 
       "headless": {
@@ -255,6 +255,12 @@ class ArgParser {
         describe: "Number of save states to keep during the duration of a crawl",
         type: "number",
         default: 5,
+      },
+
+      "deleteOnExit": {
+        describe: "Delete on intentional exit, success or abort",
+        type: "boolean",
+        default:  false,
       }
     };
   }
