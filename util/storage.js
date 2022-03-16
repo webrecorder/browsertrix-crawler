@@ -114,8 +114,9 @@ function checksumFile(hashName, path) {
 }
 
 function interpolateFilename(filename, crawlId) {
-  filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.]/g, ""));
+  filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.-]/g, ""));
   filename = filename.replace("@hostname", os.hostname());
+  filename = filename.replace("@hostsuffix", os.hostname().slice(-14));
   filename = filename.replace("@id", crawlId);
   return filename;
 }
