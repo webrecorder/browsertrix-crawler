@@ -29,6 +29,7 @@ const { S3StorageSync, getFileSize } = require("./util/storage");
 const { ScreenCaster, WSTransport, RedisPubSubTransport } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
+const { Lock } = require("./util/lock");
 
 const { getBrowserExe, loadProfile, evaluateWithCLI } = require("./util/browser");
 
@@ -89,6 +90,9 @@ class Crawler {
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
     this.blockRules = null;
+
+    // lock is obtained if last/single process in parallel runs
+    this.lock = this.params.deleteOnExit ? new Lock(this.collDir) : null;
   }
 
   statusLog(...args) {
@@ -217,9 +221,13 @@ class Crawler {
     subprocesses.push(child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts));
 
     process.on("exit", (code) => {
-      if (this.params.deleteOnExit && (code === 0 || code === 1)) {
+      if (this.params.deleteOnExit && this.lock.release() && (code === 0 || code === 3)) {
         console.log(`Deleting ${this.collDir} before exit`);
-        fs.rmSync(this.collDir, { recursive: true, force: true });
+        try {
+          fs.rmSync(this.collDir, { recursive: true, force: true });
+        } catch(e) {
+          console.warn(e);
+        }
       }
 
       for (const proc of subprocesses) {
@@ -460,6 +468,11 @@ class Crawler {
 
     // extra wait for all resources to land into WARCs
     await this.awaitPendingClear();
+
+    if (this.lock && !this.lock.release()) {
+      this.statusLog("Exiting, other parallel jobs will finish...");
+      return;
+    }
 
     if (this.params.combineWARC) {
       await this.combineWARC();

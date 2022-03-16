@@ -35,7 +35,7 @@ process.on("SIGINT", async () => {
 process.on("SIGTERM", async () => {
   if (forceTerm) {
     console.log("SIGTERM received, exit immediately");
-    process.exit(1);
+    process.exit(3);
   }
 
   console.log("SIGTERM received...");
