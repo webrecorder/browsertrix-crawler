@@ -259,7 +259,7 @@ class Crawler {
       "--no-sandbox",
       "--disable-background-media-suspend",
       "--autoplay-policy=no-user-gesture-required",
-      "--disable-features=IsolateOrigins,site-per-process",
+      "--disable-features=Translate,LazyFrameLoading,IsolateOrigins,site-per-process",
       "--disable-popup-blocking",
       "--disable-backgrounding-occluded-windows",
     ];
