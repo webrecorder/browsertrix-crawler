@@ -182,9 +182,10 @@ redis.call('hdel', KEYS[1], ARGV[1]);
       lua: `
 local json = redis.call('rpop', KEYS[1]);
 
-local data = cjson.decode(json);
-
-redis.call('hset', KEYS[2], data.url, json);
+if json then
+  local data = cjson.decode(json);
+  redis.call('hset', KEYS[2], data.url, json);
+end
 
 return json;
 `
@@ -267,8 +268,14 @@ return 0;
 
   async shift() {
     const json = await this._getNext();
+    let data;
 
-    const data = JSON.parse(json);
+    try {
+      data = JSON.parse(json);
+    } catch(e) {
+      console.error("Invalid queued json: ", json);
+      return;
+    }
 
     const url = data.url;
 
