@@ -106,7 +106,7 @@ async function main() {
     useProxy = true;
   }
 
-  const browserArgs = chromeArgs(useProxy, [
+  const browserArgs = chromeArgs(useProxy, null, [
     "--remote-debugging-port=9221",
     `--window-size=${params.windowSize}`,
   ]);

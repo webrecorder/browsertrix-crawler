@@ -30,7 +30,7 @@ const { ScreenCaster, WSTransport, RedisPubSubTransport } = require("./util/scre
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
 
-const { getBrowserExe, loadProfile, chromeArgs, evaluateWithCLI } = require("./util/browser");
+const { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } = require("./util/browser");
 
 const { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } = require("./util/constants");
 
@@ -113,22 +113,11 @@ class Crawler {
       return;
     }
 
-    this.browserExe = getBrowserExe();
-
     // if device set, it overrides the default Chrome UA
     if (this.emulateDevice) {
       this.userAgent = this.emulateDevice.userAgent;
     } else {
-      let version = process.env.BROWSER_VERSION;
-
-      try {
-        version = child_process.execFileSync(this.browserExe, ["--version"], {encoding: "utf8"});
-        version = version.match(/[\d.]+/)[0];
-      } catch(e) {
-        console.error(e);
-      }
-
-      this.userAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
+      this.userAgent = getDefaultUA();
     }
 
     // suffix to append to default userAgent
@@ -202,6 +191,8 @@ class Crawler {
       opts = {stdio: "ignore", cwd: this.params.cwd};
     }
 
+    this.browserExe = getBrowserExe();
+
     this.configureUA();
 
     this.headers = {"User-Agent": this.userAgent};
@@ -246,7 +237,7 @@ class Crawler {
       handleSIGTERM: false,
       handleSIGHUP: false,
       ignoreHTTPSErrors: true,
-      args: chromeArgs(true),
+      args: chromeArgs(true, this.userAgent),
       userDataDir: this.profileDir,
       defaultViewport: null,
     };
