@@ -30,7 +30,7 @@ const { ScreenCaster, WSTransport, RedisPubSubTransport } = require("./util/scre
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
 
-const { getBrowserExe, loadProfile, evaluateWithCLI } = require("./util/browser");
+const { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } = require("./util/browser");
 
 const { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } = require("./util/constants");
 
@@ -113,22 +113,11 @@ class Crawler {
       return;
     }
 
-    this.browserExe = getBrowserExe();
-
     // if device set, it overrides the default Chrome UA
     if (this.emulateDevice) {
       this.userAgent = this.emulateDevice.userAgent;
     } else {
-      let version = process.env.BROWSER_VERSION;
-
-      try {
-        version = child_process.execFileSync(this.browserExe, ["--version"], {encoding: "utf8"});
-        version = version.match(/[\d.]+/)[0];
-      } catch(e) {
-        console.error(e);
-      }
-
-      this.userAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
+      this.userAgent = getDefaultUA();
     }
 
     // suffix to append to default userAgent
@@ -202,6 +191,8 @@ class Crawler {
       opts = {stdio: "ignore", cwd: this.params.cwd};
     }
 
+    this.browserExe = getBrowserExe();
+
     this.configureUA();
 
     this.headers = {"User-Agent": this.userAgent};
@@ -237,21 +228,6 @@ class Crawler {
     }
   }
 
-  get chromeArgs() {
-    // Chrome Flags, including proxy server
-    return [
-      ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
-      "--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
-      `--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`,
-      "--no-sandbox",
-      "--disable-background-media-suspend",
-      "--autoplay-policy=no-user-gesture-required",
-      "--disable-features=IsolateOrigins,site-per-process",
-      "--disable-popup-blocking",
-      "--disable-backgrounding-occluded-windows",
-    ];
-  }
-
   get puppeteerArgs() {
     // Puppeter Options
     return {
@@ -261,7 +237,7 @@ class Crawler {
       handleSIGTERM: false,
       handleSIGHUP: false,
       ignoreHTTPSErrors: true,
-      args: this.chromeArgs,
+      args: chromeArgs(true, this.userAgent),
       userDataDir: this.profileDir,
       defaultViewport: null,
     };
@@ -309,6 +285,8 @@ class Crawler {
       if (this.params.profile) {
         await page._client.send("Network.setBypassServiceWorker", {bypass: true});
       }
+
+      await page.evaluateOnNewDocument("Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
       if (this.params.behaviorOpts && !page.__bx_inited) {
         await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
@@ -581,6 +559,8 @@ class Crawler {
 
     const seed = this.params.scopedSeeds[seedId];
 
+    await this.checkCF(page);
+
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
       return;
@@ -646,6 +626,17 @@ class Crawler {
       }
     } catch (e) {
       console.error("Queuing Error: ", e);
+    }
+  }
+
+  async checkCF(page) {
+    try {
+      while (await page.$("div.cf-browser-verification.cf-im-under-attack")) {
+        this.statusLog("Cloudflare Check Detected, waiting for reload...");
+        await this.sleep(5500);
+      }
+    } catch (e) {
+      console.warn(e);
     }
   }
 

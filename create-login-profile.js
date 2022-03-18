@@ -6,7 +6,7 @@ const child_process = require("child_process");
 const puppeteer = require("puppeteer-core");
 const yargs = require("yargs");
 
-const { getBrowserExe, loadProfile, saveProfile } = require("./util/browser");
+const { getBrowserExe, loadProfile, saveProfile, chromeArgs, sleep } = require("./util/browser");
 
 const fs = require("fs");
 const path = require("path");
@@ -62,6 +62,11 @@ function cliOpts() {
       type: "string",
       describe: "Browser window dimensions, specified as: width,height",
       default: "1600,900"
+    },
+
+    "proxy": {
+      type: "boolean",
+      default: false
     }
   };
 }
@@ -89,6 +94,23 @@ async function main() {
     ]);
   }
 
+  let useProxy = false;
+
+  if (params.proxy) {
+    child_process.spawn("wayback", ["--live", "--proxy", "live"], {stdio: "inherit", cwd: "/tmp"});
+
+    console.log("Running with pywb proxy");
+
+    await sleep(3000);
+
+    useProxy = true;
+  }
+
+  const browserArgs = chromeArgs(useProxy, null, [
+    "--remote-debugging-port=9221",
+    `--window-size=${params.windowSize}`,
+  ]);
+
   //await new Promise(resolve => setTimeout(resolve, 2000));
   const profileDir = await loadProfile(params.profile);
 
@@ -96,15 +118,7 @@ async function main() {
     headless: !!params.headless,
     executablePath: getBrowserExe(),
     ignoreHTTPSErrors: true,
-    args: [
-      "--no-xshm",
-      "--no-sandbox",
-      "--disable-background-media-suspend",
-      "--autoplay-policy=no-user-gesture-required",
-      "--disable-features=IsolateOrigins,site-per-process",
-      "--remote-debugging-port=9221",
-      `--window-size=${params.windowSize}`
-    ],
+    args: browserArgs,
     userDataDir: profileDir,
     defaultViewport: null,
   };
@@ -126,6 +140,7 @@ async function main() {
   await page.setCacheEnabled(false);
 
   if (params.interactive) {
+    await page.evaluateOnNewDocument("Object.defineProperty(navigator, \"webdriver\", {value: false});");
     // for testing, inject browsertrix-behaviors
     await page.evaluateOnNewDocument(behaviors + ";\nself.__bx_behaviors.init();");
   }
@@ -221,7 +236,7 @@ function promptInput(msg, hidden = false) {
 
 async function handleInteractive(params, browser, page) {
   const target = page.target();
-  const targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=localhost:9222/devtools/page/${target._targetId}&panel=resources`;
+  const targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${target._targetId}&panel=resources`;
 
   console.log("Creating Profile Interactively...");
   child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
@@ -231,7 +246,7 @@ async function handleInteractive(params, browser, page) {
     const pathname = parsedUrl.pathname;
     if (pathname === "/") {
       res.writeHead(200, {"Content-Type": "text/html"});
-      res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl.replace("$HOST", parsedUrl.hostname)));
+      res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl.replaceAll("$HOST", parsedUrl.hostname)));
 
     } else if (pathname === "/createProfile" && req.method === "POST") {
 
