@@ -30,7 +30,7 @@ const { ScreenCaster, WSTransport, RedisPubSubTransport } = require("./util/scre
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
 
-const { getBrowserExe, loadProfile, evaluateWithCLI } = require("./util/browser");
+const { getBrowserExe, loadProfile, chromeArgs, evaluateWithCLI } = require("./util/browser");
 
 const { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } = require("./util/constants");
 
@@ -237,21 +237,6 @@ class Crawler {
     }
   }
 
-  get chromeArgs() {
-    // Chrome Flags, including proxy server
-    return [
-      ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
-      "--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
-      `--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`,
-      "--no-sandbox",
-      "--disable-background-media-suspend",
-      "--autoplay-policy=no-user-gesture-required",
-      "--disable-features=IsolateOrigins,site-per-process",
-      "--disable-popup-blocking",
-      "--disable-backgrounding-occluded-windows",
-    ];
-  }
-
   get puppeteerArgs() {
     // Puppeter Options
     return {
@@ -261,7 +246,7 @@ class Crawler {
       handleSIGTERM: false,
       handleSIGHUP: false,
       ignoreHTTPSErrors: true,
-      args: this.chromeArgs,
+      args: chromeArgs(true),
       userDataDir: this.profileDir,
       defaultViewport: null,
     };

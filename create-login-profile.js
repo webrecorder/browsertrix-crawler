@@ -6,7 +6,7 @@ const child_process = require("child_process");
 const puppeteer = require("puppeteer-core");
 const yargs = require("yargs");
 
-const { getBrowserExe, loadProfile, saveProfile } = require("./util/browser");
+const { getBrowserExe, loadProfile, saveProfile, chromeArgs, sleep } = require("./util/browser");
 
 const fs = require("fs");
 const path = require("path");
@@ -62,6 +62,11 @@ function cliOpts() {
       type: "string",
       describe: "Browser window dimensions, specified as: width,height",
       default: "1600,900"
+    },
+
+    "proxy": {
+      type: "boolean",
+      default: false
     }
   };
 }
@@ -89,6 +94,23 @@ async function main() {
     ]);
   }
 
+  let useProxy = false;
+
+  if (params.proxy) {
+    child_process.spawn("wayback", ["--live", "--proxy", "live"], {stdio: "inherit", cwd: "/tmp"});
+
+    console.log("Running with pywb proxy");
+
+    await sleep(3000);
+
+    useProxy = true;
+  }
+
+  const browserArgs = chromeArgs(useProxy, [
+    "--remote-debugging-port=9221",
+    `--window-size=${params.windowSize}`,
+  ]);
+
   //await new Promise(resolve => setTimeout(resolve, 2000));
   const profileDir = await loadProfile(params.profile);
 
@@ -96,15 +118,7 @@ async function main() {
     headless: !!params.headless,
     executablePath: getBrowserExe(),
     ignoreHTTPSErrors: true,
-    args: [
-      "--no-xshm",
-      "--no-sandbox",
-      "--disable-background-media-suspend",
-      "--autoplay-policy=no-user-gesture-required",
-      "--disable-features=IsolateOrigins,site-per-process",
-      "--remote-debugging-port=9221",
-      `--window-size=${params.windowSize}`
-    ],
+    args: browserArgs,
     userDataDir: profileDir,
     defaultViewport: null,
   };

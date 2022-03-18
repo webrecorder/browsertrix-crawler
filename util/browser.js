@@ -53,6 +53,28 @@ module.exports.getBrowserExe = function() {
 };
 
 
+module.exports.chromeArgs = (proxy, extraArgs=[]) => {
+  // Chrome Flags, including proxy server
+  const args = [
+    ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
+    "--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
+    "--no-sandbox",
+    "--disable-background-media-suspend",
+    "--autoplay-policy=no-user-gesture-required",
+    "--disable-features=Translate,LazyFrameLoading,IsolateOrigins,site-per-process",
+    "--disable-popup-blocking",
+    "--disable-backgrounding-occluded-windows",
+    ...extraArgs,
+  ];
+
+  if (proxy) {
+    args.push(`--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`);
+  }
+
+  return args;
+};
+
+
 module.exports.evaluateWithCLI = async (frame, funcString) => {
   const context = await frame.executionContext();
 
@@ -78,4 +100,13 @@ module.exports.evaluateWithCLI = async (frame, funcString) => {
 
   return remoteObject.value;
 };
+
+
+module.exports.sleep = async (time) => {
+  return new Promise(resolve => setTimeout(resolve, time));
+};
+
+
+
+
 
