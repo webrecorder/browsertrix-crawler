@@ -308,7 +308,11 @@ class Crawler {
       await this.writePage(data, title, this.params.text ? text : null);
 
       if (this.params.behaviorOpts) {
-        await Promise.allSettled(page.frames().map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();")));
+        if (!page.isHTMLPage) {
+          console.log("Skipping behaviors for non-HTML page");
+        } else {
+          await Promise.allSettled(page.frames().map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();")));
+        }
       }
 
       await this.writeStats();
@@ -526,7 +530,10 @@ class Crawler {
   async loadPage(page, urlData, selectorOptsList = DEFAULT_SELECTORS) {
     const {url, seedId, depth, extraHops = 0} = urlData;
 
+    let isHTMLPage = true;
+
     if (!await this.isHTML(url)) {
+      isHTMLPage = false;
       try {
         if (await this.directFetchCapture(url)) {
           return;
@@ -544,17 +551,26 @@ class Crawler {
 
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
     // if so, don't report as an error
-    page.on("requestfailed", (req) => {
+    page.once("requestfailed", (req) => {
       ignoreAbort = shouldIgnoreAbort(req);
     });
 
+    const gotoOpts = isHTMLPage ? this.gotoOpts : "domcontentloaded";
+
     try {
-      await page.goto(url, this.gotoOpts);
+      //await Promise.race([page.goto(url, this.gotoOpts), nonHTMLLoad]);
+      await page.goto(url, gotoOpts);
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         this.statusLog(`ERROR: ${url}: ${msg}`);
       }
+    }
+
+    page.isHTMLPage = isHTMLPage;
+
+    if (!isHTMLPage) {
+      return;
     }
 
     const seed = this.params.scopedSeeds[seedId];
@@ -755,7 +771,7 @@ class Crawler {
     const signal = abort.signal;
     const resp = await fetch(this.capturePrefix + url, {signal, headers: this.headers, redirect: "manual"});
     abort.abort();
-    return resp.status === 200 && !resp.headers.get("set-cookie");
+    return resp.status === 200;// && !resp.headers.get("set-cookie");
   }
 
   async awaitPendingClear() {
