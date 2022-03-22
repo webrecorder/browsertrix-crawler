@@ -771,7 +771,7 @@ class Crawler {
     const signal = abort.signal;
     const resp = await fetch(this.capturePrefix + url, {signal, headers: this.headers, redirect: "manual"});
     abort.abort();
-    return resp.status === 200;// && !resp.headers.get("set-cookie");
+    return resp.status === 200 && !resp.headers.get("set-cookie");
   }
 
   async awaitPendingClear() {
