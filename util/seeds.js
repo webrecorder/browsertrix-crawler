@@ -80,6 +80,9 @@ class ScopedSeed
       break;
 
     case "domain":
+      if (parsedUrl.hostname.startsWith("www.")) {
+        parsedUrl.hostname = parsedUrl.hostname.replace("www.", "");
+      }
       include = [new RegExp("^" + urlRxEscape(parsedUrl.origin + "/", parsedUrl).replace("\\/\\/", "\\/\\/([^/]+\\.)*"))];
       break;
 

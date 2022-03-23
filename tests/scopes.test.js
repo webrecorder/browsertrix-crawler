@@ -115,6 +115,21 @@ seeds:
 });
 
 
+test("domain scope drop www.", async () => {
+
+  const seeds = getSeeds(`
+seeds:
+   - url: https://www.example.com/
+     scopeType: domain
+`);
+
+  expect(seeds.length).toEqual(1);
+  expect(seeds[0].scopeType).toEqual("domain");
+  expect(seeds[0].include).toEqual([/^https?:\/\/([^/]+\.)*example\.com\//]);
+
+});
+
+
 
 test("custom scope", async () => {
   const seeds = getSeeds(`
