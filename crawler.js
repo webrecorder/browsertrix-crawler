@@ -299,7 +299,7 @@ class Crawler {
 
       const title = await page.title();
       let text = "";
-      if (this.params.text) {
+      if (this.params.text && page.isHTMLPage) {
         const client = await page.target().createCDPSession();
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
