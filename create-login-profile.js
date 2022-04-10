@@ -15,7 +15,6 @@ const profileHTML = fs.readFileSync(path.join(__dirname, "html", "createProfile.
 
 const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
 
-
 function cliOpts() {
   return {
     "url": {
@@ -51,6 +50,12 @@ function cliOpts() {
       describe: "Start in interactive mode!",
       type: "boolean",
       default: false,
+    },
+
+    "shutdownWait": {
+      describe: "Shutdown browser in interactive after this many seconds, if no pings received",
+      type: "number",
+      default: 0
     },
 
     "profile": {
@@ -152,7 +157,7 @@ async function main() {
   console.log("loaded");
 
   if (params.interactive) {
-    await handleInteractive(params, browser, page);
+    new InteractiveBrowser(params, browser, page);
     return;
   }
 
@@ -234,25 +239,84 @@ function promptInput(msg, hidden = false) {
   });
 }
 
-async function handleInteractive(params, browser, page) {
-  const target = page.target();
-  const targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${target._targetId}&panel=resources`;
 
-  console.log("Creating Profile Interactively...");
-  child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
+class InteractiveBrowser {
+  constructor(params, browser, page) {
+    console.log("Creating Profile Interactively...");
+    child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
 
-  const httpServer = http.createServer(async (req, res) => {
+    const target = page.target();
+    this.targetId = target._targetId;
+
+    this.originSet = new Set();
+
+    page.on("load", () => {
+      const url = page.url();
+      if (url.startsWith("http:") || url.startsWith("https:")) {
+        this.originSet.add(new URL(url).origin);
+      }
+    });
+
+    this.shutdownWait = params.shutdownWait * 1000;
+    
+    if (this.shutdownWait) {
+      this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
+      console.log(`Shutting down in ${this.shutdownWait}ms if no ping received`);
+    } else {
+      this.shutdownTimer = 0;
+    }
+
+    const httpServer = http.createServer((req, res) => this.handleRequest(req, res));
+    const port = 9223;
+    httpServer.listen(port);
+    console.log(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`);
+  }
+
+  async handleRequest(req, res) {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     const pathname = parsedUrl.pathname;
-    if (pathname === "/") {
+    let targetUrl;
+
+    switch (pathname) {
+    case "/":
+      targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${this.targetId}&panel=resources`;
       res.writeHead(200, {"Content-Type": "text/html"});
       res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl.replaceAll("$HOST", parsedUrl.hostname)));
+      break;
 
-    } else if (pathname === "/createProfile" && req.method === "POST") {
+    case "/ping":
+      if (this.shutdownWait) {
+        clearInterval(this.shutdownTimer);
+        this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
+        console.log(`Ping received, delaying shutdown for ${this.shutdownWait}ms`);
+      }
+      res.writeHead(200, {"Content-Type": "application/json"});
+      res.end(JSON.stringify({"pong": true}));
+      break;
 
+    case "/target":
+      res.writeHead(200, {"Content-Type": "application/json"});
+      res.end(JSON.stringify({targetId: this.targetId}));
+      break;
 
+    case "/createProfileJS":
       try {
-        await createProfile(params, browser, page);
+        await createProfile(this.params, this.browser, this.page);
+
+        res.writeHead(200, {"Content-Type": "application/json"});
+        res.end(JSON.stringify({"origins": Array.from(this.originSet.values())}));
+      } catch (e) {
+        res.writeHead(500, {"Content-Type": "application/json"});
+        res.end(JSON.stringify({"error": e.toString()}));
+        console.log(e);
+      }
+
+      setTimeout(() => process.exit(0), 200);
+      break;
+
+    case "/createProfile":
+      try {
+        await createProfile(this.params, this.browser, this.page);
 
         res.writeHead(200, {"Content-Type": "text/html"});
         res.end("<html><body>Profile Created! You may now close this window.</body></html>");
@@ -263,17 +327,15 @@ async function handleInteractive(params, browser, page) {
       }
 
       setTimeout(() => process.exit(0), 200);
+      break;
 
-    } else {
+    default:
       res.writeHead(404, {"Content-Type": "text/html"});
       res.end("Not Found");
     }
-  });
-
-  const port = 9223;
-  httpServer.listen(port);
-  console.log(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`);
+  }
 }
+
 
 main();
 
