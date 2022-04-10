@@ -1,15 +1,23 @@
 ## CHANGES
 
 v0.5.0
-- State: Support for serialization and reloading of crawl state to config.yaml
+- Scope: support for `scopeType: domain` to include all subdomains and ignoring 'www.' if specified in the seed.
+- Profiles: support loading remote profile from URL as well as local file
+- Non-HTML Pages: Load non-200 responses in browser, even if non-html, fix waiting issues with non-HTML pages (eg. PDFs)
+- Config options: Fix setting user-agent
+- Page behavior: latest browsertrix-behaviors, also add experimental Cloudflare interstitial wait.
+- Error handling: better error handling for redis errors
+- State: Support loading of crawl state from config.yaml
+- State: Support serialization of crawl state to `crawls` subdirectory, both while running (keeping last N states) and on exit.
 - State: Graceful saving of crawl state on ctrl+c interrupt
 - State: Memory or Redis based crawl state
-- Config: Aadditional crawl config via env var
+- Config: Support additional options via `CRAWL_ARGS` environment variable
 - WACZ Upload: Support for S3 upload of WACZ upon crawl completion
 - WACZ Upload: HTTP/Redis webhook to notify of upload completion
 - Crawl Scope: Support for `extraHops` to optionally crawl an extra hop beyond scope
 - Signing: Support for optional signing of WACZ
-- Dependencies: update to latest pywb and wacz packages
+- Dependencies: update to latest pywb, wacz and browsertrix-behaviors packages
+
 
 v0.4.4
 - Page Block Rules Fix: 'request already handled' errors by avoiding adding duplicate handlers to same page.
