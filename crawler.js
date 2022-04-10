@@ -25,7 +25,7 @@ const warcio = require("warcio");
 const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
 
 const  TextExtract  = require("./util/textextract");
-const { S3StorageSync, getFileSize } = require("./util/storage");
+const { initStorage, getFileSize } = require("./util/storage");
 const { ScreenCaster, WSTransport, RedisPubSubTransport } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
@@ -361,23 +361,8 @@ class Crawler {
       return;
     }
 
-    if (this.params.generateWACZ && process.env.STORE_ENDPOINT_URL) {
-      const endpointUrl = process.env.STORE_ENDPOINT_URL + (process.env.STORE_PATH || "");
-      const storeInfo = {
-        endpointUrl,
-        accessKey: process.env.STORE_ACCESS_KEY,
-        secretKey: process.env.STORE_SECRET_KEY,
-      };
-
-      const opts = {
-        crawlId: process.env.CRAWL_ID || os.hostname(),
-        webhookUrl: process.env.WEBHOOK_URL,
-        userId: process.env.STORE_USER,
-        filename: process.env.STORE_FILENAME || "@ts-@id.wacz",
-      };
-
-      console.log("Initing Storage...");
-      this.storage = new S3StorageSync(storeInfo, opts);
+    if (this.params.generateWACZ) {
+      this.storage = initStorage("data/");
     }
 
     // Puppeteer Cluster init and options

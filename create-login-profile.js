@@ -7,6 +7,7 @@ const puppeteer = require("puppeteer-core");
 const yargs = require("yargs");
 
 const { getBrowserExe, loadProfile, saveProfile, chromeArgs, sleep } = require("./util/browser");
+const { initStorage } = require("./util/storage");
 
 const fs = require("fs");
 const path = require("path");
@@ -153,13 +154,14 @@ async function main() {
   console.log("loading");
 
   await page.goto(params.url, {waitUntil});
-
+  
   console.log("loaded");
 
   if (params.interactive) {
     new InteractiveBrowser(params, browser, page);
     return;
   }
+
 
   let u, p;
 
@@ -206,7 +208,16 @@ async function createProfile(params, browser, page) {
 
   saveProfile(profileFilename);
 
+  let resource = {};
+
+  const storage = initStorage("profiles/");
+  if (storage) {
+    console.log("Uploading to remote storage...");
+    resource = await storage.uploadFile(profileFilename);
+  }
+
   console.log("done");
+  return resource;
 }
 
 function promptInput(msg, hidden = false) {
@@ -245,17 +256,18 @@ class InteractiveBrowser {
     console.log("Creating Profile Interactively...");
     child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
 
+    this.params = params;
+    this.browser = browser;
+    this.page = page;
+
     const target = page.target();
     this.targetId = target._targetId;
 
     this.originSet = new Set();
 
-    page.on("load", () => {
-      const url = page.url();
-      if (url.startsWith("http:") || url.startsWith("https:")) {
-        this.originSet.add(new URL(url).origin);
-      }
-    });
+    this.addOrigin();
+
+    page.on("load", () => this.addOrigin());
 
     this.shutdownWait = params.shutdownWait * 1000;
     
@@ -272,6 +284,14 @@ class InteractiveBrowser {
     console.log(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`);
   }
 
+  addOrigin() {
+    const url = this.page.url();
+    console.log("Adding origin for", url);
+    if (url.startsWith("http:") || url.startsWith("https:")) {
+      this.originSet.add(new URL(url).origin);
+    }
+  }
+
   async handleRequest(req, res) {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     const pathname = parsedUrl.pathname;
@@ -282,7 +302,7 @@ class InteractiveBrowser {
       targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${this.targetId}&panel=resources`;
       res.writeHead(200, {"Content-Type": "text/html"});
       res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl.replaceAll("$HOST", parsedUrl.hostname)));
-      break;
+      return;
 
     case "/ping":
       if (this.shutdownWait) {
@@ -292,19 +312,24 @@ class InteractiveBrowser {
       }
       res.writeHead(200, {"Content-Type": "application/json"});
       res.end(JSON.stringify({"pong": true}));
-      break;
+      return;
 
     case "/target":
       res.writeHead(200, {"Content-Type": "application/json"});
       res.end(JSON.stringify({targetId: this.targetId}));
-      break;
+      return;
 
     case "/createProfileJS":
+      if (req.method !== "POST") {
+        break;
+      }
+
       try {
-        await createProfile(this.params, this.browser, this.page);
+        const resource = await createProfile(this.params, this.browser, this.page);
+        const origins = Array.from(this.originSet.values());
 
         res.writeHead(200, {"Content-Type": "application/json"});
-        res.end(JSON.stringify({"origins": Array.from(this.originSet.values())}));
+        res.end(JSON.stringify({resource, origins}));
       } catch (e) {
         res.writeHead(500, {"Content-Type": "application/json"});
         res.end(JSON.stringify({"error": e.toString()}));
@@ -312,9 +337,13 @@ class InteractiveBrowser {
       }
 
       setTimeout(() => process.exit(0), 200);
-      break;
+      return;
 
     case "/createProfile":
+      if (req.method !== "POST") {
+        break;
+      }
+
       try {
         await createProfile(this.params, this.browser, this.page);
 
@@ -327,12 +356,11 @@ class InteractiveBrowser {
       }
 
       setTimeout(() => process.exit(0), 200);
-      break;
-
-    default:
-      res.writeHead(404, {"Content-Type": "text/html"});
-      res.end("Not Found");
+      return;
     }
+
+    res.writeHead(404, {"Content-Type": "text/html"});
+    res.end("Not Found");
   }
 }
 
