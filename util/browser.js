@@ -3,14 +3,15 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const request = require("request");
+const { initStorage } = require("./storage");
 
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
 module.exports.loadProfile = async function(profileFilename) {
+  const targetFilename = "/tmp/profile.tar.gz";
+
   if (profileFilename &&
       (profileFilename.startsWith("http:") || profileFilename.startsWith("https:"))) {
-
-    const targetFilename = "/tmp/profile.tar.gz";
 
     console.log(`Downloading ${profileFilename} to ${targetFilename}`);
 
@@ -23,6 +24,16 @@ module.exports.loadProfile = async function(profileFilename) {
 
     await p;
       
+    profileFilename = targetFilename;
+  } else if (profileFilename && profileFilename.startsWith("@")) {
+    const storage = initStorage("");
+
+    if (!storage) {
+      throw new Error("Profile specified relative to s3 storage, but no S3 storage defined");
+    }
+
+    await storage.downloadFile(profileFilename.slice(1), targetFilename);
+
     profileFilename = targetFilename;
   }
 

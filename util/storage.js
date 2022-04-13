@@ -70,6 +70,10 @@ class S3StorageSync
     return {"path": this.targetFilename, "hash": finalHash, "bytes": size};
   }
 
+  async downloadFile(srcFilename, destFilename) {
+    await this.client.fGetObject(this.bucketName, this.objectPrefix + srcFilename, destFilename);
+  }
+
   async uploadCollWACZ(srcFilename, completed = true) {
     const resource = await this.uploadFile(srcFilename, this.targetFilename);
     console.log(resource);
