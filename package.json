@@ -1,6 +1,6 @@
 {
   "name": "browsertrix-crawler",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "main": "browsertrix-crawler",
   "repository": "https://github.com/webrecorder/browsertrix-crawler",
   "author": "Ilya Kreymer <ikreymer@gmail.com>, Webrecorder Software",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "abort-controller": "^3.0.0",
-    "browsertrix-behaviors": "^0.2.5",
+    "browsertrix-behaviors": "^0.3.0",
     "ioredis": "^4.27.1",
     "js-yaml": "^4.1.0",
     "minio": "7.0.26",

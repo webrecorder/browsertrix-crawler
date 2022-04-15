@@ -1159,10 +1159,10 @@ browserslist@^4.14.5:
     escalade "^3.1.1"
     node-releases "^1.1.71"
 
-browsertrix-behaviors@^0.2.5:
-  version "0.2.5"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.2.5.tgz#6c2e35f455291d8e1420487b3d72966adc8dc544"
-  integrity sha512-Tm37Sz/g80z05Eu9Pindm06ROqE2qPc/5Y8gajgd3qYGaCsOxOJ3t95n9mBMD73X0r47HzEq0TqxMdpiGjngjQ==
+browsertrix-behaviors@^0.3.0:
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.3.0.tgz#6f424006d9393b760199c144777c529520b24db3"
+  integrity sha512-FI9JuGk15LJ/ofTth3uPWUQHEaeVDCK3l7UfsmGuchH9E1YE8KRocmaCCpMNGgd5ABo3Ymg5BWAFe30eX53u7A==
 
 bser@2.1.1:
   version "2.1.1"
@@ -3708,7 +3708,7 @@ minimist@^1.1.1, minimist@^1.2.0, minimist@^1.2.5:
   resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.5.tgz#67d66014b66a6a8aaa0c083c5fd58df4e4e97602"
   integrity sha512-FM9nNUYrRBAELZQT3xeZQ7fmMOBg6nWNmJKTcgsJeaLstP/UODVpGsr5OhXhhXg6f+qtJ8uiZ+PUxkDWcgIXLw==
 
-minio@^7.0.26:
+minio@7.0.26:
   version "7.0.26"
   resolved "https://registry.yarnpkg.com/minio/-/minio-7.0.26.tgz#83bcda813ed486a8bc7f028efa135d49b02d9bc8"
   integrity sha512-knutnEZZMIUB/Xln6psVDrqObFKXDcF9m4IfFIX+zgDHYg3AlcF88DY1wdgg7bUkf+uU8iHkzP2q5CXAhia73w==
