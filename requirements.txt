@@ -1,5 +1,3 @@
-#pywb>=2.6.6
-git+https://github.com/webrecorder/pywb.git@post-query-json-parse-fix
+pywb>=2.6.7
 uwsgi
-#wacz>=0.4.5
-git+https://github.com/webrecorder/py-wacz.git@single-seed-with-extra-pages
+wacz>=0.4.6
