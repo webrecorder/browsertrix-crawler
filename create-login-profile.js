@@ -197,7 +197,7 @@ async function main() {
   process.exit(0);
 }
 
-async function createProfile(params, browser, page) {
+async function createProfile(params, browser, page, targetFilename = "") {
   await page._client.send("Network.clearBrowserCache");
 
   await browser.close();
@@ -213,7 +213,7 @@ async function createProfile(params, browser, page) {
   const storage = initStorage("profiles/");
   if (storage) {
     console.log("Uploading to remote storage...");
-    resource = await storage.uploadFile(profileFilename);
+    resource = await storage.uploadFile(profileFilename, targetFilename);
   }
 
   console.log("done");
@@ -325,7 +325,28 @@ class InteractiveBrowser {
       }
 
       try {
-        const resource = await createProfile(this.params, this.browser, this.page);
+
+        const buffers = [];
+
+        for await (const chunk of req) {
+          buffers.push(chunk);
+        }
+
+        const data = Buffer.concat(buffers).toString();
+
+        let targetFilename = "";
+
+        if (data.length) {
+          try {
+            targetFilename = JSON.parse(data).filename;
+          } catch (e) {
+            targetFilename = "";
+          }
+        }
+
+        console.log("target filename", targetFilename);
+
+        const resource = await createProfile(this.params, this.browser, this.page, targetFilename);
         const origins = Array.from(this.originSet.values());
 
         res.writeHead(200, {"Content-Type": "application/json"});
