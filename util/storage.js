@@ -13,7 +13,7 @@ const { initRedis } = require("./redis");
 // ===========================================================================
 class S3StorageSync
 {
-  constructor(urlOrData, {filename, webhookUrl, userId, crawlId} = {}) {
+  constructor(urlOrData, {filename, webhookUrl, userId, crawlId, prefix = ""} = {}) {
     let url;
     let accessKey;
     let secretKey;
@@ -54,20 +54,36 @@ class S3StorageSync
     this.crawlId = crawlId;
     this.webhookUrl = webhookUrl;
 
+    this.filenamePrefix = prefix;
+
     filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.]/g, ""));
     filename = filename.replace("@hostname", os.hostname());
     filename = filename.replace("@id", this.crawlId);
 
-    this.waczFilename = "data/" + filename;
+    this.targetFilename = this.filenamePrefix + filename;
   }
 
-  async uploadCollWACZ(filename, completed = true) {
-    await this.client.fPutObject(this.bucketName, this.objectPrefix + this.waczFilename, filename);
+  async uploadFile(srcFilename, targetFilename) {
+    // allow overriding targetFilename
+    if (targetFilename) {
+      targetFilename = this.filenamePrefix + targetFilename;
+    } else {
+      targetFilename = this.targetFilename;
+    }
+    await this.client.fPutObject(this.bucketName, this.objectPrefix + targetFilename, srcFilename);
 
-    const finalHash = await checksumFile("sha256", filename);
+    const finalHash = await checksumFile("sha256", srcFilename);
 
-    const size = await getFileSize(filename);
-    const resource = {"path": this.waczFilename, "hash": finalHash, "bytes": size};
+    const size = await getFileSize(srcFilename);
+    return {"path": targetFilename, "hash": finalHash, "bytes": size};
+  }
+
+  async downloadFile(srcFilename, destFilename) {
+    await this.client.fGetObject(this.bucketName, this.objectPrefix + srcFilename, destFilename);
+  }
+
+  async uploadCollWACZ(srcFilename, completed = true) {
+    const resource = await this.uploadFile(srcFilename, this.targetFilename);
     console.log(resource);
 
     if (this.webhookUrl) {
@@ -76,7 +92,7 @@ class S3StorageSync
         user: this.userId,
 
         //filename: `s3://${this.bucketName}/${this.objectPrefix}${this.waczFilename}`,
-        filename: this.fullPrefix + this.waczFilename,
+        filename: this.fullPrefix + this.targetFilename,
 
         hash: resource.hash,
         size: resource.bytes,
@@ -100,6 +116,31 @@ class S3StorageSync
   }
 }
 
+function initStorage(prefix = "") {
+  if (!process.env.STORE_ENDPOINT_URL) {
+    return null;
+  }
+
+  const endpointUrl = process.env.STORE_ENDPOINT_URL + (process.env.STORE_PATH || "");
+  const storeInfo = {
+    endpointUrl,
+    accessKey: process.env.STORE_ACCESS_KEY,
+    secretKey: process.env.STORE_SECRET_KEY,
+  };
+
+  const opts = {
+    crawlId: process.env.CRAWL_ID || os.hostname(),
+    webhookUrl: process.env.WEBHOOK_URL,
+    userId: process.env.STORE_USER,
+    prefix,
+    filename: process.env.STORE_FILENAME || "@ts-@id.wacz",
+  };
+
+  console.log("Initing Storage...");
+  return new S3StorageSync(storeInfo, opts);
+}
+
+
 async function getFileSize(filename) {
   const stats = await fsp.stat(filename);
   return stats.size;
@@ -117,5 +158,5 @@ function checksumFile(hashName, path) {
 
 module.exports.S3StorageSync = S3StorageSync;
 module.exports.getFileSize = getFileSize;
-
+module.exports.initStorage = initStorage;
 
