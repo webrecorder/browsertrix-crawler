@@ -73,6 +73,12 @@ function cliOpts() {
     "proxy": {
       type: "boolean",
       default: false
+    },
+
+    "cookieDays": {
+      type: "number",
+      describe: "If >0, set all cookies, including session cookies, to have this duration in days before saving profile",
+      default: 7
     }
   };
 }
@@ -267,7 +273,7 @@ class InteractiveBrowser {
 
     this.addOrigin();
 
-    page.on("load", () => this.addOrigin());
+    page.on("load", () => this.handlePageLoad());
 
     page.on("popup", async () => {
       await this.page._client.send("Target.activateTarget", {targetId: this.targetId});
@@ -292,6 +298,41 @@ class InteractiveBrowser {
     const port = 9223;
     httpServer.listen(port);
     console.log(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`);
+  }
+
+  handlePageLoad() {
+    this.addOrigin();
+    this.saveCookiesFor(this.page.url());
+  }
+
+  async saveAllCookies() {
+    console.log("Saving all cookies");
+
+    for (const origin of this.originSet.values()) {
+      await this.saveCookiesFor(origin + "/");
+    }
+  }
+
+  async saveCookiesFor(url) {
+    try {
+      if (this.params.cookieDays <= 0) {
+        return;
+      }
+
+      const cookies = await this.page.cookies(url);
+      for (const cookie of cookies) {
+        cookie.url = url;
+        cookie.expires = (new Date().getTime() / 1000) + this.params.cookieDays * 7;
+        delete cookie.size;
+        delete cookie.session;
+        if (cookie.sameSite && cookie.sameSite !== "Lax" && cookie.sameSite !== "Strict") {
+          delete cookie.sameSite;
+        }
+      }
+      await this.page.setCookie(...cookies);
+    } catch (e) {
+      console.log("Save Cookie Error: " + e);
+    }
   }
 
   addOrigin() {
@@ -363,6 +404,9 @@ class InteractiveBrowser {
       try {
         const postData = await this.readBodyJson(req);
         const targetFilename = postData.filename || "";
+
+        await this.saveAllCookies();
+
         const resource = await createProfile(this.params, this.browser, this.page, targetFilename);
         origins = Array.from(this.originSet.values());
 
@@ -383,6 +427,8 @@ class InteractiveBrowser {
       }
 
       try {
+        await this.saveAllCookies();
+
         await createProfile(this.params, this.browser, this.page);
 
         res.writeHead(200, {"Content-Type": "text/html"});
