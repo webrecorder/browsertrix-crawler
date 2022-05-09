@@ -255,6 +255,12 @@ class ArgParser {
         describe: "Number of save states to keep during the duration of a crawl",
         type: "number",
         default: 5,
+      },
+
+      "healthCheckPort": {
+        describe: "port to run healthcheck on",
+        type: "number",
+        default: 0,
       }
     };
   }

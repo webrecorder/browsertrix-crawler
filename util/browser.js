@@ -91,8 +91,9 @@ module.exports.chromeArgs = (proxy, userAgent=null, extraArgs=[]) => {
     "--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
     "--no-sandbox",
     "--disable-background-media-suspend",
+    "--enable-features=NetworkService,NetworkServiceInProcess",
     "--autoplay-policy=no-user-gesture-required",
-    "--disable-features=Translate,LazyFrameLoading,IsolateOrigins,site-per-process",
+    "--disable-features=IsolateOrigins,site-per-process,ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame,AutoExpandDetailsElement",
     "--disable-popup-blocking",
     "--disable-backgrounding-occluded-windows",
     `--user-agent=${userAgent || getDefaultUA()}`,
