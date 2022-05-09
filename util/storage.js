@@ -9,6 +9,9 @@ const Minio = require("minio");
 
 const { initRedis } = require("./redis");
 
+const util = require("util");
+const getFolderSize = util.promisify(require("get-folder-size"));
+
 
 // ===========================================================================
 class S3StorageSync
@@ -146,6 +149,10 @@ async function getFileSize(filename) {
   return stats.size;
 }
 
+async function getDirSize(dir) {
+  return await getFolderSize(dir);
+}
+
 function checksumFile(hashName, path) {
   return new Promise((resolve, reject) => {
     const hash = createHash(hashName);
@@ -158,5 +165,6 @@ function checksumFile(hashName, path) {
 
 module.exports.S3StorageSync = S3StorageSync;
 module.exports.getFileSize = getFileSize;
+module.exports.getDirSize = getDirSize;
 module.exports.initStorage = initStorage;
 

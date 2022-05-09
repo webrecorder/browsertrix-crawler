@@ -27,7 +27,7 @@ const warcio = require("warcio");
 const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
 
 const  TextExtract  = require("./util/textextract");
-const { initStorage, getFileSize } = require("./util/storage");
+const { initStorage, getFileSize, getDirSize } = require("./util/storage");
 const { ScreenCaster, WSTransport, RedisPubSubTransport } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
@@ -92,8 +92,9 @@ class Crawler {
 
     this.blockRules = null;
 
-    // error count
     this.errorCount = 0;
+
+    this.exitCode = 0;
   }
 
   statusLog(...args) {
@@ -255,11 +256,11 @@ class Crawler {
 
     try {
       await this.crawl();
-      process.exit(0);
+      process.exit(this.exitCode);
     } catch(e) {
       console.error("Crawl failed");
       console.error(e);
-      process.exit(1);
+      process.exit(9);
     }
   }
 
@@ -322,6 +323,8 @@ class Crawler {
 
       await this.writeStats();
 
+      await this.checkLimits();
+
       await this.serializeConfig();
 
     } catch (e) {
@@ -372,6 +375,22 @@ class Crawler {
     console.log("health check failed", this.errorCount);
     res.writeHead(503);
     res.end();
+  }
+
+  async checkLimits() {
+    if (!this.params.sizeLimit) {
+      return;
+    }
+
+    const dir = path.join(this.collDir, "archive");
+
+    const size = await getDirSize(dir);
+
+    if (size >= this.params.sizeLimit) {
+      console.log(`Size threshold reached ${size} >= ${this.params.sizeLimit}`);
+      this.crawlState.setDrain();
+      this.exitCode = 1;
+    }
   }
 
   async crawl() {
@@ -512,14 +531,13 @@ class Crawler {
     // Verify WACZ
     validateArgs.push(waczPath);
 
-    /*
-    const waczVerifyResult = await child_process.spawn("wacz", validateArgs, {stdio: "inherit"});
+    const waczVerifyResult = await this.awaitProcess(child_process.spawn("wacz", validateArgs, {stdio: "inherit"}));
 
-    if (waczVerifyResult.status !== 0) {
+    if (waczVerifyResult !== 0) {
       console.log("validate", waczVerifyResult);
       throw new Error("Unable to verify WACZ created successfully");
     }
-*/
+
     if (this.storage) {
       const finished = await this.crawlState.finished();
       await this.storage.uploadCollWACZ(waczPath, finished);

@@ -257,6 +257,12 @@ class ArgParser {
         default: 5,
       },
 
+      "sizeLimit": {
+        describe: "If set, save state and exit if size limit exceeds this value",
+        type: "number",
+        default: 0,
+      },
+
       "healthCheckPort": {
         describe: "port to run healthcheck on",
         type: "number",
