@@ -210,10 +210,10 @@ async function createProfile(params, browser, page, targetFilename = "") {
 
   let resource = {};
 
-  const storage = initStorage("profiles/");
+  const storage = initStorage();
   if (storage) {
     console.log("Uploading to remote storage...");
-    resource = await storage.uploadFile(profileFilename, targetFilename);
+    resource = await storage.uploadFile(profileFilename, "profiles/" + targetFilename);
   }
 
   console.log("done");
@@ -296,6 +296,7 @@ class InteractiveBrowser {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     const pathname = parsedUrl.pathname;
     let targetUrl;
+    let origins;
 
     switch (pathname) {
     case "/":
@@ -310,8 +311,11 @@ class InteractiveBrowser {
         this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
         console.log(`Ping received, delaying shutdown for ${this.shutdownWait}ms`);
       }
+
+      origins = Array.from(this.originSet.values());
+
       res.writeHead(200, {"Content-Type": "application/json"});
-      res.end(JSON.stringify({"pong": true}));
+      res.end(JSON.stringify({"pong": true, origins}));
       return;
 
     case "/target":
@@ -325,7 +329,6 @@ class InteractiveBrowser {
       }
 
       try {
-
         const buffers = [];
 
         for await (const chunk of req) {

@@ -16,7 +16,7 @@ const getFolderSize = util.promisify(require("get-folder-size"));
 // ===========================================================================
 class S3StorageSync
 {
-  constructor(urlOrData, {filename, webhookUrl, userId, crawlId, prefix = ""} = {}) {
+  constructor(urlOrData, {webhookUrl, userId, crawlId} = {}) {
     let url;
     let accessKey;
     let secretKey;
@@ -56,23 +56,14 @@ class S3StorageSync
     this.userId = userId;
     this.crawlId = crawlId;
     this.webhookUrl = webhookUrl;
-
-    this.filenamePrefix = prefix;
-
-    filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.]/g, ""));
-    filename = filename.replace("@hostname", os.hostname());
-    filename = filename.replace("@id", this.crawlId);
-
-    this.targetFilename = this.filenamePrefix + filename;
   }
 
   async uploadFile(srcFilename, targetFilename) {
-    // allow overriding targetFilename
-    if (targetFilename) {
-      targetFilename = this.filenamePrefix + targetFilename;
-    } else {
-      targetFilename = this.targetFilename;
-    }
+    console.log(`Bucket: ${this.bucketName}`);
+    console.log(`Crawl Id: ${this.crawlId}`);
+    console.log(`Prefix: ${this.objectPrefix}`);
+    console.log(`Target Filename: ${targetFilename}`);
+
     await this.client.fPutObject(this.bucketName, this.objectPrefix + targetFilename, srcFilename);
 
     const finalHash = await checksumFile("sha256", srcFilename);
@@ -85,8 +76,8 @@ class S3StorageSync
     await this.client.fGetObject(this.bucketName, this.objectPrefix + srcFilename, destFilename);
   }
 
-  async uploadCollWACZ(srcFilename, completed = true) {
-    const resource = await this.uploadFile(srcFilename, this.targetFilename);
+  async uploadCollWACZ(srcFilename, targetFilename, completed = true) {
+    const resource = await this.uploadFile(srcFilename, targetFilename);
     console.log(resource);
 
     if (this.webhookUrl) {
@@ -95,7 +86,7 @@ class S3StorageSync
         user: this.userId,
 
         //filename: `s3://${this.bucketName}/${this.objectPrefix}${this.waczFilename}`,
-        filename: this.fullPrefix + this.targetFilename,
+        filename: this.fullPrefix + targetFilename,
 
         hash: resource.hash,
         size: resource.bytes,
@@ -119,7 +110,7 @@ class S3StorageSync
   }
 }
 
-function initStorage(prefix = "") {
+function initStorage() {
   if (!process.env.STORE_ENDPOINT_URL) {
     return null;
   }
@@ -135,8 +126,6 @@ function initStorage(prefix = "") {
     crawlId: process.env.CRAWL_ID || os.hostname(),
     webhookUrl: process.env.WEBHOOK_URL,
     userId: process.env.STORE_USER,
-    prefix,
-    filename: process.env.STORE_FILENAME || "@ts-@id.wacz",
   };
 
   console.log("Initing Storage...");
@@ -163,8 +152,16 @@ function checksumFile(hashName, path) {
   });
 }
 
+function interpolateFilename(filename, crawlId) {
+  filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.-]/g, ""));
+  filename = filename.replace("@hostname", os.hostname());
+  filename = filename.replace("@hostsuffix", os.hostname().slice(-14));
+  filename = filename.replace("@id", crawlId);
+  return filename;
+}
+
 module.exports.S3StorageSync = S3StorageSync;
 module.exports.getFileSize = getFileSize;
 module.exports.getDirSize = getDirSize;
 module.exports.initStorage = initStorage;
-
+module.exports.interpolateFilename = interpolateFilename;

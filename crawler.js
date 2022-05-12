@@ -27,7 +27,7 @@ const warcio = require("warcio");
 const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
 
 const  TextExtract  = require("./util/textextract");
-const { initStorage, getFileSize, getDirSize } = require("./util/storage");
+const { initStorage, getFileSize, getDirSize, interpolateFilename } = require("./util/storage");
 const { ScreenCaster, WSTransport, RedisPubSubTransport } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
@@ -49,6 +49,11 @@ class Crawler {
 
     // pages file
     this.pagesFH = null;
+
+    this.crawlId = process.env.CRAWL_ID || os.hostname();
+    this.uploadDir = "data/@id/";
+
+    this.startTime = Date.now();
 
     // was the limit hit?
     this.limitHit = false;
@@ -176,8 +181,7 @@ class Crawler {
       transport = new WSTransport(this.params.screencastPort);
       this.debugLog(`Screencast server started on: ${this.params.screencastPort}`);
     } else if (this.params.redisStoreUrl && this.params.screencastRedis) {
-      const crawlId = process.env.CRAWL_ID || os.hostname();
-      transport = new RedisPubSubTransport(this.params.redisStoreUrl, crawlId);
+      transport = new RedisPubSubTransport(this.params.redisStoreUrl, this.crawlId);
       this.debugLog("Screencast enabled via redis pubsub");
     }
 
@@ -213,7 +217,16 @@ class Crawler {
 
     subprocesses.push(child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts));
 
-    process.on("exit", () => {
+    process.on("exit", (code) => {
+      if (code === 11) {
+        console.log(`Deleting ${this.collDir} before exit`);
+        try {
+          fs.rmSync(this.collDir, { recursive: true, force: true });
+        } catch(e) {
+          console.warn(e);
+        }
+      }
+
       for (const proc of subprocesses) {
         proc.kill();
       }
@@ -378,18 +391,30 @@ class Crawler {
   }
 
   async checkLimits() {
-    if (!this.params.sizeLimit) {
-      return;
+    let interrupt = false;
+
+    if (this.params.interruptSize) {
+      const dir = path.join(this.collDir, "archive");
+
+      const size = await getDirSize(dir);
+
+      if (size >= this.params.sizeLimit) {
+        console.log(`Size threshold reached ${size} >= ${this.params.sizeLimit}, interrupting`);
+        interrupt = true;
+      }
     }
 
-    const dir = path.join(this.collDir, "archive");
+    if (this.params.interruptTime) {
+      const elapsed = (Date.now() - this.startTime) / 1000;
+      if (elapsed > this.params.interruptTime) {
+        console.log(`Time threadshold reached ${elapsed} > ${this.params.interruptTime}, interrupting`);
+        interrupt = true;
+      }
+    }
 
-    const size = await getDirSize(dir);
-
-    if (size >= this.params.sizeLimit) {
-      console.log(`Size threshold reached ${size} >= ${this.params.sizeLimit}`);
+    if (interrupt) {
       this.crawlState.setDrain();
-      this.exitCode = 1;
+      this.exitCode = 11;
     }
   }
 
@@ -410,7 +435,7 @@ class Crawler {
     }
 
     if (this.params.generateWACZ) {
-      this.storage = initStorage("data/");
+      this.storage = initStorage();
     }
 
     // Puppeteer Cluster init and options
@@ -540,7 +565,10 @@ class Crawler {
 
     if (this.storage) {
       const finished = await this.crawlState.finished();
-      await this.storage.uploadCollWACZ(waczPath, finished);
+      const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
+      const targetFilename = interpolateFilename(this.uploadDir + filename, this.crawlId);
+
+      await this.storage.uploadCollWACZ(waczPath, targetFilename, finished);
     }
   }
 
@@ -979,7 +1007,9 @@ class Crawler {
 
     await fsp.mkdir(crawlDir, {recursive: true});
 
-    const filename = path.join(crawlDir, `crawl-${ts}-${this.params.crawlId}.yaml`);
+    const filenameOnly = `crawl-${ts}-${this.params.crawlId}.yaml`;
+
+    const filename = path.join(crawlDir, filenameOnly);
 
     const state = await this.crawlState.serialize();
 
@@ -1005,6 +1035,12 @@ class Crawler {
       } catch (e) {
         console.error(`Failed to delete old save state file: ${oldFilename}`);
       }
+    }
+
+    if (this.storage && done) {
+      const targetFilename = interpolateFilename(this.uploadDir + filenameOnly, this.crawlId);
+
+      await this.storage.uploadFile(filename, targetFilename);
     }
   }
 }

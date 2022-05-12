@@ -11,6 +11,7 @@ const { hideBin } = require("yargs/helpers");
 const { NewWindowPage} = require("./screencaster");
 const { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } = require("./constants");
 const { ScopedSeed } = require("./seeds");
+const { interpolateFilename } = require("./storage");
 
 
 // ============================================================================
@@ -114,7 +115,7 @@ class ArgParser {
         alias: "c",
         describe: "Collection name to crawl to (replay will be accessible under this name in pywb preview)",
         type: "string",
-        default: `capture-${new Date().toISOString().slice(0,19)}`.replace(/:/g, "-")
+        default: "crawl-@ts"
       },
 
       "headless": {
@@ -257,8 +258,14 @@ class ArgParser {
         default: 5,
       },
 
-      "sizeLimit": {
+      "interruptSize": {
         describe: "If set, save state and exit if size limit exceeds this value",
+        type: "number",
+        default: 0,
+      },
+
+      "interruptTime": {
+        describe: "If set, save state and exit after time limit, in seconds",
         type: "number",
         default: 0,
       },
@@ -298,6 +305,8 @@ class ArgParser {
 
 
   validateArgs(argv) {
+    argv.collection = interpolateFilename(argv.collection, argv.crawlId);
+
     // Check that the collection name is valid.
     if (argv.collection.search(/^[\w][\w-]*$/) === -1){
       throw new Error(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
