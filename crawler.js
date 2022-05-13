@@ -51,7 +51,6 @@ class Crawler {
     this.pagesFH = null;
 
     this.crawlId = process.env.CRAWL_ID || os.hostname();
-    this.uploadDir = "data/@id/";
 
     this.startTime = Date.now();
 
@@ -566,7 +565,7 @@ class Crawler {
     if (this.storage) {
       const finished = await this.crawlState.finished();
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
-      const targetFilename = interpolateFilename(this.uploadDir + filename, this.crawlId);
+      const targetFilename = interpolateFilename(filename, this.crawlId);
 
       await this.storage.uploadCollWACZ(waczPath, targetFilename, finished);
     }
@@ -1037,8 +1036,8 @@ class Crawler {
       }
     }
 
-    if (this.storage && done) {
-      const targetFilename = interpolateFilename(this.uploadDir + filenameOnly, this.crawlId);
+    if (this.storage && done && this.params.saveState === "always") {
+      const targetFilename = interpolateFilename(filenameOnly, this.crawlId);
 
       await this.storage.uploadFile(filename, targetFilename);
     }

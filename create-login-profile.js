@@ -213,7 +213,7 @@ async function createProfile(params, browser, page, targetFilename = "") {
   const storage = initStorage();
   if (storage) {
     console.log("Uploading to remote storage...");
-    resource = await storage.uploadFile(profileFilename, "profiles/" + targetFilename);
+    resource = await storage.uploadFile(profileFilename, targetFilename);
   }
 
   console.log("done");
