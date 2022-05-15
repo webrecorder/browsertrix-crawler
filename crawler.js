@@ -376,15 +376,15 @@ class Crawler {
     const pathname = url.parse(req.url).pathname;
     switch (pathname) {
     case "/healthz":
-      if (this.errorCount <= threshold) {
-        console.log("health check succeeds", this.errorCount);
+      if (this.errorCount < threshold) {
+        console.log(`health check ok, num errors ${this.errorCount} < ${threshold}`);
         res.writeHead(200);
         res.end();
       }
       return;
     }
 
-    console.log("health check failed", this.errorCount);
+    console.log(`health check failed: ${this.errorCount} >= ${threshold}`);
     res.writeHead(503);
     res.end();
   }
@@ -397,8 +397,8 @@ class Crawler {
 
       const size = await getDirSize(dir);
 
-      if (size >= this.params.sizeLimit) {
-        console.log(`Size threshold reached ${size} >= ${this.params.sizeLimit}, interrupting`);
+      if (size >= this.params.interruptSize) {
+        console.log(`Size threshold reached ${size} >= ${this.params.interruptSize}, interrupting`);
         interrupt = true;
       }
     }
@@ -406,7 +406,7 @@ class Crawler {
     if (this.params.interruptTime) {
       const elapsed = (Date.now() - this.startTime) / 1000;
       if (elapsed > this.params.interruptTime) {
-        console.log(`Time threadshold reached ${elapsed} > ${this.params.interruptTime}, interrupting`);
+        console.log(`Time threshold reached ${elapsed} > ${this.params.interruptTime}, interrupting`);
         interrupt = true;
       }
     }
