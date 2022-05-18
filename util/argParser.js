@@ -258,13 +258,13 @@ class ArgParser {
         default: 5,
       },
 
-      "interruptSize": {
+      "sizeLimit": {
         describe: "If set, save state and exit if size limit exceeds this value",
         type: "number",
         default: 0,
       },
 
-      "interruptTime": {
+      "timeLimit": {
         describe: "If set, save state and exit after time limit, in seconds",
         type: "number",
         default: 0,
@@ -274,7 +274,13 @@ class ArgParser {
         describe: "port to run healthcheck on",
         type: "number",
         default: 0,
-      }
+      },
+
+      "overwrite": {
+        describe: "overwrite current crawl data: if set, existing collection directory will be deleted before crawl is started",
+        type: "boolean",
+        default: false
+      },
     };
   }
 

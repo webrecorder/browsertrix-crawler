@@ -210,22 +210,22 @@ class Crawler {
 
     subprocesses.push(child_process.spawn("redis-server", {...opts, cwd: "/tmp/"}));
 
+    if (this.params.overwrite) {
+      console.log(`Clearing ${this.collDir} before starting`);
+      try {
+        fs.rmSync(this.collDir, { recursive: true, force: true });
+      } catch(e) {
+        console.warn(e);
+      }
+    }
+
     child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
 
     subprocesses.push(child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts));
 
-    process.on("exit", (code) => {
-      if (code === 11) {
-        console.log(`Deleting ${this.collDir} before exit`);
-        try {
-          fs.rmSync(this.collDir, { recursive: true, force: true });
-        } catch(e) {
-          console.warn(e);
-        }
-      }
-
+    process.on("exit", () => {
       for (const proc of subprocesses) {
         proc.kill();
       }
@@ -392,21 +392,21 @@ class Crawler {
   async checkLimits() {
     let interrupt = false;
 
-    if (this.params.interruptSize) {
+    if (this.params.sizeLimit) {
       const dir = path.join(this.collDir, "archive");
 
       const size = await getDirSize(dir);
 
-      if (size >= this.params.interruptSize) {
-        console.log(`Size threshold reached ${size} >= ${this.params.interruptSize}, interrupting`);
+      if (size >= this.params.sizeLimit) {
+        console.log(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
         interrupt = true;
       }
     }
 
-    if (this.params.interruptTime) {
+    if (this.params.timeLimit) {
       const elapsed = (Date.now() - this.startTime) / 1000;
-      if (elapsed > this.params.interruptTime) {
-        console.log(`Time threshold reached ${elapsed} > ${this.params.interruptTime}, interrupting`);
+      if (elapsed > this.params.timeLimit) {
+        console.log(`Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`);
         interrupt = true;
       }
     }
