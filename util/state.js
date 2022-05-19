@@ -6,10 +6,12 @@ class BaseState
 {
   constructor() {
     this.drainMax = 0;
+    this.localOnly = false;
   }
 
-  async setDrain() {
-    this.drainMax = (await this.numPending()) + (await this.numDone());
+  async setDrain(localOnly = false) {
+    this.drainMax = (await this.numRealPending()) + (await this.numDone());
+    this.localOnly = localOnly;
   }
 
   async size() {
@@ -28,6 +30,14 @@ class BaseState
     const seed = seeds[data.seedId];
 
     return seed.isIncluded(data.url, data.depth, data.extraHops);
+  }
+
+  numPending(localPending = 0) {
+    if (this.localOnly) {
+      return localPending;
+    }
+
+    return this.numRealPending();
   }
 }
 
@@ -146,7 +156,7 @@ class MemoryCrawlState extends BaseState
     return this.seenList.size;
   }
 
-  async numPending() {
+  async numRealPending() {
     return this.pending.size;
   }
 }
@@ -386,7 +396,7 @@ return 0;
     return await this.redis.scard(this.skey);
   }
 
-  async numPending() {
+  async numRealPending() {
     const res = await this.redis.hlen(this.pkey);
 
     // reset pendings

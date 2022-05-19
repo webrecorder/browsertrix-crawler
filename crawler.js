@@ -412,7 +412,7 @@ class Crawler {
     }
 
     if (interrupt) {
-      this.crawlState.setDrain();
+      this.crawlState.setDrain(true);
       this.exitCode = 11;
     }
   }
@@ -625,7 +625,10 @@ class Crawler {
 
     try {
       await page.goto(url, gotoOpts);
-      this.errorCount = 0;
+      if (this.errorCount > 0) {
+        this.statusLog(`Page loaded, resetting error count ${this.errorCount} to 0`);
+        this.errorCount = 0;
+      }
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
@@ -719,7 +722,8 @@ class Crawler {
         await this.sleep(5500);
       }
     } catch (e) {
-      console.warn(e);
+      //console.warn("Check CF failed, ignoring");
+      //console.warn(e);
     }
   }
 
