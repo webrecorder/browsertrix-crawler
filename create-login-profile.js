@@ -210,7 +210,7 @@ async function createProfile(params, browser, page, targetFilename = "") {
 
   let resource = {};
 
-  const storage = initStorage("profiles/");
+  const storage = initStorage();
   if (storage) {
     console.log("Uploading to remote storage...");
     resource = await storage.uploadFile(profileFilename, targetFilename);
@@ -269,6 +269,16 @@ class InteractiveBrowser {
 
     page.on("load", () => this.addOrigin());
 
+    page.on("popup", async () => {
+      await this.page._client.send("Target.activateTarget", {targetId: this.targetId});
+    });
+
+    page._client.on("Page.windowOpen", async (resp) => {
+      if (resp.url) {
+        await page.goto(resp.url);
+      }
+    });
+
     this.shutdownWait = params.shutdownWait * 1000;
     
     if (this.shutdownWait) {
@@ -296,6 +306,7 @@ class InteractiveBrowser {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     const pathname = parsedUrl.pathname;
     let targetUrl;
+    let origins;
 
     switch (pathname) {
     case "/":
@@ -310,13 +321,38 @@ class InteractiveBrowser {
         this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
         console.log(`Ping received, delaying shutdown for ${this.shutdownWait}ms`);
       }
+
+      origins = Array.from(this.originSet.values());
+
       res.writeHead(200, {"Content-Type": "application/json"});
-      res.end(JSON.stringify({"pong": true}));
+
+      res.end(JSON.stringify({pong: true, origins}));
       return;
 
     case "/target":
       res.writeHead(200, {"Content-Type": "application/json"});
       res.end(JSON.stringify({targetId: this.targetId}));
+      return;
+
+    case "/navigate":
+      if (req.method !== "POST") {
+        break;
+      }
+
+      try {
+        const postData = await this.readBodyJson(req);
+        const url = new URL(postData.url).href;
+
+        res.writeHead(200, {"Content-Type": "application/json"});
+        res.end(JSON.stringify({success: true}));
+
+        this.page.goto(url);
+
+      } catch (e) {
+        res.writeHead(400, {"Content-Type": "application/json"});
+        res.end(JSON.stringify({"error": e.toString()}));
+        console.log(e);
+      }
       return;
 
     case "/createProfileJS":
@@ -325,29 +361,10 @@ class InteractiveBrowser {
       }
 
       try {
-
-        const buffers = [];
-
-        for await (const chunk of req) {
-          buffers.push(chunk);
-        }
-
-        const data = Buffer.concat(buffers).toString();
-
-        let targetFilename = "";
-
-        if (data.length) {
-          try {
-            targetFilename = JSON.parse(data).filename;
-          } catch (e) {
-            targetFilename = "";
-          }
-        }
-
-        console.log("target filename", targetFilename);
-
+        const postData = await this.readBodyJson(req);
+        const targetFilename = postData.filename || "";
         const resource = await createProfile(this.params, this.browser, this.page, targetFilename);
-        const origins = Array.from(this.originSet.values());
+        origins = Array.from(this.originSet.values());
 
         res.writeHead(200, {"Content-Type": "application/json"});
         res.end(JSON.stringify({resource, origins}));
@@ -382,6 +399,24 @@ class InteractiveBrowser {
 
     res.writeHead(404, {"Content-Type": "text/html"});
     res.end("Not Found");
+  }
+
+  async readBodyJson(req) {
+    const buffers = [];
+
+    for await (const chunk of req) {
+      buffers.push(chunk);
+    }
+
+    const data = Buffer.concat(buffers).toString();
+
+    if (data.length) {
+      try {
+        return JSON.parse(data) || {};
+      } catch (e) {
+        return {};
+      }
+    }
   }
 }
 

@@ -274,7 +274,11 @@ return 0;
       data = JSON.parse(json);
     } catch(e) {
       console.error("Invalid queued json: ", json);
-      return;
+      return null;
+    }
+
+    if (!data) {
+      return null;
     }
 
     const url = data.url;

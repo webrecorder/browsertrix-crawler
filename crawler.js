@@ -3,6 +3,8 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const fsp = require("fs/promises");
+const http = require("http");
+const url = require("url");
 
 // to ignore HTTPS error for HEAD check
 const HTTPS_AGENT = require("https").Agent({
@@ -25,7 +27,7 @@ const warcio = require("warcio");
 const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
 
 const  TextExtract  = require("./util/textextract");
-const { initStorage, getFileSize } = require("./util/storage");
+const { initStorage, getFileSize, getDirSize, interpolateFilename } = require("./util/storage");
 const { ScreenCaster, WSTransport, RedisPubSubTransport } = require("./util/screencaster");
 const { parseArgs } = require("./util/argParser");
 const { initRedis } = require("./util/redis");
@@ -47,6 +49,10 @@ class Crawler {
 
     // pages file
     this.pagesFH = null;
+
+    this.crawlId = process.env.CRAWL_ID || os.hostname();
+
+    this.startTime = Date.now();
 
     // was the limit hit?
     this.limitHit = false;
@@ -89,6 +95,10 @@ class Crawler {
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
     this.blockRules = null;
+
+    this.errorCount = 0;
+
+    this.exitCode = 0;
   }
 
   statusLog(...args) {
@@ -170,8 +180,7 @@ class Crawler {
       transport = new WSTransport(this.params.screencastPort);
       this.debugLog(`Screencast server started on: ${this.params.screencastPort}`);
     } else if (this.params.redisStoreUrl && this.params.screencastRedis) {
-      const crawlId = process.env.CRAWL_ID || os.hostname();
-      transport = new RedisPubSubTransport(this.params.redisStoreUrl, crawlId);
+      transport = new RedisPubSubTransport(this.params.redisStoreUrl, this.crawlId);
       this.debugLog("Screencast enabled via redis pubsub");
     }
 
@@ -200,6 +209,15 @@ class Crawler {
     const subprocesses = [];
 
     subprocesses.push(child_process.spawn("redis-server", {...opts, cwd: "/tmp/"}));
+
+    if (this.params.overwrite) {
+      console.log(`Clearing ${this.collDir} before starting`);
+      try {
+        fs.rmSync(this.collDir, { recursive: true, force: true });
+      } catch(e) {
+        console.warn(e);
+      }
+    }
 
     child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
@@ -250,11 +268,11 @@ class Crawler {
 
     try {
       await this.crawl();
-      process.exit(0);
+      process.exit(this.exitCode);
     } catch(e) {
       console.error("Crawl failed");
       console.error(e);
-      process.exit(1);
+      process.exit(9);
     }
   }
 
@@ -317,6 +335,8 @@ class Crawler {
 
       await this.writeStats();
 
+      await this.checkLimits();
+
       await this.serializeConfig();
 
     } catch (e) {
@@ -351,8 +371,60 @@ class Crawler {
     return buffer;
   }
 
+  async healthCheck(req, res) {
+    const threshold = this.params.workers * 2;
+    const pathname = url.parse(req.url).pathname;
+    switch (pathname) {
+    case "/healthz":
+      if (this.errorCount < threshold) {
+        console.log(`health check ok, num errors ${this.errorCount} < ${threshold}`);
+        res.writeHead(200);
+        res.end();
+      }
+      return;
+    }
+
+    console.log(`health check failed: ${this.errorCount} >= ${threshold}`);
+    res.writeHead(503);
+    res.end();
+  }
+
+  async checkLimits() {
+    let interrupt = false;
+
+    if (this.params.sizeLimit) {
+      const dir = path.join(this.collDir, "archive");
+
+      const size = await getDirSize(dir);
+
+      if (size >= this.params.sizeLimit) {
+        console.log(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
+        interrupt = true;
+      }
+    }
+
+    if (this.params.timeLimit) {
+      const elapsed = (Date.now() - this.startTime) / 1000;
+      if (elapsed > this.params.timeLimit) {
+        console.log(`Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`);
+        interrupt = true;
+      }
+    }
+
+    if (interrupt) {
+      this.crawlState.setDrain();
+      this.exitCode = 11;
+    }
+  }
+
   async crawl() {
     this.profileDir = await loadProfile(this.params.profile);
+
+    if (this.params.healthCheckPort) {
+      this.healthServer = http.createServer((...args) => this.healthCheck(...args));
+      this.statusLog(`Healthcheck server started on ${this.params.healthCheckPort}`);
+      this.healthServer.listen(this.params.healthCheckPort);
+    }
 
     try {
       this.driver = require(this.params.driver);
@@ -362,7 +434,7 @@ class Crawler {
     }
 
     if (this.params.generateWACZ) {
-      this.storage = initStorage("data/");
+      this.storage = initStorage();
     }
 
     // Puppeteer Cluster init and options
@@ -428,7 +500,7 @@ class Crawler {
     if (this.params.generateCDX) {
       this.statusLog("Generating CDX");
 
-      child_process.spawnSync("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd});
+      await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd}));
     }
 
     if (this.params.generateWACZ) {
@@ -471,9 +543,9 @@ class Crawler {
     warcFileList.forEach((val, index) => createArgs.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
 
     // create WACZ
-    const waczResult = child_process.spawnSync("wacz" , createArgs, {stdio: "inherit"});
+    const waczResult = await this.awaitProcess(child_process.spawn("wacz" , createArgs, {stdio: "inherit"}));
 
-    if (waczResult.status !== 0) {
+    if (waczResult !== 0) {
       console.log("create result", waczResult);
       throw new Error("Unable to write WACZ successfully");
     }
@@ -483,17 +555,26 @@ class Crawler {
     // Verify WACZ
     validateArgs.push(waczPath);
 
-    const waczVerifyResult = child_process.spawnSync("wacz", validateArgs, {stdio: "inherit"});
+    const waczVerifyResult = await this.awaitProcess(child_process.spawn("wacz", validateArgs, {stdio: "inherit"}));
 
-    if (waczVerifyResult.status !== 0) {
+    if (waczVerifyResult !== 0) {
       console.log("validate", waczVerifyResult);
       throw new Error("Unable to verify WACZ created successfully");
     }
 
     if (this.storage) {
       const finished = await this.crawlState.finished();
-      await this.storage.uploadCollWACZ(waczPath, finished);
+      const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
+      const targetFilename = interpolateFilename(filename, this.crawlId);
+
+      await this.storage.uploadCollWACZ(waczPath, targetFilename, finished);
     }
+  }
+
+  awaitProcess(proc) {
+    return new Promise((resolve) => {
+      proc.on("close", (code) => resolve(code));
+    });
   }
 
   async writeStats() {
@@ -543,12 +624,13 @@ class Crawler {
     const gotoOpts = isHTMLPage ? this.gotoOpts : "domcontentloaded";
 
     try {
-      //await Promise.race([page.goto(url, this.gotoOpts), nonHTMLLoad]);
       await page.goto(url, gotoOpts);
+      this.errorCount = 0;
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         this.statusLog(`ERROR: ${url}: ${msg}`);
+        this.errorCount++;
       }
     }
 
@@ -924,7 +1006,9 @@ class Crawler {
 
     await fsp.mkdir(crawlDir, {recursive: true});
 
-    const filename = path.join(crawlDir, `crawl-${ts}-${this.params.crawlId}.yaml`);
+    const filenameOnly = `crawl-${ts}-${this.params.crawlId}.yaml`;
+
+    const filename = path.join(crawlDir, filenameOnly);
 
     const state = await this.crawlState.serialize();
 
@@ -950,6 +1034,12 @@ class Crawler {
       } catch (e) {
         console.error(`Failed to delete old save state file: ${oldFilename}`);
       }
+    }
+
+    if (this.storage && done && this.params.saveState === "always") {
+      const targetFilename = interpolateFilename(filenameOnly, this.crawlId);
+
+      await this.storage.uploadFile(filename, targetFilename);
     }
   }
 }

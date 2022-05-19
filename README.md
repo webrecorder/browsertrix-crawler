@@ -39,9 +39,13 @@ Here's how you can use some of the command-line options to configure the crawl:
 
 - To limit the crawl to a maximum number of pages, add `--limit P` where P is the number of pages that will be crawled.
 
+- To limit the crawl to a maximum size, set `--sizeLimit` (size in bytes)
+
+- To limit the crawl time, set `--timeLimit` (in seconds)
+
 - To run more than one browser worker and crawl in parallel, and `--workers N` where N is number of browsers to run in parallel. More browsers will require more CPU and network bandwidth, and does not guarantee faster crawling.
 
-- To crawl into a new directory, specify a different name for the `--collection` param, or, if omitted, a new collection directory based on current time will be created.
+- To crawl into a new directory, specify a different name for the `--collection` param, or, if omitted, a new collection directory based on current time will be created. Adding the `--overwrite` flag will delete the collection directory at the start of the crawl, if it exists.
 
 Browsertrix Crawler includes a number of additional command-line options, explained below.
 
@@ -64,7 +68,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --crawlId, --id                       A user provided ID for this crawl or
                                             crawl configuration (can also be set
                                             via CRAWL_ID env var)
-                                              [string] [default: "4dd1535f7800"]
+                                              [string] [default: <hostname> or CRAWL_ID env variable]
       --newContext                          The context for each new capture,
                                             can be a new: page, window, session
                                             or browser.
@@ -75,6 +79,9 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                                   [default: "load,networkidle2"]
       --depth                               The depth of the crawl for all seeds
                                                           [number] [default: -1]
+      --extraHops                           Number of extra 'hops' to follow,
+                                            beyond the current scope
+                                                           [number] [default: 0]
       --limit                               Limit crawl to this number of pages
                                                            [number] [default: 0]
       --timeout                             Timeout for each page to load (in
@@ -82,7 +89,8 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --scopeType                           A predfined scope of the crawl. For
                                             more customization, use 'custom' and
                                             set scopeIncludeRx regexes
-       [string] [choices: "page", "page-spa", "prefix", "host", "domain", "any", "custom"]
+       [string] [choices: "page", "page-spa", "prefix", "host", "domain", "any",
+                                                                       "custom"]
       --scopeIncludeRx, --include           Regex of page URLs that should be
                                             included in the crawl (defaults to
                                             the immediate directory of URL)
@@ -103,7 +111,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
   -c, --collection                          Collection name to crawl to (replay
                                             will be accessible under this name
                                             in pywb preview)
-                               [string] [default: "capture-YYYY-MM-DDThh:mm:ss"]
+                                                 [string] [default: "crawl-@ts"]
       --headless                            Run in headless mode, otherwise
                                             start xvfb[boolean] [default: false]
       --driver                              JS driver for the crawler
@@ -157,6 +165,10 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                             an HTTP server with screencast
                                             accessible on this port
                                                            [number] [default: 0]
+      --screencastRedis                     If set, will use the state store
+                                            redis pubsub for screencasting.
+                                            Requires --redisStoreUrl to be set
+                                                      [boolean] [default: false]
       --warcInfo, --warcinfo                Optional fields added to the
                                             warcinfo record in combined WARCs
       --redisStoreUrl                       If set, url for remote redis server
@@ -167,6 +179,25 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                             Defaults to 'partial', only saved
                                             when crawl is interrupted
            [string] [choices: "never", "partial", "always"] [default: "partial"]
+      --saveStateInterval                   If save state is set to 'always',
+                                            also save state during the crawl at
+                                            this interval (in seconds)
+                                                         [number] [default: 300]
+      --saveStateHistory                    Number of save states to keep during
+                                            the duration of a crawl
+                                                           [number] [default: 5]
+      --sizeLimit                           If set, save state and exit if size
+                                            limit exceeds this value
+                                                           [number] [default: 0]
+      --timeLimit                           If set, save state and exit after
+                                            time limit, in seconds
+                                                           [number] [default: 0]
+      --healthCheckPort                     port to run healthcheck on
+                                                           [number] [default: 0]
+      --overwrite                           overwrite current crawl data: if
+                                            set, existing collection directory
+                                            will be deleted before crawl is
+                                            started   [boolean] [default: false]
       --config                              Path to YAML config file
 ```
 </details>
