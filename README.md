@@ -39,9 +39,13 @@ Here's how you can use some of the command-line options to configure the crawl:
 
 - To limit the crawl to a maximum number of pages, add `--limit P` where P is the number of pages that will be crawled.
 
+- To limit the crawl to a maximum size, set `--sizeLimit` (size in bytes)
+
+- To limit the crawl time, set `--timeLimit` (in seconds)
+
 - To run more than one browser worker and crawl in parallel, and `--workers N` where N is number of browsers to run in parallel. More browsers will require more CPU and network bandwidth, and does not guarantee faster crawling.
 
-- To crawl into a new directory, specify a different name for the `--collection` param, or, if omitted, a new collection directory based on current time will be created.
+- To crawl into a new directory, specify a different name for the `--collection` param, or, if omitted, a new collection directory based on current time will be created. Adding the `--overwrite` flag will delete the collection directory at the start of the crawl, if it exists.
 
 Browsertrix Crawler includes a number of additional command-line options, explained below.
 
