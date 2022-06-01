@@ -322,7 +322,7 @@ class InteractiveBrowser {
       const cookies = await this.page.cookies(url);
       for (const cookie of cookies) {
         cookie.url = url;
-        cookie.expires = (new Date().getTime() / 1000) + this.params.cookieDays * 7;
+        cookie.expires = (new Date().getTime() / 1000) + this.params.cookieDays * 86400;
         delete cookie.size;
         delete cookie.session;
         if (cookie.sameSite && cookie.sameSite !== "Lax" && cookie.sameSite !== "Strict") {
