@@ -14,7 +14,7 @@ async function handleTerminate() {
   try {
     if (!crawler.crawlState.drainMax) {
       console.log("SIGNAL: gracefully finishing current pages...");
-      crawler.crawlState.setDrain();
+      crawler.crawlState.setDrain(crawler.finalExit);
 
     } else if ((Date.now() - lastSigInt) > 200) {
       console.log("SIGNAL: stopping crawl now...");
@@ -32,10 +32,14 @@ process.on("SIGINT", async () => {
   await handleTerminate();
 });
 
+process.on("SIGUSR1", () => {
+  crawler.finalExit = true;
+});
+
 process.on("SIGTERM", async () => {
-  if (forceTerm) {
+  if (forceTerm || crawler.done) {
     console.log("SIGTERM received, exit immediately");
-    process.exit(1);
+    process.exit(crawler.done ? 0 : 1);
   }
 
   console.log("SIGTERM received...");
@@ -45,6 +49,7 @@ process.on("SIGTERM", async () => {
 process.on("SIGABRT", async () => {
   console.log("SIGABRT received, will force immediate exit on SIGTERM");
   forceTerm = true;
+  crawler.exitCode = 1;
 });
 
 

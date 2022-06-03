@@ -99,6 +99,9 @@ class Crawler {
     this.errorCount = 0;
 
     this.exitCode = 0;
+    this.done = false;
+    this.sizeExceeded = false;
+    this.finalExit = false;
   }
 
   statusLog(...args) {
@@ -149,14 +152,22 @@ class Crawler {
       }
 
       let redis;
+      let retry = 10000;
 
-      try {
-        redis = await initRedis(redisUrl);
-      } catch (e) {
-        throw new Error("Unable to connect to state store Redis: " + redisUrl);
+      while (true) {
+        try {
+          redis = await initRedis(redisUrl);
+          break;
+        } catch (e) {
+          //throw new Error("Unable to connect to state store Redis: " + redisUrl);
+          console.warn(`Waiting for redis at ${redisUrl}`);
+          await this.sleep(retry);
+        }
       }
 
-      this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.params.crawlId}"`);
+      await this.redisSetStatus(redis, "running");
+
+      this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`);
 
       this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout);
 
@@ -263,6 +274,8 @@ class Crawler {
 
   async run() {
     await fsp.mkdir(this.params.cwd, {recursive: true});
+
+    //await this.sleep(1000000000);
 
     this.bootstrap();
 
@@ -400,6 +413,7 @@ class Crawler {
       if (size >= this.params.sizeLimit) {
         console.log(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
         interrupt = true;
+        this.sizeExceeded = true;
       }
     }
 
@@ -503,9 +517,32 @@ class Crawler {
       await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd}));
     }
 
-    if (this.params.generateWACZ) {
+    if (this.params.generateWACZ && (this.exitCode === 0 || this.finalExit || this.sizeExceeded)) {
       await this.generateWACZ();
+
+      if (this.sizeExceeded) {
+        console.log(`Clearing ${this.collDir} before exit`);
+        try {
+          fs.rmSync(this.collDir, { recursive: true, force: true });
+        } catch(e) {
+          console.warn(e);
+        }
+      }
     }
+
+    if (this.exitCode === 0 && this.params.waitOnDone && this.params.redisStoreUrl && !this.finalExit) {
+      this.done = true;
+      this.statusLog("All done, waiting for signal...");
+      await this.redisSetStatus(this.crawlState.redis, "done");
+
+      await this.sleep(1000000000);
+    } else if (this.finalExit && this.params.redisStoreUrl) {
+      await this.redisSetStatus(this.crawlState.redis, "done");
+    }
+  }
+
+  async redisSetStatus(redis, status_) {
+    await redis.hset(`${this.crawlId}:status`, `${os.hostname()}`, status_);
   }
 
   async generateWACZ() {
@@ -526,7 +563,6 @@ class Crawler {
     const waczPath = path.join(this.collDir, waczFilename);
 
     const createArgs = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile];
-    const validateArgs = ["validate"];
 
     if (process.env.WACZ_SIGN_URL) {
       createArgs.push("--signing-url");
@@ -538,7 +574,6 @@ class Crawler {
     }
 
     createArgs.push("-f");
-    validateArgs.push("-f");
 
     warcFileList.forEach((val, index) => createArgs.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
 
@@ -553,6 +588,9 @@ class Crawler {
     this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
 
     // Verify WACZ
+    /*
+    const validateArgs = ["validate"];
+    validateArgs.push("-f");
     validateArgs.push(waczPath);
 
     const waczVerifyResult = await this.awaitProcess(child_process.spawn("wacz", validateArgs, {stdio: "inherit"}));
@@ -561,7 +599,7 @@ class Crawler {
       console.log("validate", waczVerifyResult);
       throw new Error("Unable to verify WACZ created successfully");
     }
-
+*/
     if (this.storage) {
       const finished = await this.crawlState.finished();
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
