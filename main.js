@@ -33,7 +33,9 @@ process.on("SIGINT", async () => {
 });
 
 process.on("SIGUSR1", () => {
-  crawler.finalExit = true;
+  if (crawler) {
+    crawler.finalExit = true;
+  }
 });
 
 process.on("SIGTERM", async () => {

@@ -99,6 +99,7 @@ class Crawler {
     this.errorCount = 0;
 
     this.exitCode = 0;
+
     this.done = false;
     this.sizeExceeded = false;
     this.finalExit = false;
@@ -152,7 +153,6 @@ class Crawler {
       }
 
       let redis;
-      let retry = 10000;
 
       while (true) {
         try {
@@ -161,7 +161,7 @@ class Crawler {
         } catch (e) {
           //throw new Error("Unable to connect to state store Redis: " + redisUrl);
           console.warn(`Waiting for redis at ${redisUrl}`);
-          await this.sleep(retry);
+          await this.sleep(3);
         }
       }
 
@@ -169,7 +169,7 @@ class Crawler {
 
       this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`);
 
-      this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout);
+      this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout * 2);
 
     } else {
       this.statusLog("Storing state in memory");
@@ -275,17 +275,24 @@ class Crawler {
   async run() {
     await fsp.mkdir(this.params.cwd, {recursive: true});
 
-    //await this.sleep(1000000000);
-
     this.bootstrap();
+    let status;
 
     try {
       await this.crawl();
-      process.exit(this.exitCode);
+      status = (this.exitCode === 0 ? "done" : "interrupted");
     } catch(e) {
       console.error("Crawl failed");
       console.error(e);
-      process.exit(9);
+      this.exitCode = 9;
+      status = "failed";
+    } finally {
+
+      if (this.params.redisStoreUrl) {
+        await this.redisSetStatus(this.crawlState.redis, status);
+      }
+
+      process.exit(this.exitCode);
     }
   }
 
@@ -535,9 +542,8 @@ class Crawler {
       this.statusLog("All done, waiting for signal...");
       await this.redisSetStatus(this.crawlState.redis, "done");
 
-      await this.sleep(1000000000);
-    } else if (this.finalExit && this.params.redisStoreUrl) {
-      await this.redisSetStatus(this.crawlState.redis, "done");
+      // wait forever until signal
+      await new Promise(() => {});
     }
   }
 
@@ -757,7 +763,7 @@ class Crawler {
     try {
       while (await page.$("div.cf-browser-verification.cf-im-under-attack")) {
         this.statusLog("Cloudflare Check Detected, waiting for reload...");
-        await this.sleep(5500);
+        await this.sleep(5.5);
       }
     } catch (e) {
       //console.warn("Check CF failed, ignoring");
@@ -896,12 +902,12 @@ class Crawler {
 
       this.debugLog(`Still waiting for ${res} pending requests to finish...`);
 
-      await this.sleep(1000);
+      await this.sleep(1);
     }
   }
 
-  sleep(time) {
-    return new Promise(resolve => setTimeout(resolve, time));
+  sleep(seconds) {
+    return new Promise(resolve => setTimeout(resolve, seconds * 1000));
   }
 
   async parseSitemap(url, seedId) {
