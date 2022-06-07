@@ -190,12 +190,15 @@ class ScreenCaster
       const sessionId = resp.sessionId;
       const url = target.url();
 
-      this.caches.set(id, data);
-      this.urls.set(id, url);
+      // only send if already in map, otherwise probably already closed
+      if (this.urls.has(id)) {
+        this.caches.set(id, data);
+        this.urls.set(id, url);
 
-      //if (url !== "about:blank") {
-      await this.transport.sendAll({msg, id, data, url});
-      //}
+        //if (url !== "about:blank") {
+        await this.transport.sendAll({msg, id, data, url});
+        //}
+      }
 
       try {
         await cdp.send("Page.screencastFrameAck", {sessionId});
