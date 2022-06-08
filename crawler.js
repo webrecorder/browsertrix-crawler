@@ -165,7 +165,7 @@ class Crawler {
         }
       }
 
-      await this.redisSetStatus(redis, "running");
+      await this.redisSetStatus("running", redis);
 
       this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`);
 
@@ -285,11 +285,18 @@ class Crawler {
       console.error("Crawl failed");
       console.error(e);
       this.exitCode = 9;
-      status = "failed";
+      status = "failing";
+      if (this.params.redisStoreUrl) {
+        if (await this.redisStatusIncFailCount(3)) {
+          status = "failed";
+        }
+      }
+
     } finally {
+      console.log(status);
 
       if (this.params.redisStoreUrl) {
-        await this.redisSetStatus(this.crawlState.redis, status);
+        await this.redisSetStatus(status);
       }
 
       process.exit(this.exitCode);
@@ -540,15 +547,21 @@ class Crawler {
     if (this.exitCode === 0 && this.params.waitOnDone && this.params.redisStoreUrl && !this.finalExit) {
       this.done = true;
       this.statusLog("All done, waiting for signal...");
-      await this.redisSetStatus(this.crawlState.redis, "done");
+      await this.redisSetStatus("done");
 
       // wait forever until signal
       await new Promise(() => {});
     }
   }
 
-  async redisSetStatus(redis, status_) {
+  async redisSetStatus(status_, redis) {
+    redis = redis || this.crawlState.redis;
     await redis.hset(`${this.crawlId}:status`, `${os.hostname()}`, status_);
+  }
+
+  async redisStatusIncFailCount(count) {
+    const key = `${this.crawlId}:status:failcount:${os.hostname()}`;
+    return (await this.crawlState.redis.incr(key)) > count;
   }
 
   async generateWACZ() {
