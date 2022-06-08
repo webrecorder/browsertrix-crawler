@@ -561,7 +561,9 @@ class Crawler {
 
   async redisStatusIncFailCount(count) {
     const key = `${this.crawlId}:status:failcount:${os.hostname()}`;
-    return (await this.crawlState.redis.incr(key)) > count;
+    const res = await this.crawlState.redis.incr(key);
+    await this.crawlState.redis.expire(key, 60);
+    return (res >= count);
   }
 
   async generateWACZ() {
