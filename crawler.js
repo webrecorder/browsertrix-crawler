@@ -320,7 +320,7 @@ class Crawler {
   async crawlPage({page, data}) {
     try {
       if (this.screencaster) {
-        await this.screencaster.newTarget(page.target());
+        await this.screencaster.screencastTarget(page.target());
       }
 
       if (this.emulateDevice) {
@@ -368,15 +368,6 @@ class Crawler {
 
     } catch (e) {
       console.warn(e);
-    } finally {
-
-      try {
-        if (this.screencaster) {
-          await this.screencaster.endTarget(page.target());
-        }
-      } catch (e) {
-        console.warn(e);
-      }
     }
   }
 
@@ -574,8 +565,15 @@ class Crawler {
     // Get a list of the warcs inside
     const warcFileList = await fsp.readdir(archiveDir);
 
+    // is finished (>0 pages and all pages written)
+    const isFinished = await this.crawlState.isFinished();
+
     console.log(`Num WARC Files: ${warcFileList.length}`);
     if (!warcFileList.length) {
+      // if finished, just return
+      if (isFinished) {
+        return;
+      }
       throw new Error("No WARC Files, assuming crawl failed");
     }
 
@@ -622,11 +620,10 @@ class Crawler {
     }
 */
     if (this.storage) {
-      const finished = await this.crawlState.finished();
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
       const targetFilename = interpolateFilename(filename, this.crawlId);
 
-      await this.storage.uploadCollWACZ(waczPath, targetFilename, finished);
+      await this.storage.uploadCollWACZ(waczPath, targetFilename, isFinished);
     }
   }
 
@@ -909,7 +906,8 @@ class Crawler {
 
     const redis = await initRedis("redis://localhost/0");
 
-    while (true) {
+    // wait until pending, unless canceling
+    while (this.exitCode !== 1) {
       const res = await redis.get(`pywb:${this.params.collection}:pending`);
       if (res === "0" || !res) {
         break;
@@ -1042,7 +1040,7 @@ class Crawler {
       if (!done) {
         return;
       }
-      if (await this.crawlState.finished()) {
+      if (await this.crawlState.isFinished()) {
         return;
       }
       break;

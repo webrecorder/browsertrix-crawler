@@ -18,8 +18,8 @@ class BaseState
     return this.drainMax ? 0 : await this.realSize();
   }
 
-  async finished() {
-    return await this.realSize() == 0;
+  async isFinished() {
+    return (await this.realSize() == 0) && (await this.numDone() > 0);
   }
 
   async numSeen() {

@@ -175,10 +175,30 @@ class ScreenCaster
     }
   }
 
+  detectClose(target) {
+    const context = target.browserContext();
 
-  async newTarget(target) {
-    const cdp = await target.createCDPSession();
+    if (context.__destroy_added) {
+      return;
+    }
+
+    context.on("targetdestroyed", (target) => {
+      this.endTarget(target);
+    });
+
+    context.__destroy_added = true;
+  }
+
+  async screencastTarget(target) {
     const id = target._targetId;
+
+    if (this.targets.has(id)) {
+      return;
+    }
+
+    this.detectClose(target);
+
+    const cdp = await target.createCDPSession();
 
     this.targets.set(id, cdp);
     this.urls.set(id, target.url());
@@ -190,15 +210,12 @@ class ScreenCaster
       const sessionId = resp.sessionId;
       const url = target.url();
 
-      // only send if already in map, otherwise probably already closed
-      if (this.urls.has(id)) {
-        this.caches.set(id, data);
-        this.urls.set(id, url);
+      this.caches.set(id, data);
+      this.urls.set(id, url);
 
-        //if (url !== "about:blank") {
-        await this.transport.sendAll({msg, id, data, url});
-        //}
-      }
+      //if (url !== "about:blank") {
+      await this.transport.sendAll({msg, id, data, url});
+      //}
 
       try {
         await cdp.send("Page.screencastFrameAck", {sessionId});
