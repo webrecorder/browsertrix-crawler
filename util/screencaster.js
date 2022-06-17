@@ -175,10 +175,30 @@ class ScreenCaster
     }
   }
 
+  detectClose(target) {
+    const context = target.browserContext();
 
-  async newTarget(target) {
-    const cdp = await target.createCDPSession();
+    if (context.__destroy_added) {
+      return;
+    }
+
+    context.on("targetdestroyed", (target) => {
+      this.endTarget(target);
+    });
+
+    context.__destroy_added = true;
+  }
+
+  async screencastTarget(target) {
     const id = target._targetId;
+
+    if (this.targets.has(id)) {
+      return;
+    }
+
+    this.detectClose(target);
+
+    const cdp = await target.createCDPSession();
 
     this.targets.set(id, cdp);
     this.urls.set(id, target.url());

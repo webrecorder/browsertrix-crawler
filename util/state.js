@@ -18,8 +18,8 @@ class BaseState
     return this.drainMax ? 0 : await this.realSize();
   }
 
-  async finished() {
-    return await this.realSize() == 0;
+  async isFinished() {
+    return (await this.realSize() == 0) && (await this.numDone() > 0);
   }
 
   async numSeen() {
@@ -51,6 +51,20 @@ class MemoryCrawlState extends BaseState
     this.queue = [];
     this.pending = new Map();
     this.done = [];
+    this.status = null;
+  }
+
+  setStatus(status) {
+    this.status = status;
+  }
+
+  getStatus() {
+    return this.status;
+  }
+
+  incFailCount() {
+    // memory-only state, no retries
+    return true;
   }
 
   push(job) {
@@ -165,12 +179,13 @@ class MemoryCrawlState extends BaseState
 // ============================================================================
 class RedisCrawlState extends BaseState
 {
-  constructor(redis, key, pageTimeout) {
+  constructor(redis, key, pageTimeout, uid) {
     super();
     this.redis = redis;
 
     this._lastSize = 0;
 
+    this.uid = uid;
     this.key = key;
     this.pageTimeout = pageTimeout / 1000;
 
@@ -270,6 +285,23 @@ return 0;
 
   async _fail(url) {
     return await this.redis.movedone(this.pkey, this.dkey, url, "1", "failed");
+  }
+
+  async setStatus(status_) {
+    await this.redis.hset(`${this.key}:status`, this.uid, status_);
+  }
+
+  async getStatus() {
+    return await this.redis.hget(`${this.key}:status`, this.uid);
+  }
+
+  async incFailCount() {
+    const key = `${this.key}:status:failcount:${this.uid}`;
+    const res = await this.redis.incr(key);
+
+    // consider failed if 3 failed retries in 60 secs
+    await this.redis.expire(key, 60);
+    return (res >= 3);
   }
 
   async push(job) {

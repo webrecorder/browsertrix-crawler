@@ -281,6 +281,12 @@ class ArgParser {
         type: "boolean",
         default: false
       },
+
+      "waitOnDone": {
+        describe: "if set, wait for interrupt signal when finished instead of exiting",
+        type: "boolean",
+        default: false
+      },
     };
   }
 

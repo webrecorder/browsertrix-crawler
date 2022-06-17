@@ -99,6 +99,10 @@ class Crawler {
     this.errorCount = 0;
 
     this.exitCode = 0;
+
+    this.done = false;
+    this.sizeExceeded = false;
+    this.finalExit = false;
   }
 
   statusLog(...args) {
@@ -150,15 +154,21 @@ class Crawler {
 
       let redis;
 
-      try {
-        redis = await initRedis(redisUrl);
-      } catch (e) {
-        throw new Error("Unable to connect to state store Redis: " + redisUrl);
+      while (true) {
+        try {
+          redis = await initRedis(redisUrl);
+          break;
+        } catch (e) {
+          //throw new Error("Unable to connect to state store Redis: " + redisUrl);
+          console.warn(`Waiting for redis at ${redisUrl}`);
+          await this.sleep(3);
+        }
       }
 
-      this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.params.crawlId}"`);
+      this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`);
 
-      this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout);
+      this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout * 2, os.hostname());
+      await this.crawlState.setStatus("running");
 
     } else {
       this.statusLog("Storing state in memory");
@@ -265,14 +275,26 @@ class Crawler {
     await fsp.mkdir(this.params.cwd, {recursive: true});
 
     this.bootstrap();
+    let status;
 
     try {
       await this.crawl();
-      process.exit(this.exitCode);
+      status = (this.exitCode === 0 ? "done" : "interrupted");
     } catch(e) {
       console.error("Crawl failed");
       console.error(e);
-      process.exit(9);
+      this.exitCode = 9;
+      status = "failing";
+      if (await this.crawlState.incFailCount()) {
+        status = "failed";
+      }
+
+    } finally {
+      console.log(status);
+
+      await this.crawlState.setStatus(status);
+
+      process.exit(this.exitCode);
     }
   }
 
@@ -293,7 +315,7 @@ class Crawler {
   async crawlPage({page, data}) {
     try {
       if (this.screencaster) {
-        await this.screencaster.newTarget(page.target());
+        await this.screencaster.screencastTarget(page.target());
       }
 
       if (this.emulateDevice) {
@@ -341,15 +363,6 @@ class Crawler {
 
     } catch (e) {
       console.warn(e);
-    } finally {
-
-      try {
-        if (this.screencaster) {
-          await this.screencaster.endTarget(page.target());
-        }
-      } catch (e) {
-        console.warn(e);
-      }
     }
   }
 
@@ -400,6 +413,7 @@ class Crawler {
       if (size >= this.params.sizeLimit) {
         console.log(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
         interrupt = true;
+        this.sizeExceeded = true;
       }
     }
 
@@ -503,8 +517,26 @@ class Crawler {
       await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd}));
     }
 
-    if (this.params.generateWACZ) {
+    if (this.params.generateWACZ && (this.exitCode === 0 || this.finalExit || this.sizeExceeded)) {
       await this.generateWACZ();
+
+      if (this.sizeExceeded) {
+        console.log(`Clearing ${this.collDir} before exit`);
+        try {
+          fs.rmSync(this.collDir, { recursive: true, force: true });
+        } catch(e) {
+          console.warn(e);
+        }
+      }
+    }
+
+    if (this.exitCode === 0 && this.params.waitOnDone && this.params.redisStoreUrl && !this.finalExit) {
+      this.done = true;
+      this.statusLog("All done, waiting for signal...");
+      await this.crawlState.setStatus("done");
+
+      // wait forever until signal
+      await new Promise(() => {});
     }
   }
 
@@ -516,8 +548,15 @@ class Crawler {
     // Get a list of the warcs inside
     const warcFileList = await fsp.readdir(archiveDir);
 
+    // is finished (>0 pages and all pages written)
+    const isFinished = await this.crawlState.isFinished();
+
     console.log(`Num WARC Files: ${warcFileList.length}`);
     if (!warcFileList.length) {
+      // if finished, just return
+      if (isFinished) {
+        return;
+      }
       throw new Error("No WARC Files, assuming crawl failed");
     }
 
@@ -526,7 +565,6 @@ class Crawler {
     const waczPath = path.join(this.collDir, waczFilename);
 
     const createArgs = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile];
-    const validateArgs = ["validate"];
 
     if (process.env.WACZ_SIGN_URL) {
       createArgs.push("--signing-url");
@@ -538,7 +576,6 @@ class Crawler {
     }
 
     createArgs.push("-f");
-    validateArgs.push("-f");
 
     warcFileList.forEach((val, index) => createArgs.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
 
@@ -553,6 +590,9 @@ class Crawler {
     this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
 
     // Verify WACZ
+    /*
+    const validateArgs = ["validate"];
+    validateArgs.push("-f");
     validateArgs.push(waczPath);
 
     const waczVerifyResult = await this.awaitProcess(child_process.spawn("wacz", validateArgs, {stdio: "inherit"}));
@@ -561,13 +601,12 @@ class Crawler {
       console.log("validate", waczVerifyResult);
       throw new Error("Unable to verify WACZ created successfully");
     }
-
+*/
     if (this.storage) {
-      const finished = await this.crawlState.finished();
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
       const targetFilename = interpolateFilename(filename, this.crawlId);
 
-      await this.storage.uploadCollWACZ(waczPath, targetFilename, finished);
+      await this.storage.uploadCollWACZ(waczPath, targetFilename, isFinished);
     }
   }
 
@@ -719,7 +758,7 @@ class Crawler {
     try {
       while (await page.$("div.cf-browser-verification.cf-im-under-attack")) {
         this.statusLog("Cloudflare Check Detected, waiting for reload...");
-        await this.sleep(5500);
+        await this.sleep(5.5);
       }
     } catch (e) {
       //console.warn("Check CF failed, ignoring");
@@ -850,7 +889,8 @@ class Crawler {
 
     const redis = await initRedis("redis://localhost/0");
 
-    while (true) {
+    // wait until pending, unless canceling
+    while (this.exitCode !== 1) {
       const res = await redis.get(`pywb:${this.params.collection}:pending`);
       if (res === "0" || !res) {
         break;
@@ -858,12 +898,12 @@ class Crawler {
 
       this.debugLog(`Still waiting for ${res} pending requests to finish...`);
 
-      await this.sleep(1000);
+      await this.sleep(1);
     }
   }
 
-  sleep(time) {
-    return new Promise(resolve => setTimeout(resolve, time));
+  sleep(seconds) {
+    return new Promise(resolve => setTimeout(resolve, seconds * 1000));
   }
 
   async parseSitemap(url, seedId) {
@@ -983,7 +1023,7 @@ class Crawler {
       if (!done) {
         return;
       }
-      if (await this.crawlState.finished()) {
+      if (await this.crawlState.isFinished()) {
         return;
       }
       break;
