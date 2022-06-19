@@ -94,6 +94,7 @@ module.exports.chromeArgs = (proxy, userAgent=null, extraArgs=[]) => {
     "--enable-features=NetworkService,NetworkServiceInProcess",
     "--autoplay-policy=no-user-gesture-required",
     "--disable-features=IsolateOrigins,site-per-process,ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame,AutoExpandDetailsElement",
+    "--disable-site-isolation-trials",
     "--disable-popup-blocking",
     "--disable-backgrounding-occluded-windows",
     `--user-agent=${userAgent || getDefaultUA()}`,
