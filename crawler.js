@@ -292,7 +292,9 @@ class Crawler {
     } finally {
       console.log(status);
 
-      await this.crawlState.setStatus(status);
+      if (this.crawlState) {
+        await this.crawlState.setStatus(status);
+      }
 
       process.exit(this.exitCode);
     }
