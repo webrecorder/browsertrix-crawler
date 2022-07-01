@@ -701,6 +701,12 @@ class Crawler {
 
     await this.checkCF(page);
 
+    // in case page starts loading via fetch/xhr immediately after page load,
+    // we want to ensure we don't exit too early
+    await this.sleep(0.5);
+
+    await page.waitForNetworkIdle();
+
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
       return;
