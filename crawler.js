@@ -168,7 +168,6 @@ class Crawler {
       this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`);
 
       this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout * 2, os.hostname());
-      await this.crawlState.setStatus("running");
 
     } else {
       this.statusLog("Storing state in memory");
@@ -292,7 +291,9 @@ class Crawler {
     } finally {
       console.log(status);
 
-      await this.crawlState.setStatus(status);
+      if (this.crawlState) {
+        await this.crawlState.setStatus(status);
+      }
 
       process.exit(this.exitCode);
     }
@@ -447,6 +448,18 @@ class Crawler {
       return;
     }
 
+    await this.initCrawlState();
+
+    let initState = await this.crawlState.getStatus();
+
+    while (initState === "debug") {
+      console.log("Paused for debugging, will continue after manual resume");
+
+      await this.sleep(60);
+
+      initState = await this.crawlState.getStatus();
+    }
+
     if (this.params.generateWACZ) {
       this.storage = initStorage();
     }
@@ -463,7 +476,9 @@ class Crawler {
     });
 
 
-    this.cluster.jobQueue = await this.initCrawlState();
+    this.cluster.jobQueue = this.crawlState;
+
+    await this.crawlState.setStatus("running");
 
     if (this.params.state) {
       await this.crawlState.load(this.params.state, this.params.scopedSeeds, true);
