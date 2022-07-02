@@ -103,6 +103,7 @@ class Crawler {
     this.done = false;
     this.sizeExceeded = false;
     this.finalExit = false;
+    this.behaviorLastLine = null;
   }
 
   statusLog(...args) {
@@ -264,7 +265,7 @@ class Crawler {
       handleSIGTERM: false,
       handleSIGHUP: false,
       ignoreHTTPSErrors: true,
-      args: chromeArgs(true, this.userAgent),
+      args: chromeArgs(!process.env.NO_PROXY, this.userAgent),
       userDataDir: this.profileDir,
       defaultViewport: null,
     };
@@ -300,9 +301,15 @@ class Crawler {
   }
 
   _behaviorLog({data, type}) {
+    let behaviorLine;
+
     switch (type) {
     case "info":
-      console.log(JSON.stringify(data));
+      behaviorLine = JSON.stringify(data);
+      if (behaviorLine != this._behaviorLastLine) {
+        console.log(behaviorLine);
+        this._behaviorLastLine = behaviorLine;
+      }
       break;
 
     case "debug":
@@ -316,7 +323,7 @@ class Crawler {
   async crawlPage({page, data}) {
     try {
       if (this.screencaster) {
-        await this.screencaster.screencastTarget(page.target());
+        await this.screencaster.screencastTarget(page.target(), data.url);
       }
 
       if (this.emulateDevice) {
@@ -705,7 +712,12 @@ class Crawler {
     // we want to ensure we don't exit too early
     await this.sleep(0.5);
 
-    await page.waitForNetworkIdle();
+    try {
+      await page.waitForNetworkIdle();
+    } catch (e) {
+      console.log("note: waitForNetworkIdle timed out, ignoring");
+      // ignore, continue
+    }
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
