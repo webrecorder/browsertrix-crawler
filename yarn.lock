@@ -1159,9 +1159,10 @@ browserslist@^4.14.5:
     escalade "^3.1.1"
     node-releases "^1.1.71"
 
-"browsertrix-behaviors@github:webrecorder/browsertrix-behaviors#0.3.1-work":
-  version "0.3.1"
-  resolved "https://codeload.github.com/webrecorder/browsertrix-behaviors/tar.gz/336961fdc60c3afe02fc5127e0f461c707335581"
+browsertrix-behaviors@^0.3.2:
+  version "0.3.2"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.3.2.tgz#730c470916f1d383df7f2455a58f772f66cb31f4"
+  integrity sha512-bWvw8yx+g9PPxvAcHUwXj93AHoKI62qIoLXhj/gjUNBw9a8ueXICG5HRGx0UasRcq9WCDvi094016nLdJiKAbQ==
 
 bser@2.1.1:
   version "2.1.1"

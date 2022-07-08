@@ -287,6 +287,12 @@ class ArgParser {
         type: "boolean",
         default: false
       },
+
+      "netIdleWait": {
+        describe: "if set, wait for network idle after page load and after behaviors are done (in seconds)",
+        type: "number",
+        default: 10
+      }
     };
   }
 

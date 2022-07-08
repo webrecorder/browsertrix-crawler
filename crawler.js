@@ -360,6 +360,9 @@ class Crawler {
           console.log("Skipping behaviors for non-HTML page");
         } else {
           await Promise.allSettled(page.frames().map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();")));
+
+          // also wait for general net idle
+          await this.netIdle(page);
         }
       }
 
@@ -708,16 +711,7 @@ class Crawler {
 
     await this.checkCF(page);
 
-    // in case page starts loading via fetch/xhr immediately after page load,
-    // we want to ensure we don't exit too early
-    await this.sleep(0.5);
-
-    try {
-      await page.waitForNetworkIdle();
-    } catch (e) {
-      console.log("note: waitForNetworkIdle timed out, ignoring");
-      // ignore, continue
-    }
+    await this.netIdle(page);
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
@@ -727,6 +721,22 @@ class Crawler {
     for (const opts of selectorOptsList) {
       const links = await this.extractLinks(page, opts);
       await this.queueInScopeUrls(seedId, links, depth, extraHops);
+    }
+  }
+
+  async netIdle(page) {
+    if (!this.params.netIdleWait) {
+      return;
+    }
+    // in case page starts loading via fetch/xhr immediately after page load,
+    // we want to ensure we don't exit too early
+    await this.sleep(0.5);
+
+    try {
+      await page.waitForNetworkIdle({timeout: this.params.netIdleWait * 1000});
+    } catch (e) {
+      console.log("note: waitForNetworkIdle timed out, ignoring");
+      // ignore, continue
     }
   }
 
