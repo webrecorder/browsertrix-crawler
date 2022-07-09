@@ -78,7 +78,7 @@ class Crawler {
     this.debugLog("Seeds", this.params.scopedSeeds);
 
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
-    this.capturePrefix = this.captureBasePrefix + "/id_/";
+    this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
@@ -201,13 +201,32 @@ class Crawler {
     return new ScreenCaster(transport, this.params.workers);
   }
 
-  bootstrap() {
+  async bootstrap() {
+    const logs = path.join(this.collDir, "logs");
+
+    await fsp.mkdir(logs, {recursive: true});
+
+    const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
+
+    if (initRes.status) {
+      console.log("wb-manager init failed");
+    }
+
     let opts = {};
+    let redisStdio;
+
     if (this.params.logging.includes("pywb")) {
       opts = {stdio: "inherit", cwd: this.params.cwd};
-    }
-    else{
-      opts = {stdio: "ignore", cwd: this.params.cwd};
+      redisStdio = "inherit";
+    } else {
+
+      const pywbStderr = fs.openSync(path.join(logs, "pywb.log"), "a");
+      const stdio = [process.stdin, pywbStderr, pywbStderr];
+
+      const redisStderr = fs.openSync(path.join(logs, "redis.log"), "a");
+      redisStdio = [process.stdin, redisStderr, redisStderr];
+
+      opts = {stdio, cwd: this.params.cwd};
     }
 
     this.browserExe = getBrowserExe();
@@ -218,7 +237,7 @@ class Crawler {
 
     const subprocesses = [];
 
-    subprocesses.push(child_process.spawn("redis-server", {...opts, cwd: "/tmp/"}));
+    subprocesses.push(child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio}));
 
     if (this.params.overwrite) {
       console.log(`Clearing ${this.collDir} before starting`);
@@ -228,8 +247,6 @@ class Crawler {
         console.warn(e);
       }
     }
-
-    child_process.spawnSync("wb-manager", ["init", this.params.collection], opts);
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
 
@@ -272,9 +289,8 @@ class Crawler {
   }
 
   async run() {
-    await fsp.mkdir(this.params.cwd, {recursive: true});
+    await this.bootstrap();
 
-    this.bootstrap();
     let status;
 
     try {
@@ -396,7 +412,7 @@ class Crawler {
   }
 
   async healthCheck(req, res) {
-    const threshold = this.params.workers * 2;
+    const threshold = this.params.workers;
     const pathname = url.parse(req.url).pathname;
     switch (pathname) {
     case "/healthz":
