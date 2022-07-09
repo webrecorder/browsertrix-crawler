@@ -189,8 +189,10 @@ class ScreenCaster
     context.__destroy_added = true;
   }
 
-  async screencastTarget(target) {
+  async screencastTarget(target, currUrl) {
     const id = target._targetId;
+
+    this.urls.set(id, currUrl);
 
     if (this.targets.has(id)) {
       return;
@@ -201,7 +203,7 @@ class ScreenCaster
     const cdp = await target.createCDPSession();
 
     this.targets.set(id, cdp);
-    this.urls.set(id, target.url());
+    //this.urls.set(id, target.url());
 
     const msg = "screencast";
 

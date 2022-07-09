@@ -13,7 +13,8 @@ ENV PROXY_HOST=localhost \
     DISPLAY=:99 \
     GEOMETRY=1360x1020x16 \
     BROWSER_VERSION=${BROWSER_VERSION} \
-    BROWSER_BIN=google-chrome
+    BROWSER_BIN=google-chrome \
+    OPENSSL_CONF=/app/openssl.conf
 
 WORKDIR /app
 
@@ -28,10 +29,11 @@ ARG REBUILD
 
 RUN yarn install
 
-ADD uwsgi.ini /app/
 ADD *.js /app/
 ADD util/*.js /app/util/
-COPY config.yaml /app/
+
+ADD config/ /app/
+
 ADD html/ /app/html/
 
 RUN ln -s /app/main.js /usr/bin/crawl; ln -s /app/create-login-profile.js /usr/bin/create-login-profile
