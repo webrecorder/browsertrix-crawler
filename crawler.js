@@ -204,13 +204,13 @@ class Crawler {
   async bootstrap() {
     const logs = path.join(this.collDir, "logs");
 
-    await fsp.mkdir(logs, {recursive: true});
-
     const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
 
     if (initRes.status) {
-      console.log("wb-manager init failed");
+      console.log("wb-manager init failed, collection likely already exists");
     }
+
+    await fsp.mkdir(logs, {recursive: true});
 
     let opts = {};
     let redisStdio;
