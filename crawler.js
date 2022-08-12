@@ -412,7 +412,7 @@ class Crawler {
   }
 
   async healthCheck(req, res) {
-    const threshold = this.params.workers;
+    const threshold = this.params.workers * 2;
     const pathname = url.parse(req.url).pathname;
     switch (pathname) {
     case "/healthz":
