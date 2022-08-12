@@ -209,7 +209,7 @@ One of the key nuances of browser-based crawling is determining when a page is f
 
 The default is `load,networkidle2`, which waits until page load and <=2 requests remain, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example). The `--waitUntil networkidle0` may make sense for sites, where absolutely all requests must be waited until before proceeding.
 
-See [page.goto waitUntil options](https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options) for more info on the options that can be used with this flag from the Puppeteer docs.
+See [page.goto waitUntil options](https://pptr.dev/api/puppeteer.page.goto#remarks) for more info on the options that can be used with this flag from the Puppeteer docs.
 
 
 ### YAML Crawl Config
