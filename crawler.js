@@ -216,10 +216,6 @@ class Crawler {
     let redisStdio;
 
     if (this.params.logging.includes("pywb")) {
-      opts = {stdio: "inherit", cwd: this.params.cwd};
-      redisStdio = "inherit";
-    } else {
-
       const pywbStderr = fs.openSync(path.join(logs, "pywb.log"), "a");
       const stdio = [process.stdin, pywbStderr, pywbStderr];
 
@@ -227,6 +223,9 @@ class Crawler {
       redisStdio = [process.stdin, redisStderr, redisStderr];
 
       opts = {stdio, cwd: this.params.cwd};
+    } else {
+      opts = {stdio: "ignore", cwd: this.params.cwd};
+      redisStdio = "ignore";
     }
 
     this.browserExe = getBrowserExe();
