@@ -324,8 +324,8 @@ seeds:
   - url: https://example.com/startpage.html
     scopeType: "host"
     exclude:
-      - example.com/skip.*
-      - example.com/search.*
+      - https?://example.com/skip.*
+      - https?://example.com/search.*
 
 ```
 
