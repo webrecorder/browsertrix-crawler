@@ -304,42 +304,41 @@ class NewWindowPage extends SingleBrowserImplementation {
   async init() {
     await super.init();
 
-    this.newTargets = [];
-
-    this.nextPromise();
+    this.pendingTargets = new Map();
 
     this.mainPage = await this.browser.newPage();
 
     this.pages = [];
     this.reuse = true;
 
-    await this.mainPage.goto("about:blank");
+    this.storeTarget = 0;
+
+    //await this.mainPage.goto("about:blank");
 
     this.mainTarget = this.mainPage.target();
+    this.cdp = await this.mainTarget.createCDPSession();
 
     this.browser.on("targetcreated", (target) => {
-      if (this._nextTarget && target.opener() === this.mainTarget) {
-        this.newTargets.push(target);
-        this._nextTarget();
-        this.nextPromise();
+      if (this.storeTarget && target.url() === "about:blank") {
+        console.log("target created", target._targetId, target);
+        this.pendingTargets.set(target._targetId, target);
       }
     });
   }
 
-  nextPromise() {
-    this._nextPromise = new Promise((resolve) => this._nextTarget = resolve);
-  }
-
   async getNewPage() {
-    const p = this._nextPromise;
+    try {
+      this.storeTarget++;
+      const {targetId} = await this.cdp.send("Target.createTarget", {url: "about:blank", newWindow: true});
+      this.storeTarget--;
 
-    await this.mainPage.evaluate("window.open('about:blank', '', 'resizable');");
+      const target = this.pendingTargets.get(targetId);
+      this.pendingTargets.delete(targetId);
 
-    await p;
-
-    const target = this.newTargets.shift();
-
-    return {page: await target.page() };
+      return {page: await target.page() };
+    } catch (e) {
+      console.log(e);
+    }
   }
 
   async createResources() {
