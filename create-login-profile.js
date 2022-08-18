@@ -204,7 +204,7 @@ async function main() {
 }
 
 async function createProfile(params, browser, page, targetFilename = "") {
-  await page._client.send("Network.clearBrowserCache");
+  await page._client().send("Network.clearBrowserCache");
 
   await browser.close();
 
@@ -276,10 +276,10 @@ class InteractiveBrowser {
     page.on("load", () => this.handlePageLoad());
 
     page.on("popup", async () => {
-      await this.page._client.send("Target.activateTarget", {targetId: this.targetId});
+      await this.page._client().send("Target.activateTarget", {targetId: this.targetId});
     });
 
-    page._client.on("Page.windowOpen", async (resp) => {
+    page._client().on("Page.windowOpen", async (resp) => {
       if (resp.url) {
         await page.goto(resp.url);
       }

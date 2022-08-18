@@ -346,7 +346,7 @@ class Crawler {
       }
 
       if (this.params.profile) {
-        await page._client.send("Network.setBypassServiceWorker", {bypass: true});
+        await page._client().send("Network.setBypassServiceWorker", {bypass: true});
       }
 
       await page.evaluateOnNewDocument("Object.defineProperty(navigator, \"webdriver\", {value: false});");
