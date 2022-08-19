@@ -6,9 +6,6 @@ const path = require("path");
 
 const { initRedis } = require("./redis");
 
-
-const SingleBrowserImplementation = require("puppeteer-cluster/dist/concurrency/SingleBrowserImplementation").default;
-
 const indexHTML = fs.readFileSync(path.join(__dirname, "..", "html", "screencast.html"), {encoding: "utf8"});
 
 
@@ -231,27 +228,36 @@ class ScreenCaster
     }
   }
 
-  async endTarget(target) {
-    const id = target._targetId;
-    const cdp = this.targets.get(id);
-    if (!cdp) {
-      return;
+  async endAllTargets() {
+    const targetIds = this.targets.keys();
+
+    for (const key of targetIds) {
+      await this.endTargetById(key);
     }
+  }
 
-    await this.stopCast(cdp);
+  async endTarget(target) {
+    await this.endTargetById(target._targetId);
+  }
 
+  async endTargetById(id) {
     this.caches.delete(id);
     this.urls.delete(id);
+
+    const cdp = this.targets.get(id);
+
+    if (cdp) {
+      try {
+        await this.stopCast(cdp);
+        await cdp.detach();
+      } catch (e) {
+        // already detached
+      }
+    }
 
     await this.transport.sendAll({msg: "close", id});
 
     this.targets.delete(id);
-
-    try {
-      await cdp.detach();
-    } catch (e) {
-      // already detached
-    }
   }
 
   async startCast(cdp) {
@@ -298,66 +304,4 @@ class ScreenCaster
   }
 }
 
-
-// ===========================================================================
-class NewWindowPage extends SingleBrowserImplementation {
-  async init() {
-    await super.init();
-
-    this.newTargets = [];
-
-    this.nextPromise();
-
-    this.mainPage = await this.browser.newPage();
-
-    this.pages = [];
-    this.reuse = true;
-
-    await this.mainPage.goto("about:blank");
-
-    this.mainTarget = this.mainPage.target();
-
-    this.browser.on("targetcreated", (target) => {
-      if (this._nextTarget && target.opener() === this.mainTarget) {
-        this.newTargets.push(target);
-        this._nextTarget();
-        this.nextPromise();
-      }
-    });
-  }
-
-  nextPromise() {
-    this._nextPromise = new Promise((resolve) => this._nextTarget = resolve);
-  }
-
-  async getNewPage() {
-    const p = this._nextPromise;
-
-    await this.mainPage.evaluate("window.open('about:blank', '', 'resizable');");
-
-    await p;
-
-    const target = this.newTargets.shift();
-
-    return {page: await target.page() };
-  }
-
-  async createResources() {
-    if (this.pages.length) {
-      return {page: this.pages.shift()};
-    }
-    return await this.getNewPage();
-  }
-
-  async freeResources(resources) {
-    if (this.reuse) {
-      this.pages.push(resources.page);
-    } else {
-      await resources.page.close();
-    }
-  }
-}
-
-
-
-module.exports = { ScreenCaster, NewWindowPage, WSTransport, RedisPubSubTransport };
+module.exports = { ScreenCaster, WSTransport, RedisPubSubTransport };
