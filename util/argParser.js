@@ -158,7 +158,7 @@ class ArgParser {
       },
 
       "logging": {
-        describe: "Logging options for crawler, can include: stats, pywb, behaviors, behaviors-debug",
+        describe: "Logging options for crawler, can include: stats, pywb, behaviors, behaviors-debug, console",
         type: "string",
         default: "stats",
       },

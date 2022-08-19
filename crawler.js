@@ -104,6 +104,8 @@ class Crawler {
     this.sizeExceeded = false;
     this.finalExit = false;
     this.behaviorLastLine = null;
+
+    this.logConsole = false;
   }
 
   statusLog(...args) {
@@ -227,6 +229,8 @@ class Crawler {
       opts = {stdio: "ignore", cwd: this.params.cwd};
       redisStdio = "ignore";
     }
+
+    this.logConsole = this.params.logging.includes("console");
 
     this.browserExe = getBrowserExe();
 
@@ -707,6 +711,14 @@ class Crawler {
 
     // more serious page error, mark page session as invalid
     page.on("error", () => this.markPageFailed(page));
+
+    if (this.logConsole) {
+      page.on("console", (msg) => {
+        if (msg.type() === "error") {
+          console.log(msg.text(), msg.location());
+        }
+      });
+    }
 
     const gotoOpts = isHTMLPage ? this.gotoOpts : "domcontentloaded";
 
