@@ -228,27 +228,36 @@ class ScreenCaster
     }
   }
 
-  async endTarget(target) {
-    const id = target._targetId;
-    const cdp = this.targets.get(id);
-    if (!cdp) {
-      return;
+  async endAllTargets() {
+    const targetIds = this.targets.keys();
+
+    for (const key of targetIds) {
+      await this.endTargetById(key);
     }
+  }
 
-    await this.stopCast(cdp);
+  async endTarget(target) {
+    await this.endTargetById(target._targetId);
+  }
 
+  async endTargetById(id) {
     this.caches.delete(id);
     this.urls.delete(id);
+
+    const cdp = this.targets.get(id);
+
+    if (cdp) {
+      try {
+        await this.stopCast(cdp);
+        await cdp.detach();
+      } catch (e) {
+        // already detached
+      }
+    }
 
     await this.transport.sendAll({msg: "close", id});
 
     this.targets.delete(id);
-
-    try {
-      await cdp.detach();
-    } catch (e) {
-      // already detached
-    }
   }
 
   async startCast(cdp) {

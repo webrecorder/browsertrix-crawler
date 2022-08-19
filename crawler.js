@@ -389,6 +389,7 @@ class Crawler {
 
     } catch (e) {
       console.warn(e);
+      await this.markPageFailed(page);
     }
   }
 
@@ -518,6 +519,10 @@ class Crawler {
     }
 
     this.screencaster = this.initScreenCaster();
+
+    if (this.cluster.browser.setScreencaster) {
+      this.cluster.browser.setScreencaster(this.screencaster);
+    }
 
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
@@ -700,6 +705,9 @@ class Crawler {
       ignoreAbort = shouldIgnoreAbort(req);
     });
 
+    // more serious page error, mark page session as invalid
+    page.on("error", () => this.markPageFailed(page));
+
     const gotoOpts = isHTMLPage ? this.gotoOpts : "domcontentloaded";
 
     try {
@@ -711,7 +719,7 @@ class Crawler {
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
-        this.statusLog(`ERROR: ${url}: ${msg}`);
+        this.statusLog(`Load Error: ${url}: ${msg}`);
         this.errorCount++;
       }
     }
@@ -736,6 +744,14 @@ class Crawler {
     for (const opts of selectorOptsList) {
       const links = await this.extractLinks(page, opts);
       await this.queueInScopeUrls(seedId, links, depth, extraHops);
+    }
+  }
+
+  async markPageFailed(page) {
+    page.__failed = true;
+    this.errorCount++;
+    if (this.screencaster) {
+      await this.screencaster.endTarget(page.target());
     }
   }
 
