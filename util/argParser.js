@@ -8,7 +8,7 @@ const { Cluster } = require("puppeteer-cluster");
 const yargs = require("yargs/yargs");
 const { hideBin } = require("yargs/helpers");
 
-const { NewWindowPage} = require("./screencaster");
+const { ReuseWindowConcurrency } = require("./windowconcur");
 const { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } = require("./constants");
 const { ScopedSeed } = require("./seeds");
 const { interpolateFilename } = require("./storage");
@@ -374,7 +374,7 @@ class ArgParser {
       argv.newContext = Cluster.CONCURRENCY_PAGE;
       if (argv.screencastPort && argv.workers > 1) {
         console.log("Note: to support screencasting with >1 workers, newContext set to 'window' instead of 'page'");
-        argv.newContext = NewWindowPage;
+        argv.newContext = ReuseWindowConcurrency;
       }
       break;
 
@@ -387,7 +387,7 @@ class ArgParser {
       break;
 
     case "window":
-      argv.newContext = NewWindowPage;
+      argv.newContext = ReuseWindowConcurrency;
       break;
 
     default:
