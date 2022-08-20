@@ -84,19 +84,53 @@ function getDefaultUA() {
 module.exports.getDefaultUA = getDefaultUA;
 
 
+// from https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/chromium/chromium.ts#L327
+const DEFAULT_PLAYWRIGHT_FLAGS = [
+  "--disable-field-trial-config", // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
+  "--disable-background-networking",
+  "--enable-features=NetworkService,NetworkServiceInProcess",
+  "--disable-background-timer-throttling",
+  "--disable-backgrounding-occluded-windows",
+  "--disable-back-forward-cache", // Avoids surprises like main request not being intercepted during page.goBack().
+  "--disable-breakpad",
+  "--disable-client-side-phishing-detection",
+  "--disable-component-extensions-with-background-pages",
+  "--disable-default-apps",
+  "--disable-dev-shm-usage",
+  "--disable-extensions",
+  // AvoidUnnecessaryBeforeUnloadCheckSync - https://github.com/microsoft/playwright/issues/14047
+  // Translate - https://github.com/microsoft/playwright/issues/16126
+  "--disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate",
+  "--allow-pre-commit-input",
+  "--disable-hang-monitor",
+  "--disable-ipc-flooding-protection",
+  "--disable-popup-blocking",
+  "--disable-prompt-on-repost",
+  "--disable-renderer-backgrounding",
+  "--disable-sync",
+  "--force-color-profile=srgb",
+  "--metrics-recording-only",
+  "--no-first-run",
+  "--enable-automation",
+  "--password-store=basic",
+  "--use-mock-keychain",
+  // See https://chromium-review.googlesource.com/c/chromium/src/+/2436773
+  "--no-service-autorun",
+  "--export-tagged-pdf"
+];
+
+
 module.exports.chromeArgs = (proxy, userAgent=null, extraArgs=[]) => {
   // Chrome Flags, including proxy server
   const args = [
+    ...DEFAULT_PLAYWRIGHT_FLAGS,
     ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
-    "--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
+    //"--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
     "--no-sandbox",
     "--disable-background-media-suspend",
-    "--enable-features=NetworkService,NetworkServiceInProcess",
+    "--remote-debugging-port=9221",
     "--autoplay-policy=no-user-gesture-required",
-    "--disable-features=IsolateOrigins,site-per-process,ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame,AutoExpandDetailsElement",
     "--disable-site-isolation-trials",
-    "--disable-popup-blocking",
-    "--disable-backgrounding-occluded-windows",
     `--user-agent=${userAgent || getDefaultUA()}`,
     ...extraArgs,
   ];

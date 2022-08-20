@@ -230,7 +230,7 @@ class Crawler {
       redisStdio = "ignore";
     }
 
-    this.logConsole = this.params.logging.includes("console");
+    this.logConsole = this.params.logging.includes("jserrors");
 
     this.browserExe = getBrowserExe();
 
@@ -260,6 +260,8 @@ class Crawler {
         proc.kill();
       }
     });
+
+    child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
 
     if (!this.params.headless && !process.env.NO_XVFB) {
       child_process.spawn("Xvfb", [
