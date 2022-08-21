@@ -104,6 +104,8 @@ class Crawler {
     this.sizeExceeded = false;
     this.finalExit = false;
     this.behaviorLastLine = null;
+
+    this.logConsole = false;
   }
 
   statusLog(...args) {
@@ -228,6 +230,8 @@ class Crawler {
       redisStdio = "ignore";
     }
 
+    this.logConsole = this.params.logging.includes("jserrors");
+
     this.browserExe = getBrowserExe();
 
     this.configureUA();
@@ -256,6 +260,8 @@ class Crawler {
         proc.kill();
       }
     });
+
+    child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
 
     if (!this.params.headless && !process.env.NO_XVFB) {
       child_process.spawn("Xvfb", [
@@ -707,6 +713,14 @@ class Crawler {
 
     // more serious page error, mark page session as invalid
     page.on("error", () => this.markPageFailed(page));
+
+    if (this.logConsole) {
+      page.on("console", (msg) => {
+        if (msg.type() === "error") {
+          console.log(msg.text(), msg.location());
+        }
+      });
+    }
 
     const gotoOpts = isHTMLPage ? this.gotoOpts : "domcontentloaded";
 
