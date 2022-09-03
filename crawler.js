@@ -977,14 +977,19 @@ class Crawler {
 
     const redis = await initRedis("redis://localhost/0");
 
-    // wait until pending, unless canceling
-    while (this.exitCode !== 1) {
-      const res = await redis.get(`pywb:${this.params.collection}:pending`);
-      if (res === "0" || !res) {
+    // wait for pending requests upto 120 secs, unless canceling
+    const MAX_WAIT = 120;
+
+    for (let i = 0; i < MAX_WAIT && this.exitCode !== 1; i++) {
+      try {
+        const count = Number(await redis.get(`pywb:${this.params.collection}:pending`) || 0);
+        if (count <= 0) {
+          break;
+        }
+        this.debugLog(`Still waiting for ${count} pending requests to finish...`);
+      } catch (e) {
         break;
       }
-
-      this.debugLog(`Still waiting for ${res} pending requests to finish...`);
 
       await this.sleep(1);
     }
