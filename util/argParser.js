@@ -53,7 +53,7 @@ class ArgParser {
 
       "waitUntil": {
         describe: "Puppeteer page.goto() condition to wait for before continuing, can be multiple separate by ','",
-        default: "load",
+        default: "load,networkidle2",
       },
 
       "depth": {
@@ -201,7 +201,7 @@ class ArgParser {
 
       "behaviors": {
         describe: "Which background behaviors to enable on each page",
-        default: "autoplay,autofetch,siteSpecific",
+        default: "autoplay,autofetch,autoscroll,siteSpecific",
         type: "string",
       },
 
@@ -291,7 +291,7 @@ class ArgParser {
       "netIdleWait": {
         describe: "if set, wait for network idle after page load and after behaviors are done (in seconds)",
         type: "number",
-        default: 10
+        default: 2
       }
     };
   }
