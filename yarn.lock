@@ -1661,10 +1661,10 @@ detect-newline@^3.0.0:
   resolved "https://registry.yarnpkg.com/detect-newline/-/detect-newline-3.1.0.tgz#576f5dfc63ae1a192ff192d8ad3af6308991b651"
   integrity sha512-TLz+x/vEXm/Y7P7wn1EJFNLxYpUD4TgMosxY6fAVJUnJMbupHBOncxyWUG9OpTaH9EBD7uFI5LfEgmMOc54DsA==
 
-devtools-protocol@0.0.1019158:
-  version "0.0.1019158"
-  resolved "https://registry.yarnpkg.com/devtools-protocol/-/devtools-protocol-0.0.1019158.tgz#4b08d06108a784a2134313149626ba55f030a86f"
-  integrity sha512-wvq+KscQ7/6spEV7czhnZc9RM/woz1AY+/Vpd8/h2HFMwJSdTliu7f/yr1A6vDdJfKICZsShqsYpEQbdhg8AFQ==
+devtools-protocol@0.0.1036444:
+  version "0.0.1036444"
+  resolved "https://registry.yarnpkg.com/devtools-protocol/-/devtools-protocol-0.0.1036444.tgz#a570d3cdde61527c82f9b03919847b8ac7b1c2b9"
+  integrity sha512-0y4f/T8H9lsESV9kKP1HDUXgHxCdniFeJh6Erq+FbdOEvp/Ydp9t8kcAAM5gOd17pMrTDlFWntoHtzzeTUWKNw==
 
 diff-sequences@^26.6.2:
   version "26.6.2"
@@ -4151,7 +4151,7 @@ pirates@^4.0.1:
   dependencies:
     node-modules-regexp "^1.0.0"
 
-pkg-dir@4.2.0, pkg-dir@^4.2.0:
+pkg-dir@^4.2.0:
   version "4.2.0"
   resolved "https://registry.yarnpkg.com/pkg-dir/-/pkg-dir-4.2.0.tgz#f099133df7ede422e81d1d8448270eeb3e4261f3"
   integrity sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ==
@@ -4246,17 +4246,16 @@ punycode@^2.1.0, punycode@^2.1.1:
   dependencies:
     debug "^4.1.1"
 
-puppeteer-core@^16.1.1:
-  version "16.1.1"
-  resolved "https://registry.yarnpkg.com/puppeteer-core/-/puppeteer-core-16.1.1.tgz#2c26c560934a1c524a767c9ec0818520b7adb22a"
-  integrity sha512-ls+A6t+cbeNtsNIEyWkGoVJRHseEvBhS3NlI2DBFaJNBUG6kUfmAVyColu1ubgy4VuWLKpGUcwrPTVIvNd1Dew==
+puppeteer-core@^17.1.2:
+  version "17.1.2"
+  resolved "https://registry.yarnpkg.com/puppeteer-core/-/puppeteer-core-17.1.2.tgz#fdf109fa2d805fdb007b5abfc83728c545ac9ac0"
+  integrity sha512-mUndfkp581aFC9Tj0NQzoQ4kBEiYszvubkAovAfA72cO2VgiAnk4RTeQhgPekdL50+7bvU1JZp+10y2xOBOy0g==
   dependencies:
     cross-fetch "3.1.5"
     debug "4.3.4"
-    devtools-protocol "0.0.1019158"
+    devtools-protocol "0.0.1036444"
     extract-zip "2.0.1"
     https-proxy-agent "5.0.1"
-    pkg-dir "4.2.0"
     progress "2.0.3"
     proxy-from-env "1.1.0"
     rimraf "3.0.2"

@@ -201,7 +201,7 @@ class ArgParser {
 
       "behaviors": {
         describe: "Which background behaviors to enable on each page",
-        default: "autoplay,autofetch,siteSpecific",
+        default: "autoplay,autofetch,autoscroll,siteSpecific",
         type: "string",
       },
 
@@ -289,9 +289,9 @@ class ArgParser {
       },
 
       "netIdleWait": {
-        describe: "if set, wait for network idle after page load and after behaviors are done (in seconds)",
+        describe: "if set, wait for network idle after page load and after behaviors are done (in seconds). if -1 (default), determine based on scope",
         type: "number",
-        default: 10
+        default: -1
       }
     };
   }
@@ -414,6 +414,15 @@ class ArgParser {
           argv.seeds.push(seed);
         }
       }
+    }
+
+    if (argv.netIdleWait === -1) {
+      if (argv.scopeType === "page" || argv.scopeType === "page-spa") {
+        argv.netIdleWait = 15;
+      } else {
+        argv.netIdleWait = 2;
+      }
+      console.log(`Set netIdleWait to ${argv.netIdleWait} seconds`);
     }
 
     if (argv.include) {

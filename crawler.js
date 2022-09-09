@@ -492,6 +492,20 @@ class Crawler {
       initState = await this.crawlState.getStatus();
     }
 
+    // if already done, don't crawl anymore
+    if (initState === "done") {
+      this.done = true;
+
+      if (this.params.waitOnDone) {
+        this.statusLog("Already done, waiting for signal to exit...");
+
+        // wait forever until signal
+        await new Promise(() => {});
+      }
+
+      return;
+    }
+
     if (this.params.generateWACZ) {
       this.storage = initStorage();
     }
