@@ -1,6 +1,6 @@
 {
   "name": "browsertrix-crawler",
-  "version": "0.7.0",
+  "version": "0.7.0-beta.4",
   "main": "browsertrix-crawler",
   "repository": "https://github.com/webrecorder/browsertrix-crawler",
   "author": "Ilya Kreymer <ikreymer@gmail.com>, Webrecorder Software",
