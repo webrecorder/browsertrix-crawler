@@ -98,11 +98,12 @@ class Crawler {
 
     this.errorCount = 0;
 
-    this.exitCode = 0;
+    this.interrupted = false;
+    this.finalExit = false;
+    this.clearOnExit = false;
 
     this.done = false;
-    this.sizeExceeded = false;
-    this.finalExit = false;
+
     this.behaviorLastLine = null;
 
     this.logConsole = false;
@@ -297,14 +298,15 @@ class Crawler {
     await this.bootstrap();
 
     let status;
+    let exitCode = 0;
 
     try {
       await this.crawl();
-      status = (this.exitCode === 0 ? "done" : "interrupted");
+      status = (!this.interrupted ? "done" : "interrupted");
     } catch(e) {
       console.error("Crawl failed");
       console.error(e);
-      this.exitCode = 9;
+      exitCode = 9;
       status = "failing";
       if (await this.crawlState.incFailCount()) {
         status = "failed";
@@ -317,7 +319,7 @@ class Crawler {
         await this.crawlState.setStatus(status);
       }
 
-      process.exit(this.exitCode);
+      process.exit(exitCode);
     }
   }
 
@@ -341,7 +343,20 @@ class Crawler {
     }
   }
 
-  async crawlPage({page, data}) {
+  isInScope({seedId, url, depth, extraHops} = {}) {
+    const seed = this.params.scopedSeeds[seedId];
+
+    return seed.isIncluded(url, depth, extraHops);
+  }
+
+  async crawlPage(opts) {
+    const {page, data} = opts;
+
+    if (!this.isInScope(data)) {
+      console.log(`No longer in scope: ${data}`);
+      return;
+    }
+
     try {
       if (this.screencaster) {
         await this.screencaster.screencastTarget(page.target(), data.url);
@@ -446,7 +461,7 @@ class Crawler {
       if (size >= this.params.sizeLimit) {
         console.log(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
         interrupt = true;
-        this.sizeExceeded = true;
+        this.clearOnExit = true;
       }
     }
 
@@ -459,9 +474,32 @@ class Crawler {
     }
 
     if (interrupt) {
-      this.crawlState.setDrain(true);
-      this.exitCode = 11;
+      this.gracefulFinish();
     }
+  }
+
+  gracefulFinish() {
+    this.crawlState.setDrain(true);
+    this.interrupted = true;
+    if (!this.params.waitOnDone) {
+      this.finalExit = true;
+    }
+  }
+
+  prepareForExit(markDone = true) {
+    if (!markDone) {
+      this.params.waitOnDone = false;
+      this.clearOnExit = true;
+      console.log("SIGNAL: Preparing for exit of this crawler instance only");
+    } else {
+      console.log("SIGNAL: Preparing for final exit of all crawlers");
+      this.finalExit = true;
+    }
+  }
+
+  async serializeAndExit() {
+    await this.serializeConfig();
+    process.exit(0);
   }
 
   async crawl() {
@@ -582,10 +620,10 @@ class Crawler {
       await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd}));
     }
 
-    if (this.params.generateWACZ && (this.exitCode === 0 || this.finalExit || this.sizeExceeded)) {
+    if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.clearOnExit)) {
       await this.generateWACZ();
 
-      if (this.sizeExceeded) {
+      if (this.clearOnExit) {
         console.log(`Clearing ${this.collDir} before exit`);
         try {
           fs.rmSync(this.collDir, { recursive: true, force: true });
@@ -595,7 +633,7 @@ class Crawler {
       }
     }
 
-    if (this.exitCode === 0 && this.params.waitOnDone && this.params.redisStoreUrl && !this.finalExit) {
+    if (this.params.waitOnDone && (!this.interrupted || this.finalExit)) {
       this.done = true;
       this.statusLog("All done, waiting for signal...");
       await this.crawlState.setStatus("done");
@@ -685,7 +723,7 @@ class Crawler {
     if (this.params.statsFilename) {
       const total = this.cluster.allTargetCount;
       const workersRunning = this.cluster.workersBusy.length;
-      const numCrawled = total - (await this.cluster.jobQueue.size()) - workersRunning;
+      const numCrawled = total - (await this.crawlState.size()) - workersRunning;
       const limit = {max: this.params.limit || 0, hit: this.limitHit};
       const stats = {numCrawled, workersRunning, total, limit};
 
@@ -764,6 +802,8 @@ class Crawler {
 
     await this.netIdle(page);
 
+    await this.sleep(5);
+
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
       return;
@@ -833,13 +873,12 @@ class Crawler {
   async queueInScopeUrls(seedId, urls, depth, extraHops = 0) {
     try {
       depth += 1;
-      const seed = this.params.scopedSeeds[seedId];
 
       // new number of extra hops, set if this hop is out-of-scope (oos)
       const newExtraHops = extraHops + 1;
 
       for (const possibleUrl of urls) {
-        const res = seed.isIncluded(possibleUrl, depth, newExtraHops);
+        const res = this.isInScope({url: possibleUrl, extraHops: newExtraHops, depth, seedId});
 
         if (!res) {
           continue;
@@ -994,7 +1033,7 @@ class Crawler {
     // wait for pending requests upto 120 secs, unless canceling
     const MAX_WAIT = 120;
 
-    for (let i = 0; i < MAX_WAIT && this.exitCode !== 1; i++) {
+    for (let i = 0; i < MAX_WAIT && !this.interrupted; i++) {
       try {
         const count = Number(await redis.get(`pywb:${this.params.collection}:pending`) || 0);
         if (count <= 0) {

@@ -6,20 +6,26 @@ var lastSigInt = 0;
 let forceTerm = false;
 
 
-async function handleTerminate() {
+async function handleTerminate(signame) {
+  console.log(`${signame} received...`);
   if (!crawler || !crawler.crawlState) {
+    console.log("error: no crawler running, exiting");
+    process.exit(1);
+  }
+
+  if (crawler.done) {
+    console.log("success: crawler done, exiting");
     process.exit(0);
   }
 
   try {
     if (!crawler.crawlState.drainMax) {
       console.log("SIGNAL: gracefully finishing current pages...");
-      crawler.crawlState.setDrain(crawler.finalExit);
+      crawler.gracefulFinish();
 
-    } else if ((Date.now() - lastSigInt) > 200) {
+    } else if (forceTerm || (Date.now() - lastSigInt) > 200) {
       console.log("SIGNAL: stopping crawl now...");
-      await crawler.serializeConfig();
-      process.exit(0);
+      await crawler.serializeAndExit();
     }
     lastSigInt = Date.now();
   } catch (e) {
@@ -27,31 +33,25 @@ async function handleTerminate() {
   }
 }
 
-process.on("SIGINT", async () => {
-  console.log("SIGINT received...");
-  await handleTerminate();
+process.on("SIGINT", () => handleTerminate("SIGINT"));
+
+process.on("SIGTERM", () => handleTerminate("SIGTERM"));
+
+process.on("SIGABRT", async () => {
+  console.log("SIGABRT received, will force immediate exit on SIGTERM/SIGINT");
+  forceTerm = true;
 });
 
 process.on("SIGUSR1", () => {
   if (crawler) {
-    crawler.finalExit = true;
+    crawler.prepareForExit(true);
   }
 });
 
-process.on("SIGTERM", async () => {
-  if (forceTerm || crawler.done) {
-    console.log("SIGTERM received, exit immediately");
-    process.exit(crawler.done ? 0 : 1);
+process.on("SIGUSR2", () => {
+  if (crawler) {
+    crawler.prepareForExit(false);
   }
-
-  console.log("SIGTERM received...");
-  await handleTerminate();
-});
-
-process.on("SIGABRT", async () => {
-  console.log("SIGABRT received, will force immediate exit on SIGTERM");
-  forceTerm = true;
-  crawler.exitCode = 1;
 });
 
 
