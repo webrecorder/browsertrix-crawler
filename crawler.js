@@ -353,7 +353,7 @@ class Crawler {
     const {page, data} = opts;
 
     if (!this.isInScope(data)) {
-      console.log(`No longer in scope: ${data}`);
+      console.log(`No longer in scope: ${JSON.stringify(data)}`);
       return;
     }
 
