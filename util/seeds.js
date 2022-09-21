@@ -119,6 +119,10 @@ class ScopedSeed
 
     url = url.href;
 
+    if (url === this.url) {
+      return true;
+    }
+
     // skip already crawled
     // if (this.seenList.has(url)) {
     //  return false;
