@@ -34,7 +34,7 @@ function cliOpts() {
 
     "filename": {
       describe: "The filename for the profile tarball",
-      default: "/output/profile.tar.gz",
+      default: "/crawls/profiles/profile.tar.gz",
     },
 
     "debugScreenshot": {
@@ -209,7 +209,12 @@ async function createProfile(params, browser, page, targetFilename = "") {
 
   console.log("creating profile");
 
-  const profileFilename = params.filename || "/output/profile.tar.gz";
+  const profileFilename = params.filename || "/crawls/profiles/profile.tar.gz";
+ 
+  const outputDir = path.dirname(profileFilename);
+  if (outputDir && !fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, {recursive: true})
+  }
 
   saveProfile(profileFilename);
 
