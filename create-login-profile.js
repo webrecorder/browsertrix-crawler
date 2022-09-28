@@ -213,7 +213,7 @@ async function createProfile(params, browser, page, targetFilename = "") {
  
   const outputDir = path.dirname(profileFilename);
   if (outputDir && !fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, {recursive: true})
+    fs.mkdirSync(outputDir, {recursive: true});
   }
 
   saveProfile(profileFilename);
