@@ -73,6 +73,13 @@ class Crawler {
       this.statusLog("With Browser Profile: " + this.params.profile);
     }
 
+    if (this.params.httpUser && this.params.httpPassword) {
+      this.httpBasicAuth = {
+        username: this.params.httpUser,
+        password: this.params.httpPassword
+      };
+    }
+
     this.emulateDevice = this.params.emulateDevice;
 
     this.debugLog("Seeds", this.params.scopedSeeds);
@@ -772,6 +779,11 @@ class Crawler {
           console.log(msg.text(), msg.location());
         }
       });
+    }
+
+    if (this.httpBasicAuth) {
+      console.log(`Using HTTP Basic Auth: ${JSON.stringify(this.httpBasicAuth)}`)
+      await page.authenticate(this.httpBasicAuth);
     }
 
     const gotoOpts = isHTMLPage ? this.gotoOpts : "domcontentloaded";
