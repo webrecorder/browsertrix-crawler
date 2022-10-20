@@ -1,3 +1,5 @@
+import fs from "fs";
+
 const RULE_TYPES = ["block", "allowOnly"];
 
 const ALWAYS_ALLOW = ["https://pywb.proxy/", "http://pywb.proxy/"];
@@ -6,7 +8,8 @@ const BlockState = {
   ALLOW: null,
   BLOCK_PAGE_NAV: "page",
   BLOCK_IFRAME_NAV: "iframe",
-  BLOCK_OTHER: "resource"
+  BLOCK_OTHER: "resource",
+  BLOCK_AD: "advertisement"
 };
 
 
@@ -203,6 +206,86 @@ export class BlockRules
     } catch (e) {
       this.debugLog(e);
     }
+  }
+
+  async recordBlockMsg(url) {
+    if (this.blockedUrlSet.has(url)) {
+      return;
+    }
+
+    this.blockedUrlSet.add(url);
+
+    if (!this.blockErrMsg || !this.blockPutUrl) {
+      return;
+    }
+
+    const body = this.blockErrMsg;
+    const putUrl = new URL(this.blockPutUrl);
+    putUrl.searchParams.set("url", url);
+    await fetch(putUrl.href, {method: "PUT", headers: {"Content-Type": "text/html"}, body});
+  }
+}
+
+
+// ===========================================================================
+export class AdBlockRules
+{
+  constructor(blockPutUrl, blockErrMsg, debugLog, blocklistFilePath = "../ad-hosts.json") {
+    this.blockPutUrl = blockPutUrl;
+    this.blockErrMsg = blockErrMsg;
+    this.debugLog = debugLog;
+
+    this.blocklist = JSON.parse(fs.readFileSync(new URL(blocklistFilePath, import.meta.url)));
+
+    this.blockedUrlSet = new Set();
+  }
+
+  async initPage(page) {
+    if (page._btrix_adInterceptionAdded) {
+      return true;
+    }
+
+    page._btrix_adInterceptionAdded = true;
+
+    await page.setRequestInterception(true);
+
+    page.on("request", async (request) => {
+      try {
+        await this.handleRequest(request);
+      } catch (e) {
+        console.warn(e);
+      }
+    });
+  }
+
+  async handleRequest(request) {
+    const url = request.url();
+
+    let blockState;
+
+    try {
+      blockState = await this.shouldBlock(url);
+
+      if (blockState === BlockState.ALLOW) {
+        await request.continue();
+      } else {
+        await request.abort("blockedbyclient");
+      }
+
+    } catch (e) {
+      this.debugLog(`Block: (${blockState}) Failed On: ${url} Reason: ${e}`);
+    }
+  }
+
+  async shouldBlock(url) {
+    const fragments = url.split("/");
+    const domain = fragments.length > 2 ? fragments[2] : null;
+    if (this.blocklist.includes(domain)) {
+      this.debugLog(`URL blocked for being an ad: ${url}`);
+      await this.recordBlockMsg(url);
+      return BlockState.BLOCK_AD;
+    }
+    return BlockState.ALLOW;
   }
 
   async recordBlockMsg(url) {
