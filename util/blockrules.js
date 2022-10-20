@@ -228,16 +228,11 @@ export class BlockRules
 
 
 // ===========================================================================
-export class AdBlockRules
+export class AdBlockRules extends BlockRules
 {
   constructor(blockPutUrl, blockErrMsg, debugLog, blocklistFilePath = "../ad-hosts.json") {
-    this.blockPutUrl = blockPutUrl;
-    this.blockErrMsg = blockErrMsg;
-    this.debugLog = debugLog;
-
+    super([], blockPutUrl, blockErrMsg, debugLog);
     this.blocklist = JSON.parse(fs.readFileSync(new URL(blocklistFilePath, import.meta.url)));
-
-    this.blockedUrlSet = new Set();
   }
 
   async initPage(page) {
@@ -258,25 +253,6 @@ export class AdBlockRules
     });
   }
 
-  async handleRequest(request) {
-    const url = request.url();
-
-    let blockState;
-
-    try {
-      blockState = await this.shouldBlock(url);
-
-      if (blockState === BlockState.ALLOW) {
-        await request.continue();
-      } else {
-        await request.abort("blockedbyclient");
-      }
-
-    } catch (e) {
-      this.debugLog(`Block: (${blockState}) Failed On: ${url} Reason: ${e}`);
-    }
-  }
-
   async shouldBlock(url) {
     const fragments = url.split("/");
     const domain = fragments.length > 2 ? fragments[2] : null;
@@ -286,22 +262,5 @@ export class AdBlockRules
       return BlockState.BLOCK_AD;
     }
     return BlockState.ALLOW;
-  }
-
-  async recordBlockMsg(url) {
-    if (this.blockedUrlSet.has(url)) {
-      return;
-    }
-
-    this.blockedUrlSet.add(url);
-
-    if (!this.blockErrMsg || !this.blockPutUrl) {
-      return;
-    }
-
-    const body = this.blockErrMsg;
-    const putUrl = new URL(this.blockPutUrl);
-    putUrl.searchParams.set("url", url);
-    await fetch(putUrl.href, {method: "PUT", headers: {"Content-Type": "text/html"}, body});
   }
 }
