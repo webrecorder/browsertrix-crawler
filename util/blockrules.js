@@ -230,9 +230,9 @@ export class BlockRules
 // ===========================================================================
 export class AdBlockRules extends BlockRules
 {
-  constructor(blockPutUrl, blockErrMsg, debugLog, blocklistFilePath = "../ad-hosts.json") {
+  constructor(blockPutUrl, blockErrMsg, debugLog, adhostsFilePath = "../ad-hosts.json") {
     super([], blockPutUrl, blockErrMsg, debugLog);
-    this.blocklist = JSON.parse(fs.readFileSync(new URL(blocklistFilePath, import.meta.url)));
+    this.adhosts = JSON.parse(fs.readFileSync(new URL(adhostsFilePath, import.meta.url)));
   }
 
   async initPage(page) {
@@ -256,7 +256,7 @@ export class AdBlockRules extends BlockRules
   async shouldBlock(url) {
     const fragments = url.split("/");
     const domain = fragments.length > 2 ? fragments[2] : null;
-    if (this.blocklist.includes(domain)) {
+    if (this.adhosts.includes(domain)) {
       this.debugLog(`URL blocked for being an ad: ${url}`);
       await this.recordBlockMsg(url);
       return BlockState.BLOCK_AD;

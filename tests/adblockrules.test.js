@@ -24,18 +24,18 @@ function doesCDXContain(coll, value) {
   return data.indexOf(value) >= 0;
 }
 
-test("test crawl without block for specific URL", () => {
+test("test crawl without ad block for specific URL", () => {
   const config = {
     "url": "https://www.mozilla.org/en-US/firefox/",
   };
 
   runCrawl("adblock-no-block", config);
 
-  // without blocks, URL with add sense is included
+  // without ad blocking, URL with googletagmanager is included
   expect(doesCDXContain("adblock-no-block", "www.googletagmanager.com")).toBe(true);
 });
 
-test("test block rule on specific URL", () => {
+test("testcrawl with ad block for specific URL", () => {
   const config = {
     "url": "https://www.mozilla.org/en-US/firefox/",
     "blockAds": true,
