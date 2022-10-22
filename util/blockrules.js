@@ -253,7 +253,7 @@ export class AdBlockRules extends BlockRules
     });
   }
 
-  async shouldBlock(url) {
+  async shouldBlock(request, url) {
     const fragments = url.split("/");
     const domain = fragments.length > 2 ? fragments[2] : null;
     if (this.adhosts.includes(domain)) {
