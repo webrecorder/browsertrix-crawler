@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { Crawler } from "./crawler.js";
+
 var crawler = null;
 
 var lastSigInt = 0;
@@ -53,10 +55,6 @@ process.on("SIGUSR2", () => {
     crawler.prepareForExit(false);
   }
 });
-
-
-
-const { Crawler } = require("./crawler");
 
 crawler = new Crawler();
 crawler.run();

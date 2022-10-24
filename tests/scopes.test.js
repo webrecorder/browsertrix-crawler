@@ -1,6 +1,6 @@
-const { parseArgs } = require("../util/argParser");
+import { parseArgs } from "../util/argParser.js";
 
-const fs = require("fs");
+import fs from "fs";
 
 function getSeeds(config) {
   const orig = fs.readFileSync;
