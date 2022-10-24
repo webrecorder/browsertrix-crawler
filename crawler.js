@@ -1,46 +1,50 @@
-const child_process = require("child_process");
-const path = require("path");
-const fs = require("fs");
-const os = require("os");
-const fsp = require("fs/promises");
-const http = require("http");
-const url = require("url");
+import child_process from "child_process";
+import path from "path";
+import fs from "fs";
+import os from "os";
+import fsp from "fs/promises";
+import http from "http";
+import url from "url";
+
+import fetch from "node-fetch";
+import puppeteer from "puppeteer-core";
+import { Cluster } from "puppeteer-cluster";
+import { RedisCrawlState, MemoryCrawlState } from "./util/state.js";
+import AbortController from "abort-controller";
+import Sitemapper from "sitemapper";
+import { v4 as uuidv4 } from "uuid";
+import yaml from "js-yaml";
+
+import * as warcio from "warcio";
+
+import { TextExtract } from "./util/textextract.js";
+import { initStorage, getFileSize, getDirSize, interpolateFilename } from "./util/storage.js";
+import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
+import { parseArgs } from "./util/argParser.js";
+import { initRedis } from "./util/redis.js";
+
+import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
+
+import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
+
+import { BlockRules } from "./util/blockrules.js";
 
 // to ignore HTTPS error for HEAD check
-const HTTPS_AGENT = require("https").Agent({
+import { Agent as HTTPAgent } from "http";
+import { Agent as HTTPSAgent } from "https";
+
+const HTTPS_AGENT = HTTPSAgent({
   rejectUnauthorized: false,
 });
 
-const HTTP_AGENT = require("http").Agent();
+const HTTP_AGENT = HTTPAgent();
 
-const fetch = require("node-fetch");
-const puppeteer = require("puppeteer-core");
-const { Cluster } = require("puppeteer-cluster");
-const { RedisCrawlState, MemoryCrawlState } = require("./util/state");
-const AbortController = require("abort-controller");
-const Sitemapper = require("sitemapper");
-const { v4: uuidv4 } = require("uuid");
-const yaml = require("js-yaml");
+const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
-const warcio = require("warcio");
-
-const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
-
-const  TextExtract  = require("./util/textextract");
-const { initStorage, getFileSize, getDirSize, interpolateFilename } = require("./util/storage");
-const { ScreenCaster, WSTransport, RedisPubSubTransport } = require("./util/screencaster");
-const { parseArgs } = require("./util/argParser");
-const { initRedis } = require("./util/redis");
-
-const { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } = require("./util/browser");
-
-const { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } = require("./util/constants");
-
-const { BlockRules } = require("./util/blockrules");
 
 
 // ============================================================================
-class Crawler {
+export class Crawler {
   constructor() {
     this.headers = {};
     this.crawlState = null;
@@ -254,7 +258,7 @@ class Crawler {
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
 
-    subprocesses.push(child_process.spawn("uwsgi", [path.join(__dirname, "uwsgi.ini")], opts));
+    subprocesses.push(child_process.spawn("uwsgi", [new URL("uwsgi.ini", import.meta.url).pathname], opts));
 
     process.on("exit", () => {
       for (const proc of subprocesses) {
@@ -512,7 +516,8 @@ class Crawler {
     }
 
     try {
-      this.driver = require(this.params.driver);
+      const driverUrl = new URL(this.params.driver, import.meta.url);
+      this.driver = (await import(driverUrl)).default;
     } catch(e) {
       console.warn(e);
       return;
@@ -1257,4 +1262,3 @@ function shouldIgnoreAbort(req) {
   }
 }
 
-module.exports.Crawler = Crawler;

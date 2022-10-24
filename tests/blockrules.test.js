@@ -1,6 +1,6 @@
-const yaml = require("js-yaml");
-const child_process = require("child_process");
-const fs = require("fs");
+import child_process from "child_process";
+import fs from "fs";
+import yaml from "js-yaml";
 
 function runCrawl(name, config, commandExtra = "") {
   config.generateCDX = true;

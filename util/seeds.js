@@ -1,4 +1,4 @@
-class ScopedSeed
+export class ScopedSeed
 {
   constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} = {}) {
     const parsedUrl = this.parseUrl(url);
@@ -160,16 +160,14 @@ class ScopedSeed
   }
 }
 
-function rxEscape(string) {
+export function rxEscape(string) {
   return string.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 }
 
-function urlRxEscape(url, parsedUrl) {
+export function urlRxEscape(url, parsedUrl) {
   return rxEscape(url).replace(parsedUrl.protocol, "https?:");
 }
 
 
 
-module.exports.ScopedSeed = ScopedSeed;
-module.exports.rxEscape = rxEscape;
 

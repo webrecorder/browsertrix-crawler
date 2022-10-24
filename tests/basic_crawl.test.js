@@ -1,7 +1,9 @@
-const child_process = require("child_process");
-const fs = require("fs");
-const path = require("path");
-const md5 = require("md5");
+import child_process from "child_process";
+import fs from "fs";
+import path from "path";
+import md5 from "md5";
+
+
 
 
 test("ensure basic crawl run with docker run passes", async () => {

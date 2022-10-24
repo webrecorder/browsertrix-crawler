@@ -1,7 +1,7 @@
-const Redis = require("ioredis");
+import Redis from "ioredis";
 
-module.exports.initRedis = async function(url) {
+export async function initRedis(url) {
   const redis = new Redis(url, {lazyConnect: true});
   await redis.connect();
   return redis;
-};
+}

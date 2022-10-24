@@ -1,20 +1,18 @@
-const fs = require("fs");
-const fsp = require("fs/promises");
+import fs from "fs";
+import fsp from "fs/promises";
 
-const os = require("os");
-const { createHash } = require("crypto");
+import os from "os";
+import { createHash } from "crypto";
 
-const fetch = require("node-fetch");
-const Minio = require("minio");
+import Minio from "minio";
 
-const { initRedis } = require("./redis");
+import { initRedis } from "./redis.js";
 
-const util = require("util");
-const getFolderSize = util.promisify(require("get-folder-size"));
+import getFolderSize from "get-folder-size";
 
 
 // ===========================================================================
-class S3StorageSync
+export class S3StorageSync
 {
   constructor(urlOrData, {webhookUrl, userId, crawlId} = {}) {
     let url;
@@ -110,7 +108,7 @@ class S3StorageSync
   }
 }
 
-function initStorage() {
+export function initStorage() {
   if (!process.env.STORE_ENDPOINT_URL) {
     return null;
   }
@@ -133,12 +131,12 @@ function initStorage() {
 }
 
 
-async function getFileSize(filename) {
+export async function getFileSize(filename) {
   const stats = await fsp.stat(filename);
   return stats.size;
 }
 
-async function getDirSize(dir) {
+export async function getDirSize(dir) {
   return await getFolderSize(dir);
 }
 
@@ -152,7 +150,7 @@ function checksumFile(hashName, path) {
   });
 }
 
-function interpolateFilename(filename, crawlId) {
+export function interpolateFilename(filename, crawlId) {
   filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.-]/g, ""));
   filename = filename.replace("@hostname", os.hostname());
   filename = filename.replace("@hostsuffix", os.hostname().slice(-14));
@@ -160,8 +158,3 @@ function interpolateFilename(filename, crawlId) {
   return filename;
 }
 
-module.exports.S3StorageSync = S3StorageSync;
-module.exports.getFileSize = getFileSize;
-module.exports.getDirSize = getDirSize;
-module.exports.initStorage = initStorage;
-module.exports.interpolateFilename = interpolateFilename;

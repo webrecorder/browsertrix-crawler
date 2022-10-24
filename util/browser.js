@@ -1,13 +1,13 @@
-const child_process = require("child_process");
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-const request = require("request");
-const { initStorage } = require("./storage");
+import child_process from "child_process";
+import fs from "fs";
+import path from "path";
+import os from "os";
+import request from "request";
+import { initStorage } from "./storage.js";
 
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
-module.exports.loadProfile = async function(profileFilename) {
+export async function loadProfile(profileFilename) {
   const targetFilename = "/tmp/profile.tar.gz";
 
   if (profileFilename &&
@@ -46,13 +46,13 @@ module.exports.loadProfile = async function(profileFilename) {
   }
 
   return profileDir;
-};
+}
 
-module.exports.saveProfile = function(profileFilename) {
+export function saveProfile(profileFilename) {
   child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {cwd: profileDir});
-};
+}
 
-function getBrowserExe() {
+export function getBrowserExe() {
   const files = [process.env.BROWSER_BIN, "/usr/bin/google-chrome", "/usr/bin/chromium-browser"];
   for (const file of files) {
     if (file && fs.existsSync(file)) {
@@ -64,10 +64,8 @@ function getBrowserExe() {
 }
 
 
-module.exports.getBrowserExe = getBrowserExe;
 
-
-function getDefaultUA() {
+export function getDefaultUA() {
   let version = process.env.BROWSER_VERSION;
 
   try {
@@ -81,7 +79,6 @@ function getDefaultUA() {
 }
 
 
-module.exports.getDefaultUA = getDefaultUA;
 
 
 // from https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/chromium/chromium.ts#L327
@@ -120,7 +117,7 @@ const DEFAULT_PLAYWRIGHT_FLAGS = [
 ];
 
 
-module.exports.chromeArgs = (proxy, userAgent=null, extraArgs=[]) => {
+export function chromeArgs (proxy, userAgent=null, extraArgs=[]) {
   // Chrome Flags, including proxy server
   const args = [
     ...DEFAULT_PLAYWRIGHT_FLAGS,
@@ -140,10 +137,10 @@ module.exports.chromeArgs = (proxy, userAgent=null, extraArgs=[]) => {
   }
 
   return args;
-};
+}
 
 
-module.exports.evaluateWithCLI = async (frame, funcString) => {
+export async function evaluateWithCLI(frame, funcString) {
   const context = await frame.executionContext();
 
   // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
@@ -167,12 +164,12 @@ module.exports.evaluateWithCLI = async (frame, funcString) => {
   }
 
   return remoteObject.value;
-};
+}
 
 
-module.exports.sleep = async (time) => {
+export async function sleep(time) {
   return new Promise(resolve => setTimeout(resolve, time));
-};
+}
 
 
 

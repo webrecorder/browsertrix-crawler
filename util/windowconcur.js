@@ -1,8 +1,10 @@
-const SingleBrowserImplementation = require("puppeteer-cluster/dist/concurrency/SingleBrowserImplementation").default;
+import sbi from "puppeteer-cluster/dist/concurrency/SingleBrowserImplementation.js";
+
+const SingleBrowserImplementation = sbi.default;
 
 
 // ===========================================================================
-class ReuseWindowConcurrency extends SingleBrowserImplementation {
+export class ReuseWindowConcurrency extends SingleBrowserImplementation {
   async init() {
     await super.init();
 
@@ -109,7 +111,4 @@ class ReuseWindowConcurrency extends SingleBrowserImplementation {
     }
   }
 }
-
-module.exports = { ReuseWindowConcurrency };
-
 

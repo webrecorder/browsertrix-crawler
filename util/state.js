@@ -1,8 +1,9 @@
-const Job = require("puppeteer-cluster/dist/Job").default;
+import mod from "puppeteer-cluster/dist/Job.js";
+const Job = mod.default;
 
 
 // ============================================================================
-class BaseState
+export class BaseState
 {
   constructor() {
     this.drainMax = 0;
@@ -43,7 +44,7 @@ class BaseState
 
 
 // ============================================================================
-class MemoryCrawlState extends BaseState
+export class MemoryCrawlState extends BaseState
 {
   constructor() {
     super();
@@ -177,7 +178,7 @@ class MemoryCrawlState extends BaseState
 
 
 // ============================================================================
-class RedisCrawlState extends BaseState
+export class RedisCrawlState extends BaseState
 {
   constructor(redis, key, pageTimeout, uid) {
     super();
@@ -455,5 +456,3 @@ return 0;
   }
 }
 
-module.exports.RedisCrawlState = RedisCrawlState;
-module.exports.MemoryCrawlState = MemoryCrawlState;

@@ -1,10 +1,10 @@
-const util = require("util");
-const exec = util.promisify(require("child_process").exec);
-const fs = require("fs");
+import util from "util";
+import {exec as execCallback } from "child_process";
+import fs from "fs";
+
+const exec = util.promisify(execCallback);
 
 test("check that URLs one-depth out from the seed-list are crawled", async () => {
-  jest.setTimeout(30000);
-
   try {
 
     await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection filelisttest --urlFile /tests/fixtures/urlSeedFile.txt --timeout 10000");

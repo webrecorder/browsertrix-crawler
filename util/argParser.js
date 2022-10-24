@@ -1,17 +1,17 @@
-const path = require("path");
-const fs = require("fs");
-const os = require("os");
+import path from "path";
+import fs from "fs";
+import os from "os";
 
-const yaml = require("js-yaml");
-const puppeteer = require("puppeteer-core");
-const { Cluster } = require("puppeteer-cluster");
-const yargs = require("yargs/yargs");
-const { hideBin } = require("yargs/helpers");
+import yaml from "js-yaml";
+import puppeteer from "puppeteer-core";
+import { Cluster } from "puppeteer-cluster";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
-const { ReuseWindowConcurrency } = require("./windowconcur");
-const { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } = require("./constants");
-const { ScopedSeed } = require("./seeds");
-const { interpolateFilename } = require("./storage");
+import { ReuseWindowConcurrency } from "./windowconcur.js";
+import { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } from "./constants.js";
+import { ScopedSeed } from "./seeds.js";
+import { interpolateFilename } from "./storage.js";
 
 
 // ============================================================================
@@ -127,7 +127,7 @@ class ArgParser {
       "driver": {
         describe: "JS driver for the crawler",
         type: "string",
-        default: path.join(__dirname, "..", "defaultDriver.js"),
+        default: "./defaultDriver.js",
       },
 
       "generateCDX": {
@@ -459,6 +459,6 @@ class ArgParser {
   }
 }
 
-module.exports.parseArgs = function(argv) {
+export function parseArgs(argv) {
   return new ArgParser().parseArgs(argv);
-};
+}
