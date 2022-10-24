@@ -1,4 +1,4 @@
-class TextExtract {
+export class TextExtract {
   
   constructor(dom){
     this.dom = dom;
@@ -56,4 +56,3 @@ class TextExtract {
   }
 }
 
-module.exports = TextExtract;

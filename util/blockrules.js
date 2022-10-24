@@ -1,5 +1,3 @@
-const fetch = require("node-fetch");
-
 const RULE_TYPES = ["block", "allowOnly"];
 
 const ALWAYS_ALLOW = ["https://pywb.proxy/", "http://pywb.proxy/"];
@@ -44,7 +42,7 @@ ${this.frameTextMatch ? "Frame Text Regex: " + this.frameTextMatch : ""}
 
 
 // ===========================================================================
-class BlockRules
+export class BlockRules
 {
   constructor(blockRules, blockPutUrl, blockErrMsg, debugLog) {
     this.rules = [];
@@ -224,6 +222,3 @@ class BlockRules
     await fetch(putUrl.href, {method: "PUT", headers: {"Content-Type": "text/html"}, body});
   }
 }
-
-module.exports.BlockRules = BlockRules;
-

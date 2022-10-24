@@ -504,34 +504,6 @@
     "@types/yargs" "^15.0.0"
     chalk "^4.0.0"
 
-"@peculiar/asn1-schema@^2.0.27", "@peculiar/asn1-schema@^2.0.32":
-  version "2.0.32"
-  resolved "https://registry.yarnpkg.com/@peculiar/asn1-schema/-/asn1-schema-2.0.32.tgz#8711214df06859dbea5491ca0b400602adfbfc45"
-  integrity sha512-JzGUVxOFN+RKslJrGAxcq4l6tEmmLY1XuALHINVxc8BJsB4bXOdZzTvxbN9dCPk65Vbulno0B6DmImZ7I6SO8w==
-  dependencies:
-    "@types/asn1js" "^2.0.0"
-    asn1js "^2.1.1"
-    pvtsutils "^1.1.2"
-    tslib "^2.2.0"
-
-"@peculiar/json-schema@^1.1.12":
-  version "1.1.12"
-  resolved "https://registry.yarnpkg.com/@peculiar/json-schema/-/json-schema-1.1.12.tgz#fe61e85259e3b5ba5ad566cb62ca75b3d3cd5339"
-  integrity sha512-coUfuoMeIB7B8/NMekxaDzLhaYmp0HZNPEjYRm9goRou8UZIC3z21s0sL9AWoCw4EG876QyO3kYrc61WNF9B/w==
-  dependencies:
-    tslib "^2.0.0"
-
-"@peculiar/webcrypto@^1.1.1":
-  version "1.1.7"
-  resolved "https://registry.yarnpkg.com/@peculiar/webcrypto/-/webcrypto-1.1.7.tgz#ff02008612e67ab7cc2a92fce04a7f0e2a04b71c"
-  integrity sha512-aCNLYdHZkvGH+T8/YBOY33jrVGVuLIa3bpizeHXqwN+P4ZtixhA+kxEEWM1amZwUY2nY/iuj+5jdZn/zB7EPPQ==
-  dependencies:
-    "@peculiar/asn1-schema" "^2.0.32"
-    "@peculiar/json-schema" "^1.1.12"
-    pvtsutils "^1.1.6"
-    tslib "^2.2.0"
-    webcrypto-core "^1.2.0"
-
 "@sindresorhus/is@^4.0.0":
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/@sindresorhus/is/-/is-4.0.1.tgz#d26729db850fa327b7cacc5522252194404226f5"
@@ -557,11 +529,6 @@
   integrity sha512-PyRA9sm1Yayuj5OIoJ1hGt2YISX45w9WcFbh6ddT0Z/0yaFxOtGLInr4jUfU1EAFVs0Yfyfev4RNwBlUaHdlDQ==
   dependencies:
     defer-to-connect "^2.0.0"
-
-"@types/asn1js@^2.0.0":
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/@types/asn1js/-/asn1js-2.0.0.tgz#10ca75692575744d0117098148a8dc84cbee6682"
-  integrity sha512-Jjzp5EqU0hNpADctc/UqhiFbY1y2MqIxBVa2S4dBlbnZHTLPMuggoL5q43X63LpsOIINRDirBjP56DUUKIUWIA==
 
 "@types/babel__core@^7.0.0", "@types/babel__core@^7.1.7":
   version "7.1.14"
@@ -878,13 +845,6 @@ asn1@~0.2.3:
   integrity sha512-jxwzQpLQjSmWXgwaCZE9Nz+glAG01yF1QnWgbhGwHI5A6FRIEY6IVqtHhIepHqI7/kyEyQEagBC5mBEFlIYvdg==
   dependencies:
     safer-buffer "~2.1.0"
-
-asn1js@^2.0.26, asn1js@^2.1.1:
-  version "2.1.1"
-  resolved "https://registry.yarnpkg.com/asn1js/-/asn1js-2.1.1.tgz#bb3896191ebb5fb1caeda73436a6c6e20a2eedff"
-  integrity sha512-t9u0dU0rJN4ML+uxgN6VM2Z4H5jWIYm0w8LsZLzMJaQsgL3IJNbxHgmbWDvJAwspyHpDFuzUaUFh4c05UB4+6g==
-  dependencies:
-    pvutils latest
 
 assert-plus@1.0.0, assert-plus@^1.0.0:
   version "1.0.0"
@@ -1933,11 +1893,6 @@ eslint@^7.20.0:
     text-table "^0.2.0"
     v8-compile-cache "^2.0.3"
 
-esm@^3.2.25:
-  version "3.2.25"
-  resolved "https://registry.yarnpkg.com/esm/-/esm-3.2.25.tgz#342c18c29d56157688ba5ce31f8431fbb795cc10"
-  integrity sha512-U1suiZ2oDVWv4zPO56S0NcR5QriEahGtdN2OR6FiOG4WJvcjBVFB0qI4+eKoWFH483PKGuLuu6V8Z4T5g63UVA==
-
 espree@^7.3.0, espree@^7.3.1:
   version "7.3.1"
   resolved "https://registry.yarnpkg.com/espree/-/espree-7.3.1.tgz#f2df330b752c6f55019f8bd89b7660039c1bbbb6"
@@ -2262,13 +2217,12 @@ get-caller-file@^2.0.1, get-caller-file@^2.0.5:
   resolved "https://registry.yarnpkg.com/get-caller-file/-/get-caller-file-2.0.5.tgz#4f94412a82db32f36e3b0b9741f8a97feb031f7e"
   integrity sha512-DyFP3BM/3YHTQOCUL/w0OZHR0lpKeGrxotcHWcqNEdnltqFwXVfhEBQ94eIo34AfQpo0rGki4cyIiftY06h2Fg==
 
-get-folder-size@2:
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/get-folder-size/-/get-folder-size-2.0.1.tgz#3fe0524dd3bad05257ef1311331417bcd020a497"
-  integrity sha512-+CEb+GDCM7tkOS2wdMKTn9vU7DgnKUTuDlehkNJKNSovdCOVxs14OfKCk4cvSaR3za4gj+OBdl9opPN9xrJ0zA==
+get-folder-size@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/get-folder-size/-/get-folder-size-4.0.0.tgz#d73eedb4b2fa9144a3b5a115909d129e1ba8300a"
+  integrity sha512-Z6sv92povPRhGTNv1j8pMOzkXCcJOYWFTSrulKzoF9qbIRHXtR2Vfjw964jsWVMrIKnwHzm/0jl8IFONbBbEKw==
   dependencies:
     gar "^1.0.4"
-    tiny-each-async "2.0.3"
 
 get-intrinsic@^1.0.2, get-intrinsic@^1.1.0, get-intrinsic@^1.1.1:
   version "1.1.1"
@@ -4263,18 +4217,6 @@ puppeteer-core@^17.1.2:
     unbzip2-stream "1.4.3"
     ws "8.8.1"
 
-pvtsutils@^1.1.2, pvtsutils@^1.1.6:
-  version "1.1.6"
-  resolved "https://registry.yarnpkg.com/pvtsutils/-/pvtsutils-1.1.6.tgz#0d663b26edf588670234bc949aa59b55ae7ec38d"
-  integrity sha512-Tm/74+LIqWtItcZHBJztPEPqLzNKbtPAA3LoFt763PFCHxmCfrF4YXhdFEiPAxMTakR0shbVymKKyMxg1Zqt4A==
-  dependencies:
-    tslib "^2.2.0"
-
-pvutils@latest:
-  version "1.0.17"
-  resolved "https://registry.yarnpkg.com/pvutils/-/pvutils-1.0.17.tgz#ade3c74dfe7178944fe44806626bd2e249d996bf"
-  integrity sha512-wLHYUQxWaXVQvKnwIDWFVKDJku9XDCvyhhxoq8dc5MFdIlRenyPI9eSfEtcvgHgD7FlvCyGAlWgOzRnZD99GZQ==
-
 qs@~6.5.2:
   version "6.5.2"
   resolved "https://registry.yarnpkg.com/qs/-/qs-6.5.2.tgz#cb3ae806e8740444584ef154ce8ee98d403f3e36"
@@ -5014,11 +4956,6 @@ through@^2.3.8:
   resolved "https://registry.yarnpkg.com/through/-/through-2.3.8.tgz#0dd4c9ffaabc357960b1b724115d7e0e86a2e1f5"
   integrity sha1-DdTJ/6q8NXlgsbckEV1+Doai4fU=
 
-tiny-each-async@2.0.3:
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/tiny-each-async/-/tiny-each-async-2.0.3.tgz#8ebbbfd6d6295f1370003fbb37162afe5a0a51d1"
-  integrity sha1-jru/1tYpXxNwAD+7NxYq/loKUdE=
-
 tmpl@1.0.x:
   version "1.0.4"
   resolved "https://registry.yarnpkg.com/tmpl/-/tmpl-1.0.4.tgz#23640dd7b42d00433911140820e5cf440e521dd1"
@@ -5089,11 +5026,6 @@ tr46@~0.0.3:
   version "0.0.3"
   resolved "https://registry.yarnpkg.com/tr46/-/tr46-0.0.3.tgz#8184fd347dac9cdc185992f3a6622e14b9d9ab6a"
   integrity sha1-gYT9NH2snNwYWZLzpmIuFLnZq2o=
-
-tslib@^2.0.0, tslib@^2.1.0, tslib@^2.2.0:
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.2.0.tgz#fb2c475977e35e241311ede2693cee1ec6698f5c"
-  integrity sha512-gS9GVHRU+RGn5KQM2rllAlR3dU6m7AcpJKdtH8gFvQiC4Otgk98XnmMU+nZenHt/+VhnBPWwgrJsyrdcw6i23w==
 
 tunnel-agent@^0.6.0:
   version "0.6.0"
@@ -5295,15 +5227,12 @@ walker@^1.0.7, walker@~1.0.5:
   dependencies:
     makeerror "1.0.x"
 
-warcio@1.5.1:
-  version "1.5.1"
-  resolved "https://registry.yarnpkg.com/warcio/-/warcio-1.5.1.tgz#4e0db94ced22919ce2f6daa72a60bcd1cefc5c54"
-  integrity sha512-H1BTLMEufutoR5E3Hrpg3mc2gcWVxl+gwXH0BBglR+ISYoXikgvTA2YuiunoLeSARybCkUQI3WgnyeKEIcHV4Q==
+warcio@^1.6.0:
+  version "1.6.0"
+  resolved "https://registry.yarnpkg.com/warcio/-/warcio-1.6.0.tgz#ca3a1380bf9f2ce25fe1c09bda18311a6475d78d"
+  integrity sha512-xSpjZTP2uXBn41vDBo0QBGi2+IScYJaKVs6wmd4irEnOeaf3Pd8/8I1lMOFveo2kA4niIKpZfbk2t+SUdwwO6Q==
   dependencies:
-    "@peculiar/webcrypto" "^1.1.1"
-    esm "^3.2.25"
     hi-base32 "^0.5.0"
-    node-fetch "^2.6.1"
     pako "^1.0.11"
     uuid-random "^1.3.0"
     yargs "^15.3.1"
@@ -5316,17 +5245,6 @@ web-encoding@^1.1.5:
     util "^0.12.3"
   optionalDependencies:
     "@zxing/text-encoding" "0.9.0"
-
-webcrypto-core@^1.2.0:
-  version "1.2.0"
-  resolved "https://registry.yarnpkg.com/webcrypto-core/-/webcrypto-core-1.2.0.tgz#44fda3f9315ed6effe9a1e47466e0935327733b5"
-  integrity sha512-p76Z/YLuE4CHCRdc49FB/ETaM4bzM3roqWNJeGs+QNY1fOTzKTOVnhmudW1fuO+5EZg6/4LG9NJ6gaAyxTk9XQ==
-  dependencies:
-    "@peculiar/asn1-schema" "^2.0.27"
-    "@peculiar/json-schema" "^1.1.12"
-    asn1js "^2.0.26"
-    pvtsutils "^1.1.2"
-    tslib "^2.1.0"
 
 webidl-conversions@^3.0.0:
   version "3.0.1"

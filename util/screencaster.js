@@ -1,12 +1,11 @@
-const ws = require("ws");
-const http = require("http");
-const url = require("url");
-const fs = require("fs");
-const path = require("path");
+import ws from "ws";
+import http from "http";
+import url from "url";
+import fs from "fs";
 
-const { initRedis } = require("./redis");
+import { initRedis } from "./redis.js";
 
-const indexHTML = fs.readFileSync(path.join(__dirname, "..", "html", "screencast.html"), {encoding: "utf8"});
+const indexHTML = fs.readFileSync(new URL("../html/screencast.html", import.meta.url), {encoding: "utf8"});
 
 
 // ===========================================================================
@@ -304,4 +303,4 @@ class ScreenCaster
   }
 }
 
-module.exports = { ScreenCaster, WSTransport, RedisPubSubTransport };
+export { ScreenCaster, WSTransport, RedisPubSubTransport };
