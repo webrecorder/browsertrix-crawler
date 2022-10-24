@@ -1,7 +1,12 @@
-const yaml = require("js-yaml");
-const util = require("util");
-const exec = util.promisify(require("child_process").exec);
-const fs = require("fs");
+import fs from "fs";
+import yaml from "js-yaml";
+
+import util from "util";
+import {exec as execCallback } from "child_process";
+import {jest} from "@jest/globals";
+
+const exec = util.promisify(execCallback);
+
 
 test("check yaml config file with seed list is used", async () => {
   jest.setTimeout(30000);

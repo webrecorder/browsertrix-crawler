@@ -1,6 +1,13 @@
-const util = require("util");
-const exec = util.promisify(require("child_process").exec);
-const fs = require("fs");
+import fs from "fs";
+
+import util from "util";
+import {exec as execCallback } from "child_process";
+
+import {jest} from "@jest/globals";
+
+const exec = util.promisify(execCallback);
+
+
 
 test("check that URLs are crawled 2 extra hops beyond depth", async () => {
   jest.setTimeout(120000);

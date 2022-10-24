@@ -15,7 +15,7 @@ import Sitemapper from "sitemapper";
 import { v4 as uuidv4 } from "uuid";
 import yaml from "js-yaml";
 
-import warcio from "warcio";
+import * as warcio from "warcio";
 
 import { TextExtract } from "./util/textextract.js";
 import { initStorage, getFileSize, getDirSize, interpolateFilename } from "./util/storage.js";

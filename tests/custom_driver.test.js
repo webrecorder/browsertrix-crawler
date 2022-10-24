@@ -1,5 +1,7 @@
-const child_process = require("child_process");
-const fs = require("fs");
+import child_process from "child_process";
+import fs from "fs";
+import {jest} from "@jest/globals";
+
 
 test("ensure custom driver with custom selector crawls JS files as pages", async () => {
   jest.setTimeout(30000);

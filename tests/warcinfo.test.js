@@ -1,6 +1,7 @@
-const fs = require("fs");
-const zlib = require("zlib");
-const child_process = require("child_process");
+import fs from "fs";
+import zlib from "zlib";
+import child_process from "child_process";
+import {jest} from "@jest/globals";
 
 test("check that the warcinfo file works as expected on the command line", async () => {
   jest.setTimeout(30000);

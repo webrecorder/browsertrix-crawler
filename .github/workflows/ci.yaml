@@ -41,7 +41,7 @@ jobs:
     - name: build docker
       run: docker-compose build
     - name: run jest
-      run: sudo yarn jest
+      run: sudo yarn test
         
 
 

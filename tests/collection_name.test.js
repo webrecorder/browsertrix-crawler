@@ -1,5 +1,9 @@
-const util = require("util");
-const exec = util.promisify(require("child_process").exec);
+import util from "util";
+import {exec as execCallback } from "child_process";
+import {jest} from "@jest/globals";
+
+const exec = util.promisify(execCallback);
+
 
 test("check that the collection name is properly validated", async () => {
   jest.setTimeout(30000);
