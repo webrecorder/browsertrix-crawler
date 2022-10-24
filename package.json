@@ -1,6 +1,6 @@
 {
   "name": "browsertrix-crawler",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "main": "browsertrix-crawler",
   "repository": "https://github.com/webrecorder/browsertrix-crawler",
   "author": "Ilya Kreymer <ikreymer@gmail.com>, Webrecorder Software",
@@ -21,7 +21,7 @@
     "request": "^2.88.2",
     "sitemapper": "^3.1.2",
     "uuid": "8.3.2",
-    "warcio": "^1.5.0",
+    "warcio": "1.5.1",
     "ws": "^7.4.4",
     "yargs": "^16.0.3"
   },
