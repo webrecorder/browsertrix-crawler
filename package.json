@@ -33,6 +33,7 @@
     "md5": "^2.3.0"
   },
   "jest": {
-    "transform": {}
+    "transform": {},
+    "testTimeout": 90000
   }
 }

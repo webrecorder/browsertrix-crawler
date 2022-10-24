@@ -1,12 +1,8 @@
 import child_process from "child_process";
 import fs from "fs";
 import yaml from "js-yaml";
-import {jest} from "@jest/globals";
-
 
 test("pass config file via stdin", async () => {
-  jest.setTimeout(30000);
-
   const configYaml = fs.readFileSync("tests/fixtures/crawl-2.yaml", "utf8");
   const config = yaml.load(configYaml);
 

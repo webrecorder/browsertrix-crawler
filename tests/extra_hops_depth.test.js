@@ -3,15 +3,11 @@ import fs from "fs";
 import util from "util";
 import {exec as execCallback } from "child_process";
 
-import {jest} from "@jest/globals";
-
 const exec = util.promisify(execCallback);
 
 
 
 test("check that URLs are crawled 2 extra hops beyond depth", async () => {
-  jest.setTimeout(120000);
-
   try {
     await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-beyond --extraHops 2 --url https://example.com/ --limit 7");
   }

@@ -1,12 +1,10 @@
 import util from "util";
 import {exec as execCallback } from "child_process";
-import {jest} from "@jest/globals";
 
 const exec = util.promisify(execCallback);
 
 
 test("check that the collection name is properly validated", async () => {
-  jest.setTimeout(30000);
   let passed = "";
 
   try{
@@ -21,7 +19,6 @@ test("check that the collection name is properly validated", async () => {
 
 
 test("check that the collection name is not accepted if it doesn't meets our standards", async () => {
-  jest.setTimeout(30000);
   let passed = "";
 
   try{

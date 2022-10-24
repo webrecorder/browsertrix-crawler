@@ -3,14 +3,11 @@ import yaml from "js-yaml";
 
 import util from "util";
 import {exec as execCallback } from "child_process";
-import {jest} from "@jest/globals";
 
 const exec = util.promisify(execCallback);
 
 
 test("check yaml config file with seed list is used", async () => {
-  jest.setTimeout(30000);
-
   try{
 
     await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --config /tests/fixtures/crawl-1.yaml --depth 0");
@@ -46,8 +43,6 @@ test("check yaml config file with seed list is used", async () => {
 });
 
 test("check yaml config file will be overwritten by command line", async () => {
-  jest.setTimeout(30000);
-
   try{
 
     await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection configtest-2 --config /tests/fixtures/crawl-1.yaml --url https://www.example.com --timeout 20000");
