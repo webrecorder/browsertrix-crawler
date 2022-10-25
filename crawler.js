@@ -27,7 +27,7 @@ import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI }
 
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
-import { BlockRules } from "./util/blockrules.js";
+import { AdBlockRules, BlockRules } from "./util/blockrules.js";
 
 // to ignore HTTPS error for HEAD check
 import { Agent as HTTPAgent } from "http";
@@ -40,7 +40,6 @@ const HTTPS_AGENT = HTTPSAgent({
 const HTTP_AGENT = HTTPAgent();
 
 const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
-
 
 
 // ============================================================================
@@ -99,6 +98,7 @@ export class Crawler {
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
     this.blockRules = null;
+    this.adBlockRules = null;
 
     this.errorCount = 0;
 
@@ -577,6 +577,10 @@ export class Crawler {
 
     await this.initPages();
 
+    if (this.params.blockAds) {
+      this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage, (text) => this.debugLog(text));
+    }
+
     if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, (text) => this.debugLog(text));
     }
@@ -754,6 +758,10 @@ export class Crawler {
       } catch (e) {
         // ignore failed direct fetch attempt, do browser-based capture
       }
+    }
+
+    if (this.adBlockRules) {
+      await this.adBlockRules.initPage(page);
     }
 
     if (this.blockRules) {

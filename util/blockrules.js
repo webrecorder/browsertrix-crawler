@@ -1,3 +1,5 @@
+import fs from "fs";
+
 const RULE_TYPES = ["block", "allowOnly"];
 
 const ALWAYS_ALLOW = ["https://pywb.proxy/", "http://pywb.proxy/"];
@@ -6,7 +8,8 @@ const BlockState = {
   ALLOW: null,
   BLOCK_PAGE_NAV: "page",
   BLOCK_IFRAME_NAV: "iframe",
-  BLOCK_OTHER: "resource"
+  BLOCK_OTHER: "resource",
+  BLOCK_AD: "advertisement"
 };
 
 
@@ -220,5 +223,44 @@ export class BlockRules
     const putUrl = new URL(this.blockPutUrl);
     putUrl.searchParams.set("url", url);
     await fetch(putUrl.href, {method: "PUT", headers: {"Content-Type": "text/html"}, body});
+  }
+}
+
+
+// ===========================================================================
+export class AdBlockRules extends BlockRules
+{
+  constructor(blockPutUrl, blockErrMsg, debugLog, adhostsFilePath = "../ad-hosts.json") {
+    super([], blockPutUrl, blockErrMsg, debugLog);
+    this.adhosts = JSON.parse(fs.readFileSync(new URL(adhostsFilePath, import.meta.url)));
+  }
+
+  async initPage(page) {
+    if (page._btrix_adInterceptionAdded) {
+      return true;
+    }
+
+    page._btrix_adInterceptionAdded = true;
+
+    await page.setRequestInterception(true);
+
+    page.on("request", async (request) => {
+      try {
+        await this.handleRequest(request);
+      } catch (e) {
+        console.warn(e);
+      }
+    });
+  }
+
+  async shouldBlock(request, url) {
+    const fragments = url.split("/");
+    const domain = fragments.length > 2 ? fragments[2] : null;
+    if (this.adhosts.includes(domain)) {
+      this.debugLog(`URL blocked for being an ad: ${url}`);
+      await this.recordBlockMsg(url);
+      return BlockState.BLOCK_AD;
+    }
+    return BlockState.ALLOW;
   }
 }
