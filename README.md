@@ -237,7 +237,7 @@ seeds:
   - https://example.com/
   - https://www.iana.org/
 
-combineWARCs: true
+combineWARC: true
 ```
 
 The list of seeds can be loaded via an external file by specifying the filename via the `seedFile` config or command-line option.
