@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 
-const readline = require("readline");
-const child_process = require("child_process");
+import fs from "fs";
+import path from "path";
+import http from "http";
 
-const puppeteer = require("puppeteer-core");
-const yargs = require("yargs");
+import readline from "readline";
+import child_process from "child_process";
 
-const { getBrowserExe, loadProfile, saveProfile, chromeArgs, sleep } = require("./util/browser");
-const { initStorage } = require("./util/storage");
+import puppeteer from "puppeteer-core";
+import yargs from "yargs";
 
-const fs = require("fs");
-const path = require("path");
-const http = require("http");
-const profileHTML = fs.readFileSync(path.join(__dirname, "html", "createProfile.html"), {encoding: "utf8"});
+import { getBrowserExe, loadProfile, saveProfile, chromeArgs, sleep } from "./util/browser.js";
+import { initStorage } from "./util/storage.js";
 
-const behaviors = fs.readFileSync(path.join(__dirname, "node_modules", "browsertrix-behaviors", "dist", "behaviors.js"), {encoding: "utf8"});
+const profileHTML = fs.readFileSync(new URL("html/createProfile.html", import.meta.url), {encoding: "utf8"});
+
+const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
 function cliOpts() {
   return {
@@ -86,7 +87,7 @@ function cliOpts() {
 
 
 async function main() {
-  const params = yargs
+  const params = yargs(process.argv)
     .usage("browsertrix-crawler profile [options]")
     .option(cliOpts())
     .argv;
