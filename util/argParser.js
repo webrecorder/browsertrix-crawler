@@ -118,6 +118,13 @@ class ArgParser {
         default: false,
       },
 
+      "blockCookiePopups": {
+        alias: "blockcookiepopups",
+        describe: "If set, block cookie, GDPR, and privacy notice pop-ups (based on EasyList Cookie List)",
+        type: "boolean",
+        default: false,
+      },
+
       "adBlockMessage": {
         describe: "If specified, when an ad is blocked, a record with this error message is added instead",
         type: "string",

@@ -3,8 +3,14 @@ ARG BROWSER_VERSION=105
 
 FROM ${BROWSER_IMAGE_BASE}:${BROWSER_VERSION}
 
-# TODO: Move this into base image
 RUN apt-get update && apt-get install -y jq
+
+ENV RUSTUP_HOME=/rust
+ENV CARGO_HOME=/cargo 
+ENV PATH=/cargo/bin:/rust/bin:$PATH
+
+RUN echo "(curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly --no-modify-path)" > /install-rust.sh && chmod 755 /install-rust.sh
+RUN /install-rust.sh
 
 # needed to add args to main build stage
 ARG BROWSER_VERSION
@@ -35,6 +41,9 @@ RUN mkdir -p /tmp/ads && cd /tmp/ads && \
     curl -vs -o ad-hosts.txt https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts && \
     cat ad-hosts.txt | grep '^0.0.0.0 '| awk '{ print $2; }' | grep -v '0.0.0.0' | jq --raw-input --slurp 'split("\n")' > /app/ad-hosts.json && \
     rm /tmp/ads/ad-hosts.txt
+
+# Add cookie popup blocklist
+RUN curl -vs -o /app/easylist-cookies.txt https://secure.fanboy.co.nz/fanboy-cookiemonster.txt
 
 RUN yarn install
 

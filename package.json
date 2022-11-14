@@ -12,11 +12,13 @@
   },
   "dependencies": {
     "abort-controller": "^3.0.0",
+    "adblock-rs": "^0.5.8",
     "browsertrix-behaviors": "^0.3.4",
     "get-folder-size": "^4.0.0",
     "ioredis": "^4.27.1",
     "js-yaml": "^4.1.0",
     "minio": "7.0.26",
+    "neon-cli": "^0.10.1",
     "puppeteer-cluster": "github:ikreymer/puppeteer-cluster#async-job-queue",
     "puppeteer-core": "^17.1.2",
     "request": "^2.88.2",
