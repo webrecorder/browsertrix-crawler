@@ -292,6 +292,16 @@ class ArgParser {
         describe: "if set, wait for network idle after page load and after behaviors are done (in seconds). if -1 (default), determine based on scope",
         type: "number",
         default: -1
+      },
+
+      "httpUser": {
+        describe: "a user for HTTP Basic Authentication requests",
+        type: "string"
+      },
+
+      "httpPassword": {
+        describe: "a password for HTTP Basic Authenication requests",
+        type: "string"
       }
     };
   }
