@@ -5,7 +5,7 @@
   "type": "module",
   "repository": "https://github.com/webrecorder/browsertrix-crawler",
   "author": "Ilya Kreymer <ikreymer@gmail.com>, Webrecorder Software",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "lint": "eslint *.js util/*.js tests/*.test.js",
     "test": "yarn node --experimental-vm-modules $(yarn bin jest)"
