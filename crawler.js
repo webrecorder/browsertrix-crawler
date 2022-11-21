@@ -292,10 +292,18 @@ export class Crawler {
       handleSIGTERM: false,
       handleSIGHUP: false,
       ignoreHTTPSErrors: true,
-      args: chromeArgs(!process.env.NO_PROXY, this.userAgent),
+      args: chromeArgs(!process.env.NO_PROXY, this.userAgent, this.extraChromeArgs()),
       userDataDir: this.profileDir,
       defaultViewport: null,
     };
+  }
+
+  extraChromeArgs() {
+    const args = [];
+    if (this.params.lang) {
+      args.push(`--accept-lang=${this.params.lang}`);
+    }
+    return args;
   }
 
   async run() {

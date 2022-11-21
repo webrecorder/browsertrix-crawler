@@ -304,6 +304,11 @@ class ArgParser {
         describe: "if set, wait for network idle after page load and after behaviors are done (in seconds). if -1 (default), determine based on scope",
         type: "number",
         default: -1
+      },
+
+      "lang": {
+        describe: "if set, sets the language used by the browser, should be ISO 639 language[-country] code",
+        type: "string"
       }
     };
   }
