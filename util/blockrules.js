@@ -1,4 +1,5 @@
 import fs from "fs";
+import * as AdBlockClient from "adblock-rs";
 
 const RULE_TYPES = ["block", "allowOnly"];
 
@@ -9,7 +10,8 @@ const BlockState = {
   BLOCK_PAGE_NAV: "page",
   BLOCK_IFRAME_NAV: "iframe",
   BLOCK_OTHER: "resource",
-  BLOCK_AD: "advertisement"
+  BLOCK_AD: "advertisement",
+  BLOCK_COOKIE_POPUP: "cookie pop-up"
 };
 
 
@@ -47,11 +49,22 @@ ${this.frameTextMatch ? "Frame Text Regex: " + this.frameTextMatch : ""}
 // ===========================================================================
 export class BlockRules
 {
-  constructor(blockRules, blockPutUrl, blockErrMsg, debugLog) {
+  constructor(blockRules, blockPutUrl, blockErrMsg, blockAds, adBlockErrMsg, blockCookiePopups, debugLog) {
     this.rules = [];
     this.blockPutUrl = blockPutUrl;
     this.blockErrMsg = blockErrMsg;
+    this.blockAds = blockAds;
+    this.adBlockErrMsg = adBlockErrMsg;
+    this.blockCookiePopups = blockCookiePopups;
     this.debugLog = debugLog;
+
+    this.adhosts = JSON.parse(fs.readFileSync(new URL("../ad-hosts.json", import.meta.url)));
+    if (this.blockCookiePopups) {
+      const easylistRules = fs.readFileSync(new URL("../easylist-cookies.txt", import.meta.url), { encoding: "utf-8" }).split("\n");
+      const filterSet = new AdBlockClient.FilterSet(true);
+      filterSet.addFilters(easylistRules);
+      this.cookieBlockClient = new AdBlockClient.Engine(filterSet, true);
+    }
 
     this.blockedUrlSet = new Set();
 
@@ -68,10 +81,6 @@ export class BlockRules
   }
 
   async initPage(page) {
-    if (!this.rules.length) {
-      return;
-    }
-
     if (page._btrix_interceptionAdded) {
       return true;
     }
@@ -95,14 +104,25 @@ export class BlockRules
     let blockState;
 
     try {
-      blockState = await this.shouldBlock(request, url);
-
-      if (blockState === BlockState.ALLOW) {
-        await request.continue();
-      } else {
-        await request.abort("blockedbyclient");
+      if (this.blockAds) {
+        blockState = await this.shouldBlockAd(request, url);
+        if (blockState === BlockState.BLOCK_AD) {
+          return await request.abort("blockedbyclient");
+        }
       }
-
+      if (this.blockCookiePopups) {
+        blockState = await this.shouldBlockCookiePopup(request, url);
+        if (blockState === BlockState.BLOCK_COOKIE_POPUP) {
+          return await request.abort("blockedbyclient");
+        }
+      }
+      if (this.rules.length) {
+        blockState = await this.shouldBlock(request, url);
+        if (blockState !== BlockState.ALLOW) {
+          return await request.abort("blockedbyclient");
+        }
+      }
+      await request.continue();
     } catch (e) {
       this.debugLog(`Block: (${blockState}) Failed On: ${url} Reason: ${e}`);
     }
@@ -208,7 +228,27 @@ export class BlockRules
     }
   }
 
-  async recordBlockMsg(url) {
+  async shouldBlockAd(request, url) {
+    const fragments = url.split("/");
+    const domain = fragments.length > 2 ? fragments[2] : null;
+    if (this.adhosts.includes(domain)) {
+      this.debugLog(`URL blocked for being an ad: ${url}`);
+      await this.recordBlockMsg(url, true);
+      return BlockState.BLOCK_AD;
+    }
+    return BlockState.ALLOW;
+  }
+
+  async shouldBlockCookiePopup(request, url) {
+    const checkResult = this.cookieBlockClient.check(url, "", "");
+    if (checkResult != false) {
+      this.debugLog(`URL blocked for being a cookie pop-up: ${url}`);
+      return BlockState.BLOCK_COOKIE_POPUP;
+    }
+    return BlockState.ALLOW;
+  }
+
+  async recordBlockMsg(url, ad=false) {
     if (this.blockedUrlSet.has(url)) {
       return;
     }
@@ -219,48 +259,12 @@ export class BlockRules
       return;
     }
 
-    const body = this.blockErrMsg;
+    let body = this.blockErrMsg;
+    if (ad) {
+      body = this.adBlockErrMessage;
+    }
     const putUrl = new URL(this.blockPutUrl);
     putUrl.searchParams.set("url", url);
     await fetch(putUrl.href, {method: "PUT", headers: {"Content-Type": "text/html"}, body});
-  }
-}
-
-
-// ===========================================================================
-export class AdBlockRules extends BlockRules
-{
-  constructor(blockPutUrl, blockErrMsg, debugLog, adhostsFilePath = "../ad-hosts.json") {
-    super([], blockPutUrl, blockErrMsg, debugLog);
-    this.adhosts = JSON.parse(fs.readFileSync(new URL(adhostsFilePath, import.meta.url)));
-  }
-
-  async initPage(page) {
-    if (page._btrix_adInterceptionAdded) {
-      return true;
-    }
-
-    page._btrix_adInterceptionAdded = true;
-
-    await page.setRequestInterception(true);
-
-    page.on("request", async (request) => {
-      try {
-        await this.handleRequest(request);
-      } catch (e) {
-        console.warn(e);
-      }
-    });
-  }
-
-  async shouldBlock(request, url) {
-    const fragments = url.split("/");
-    const domain = fragments.length > 2 ? fragments[2] : null;
-    if (this.adhosts.includes(domain)) {
-      this.debugLog(`URL blocked for being an ad: ${url}`);
-      await this.recordBlockMsg(url);
-      return BlockState.BLOCK_AD;
-    }
-    return BlockState.ALLOW;
   }
 }

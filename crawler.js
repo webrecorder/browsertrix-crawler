@@ -27,7 +27,7 @@ import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI }
 
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
-import { AdBlockRules, BlockRules } from "./util/blockrules.js";
+import { BlockRules } from "./util/blockrules.js";
 
 // to ignore HTTPS error for HEAD check
 import { Agent as HTTPAgent } from "http";
@@ -98,7 +98,6 @@ export class Crawler {
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
     this.blockRules = null;
-    this.adBlockRules = null;
 
     this.errorCount = 0;
 
@@ -509,6 +508,10 @@ export class Crawler {
     }
   }
 
+  blockEnabled() {
+    return (this.params.blockRules && this.params.blockRules.length) || this.params.blockAds || this.params.blockCookiePopups;
+  }
+
   async serializeAndExit() {
     await this.serializeConfig();
     process.exit(0);
@@ -585,12 +588,15 @@ export class Crawler {
 
     await this.initPages();
 
-    if (this.params.blockAds) {
-      this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage, (text) => this.debugLog(text));
-    }
-
-    if (this.params.blockRules && this.params.blockRules.length) {
-      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, (text) => this.debugLog(text));
+    if (this.blockEnabled()) {
+      this.blockRules = new BlockRules(
+        this.params.blockRules,
+        this.captureBasePrefix,
+        this.params.blockMessage,
+        this.params.blockAds,
+        this.params.adBlockMessage,
+        this.params.blockCookiePopups,
+        (text) => this.debugLog(text));
     }
 
     this.screencaster = this.initScreenCaster();
@@ -768,11 +774,7 @@ export class Crawler {
       }
     }
 
-    if (this.adBlockRules) {
-      await this.adBlockRules.initPage(page);
-    }
-
-    if (this.blockRules) {
+    if (this.blockEnabled()) {
       await this.blockRules.initPage(page);
     }
 
