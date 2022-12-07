@@ -1,5 +1,5 @@
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base
-ARG BROWSER_VERSION=105
+ARG BROWSER_VERSION=brave-test-latest
 
 FROM ${BROWSER_IMAGE_BASE}:${BROWSER_VERSION}
 
@@ -44,6 +44,9 @@ ADD util/*.js /app/util/
 ADD config/ /app/
 
 ADD html/ /app/html/
+
+COPY brave-default-profile.tar.gz /app/
+COPY brave-ad-blocking-disabled-profile.tar.gz /app/
 
 RUN ln -s /app/main.js /usr/bin/crawl; ln -s /app/create-login-profile.js /usr/bin/create-login-profile
 
