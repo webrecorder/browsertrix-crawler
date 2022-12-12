@@ -226,6 +226,7 @@ class ArgParser {
       "profile": {
         describe: "Path to tar.gz file which will be extracted and used as the browser profile",
         type: "string",
+        default: "/app/brave-default-profile.tar.gz"
       },
 
       "screencastPort": {
