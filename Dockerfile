@@ -16,7 +16,7 @@ ENV PROXY_HOST=localhost \
     DISPLAY=:99 \
     GEOMETRY=1360x1020x16 \
     BROWSER_VERSION=${BROWSER_VERSION} \
-    BROWSER_BIN=google-chrome \
+    BROWSER_BIN=/usr/bin/chromium-browser \
     OPENSSL_CONF=/app/openssl.conf
 
 WORKDIR /app
