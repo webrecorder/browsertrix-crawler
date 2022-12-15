@@ -4,6 +4,9 @@ import path from "path";
 import os from "os";
 import request from "request";
 import { initStorage } from "./storage.js";
+import { Logger } from "./logger.js";
+
+const logger = new Logger();
 
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
@@ -13,7 +16,7 @@ export async function loadProfile(profileFilename) {
   if (profileFilename &&
       (profileFilename.startsWith("http:") || profileFilename.startsWith("https:"))) {
 
-    console.log(`Downloading ${profileFilename} to ${targetFilename}`);
+    logger.info(`Downloading ${profileFilename} to ${targetFilename}`, {}, "browserProfile");
 
     const p = new Promise((resolve, reject) => {
       request.get(profileFilename).
@@ -29,7 +32,7 @@ export async function loadProfile(profileFilename) {
     const storage = initStorage("");
 
     if (!storage) {
-      throw new Error("Profile specified relative to s3 storage, but no S3 storage defined");
+      logger.fatal("Profile specified relative to s3 storage, but no S3 storage defined");
     }
 
     await storage.downloadFile(profileFilename.slice(1), targetFilename);
@@ -41,7 +44,7 @@ export async function loadProfile(profileFilename) {
     try {
       child_process.execSync("tar xvfz " + profileFilename, {cwd: profileDir});
     } catch (e) {
-      console.error(`Profile filename ${profileFilename} not a valid tar.gz`);
+      logger.error(`Profile filename ${profileFilename} not a valid tar.gz`);
     }
   }
 
@@ -72,7 +75,7 @@ export function getDefaultUA() {
     version = child_process.execFileSync(getBrowserExe(), ["--version"], {encoding: "utf8"});
     version = version.match(/[\d.]+/)[0];
   } catch(e) {
-    console.error(e);
+    logger.error("Error getting default UserAgent", e);
   }
 
   return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
@@ -158,7 +161,7 @@ export async function evaluateWithCLI(frame, funcString) {
     });
 
   if (exceptionDetails) {
-    throw new Error(
+    logger.fatal(
       "Behavior Evaluation Failed" + exceptionDetails.text
     );
   }

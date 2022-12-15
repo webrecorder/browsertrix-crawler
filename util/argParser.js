@@ -13,6 +13,9 @@ import { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
+import { Logger } from "./logger.js";
+
+const logger = new Logger();
 
 
 // ============================================================================
@@ -171,7 +174,7 @@ class ArgParser {
       },
 
       "logging": {
-        describe: "Logging options for crawler, can include: stats, pywb, behaviors, behaviors-debug, jserrors",
+        describe: "Logging options for crawler, can include: stats (enabled by default), jserrors, pywb, debug",
         type: "string",
         default: "stats",
       },
@@ -351,7 +354,7 @@ class ArgParser {
 
     // Check that the collection name is valid.
     if (argv.collection.search(/^[\w][\w-]*$/) === -1){
-      throw new Error(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
+      logger.fatal(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
 
     argv.timeout *= 1000;
@@ -365,7 +368,7 @@ class ArgParser {
 
     for (const opt of argv.waitUntil) {
       if (!WAIT_UNTIL_OPTS.includes(opt)) {
-        throw new Error("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
+        logger.fatal("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
       }
     }
 
@@ -394,30 +397,25 @@ class ArgParser {
     if (argv.behaviorTimeout) {
       behaviorOpts.timeout = argv.behaviorTimeout *= 1000;
     }
-    if (argv.logging.includes("behaviors")) {
-      behaviorOpts.log = BEHAVIOR_LOG_FUNC;
-    } else if (argv.logging.includes("behaviors-debug")) {
-      behaviorOpts.log = BEHAVIOR_LOG_FUNC;
-      argv.behaviorsLogDebug = true;
-    }
+    behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 
     if (argv.newContext) {
-      console.log("Note: The newContext argument is deprecated in 0.8.0. Values passed to this option will be ignored");
+      logger.info("Note: The newContext argument is deprecated in 0.8.0. Values passed to this option will be ignored");
     }
 
     if (argv.workers > 1) {
-      console.log("Window context being used to support >1 workers");
+      logger.info("Window context being used to support >1 workers");
       argv.newContext = ReuseWindowConcurrency;
     } else {
-      console.log("Page context being used with 1 worker");
+      logger.info("Page context being used with 1 worker");
       argv.newContext = Cluster.CONCURRENCY_PAGE;
     }
 
     if (argv.mobileDevice) {
       argv.emulateDevice = puppeteer.devices[argv.mobileDevice];
       if (!argv.emulateDevice) {
-        throw new Error("Unknown device: " + argv.mobileDevice);
+        logger.fatal("Unknown device: " + argv.mobileDevice);
       }
     }
 
@@ -442,13 +440,13 @@ class ArgParser {
       } else {
         argv.netIdleWait = 2;
       }
-      console.log(`Set netIdleWait to ${argv.netIdleWait} seconds`);
+      logger.info(`Set netIdleWait to ${argv.netIdleWait} seconds`);
     }
 
     // prefer argv.include only if string or a non-empty array
     if (argv.include && (typeof(argv.include) === "string" || argv.include.length)) {
       if (argv.scopeType && argv.scopeType !== "custom") {
-        console.warn("You've specified a --scopeType and a --scopeIncludeRx / --include regex. The custom scope regex will take precedence, overriding the scopeType");
+        logger.info("You've specified a --scopeType and a --scopeIncludeRx / --include regex. The custom scope regex will take precedence, overriding the scopeType");
         argv.scopeType = "custom";
       }
     }

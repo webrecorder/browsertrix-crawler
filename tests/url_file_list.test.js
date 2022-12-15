@@ -4,10 +4,10 @@ import fs from "fs";
 
 const exec = util.promisify(execCallback);
 
-test("check that URLs one-depth out from the seed-list are crawled", async () => {
+test("check that URLs in seed-list are crawled", async () => {
   try {
 
-    await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection filelisttest --urlFile /tests/fixtures/urlSeedFile.txt --timeout 10000");
+    await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection filelisttest --urlFile /tests/fixtures/urlSeedFile.txt --timeout 90000");
   }
   catch (error) {
     console.log(error);

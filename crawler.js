@@ -23,6 +23,7 @@ import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screenca
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
+import { Logger } from "./util/logger.js";
 
 import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
 
@@ -46,6 +47,13 @@ const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/
 // ============================================================================
 export class Crawler {
   constructor() {
+    const res = parseArgs();
+    this.params = res.parsed;
+    this.origConfig = res.origConfig;
+
+    const debugLogging = this.params.logging.includes("debug");
+    this.logger = new Logger(debugLogging);
+
     this.headers = {};
     this.crawlState = null;
 
@@ -63,23 +71,17 @@ export class Crawler {
 
     this.userAgent = "";
 
-    const res = parseArgs();
-    this.params = res.parsed;
-    this.origConfig = res.origConfig;
-
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
-    this.saveStateInterval = this.params.saveStateInterval * 1000;
-
-    this.debugLogging = this.params.logging.includes("debug");
+    this.saveStateInterval = this.params.saveStateInterval * 1000;    
 
     if (this.params.profile) {
-      this.statusLog("With Browser Profile: " + this.params.profile);
+      this.logger.info(`With Browser Profile: ${this.params.profile}"`);
     }
 
     this.emulateDevice = this.params.emulateDevice;
 
-    this.debugLog("Seeds", this.params.scopedSeeds);
+    this.logger.info("Seeds", this.params.scopedSeeds);
 
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
     this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
@@ -110,18 +112,6 @@ export class Crawler {
     this.done = false;
 
     this.behaviorLastLine = null;
-
-    this.logConsole = false;
-  }
-
-  statusLog(...args) {
-    console.log(...args);
-  }
-
-  debugLog(...args) {
-    if (this.debugLogging) {
-      console.log(...args);
-    }
   }
 
   configureUA() {
@@ -158,7 +148,7 @@ export class Crawler {
 
     if (redisUrl) {
       if (!redisUrl.startsWith("redis://")) {
-        throw new Error("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
+        this.logger.fatal("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
       }
 
       let redis;
@@ -168,24 +158,24 @@ export class Crawler {
           redis = await initRedis(redisUrl);
           break;
         } catch (e) {
-          //throw new Error("Unable to connect to state store Redis: " + redisUrl);
-          console.warn(`Waiting for redis at ${redisUrl}`);
+          //this.logger.fatal("Unable to connect to state store Redis: " + redisUrl);
+          this.logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
           await this.sleep(3);
         }
       }
 
-      this.statusLog(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`);
+      this.logger.info(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
 
       this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout * 2, os.hostname());
 
     } else {
-      this.statusLog("Storing state in memory");
+      this.logger.info("Storing state in memory", {}, "state");
 
       this.crawlState = new MemoryCrawlState();
     }
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
-      this.statusLog(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`);
+      this.logger.info(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
     }
 
     return this.crawlState;
@@ -196,10 +186,10 @@ export class Crawler {
 
     if (this.params.screencastPort) {
       transport = new WSTransport(this.params.screencastPort);
-      this.debugLog(`Screencast server started on: ${this.params.screencastPort}`);
+      this.logger.debug(`Screencast server started on: ${this.params.screencastPort}`, {}, "screencast");
     } else if (this.params.redisStoreUrl && this.params.screencastRedis) {
       transport = new RedisPubSubTransport(this.params.redisStoreUrl, this.crawlId);
-      this.debugLog("Screencast enabled via redis pubsub");
+      this.logger.debug("Screencast enabled via redis pubsub", {}, "screencast");
     }
 
     if (!transport) {
@@ -215,7 +205,7 @@ export class Crawler {
     const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
 
     if (initRes.status) {
-      console.log("wb-manager init failed, collection likely already exists");
+      this.logger.info("wb-manager init failed, collection likely already exists");
     }
 
     await fsp.mkdir(logs, {recursive: true});
@@ -236,8 +226,6 @@ export class Crawler {
       redisStdio = "ignore";
     }
 
-    this.logConsole = this.params.logging.includes("jserrors");
-
     this.browserExe = getBrowserExe();
 
     this.configureUA();
@@ -249,11 +237,11 @@ export class Crawler {
     subprocesses.push(child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio}));
 
     if (this.params.overwrite) {
-      console.log(`Clearing ${this.collDir} before starting`);
+      this.logger.info(`Clearing ${this.collDir} before starting`);
       try {
         fs.rmSync(this.collDir, { recursive: true, force: true });
       } catch(e) {
-        console.warn(e);
+        this.logger.error(`Unable to clear ${this.collDir}`, e);
       }
     }
 
@@ -318,8 +306,7 @@ export class Crawler {
       await this.crawl();
       status = (!this.interrupted ? "done" : "interrupted");
     } catch(e) {
-      console.error("Crawl failed");
-      console.error(e);
+      this.logger.error("Crawl failed", e);
       exitCode = 9;
       status = "failing";
       if (await this.crawlState.incFailCount()) {
@@ -327,7 +314,7 @@ export class Crawler {
       }
 
     } finally {
-      console.log(status);
+      this.logger.info(`Crawl status: ${status}`);
 
       if (this.crawlState) {
         await this.crawlState.setStatus(status);
@@ -344,16 +331,14 @@ export class Crawler {
     case "info":
       behaviorLine = JSON.stringify(data);
       if (behaviorLine != this._behaviorLastLine) {
-        console.log(behaviorLine);
+        this.logger.info("Behavior line", data, "behavior");
         this._behaviorLastLine = behaviorLine;
       }
       break;
 
     case "debug":
     default:
-      if (this.params.behaviorsLogDebug) {
-        console.log("behavior debug: " + JSON.stringify(data));
-      }
+      this.logger.debug("Behavior debug", data, "behavior");
     }
   }
 
@@ -367,7 +352,7 @@ export class Crawler {
     const {page, data} = opts;
 
     if (!this.isInScope(data)) {
-      console.log(`No longer in scope: ${JSON.stringify(data)}`);
+      this.logger.info("Page no longer in scope", data);
       return;
     }
 
@@ -425,7 +410,7 @@ export class Crawler {
 
       if (this.params.behaviorOpts) {
         if (!page.isHTMLPage) {
-          console.log("Skipping behaviors for non-HTML page");
+          this.logger.info("Skipping behaviors for non-HTML page", data, "behavior");
         } else {
           await Promise.allSettled(page.frames().map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();")));
 
@@ -434,6 +419,8 @@ export class Crawler {
         }
       }
 
+      this.logger.info("Page graph data for successfully crawled page", data, "pageGraph");
+
       await this.writeStats();
 
       await this.checkLimits();
@@ -441,7 +428,7 @@ export class Crawler {
       await this.serializeConfig();
 
     } catch (e) {
-      console.warn(e);
+      this.logger.error(`Error crawling page ${data.url}`, e.message);
       await this.markPageFailed(page);
     }
   }
@@ -470,14 +457,14 @@ export class Crawler {
     switch (pathname) {
     case "/healthz":
       if (this.errorCount < threshold) {
-        console.log(`health check ok, num errors ${this.errorCount} < ${threshold}`);
+        this.logger.debug(`health check ok, num errors ${this.errorCount} < ${threshold}`);
         res.writeHead(200);
         res.end();
       }
       return;
     }
 
-    console.log(`health check failed: ${this.errorCount} >= ${threshold}`);
+    this.logger.error(`health check failed: ${this.errorCount} >= ${threshold}`);
     res.writeHead(503);
     res.end();
   }
@@ -491,7 +478,7 @@ export class Crawler {
       const size = await getDirSize(dir);
 
       if (size >= this.params.sizeLimit) {
-        console.log(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
+        this.logger.info(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
         interrupt = true;
         this.clearOnExit = true;
       }
@@ -500,7 +487,7 @@ export class Crawler {
     if (this.params.timeLimit) {
       const elapsed = (Date.now() - this.startTime) / 1000;
       if (elapsed > this.params.timeLimit) {
-        console.log(`Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`);
+        this.logger.info(`Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`);
         interrupt = true;
       }
     }
@@ -522,9 +509,9 @@ export class Crawler {
     if (!markDone) {
       this.params.waitOnDone = false;
       this.clearOnExit = true;
-      console.log("SIGNAL: Preparing for exit of this crawler instance only");
+      this.logger.info("SIGNAL: Preparing for exit of this crawler instance only");
     } else {
-      console.log("SIGNAL: Preparing for final exit of all crawlers");
+      this.logger.info("SIGNAL: Preparing for final exit of all crawlers");
       this.finalExit = true;
     }
   }
@@ -539,7 +526,7 @@ export class Crawler {
 
     if (this.params.healthCheckPort) {
       this.healthServer = http.createServer((...args) => this.healthCheck(...args));
-      this.statusLog(`Healthcheck server started on ${this.params.healthCheckPort}`);
+      this.logger.info(`Healthcheck server started on ${this.params.healthCheckPort}`);
       this.healthServer.listen(this.params.healthCheckPort);
     }
 
@@ -547,7 +534,7 @@ export class Crawler {
       const driverUrl = new URL(this.params.driver, import.meta.url);
       this.driver = (await import(driverUrl)).default;
     } catch(e) {
-      console.warn(e);
+      this.logger.warn(`Error importing driver ${this.params.driver}`, e);
       return;
     }
 
@@ -556,7 +543,7 @@ export class Crawler {
     let initState = await this.crawlState.getStatus();
 
     while (initState === "debug") {
-      console.log("Paused for debugging, will continue after manual resume");
+      this.logger.info("Paused for debugging, will continue after manual resume");
 
       await this.sleep(60);
 
@@ -568,7 +555,7 @@ export class Crawler {
       this.done = true;
 
       if (this.params.waitOnDone) {
-        this.statusLog("Already done, waiting for signal to exit...");
+        this.logger.info("Already done, waiting for signal to exit...");
 
         // wait forever until signal
         await new Promise(() => {});
@@ -589,7 +576,7 @@ export class Crawler {
       timeout: this.params.timeout * 2,
       puppeteerOptions: this.puppeteerArgs,
       puppeteer,
-      monitor: this.params.logging.includes("stats")
+      monitor: false
     });
 
 
@@ -606,11 +593,11 @@ export class Crawler {
     await this.initPages();
 
     if (this.params.blockAds) {
-      this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage, (text) => this.debugLog(text));
+      this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage, this.logger);
     }
 
     if (this.params.blockRules && this.params.blockRules.length) {
-      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, (text) => this.debugLog(text));
+      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, this.logger);
     }
 
     this.screencaster = this.initScreenCaster();
@@ -637,8 +624,6 @@ export class Crawler {
 
     await this.serializeConfig(true);
 
-    this.writeStats();
-
     if (this.pagesFH) {
       await this.pagesFH.sync();
       await this.pagesFH.close();
@@ -652,27 +637,28 @@ export class Crawler {
     }
 
     if (this.params.generateCDX) {
-      this.statusLog("Generating CDX");
-
-      await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {stdio: "inherit", cwd: this.params.cwd}));
+      this.logger.info("Generating CDX");
+      await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
     }
+
+    await this.writeStats(true);
 
     if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.clearOnExit)) {
       await this.generateWACZ();
 
       if (this.clearOnExit) {
-        console.log(`Clearing ${this.collDir} before exit`);
+        this.logger.info(`Clearing ${this.collDir} before exit`);
         try {
           fs.rmSync(this.collDir, { recursive: true, force: true });
         } catch(e) {
-          console.warn(e);
+          this.logger.warn(`Unable to clear ${this.collDir} before exit`, e);
         }
       }
     }
 
     if (this.params.waitOnDone && (!this.interrupted || this.finalExit)) {
       this.done = true;
-      this.statusLog("All done, waiting for signal...");
+      this.logger.info("All done, waiting for signal...");
       await this.crawlState.setStatus("done");
 
       // wait forever until signal
@@ -681,7 +667,7 @@ export class Crawler {
   }
 
   async generateWACZ() {
-    this.statusLog("Generating WACZ");
+    this.logger.info("Generating WACZ");
 
     const archiveDir = path.join(this.collDir, "archive");
 
@@ -691,13 +677,13 @@ export class Crawler {
     // is finished (>0 pages and all pages written)
     const isFinished = await this.crawlState.isFinished();
 
-    console.log(`Num WARC Files: ${warcFileList.length}`);
+    this.logger.info(`Num WARC Files: ${warcFileList.length}`);
     if (!warcFileList.length) {
       // if finished, just return
       if (isFinished) {
         return;
       }
-      throw new Error("No WARC Files, assuming crawl failed");
+      this.logger.fatal("No WARC Files, assuming crawl failed");
     }
 
     // Build the argument list to pass to the wacz create command
@@ -720,14 +706,14 @@ export class Crawler {
     warcFileList.forEach((val, index) => createArgs.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
 
     // create WACZ
-    const waczResult = await this.awaitProcess(child_process.spawn("wacz" , createArgs, {stdio: "inherit"}));
+    const waczResult = await this.awaitProcess(child_process.spawn("wacz" , createArgs));
 
     if (waczResult !== 0) {
-      console.log("create result", waczResult);
-      throw new Error("Unable to write WACZ successfully");
+      this.logger.error("Error creating WACZ", {"status code": waczResult});
+      this.logger.fatal("Unable to write WACZ successfully");
     }
 
-    this.debugLog(`WACZ successfully generated and saved to: ${waczPath}`);
+    this.logger.debug(`WACZ successfully generated and saved to: ${waczPath}`);
 
     // Verify WACZ
     /*
@@ -735,11 +721,11 @@ export class Crawler {
     validateArgs.push("-f");
     validateArgs.push(waczPath);
 
-    const waczVerifyResult = await this.awaitProcess(child_process.spawn("wacz", validateArgs, {stdio: "inherit"}));
+    const waczVerifyResult = await this.awaitProcess(child_process.spawn("wacz", validateArgs));
 
     if (waczVerifyResult !== 0) {
       console.log("validate", waczVerifyResult);
-      throw new Error("Unable to verify WACZ created successfully");
+      this.logger.fatal("Unable to verify WACZ created successfully");
     }
 */
     if (this.storage) {
@@ -751,23 +737,43 @@ export class Crawler {
   }
 
   awaitProcess(proc) {
+    proc.stdout.on("data", (data) => {
+      this.logger.info(data.toString());
+    });
+
+    proc.stderr.on("data", (data) => {
+      this.logger.error(data.toString());
+    });
     return new Promise((resolve) => {
       proc.on("close", (code) => resolve(code));
     });
   }
 
-  async writeStats() {
-    if (this.params.statsFilename) {
-      const total = this.cluster.allTargetCount;
-      const workersRunning = this.cluster.workersBusy.length;
-      const numCrawled = total - (await this.crawlState.size()) - workersRunning;
-      const limit = {max: this.params.limit || 0, hit: this.limitHit};
-      const stats = {numCrawled, workersRunning, total, limit};
+  async writeStats(toFile=false) {
+    if (!this.params.logging.includes("stats")) {
+      return;
+    }
 
+    const realSize = await this.crawlState.realSize();
+    const pending = await this.crawlState.numRealPending();
+    const done = await this.crawlState.numDone();
+    const total = realSize + pending + done;
+    const limit = {max: this.params.limit || 0, hit: this.limitHit};
+    const stats = {
+      "crawled": done,
+      "total": total,
+      "pending": pending,
+      "limit": limit,
+      "pendingPages": Array.from(this.crawlState.pending.values()).map(x => JSON.stringify(x))
+    };
+
+    this.logger.info("Crawl statistics", stats, "crawlState");
+
+    if (toFile && this.params.statsFilename) {
       try {
         await fsp.writeFile(this.params.statsFilename, JSON.stringify(stats, null, 2));
       } catch (err) {
-        console.warn("Stats output failed", err);
+        this.logger.warn("Stats output failed", err);
       }
     }
   }
@@ -807,26 +813,24 @@ export class Crawler {
     // more serious page error, mark page session as invalid
     page.on("error", () => this.markPageFailed(page));
 
-    if (this.logConsole) {
-      page.on("console", (msg) => {
-        if (msg.type() === "error") {
-          console.log(msg.text(), msg.location());
-        }
-      });
-    }
+    page.on("console", (msg) => {
+      if (this.params.logging.includes("jserrors") && (msg.type() === "error")) {
+        this.logger.warn(msg.text(), {"location": msg.location()}, "jsError");
+      }
+    });
 
     const gotoOpts = isHTMLPage ? this.gotoOpts : "domcontentloaded";
 
     try {
       await page.goto(url, gotoOpts);
       if (this.errorCount > 0) {
-        this.statusLog(`Page loaded, resetting error count ${this.errorCount} to 0`);
+        this.logger.info(`Page loaded, resetting error count ${this.errorCount} to 0`);
         this.errorCount = 0;
       }
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
-        this.statusLog(`Load Error: ${url}: ${msg}`);
+        this.logger.error(`Load Error: ${url}: ${msg}`);
         this.errorCount++;
       }
     }
@@ -875,7 +879,7 @@ export class Crawler {
     try {
       await page.waitForNetworkIdle({timeout: this.params.netIdleWait * 1000});
     } catch (e) {
-      console.log("note: waitForNetworkIdle timed out, ignoring");
+      this.logger.info("note: waitForNetworkIdle timed out, ignoring");
       // ignore, continue
     }
   }
@@ -906,7 +910,7 @@ export class Crawler {
       }
 
     } catch (e) {
-      console.warn("Link Extraction failed", e);
+      this.logger.warn("Link Extraction failed", e);
     }
     return results;
   }
@@ -932,19 +936,18 @@ export class Crawler {
         }
       }
     } catch (e) {
-      console.error("Queuing Error: ", e);
+      this.logger.error("Queuing Error", e);
     }
   }
 
   async checkCF(page) {
     try {
       while (await page.$("div.cf-browser-verification.cf-im-under-attack")) {
-        this.statusLog("Cloudflare Check Detected, waiting for reload...");
+        this.logger.info("Cloudflare Check Detected, waiting for reload...");
         await this.sleep(5.5);
       }
     } catch (e) {
-      //console.warn("Check CF failed, ignoring");
-      //console.warn(e);
+      this.logger.warn("Check CF failed, ignoring", e.message);
     }
   }
 
@@ -987,17 +990,17 @@ export class Crawler {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
           header["hasText"] = true;
-          this.statusLog("Text Extraction: Enabled");
+          this.logger.info("Text Extraction: Enabled");
         } else {
           header["hasText"] = false;
-          this.statusLog("Text Extraction: Disabled");
+          this.logger.info("Text Extraction: Disabled");
         }
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
       }
 
     } catch(err) {
-      console.error("pages/pages.jsonl creation failed", err);
+      this.logger.error("pages/pages.jsonl creation failed", err);
     }
   }
 
@@ -1017,7 +1020,7 @@ export class Crawler {
     try {
       await this.pagesFH.writeFile(processedRow);
     } catch (err) {
-      console.warn("pages/pages.jsonl append failed", err);
+      this.logger.warn("pages/pages.jsonl append failed", err);
     }
   }
 
@@ -1033,7 +1036,7 @@ export class Crawler {
         agent: this.resolveAgent
       });
       if (resp.status !== 200) {
-        this.debugLog(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
+        this.logger.debug(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
         return true;
       }
 
@@ -1067,7 +1070,7 @@ export class Crawler {
   }
 
   async awaitPendingClear() {
-    this.statusLog("Waiting to ensure pending data is written to WARCs...");
+    this.logger.info("Waiting to ensure pending data is written to WARCs...");
 
     const redis = await initRedis("redis://localhost/0");
 
@@ -1080,7 +1083,7 @@ export class Crawler {
         if (count <= 0) {
           break;
         }
-        this.debugLog(`Still waiting for ${count} pending requests to finish...`);
+        this.logger.debug(`Still waiting for ${count} pending requests to finish...`);
       } catch (e) {
         break;
       }
@@ -1104,17 +1107,17 @@ export class Crawler {
       const { sites } = await sitemapper.fetch();
       await this.queueInScopeUrls(seedId, sites, 0);
     } catch(e) {
-      console.warn(e);
+      this.logger.warn("Error fetching sites from sitemap", e);
     }
   }
 
   async combineWARC() {
-    this.statusLog("Generating Combined WARCs");
+    this.logger.info("Generating Combined WARCs");
 
     // Get the list of created Warcs
     const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));
 
-    this.debugLog(`Combining ${warcLists.length} WARCs...`);
+    this.logger.debug(`Combining ${warcLists.length} WARCs...`);
 
     const fileSizeObjects = []; // Used to sort the created warc by fileSize
 
@@ -1181,7 +1184,7 @@ export class Crawler {
         fh.write(warcBuffer);
       }
 
-      this.debugLog(`Appending WARC ${fileSizeObjects[j].fileName}`);
+      this.logger.debug(`Appending WARC ${fileSizeObjects[j].fileName}`);
 
       const reader = fs.createReadStream(fileSizeObjects[j].fileName);
 
@@ -1198,7 +1201,7 @@ export class Crawler {
       await fh.end();
     }
 
-    this.debugLog(`Combined WARCs saved as: ${generatedCombinedWarcs}`);
+    this.logger.debug(`Combined WARCs saved as: ${generatedCombinedWarcs}`);
   }
 
   async serializeConfig(done = false) {
@@ -1248,10 +1251,10 @@ export class Crawler {
     }
     const res = yaml.dump(this.origConfig, {lineWidth: -1});
     try {
-      this.statusLog("Saving crawl state to: " + filename);
+      this.logger.info(`Saving crawl state to: ${filename}`);
       await fsp.writeFile(filename, res);
     } catch (e) {
-      console.error(`Failed to write save state file: ${filename}`, e);
+      this.logger.error(`Failed to write save state file: ${filename}`, e);
       return;
     }
 
@@ -1259,11 +1262,11 @@ export class Crawler {
 
     if (this.saveStateFiles.length > this.params.saveStateHistory) {
       const oldFilename = this.saveStateFiles.shift();
-      this.statusLog(`Removing old save-state: ${oldFilename}`);
+      this.logger.info(`Removing old save-state: ${oldFilename}`);
       try {
         await fsp.unlink(oldFilename);
       } catch (e) {
-        console.error(`Failed to delete old save state file: ${oldFilename}`);
+        this.logger.error(`Failed to delete old save state file: ${oldFilename}`);
       }
     }
 

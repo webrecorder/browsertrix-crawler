@@ -1,5 +1,9 @@
 import fs from "fs";
 
+import { Logger } from "./logger.js";
+
+const logger = new Logger();
+
 const RULE_TYPES = ["block", "allowOnly"];
 
 const ALWAYS_ALLOW = ["https://pywb.proxy/", "http://pywb.proxy/"];
@@ -28,7 +32,7 @@ class BlockRule
     }
 
     if (!RULE_TYPES.includes(this.type)) {
-      throw new Error("Rule \"type\" must be: " + RULE_TYPES.join(", "));
+      logger.fatal("Rule \"type\" must be: " + RULE_TYPES.join(", "));
     }
   }
 
@@ -47,11 +51,11 @@ ${this.frameTextMatch ? "Frame Text Regex: " + this.frameTextMatch : ""}
 // ===========================================================================
 export class BlockRules
 {
-  constructor(blockRules, blockPutUrl, blockErrMsg, debugLog) {
+  constructor(blockRules, blockPutUrl, blockErrMsg, logger) {
     this.rules = [];
     this.blockPutUrl = blockPutUrl;
     this.blockErrMsg = blockErrMsg;
-    this.debugLog = debugLog;
+    this.logger = logger;
 
     this.blockedUrlSet = new Set();
 
@@ -60,9 +64,9 @@ export class BlockRules
     }
 
     if (this.rules.length) {
-      this.debugLog("URL Block Rules:\n");
+      this.logger.debug("URL Block Rules:\n");
       for (const rule of this.rules) {
-        this.debugLog(rule.toString());
+        this.logger.debug(rule.toString());
       }
     }
   }
@@ -84,7 +88,7 @@ export class BlockRules
       try {
         await this.handleRequest(request);
       } catch (e) {
-        console.warn(e);
+        this.logger.warn("Error handling request", e);
       }
     });
   }
@@ -104,7 +108,7 @@ export class BlockRules
       }
 
     } catch (e) {
-      this.debugLog(`Block: (${blockState}) Failed On: ${url} Reason: ${e}`);
+      this.logger.debug(`Block: (${blockState}) Failed On: ${url}`, e);
     }
   }
 
@@ -151,10 +155,10 @@ export class BlockRules
 
       if (block) {
         if (blockState === BlockState.BLOCK_PAGE_NAV) {
-          console.warn(`Warning: Block rule match for page request "${url}" ignored, set --exclude to block full pages`);
+          this.logger.warn(`Warning: Block rule match for page request "${url}" ignored, set --exclude to block full pages`);
           return BlockState.ALLOW;
         }
-        this.debugLog(`URL Blocked/Aborted: ${url} in frame ${frameUrl}`);
+        this.logger.debug(`URL Blocked/Aborted: ${url} in frame ${frameUrl}`);
         await this.recordBlockMsg(url);
         return blockState;
       }
@@ -187,7 +191,7 @@ export class BlockRules
       }
 
       const block = await this.isTextMatch(request, reqUrl, frameTextMatch) ? !allowOnly : allowOnly;
-      this.debugLog(`iframe ${url} conditionally ${block ? "BLOCKED" : "ALLOWED"}, parent frame ${frameUrl}`);
+      this.logger.debug(`iframe ${url} conditionally ${block ? "BLOCKED" : "ALLOWED"}, parent frame ${frameUrl}`);
       return {block, done: true};
     }
 
@@ -204,7 +208,7 @@ export class BlockRules
       return !!text.match(frameTextMatch);
 
     } catch (e) {
-      this.debugLog(e);
+      this.logger.debug("Error determining text match", e);
     }
   }
 
@@ -230,8 +234,8 @@ export class BlockRules
 // ===========================================================================
 export class AdBlockRules extends BlockRules
 {
-  constructor(blockPutUrl, blockErrMsg, debugLog, adhostsFilePath = "../ad-hosts.json") {
-    super([], blockPutUrl, blockErrMsg, debugLog);
+  constructor(blockPutUrl, blockErrMsg, logger, adhostsFilePath = "../ad-hosts.json") {
+    super([], blockPutUrl, blockErrMsg, logger);
     this.adhosts = JSON.parse(fs.readFileSync(new URL(adhostsFilePath, import.meta.url)));
   }
 
@@ -248,7 +252,7 @@ export class AdBlockRules extends BlockRules
       try {
         await this.handleRequest(request);
       } catch (e) {
-        console.warn(e);
+        this.logger.warn("Error handling request", e);
       }
     });
   }
@@ -257,7 +261,7 @@ export class AdBlockRules extends BlockRules
     const fragments = url.split("/");
     const domain = fragments.length > 2 ? fragments[2] : null;
     if (this.adhosts.includes(domain)) {
-      this.debugLog(`URL blocked for being an ad: ${url}`);
+      this.logger.debug(`URL blocked for being an ad: ${url}`);
       await this.recordBlockMsg(url);
       return BlockState.BLOCK_AD;
     }

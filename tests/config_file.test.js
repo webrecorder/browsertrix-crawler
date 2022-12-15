@@ -45,7 +45,7 @@ test("check yaml config file with seed list is used", async () => {
 test("check yaml config file will be overwritten by command line", async () => {
   try{
 
-    await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection configtest-2 --config /tests/fixtures/crawl-1.yaml --url https://www.example.com --timeout 20000");
+    await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection configtest-2 --config /tests/fixtures/crawl-1.yaml --url https://specs.webrecorder.net/ --scopeType page --timeout 20000");
   }
   catch (error) {
     console.log(error);
@@ -61,7 +61,7 @@ test("check yaml config file will be overwritten by command line", async () => {
     }
   }
 
-  expect(pages.has("https://www.example.com/")).toBe(true);
+  expect(pages.has("https://specs.webrecorder.net/")).toBe(true);
   expect(pages.size).toBe(1);
 
 });

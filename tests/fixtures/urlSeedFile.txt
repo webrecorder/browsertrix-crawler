@@ -1,2 +1,2 @@
-https://www.example.org
-https://www.example.com
+https://webrecorder.net/about/
+https://specs.webrecorder.net/wacz/1.1.1/

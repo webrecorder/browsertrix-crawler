@@ -7,8 +7,11 @@ import { createHash } from "crypto";
 import Minio from "minio";
 
 import { initRedis } from "./redis.js";
+import { Logger } from "./logger.js";
 
 import getFolderSize from "get-folder-size";
+
+const logger = new Logger();
 
 
 // ===========================================================================
@@ -57,10 +60,13 @@ export class S3StorageSync
   }
 
   async uploadFile(srcFilename, targetFilename) {
-    console.log(`Bucket: ${this.bucketName}`);
-    console.log(`Crawl Id: ${this.crawlId}`);
-    console.log(`Prefix: ${this.objectPrefix}`);
-    console.log(`Target Filename: ${targetFilename}`);
+    const fileUploadInfo = {
+      "bucket": this.bucketName,
+      "crawlId": this.crawlId,
+      "prefix": this.objectPrefix,
+      "targetFilename": this.targetFilename
+    };
+    logger.info("S3 file upload information", fileUploadInfo, "s3Upload");
 
     await this.client.fPutObject(this.bucketName, this.objectPrefix + targetFilename, srcFilename);
 
@@ -76,7 +82,7 @@ export class S3StorageSync
 
   async uploadCollWACZ(srcFilename, targetFilename, completed = true) {
     const resource = await this.uploadFile(srcFilename, targetFilename);
-    console.log(resource);
+    logger.info("WACZ S3 file upload resource", resource, "s3Upload");
 
     if (this.webhookUrl) {
       const body = {
@@ -92,14 +98,14 @@ export class S3StorageSync
         completed
       };
 
-      console.log("Pinging Webhook: " + this.webhookUrl);
+      logger.info(`Pinging Webhook: ${this.webhookUrl}`);
 
       if (this.webhookUrl.startsWith("http://") || this.webhookUrl.startsWith("https://")) {
         await fetch(this.webhookUrl, {method: "POST", body: JSON.stringify(body)});
       } else if (this.webhookUrl.startsWith("redis://")) {
         const parts = this.webhookUrl.split("/");
         if (parts.length !== 5) {
-          throw new Error("redis webhook url must be in format: redis://<host>:<port>/<db>/<key>");
+          logger.fatal("redis webhook url must be in format: redis://<host>:<port>/<db>/<key>");
         }
         const redis = await initRedis(parts.slice(0, 4).join("/"));
         await redis.rpush(parts[4], JSON.stringify(body));

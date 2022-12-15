@@ -1,5 +1,10 @@
 import mod from "puppeteer-cluster/dist/Job.js";
+
+import { Logger } from "./logger.js";
+
 const Job = mod.default;
+
+const logger = new Logger();
 
 
 // ============================================================================
@@ -102,7 +107,7 @@ export class MemoryCrawlState extends BaseState
       },
 
       reject(e) {
-        console.warn(`Page Load Failed: ${url}, Reason: ${e}`);
+        logger.warn(`Page Load Failed: ${url}`, e.message);
 
         state.pending.delete(url);
 
@@ -316,7 +321,7 @@ return 0;
     try {
       data = JSON.parse(json);
     } catch(e) {
-      console.error("Invalid queued json: ", json);
+      logger.error("Invalid queued json", json);
       return null;
     }
 
@@ -338,7 +343,7 @@ return 0;
       },
 
       async reject(e) {
-        console.warn(`Page Load Failed: ${url}, Reason: ${e}`);
+        logger.warn(`Page Load Failed: ${url}`, e.message);
         await state._fail(url);
       }
     };
@@ -445,7 +450,7 @@ return 0;
 
     for (const url of pendingUrls) {
       if (await this.redis.requeue(this.pkey, this.qkey, this.pkey + ":" + url, url)) {
-        console.log("Requeued: " + url);
+        logger.info(`Requeued: ${url}`);
       }
     }
   }

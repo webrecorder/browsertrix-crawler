@@ -8,7 +8,7 @@ const exec = util.promisify(execCallback);
 
 test("check that URLs are crawled 2 extra hops beyond depth", async () => {
   try {
-    await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-beyond --extraHops 2 --url https://example.com/ --limit 7");
+    await exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-beyond --extraHops 2 --url https://webrecorder.net/ --limit 7");
   }
   catch (error) {
     console.log(error);
@@ -17,13 +17,13 @@ test("check that URLs are crawled 2 extra hops beyond depth", async () => {
   const crawled_pages = fs.readFileSync("test-crawls/collections/extra-hops-beyond/pages/pages.jsonl", "utf8");
 
   const expectedPages = [
-    "https://example.com/",
-    "https://www.iana.org/domains/example",
-    "http://www.iana.org/",
-    "http://www.iana.org/domains",
-    "http://www.iana.org/protocols",
-    "http://www.iana.org/numbers",
-    "http://www.iana.org/about",
+    "https://webrecorder.net/",
+    "https://webrecorder.net/blog",
+    "https://webrecorder.net/tools",
+    "https://webrecorder.net/community",
+    "https://webrecorder.net/about",
+    "https://webrecorder.net/contact",
+    "https://webrecorder.net/faq",
   ];
 
   for (const page of crawled_pages.trim().split("\n")) {

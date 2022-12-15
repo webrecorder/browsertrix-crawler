@@ -1,5 +1,9 @@
 import sbi from "puppeteer-cluster/dist/concurrency/SingleBrowserImplementation.js";
 
+import { Logger } from "./logger.js";
+
+const logger = new Logger();
+
 const SingleBrowserImplementation = sbi.default;
 
 
@@ -40,7 +44,7 @@ export class ReuseWindowConcurrency extends SingleBrowserImplementation {
     }
 
     this.repairing = true;
-    console.debug("Starting repair");
+    logger.warn("Starting browser repair");
 
     if (this.screencaster) {
       this.screencaster.endAllTargets();
@@ -50,13 +54,13 @@ export class ReuseWindowConcurrency extends SingleBrowserImplementation {
       // will probably fail, but just in case the repair was not necessary
       await this.browser.close();
     } catch (e) {
-      console.debug("Unable to close browser.");
+      logger.warn("Unable to close browser");
     }
 
     try {
       await this.init();
     } catch (err) {
-      console.debug("Unable to restart chrome.");
+      logger.warn("Unable to restart chrome");
     }
     this.repairRequested = false;
     this.repairing = false;
@@ -71,7 +75,7 @@ export class ReuseWindowConcurrency extends SingleBrowserImplementation {
         const res = await this.cdp.send("Target.createTarget", {url: this.startPage, newWindow: true});
         targetId = res.targetId;
       } catch (e) {
-        console.warn(e);
+        logger.warn("Error getting new page in window context", e);
         await this.repair();
       }
 

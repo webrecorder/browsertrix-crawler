@@ -2,6 +2,9 @@ import fs from "fs";
 import path from "path";
 import * as warcio from "warcio";
 
+import { Logger } from "./logger.js";
+
+const logger = new Logger();
 
 // ============================================================================
 
@@ -43,9 +46,9 @@ export class Screenshots {
       const warcRecord = await this.wrap(screenshotBuffer, screenshotType, options.type);
       const warcRecordBuffer = await warcio.WARCSerializer.serialize(warcRecord, {gzip: true});
       fs.appendFileSync(this.warcName, warcRecordBuffer);
-      console.log(`Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.warcName}`);
+      logger.info(`Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.warcName}`);
     } catch (e) {
-      console.log(`Taking screenshot (type: ${screenshotType}) failed for ${this.url}`, e);
+      logger.error(`Taking screenshot (type: ${screenshotType}) failed for ${this.url}`, e.message);
     }
   }
 

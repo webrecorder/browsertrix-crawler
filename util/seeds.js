@@ -1,7 +1,15 @@
+import { Logger } from "./logger.js";
+
+const logger = new Logger();
+
+
 export class ScopedSeed
 {
   constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} = {}) {
     const parsedUrl = this.parseUrl(url);
+    if (!parsedUrl) {
+      logger.fatal(`Invalid Seed "${url}" - not a valid URL`);
+    }
     this.url = parsedUrl.href;
     this.include = this.parseRx(include);
     this.exclude = this.parseRx(exclude);
@@ -36,11 +44,12 @@ export class ScopedSeed
     try {
       parsedUrl = new URL(url.trim());
     } catch (e) {
-      throw new Error(`Invalid Seed "${url}" - not a valid URL`);
+      logger.error(`Invalid Seed "${url}" - not a valid URL`);
     }
 
     if (parsedUrl.protocol !== "http:" && parsedUrl.protocol != "https:") {
-      throw new Error(`Invalid Seed "${url}" - URL must start with http:// or https://`);
+      logger.error(`Invalid Seed "${url}" - URL must start with http:// or https://`);
+      parsedUrl = null;
     }
 
     return parsedUrl;
@@ -91,7 +100,7 @@ export class ScopedSeed
       break;
 
     default:
-      throw new Error(`Invalid scope type "${scopeType}" specified, valid types are: page, page-spa, prefix, host, domain, any`);
+      logger.fatal(`Invalid scope type "${scopeType}" specified, valid types are: page, page-spa, prefix, host, domain, any`);
     }
 
     return [include, allowHash];
@@ -106,9 +115,8 @@ export class ScopedSeed
       return false;
     }
 
-    try {
-      url = this.parseUrl(url);
-    } catch(e) {
+    url = this.parseUrl(url);
+    if (!url) {
       return false;
     }
 

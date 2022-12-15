@@ -1,8 +1,8 @@
 name: crawl-test-1
 collection: configtest
 seeds:
-  - https://www.example.org
-  - https://www.iana.org/
+  - https://webrecorder.net/
+  - https://specs.webrecorder.net/
 
 generateWACZ: true
 
