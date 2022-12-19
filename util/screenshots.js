@@ -5,7 +5,27 @@ import * as warcio from "warcio";
 
 // ============================================================================
 
-class Screenshots {
+export const screenshotTypes = {
+  "view": {
+    type: "png",
+    omitBackground: true,
+    fullPage: false
+  },
+  "thumbnail": {
+    type: "jpeg",
+    omitBackground: true,
+    fullPage: false,
+    quality: 75
+  },
+  "fullPage": {
+    type: "png",
+    omitBackground: true,
+    fullPage: false
+  }
+};
+
+
+export class Screenshots {
 
   constructor({page, url, date, directory}) {
     this.page = page;
@@ -13,55 +33,28 @@ class Screenshots {
     this.directory = directory;
     this.warcName = path.join(this.directory, "screenshots.warc.gz");
     this.date = date ? date : new Date();
-
-    this.screenshotOptions = {
-      name: "screenshot",
-      options: {
-        type: "png",
-        omitBackground: true,
-        fullPage: false
-      }
-    };
-
-    this.screenshotFullPageOptions = {
-      name: "screenshot-fullpage",
-      options: {
-        type: "png",
-        omitBackground: true,
-        fullPage: true
-      }
-    };
-
-    this.thumbnailOptions = {
-      name: "thumbnail",
-      options: {
-        type: "jpeg",
-        omitBackground: true,
-        fullPage: false,
-        quality: 75
-      }
-    };
   }
 
-  async take(typeOptions = this.screenshotOptions) {
+  async take(screenshotType="view") {
     try {
       await this.page.setViewport({width: 1920, height: 1080});
-      let screenshotBuffer = await this.page.screenshot(typeOptions.options);
-      let warcRecord = await this.wrap(screenshotBuffer, typeOptions.name, typeOptions.options.type);
-      let warcRecordBuffer = await warcio.WARCSerializer.serialize(warcRecord, {gzip: true});
+      const options = screenshotTypes[screenshotType];
+      const screenshotBuffer = await this.page.screenshot(options);
+      const warcRecord = await this.wrap(screenshotBuffer, screenshotType, options.type);
+      const warcRecordBuffer = await warcio.WARCSerializer.serialize(warcRecord, {gzip: true});
       fs.appendFileSync(this.warcName, warcRecordBuffer);
-      console.log(`Screenshot (type: ${typeOptions.name}) for ${this.url} written to ${this.warcName}`);
+      console.log(`Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.warcName}`);
     } catch (e) {
-      console.log(`Taking screenshot (type: ${typeOptions.name}) failed for ${this.url}`, e);
+      console.log(`Taking screenshot (type: ${screenshotType}) failed for ${this.url}`, e);
     }
   }
 
   async takeFullPage() {
-    await this.take(this.screenshotFullPageOptions);
+    await this.take("fullPage");
   }
 
   async takeThumbnail() {
-    await this.take(this.thumbnailOptions);
+    await this.take("thumbnail");
   }
 
   async wrap(buffer, screenshotType="screenshot", imageType="png") {
@@ -80,5 +73,3 @@ class Screenshots {
       warcHeaders}, content());
   }
 }
-
-export { Screenshots };

@@ -12,6 +12,7 @@ import { ReuseWindowConcurrency } from "./windowconcur.js";
 import { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
+import { screenshotTypes } from "./screenshots.js";
 
 
 // ============================================================================
@@ -364,12 +365,13 @@ class ArgParser {
     }
 
     // validate screenshot options
-    let screenshotTypes = argv.screenshot.split(",");
-    const allowedScreenshotTypes = ["view", "thumbnail", "fullPage"];
+    let passedScreenshotTypes = argv.screenshot.split(",");
     argv.screenshot = [];
-    screenshotTypes.forEach((element) => {
-      if (allowedScreenshotTypes.includes(element)) {
+    passedScreenshotTypes.forEach((element) => {
+      if (element in screenshotTypes) {
         argv.screenshot.push(element);
+      } else {
+        console.log(`${element} not found in ${screenshotTypes}`);
       }
     });
 
