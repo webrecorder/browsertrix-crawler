@@ -22,8 +22,8 @@ test("check that URLs one-depth out from the seed-list are crawled", async () =>
       seed_file_list.push(seed_file[j]);
     }
   }
-  
-  let foundSeedUrl = true; 
+
+  let foundSeedUrl = true;
 
   for (var i = 1; i < seed_file_list.length; i++) {
     if (crawled_pages.indexOf(seed_file_list[i]) == -1){

@@ -20,6 +20,7 @@ import * as warcio from "warcio";
 import { TextExtract } from "./util/textextract.js";
 import { initStorage, getFileSize, getDirSize, interpolateFilename } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
+import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 
@@ -394,6 +395,24 @@ export class Crawler {
       await this.driver({page, data, crawler: this});
 
       const title = await page.title();
+
+      if (this.params.screenshot) {
+        if (!page.isHTMLPage) {
+          console.log("Skipping screenshots for non-HTML page");
+        }
+        const archiveDir = path.join(this.collDir, "archive");
+        const screenshots = new Screenshots({page, url: data.url, directory: archiveDir});
+        if (this.params.screenshot.includes("view")) {
+          await screenshots.take();
+        }
+        if (this.params.screenshot.includes("fullPage")) {
+          await screenshots.takeFullPage();
+        }
+        if (this.params.screenshot.includes("thumbnail")) {
+          await screenshots.takeThumbnail();
+        }
+      }
+
       let text = "";
       if (this.params.text && page.isHTMLPage) {
         const client = await page.target().createCDPSession();
@@ -437,7 +456,7 @@ export class Crawler {
       "software": `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`,
       "format": "WARC File Format 1.0"
     };
-    
+
     const warcInfo = {...info, ...this.params.warcInfo, };
     const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, warcInfo);
     const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});

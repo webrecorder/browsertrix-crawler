@@ -12,6 +12,7 @@ import { ReuseWindowConcurrency } from "./windowconcur.js";
 import { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
+import { screenshotTypes } from "./screenshots.js";
 
 
 // ============================================================================
@@ -46,8 +47,8 @@ class ArgParser {
       },
 
       "newContext": {
-        describe: "The context for each new capture, can be a new: page, window, session or browser.",
-        default: "page",
+        describe: "Deprecated as of 0.8.0, any values passed will be ignored",
+        default: null,
         type: "string"
       },
 
@@ -228,6 +229,12 @@ class ArgParser {
         type: "string",
       },
 
+      "screenshot": {
+        describe: "Screenshot options for crawler, can include: view, thumbnail, fullPage (comma-separated list)",
+        type: "string",
+        default: "",
+      },
+
       "screencastPort": {
         describe: "If set to a non-zero value, starts an HTTP server with screencast accessible on this port",
         type: "number",
@@ -362,6 +369,17 @@ class ArgParser {
       }
     }
 
+    // validate screenshot options
+    let passedScreenshotTypes = argv.screenshot.split(",");
+    argv.screenshot = [];
+    passedScreenshotTypes.forEach((element) => {
+      if (element in screenshotTypes) {
+        argv.screenshot.push(element);
+      } else {
+        console.log(`${element} not found in ${screenshotTypes}`);
+      }
+    });
+
     // log options
     argv.logging = argv.logging.split(",");
 
@@ -382,33 +400,16 @@ class ArgParser {
     }
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 
-    if (!argv.newContext) {
-      argv.newContext = "page";
+    if (argv.newContext) {
+      console.log("Note: The newContext argument is deprecated in 0.8.0. Values passed to this option will be ignored");
     }
 
-    switch (argv.newContext) {
-    case "page":
-      argv.newContext = Cluster.CONCURRENCY_PAGE;
-      if (argv.screencastPort && argv.workers > 1) {
-        console.log("Note: to support screencasting with >1 workers, newContext set to 'window' instead of 'page'");
-        argv.newContext = ReuseWindowConcurrency;
-      }
-      break;
-
-    case "session":
-      argv.newContext = Cluster.CONCURRENCY_CONTEXT;
-      break;
-
-    case "browser":
-      argv.newContext = Cluster.CONCURRENCY_BROWSER;
-      break;
-
-    case "window":
+    if (argv.workers > 1) {
+      console.log("Window context being used to support >1 workers");
       argv.newContext = ReuseWindowConcurrency;
-      break;
-
-    default:
-      throw new Error("Invalid newContext, must be one of: page, session, browser");
+    } else {
+      console.log("Page context being used with 1 worker");
+      argv.newContext = Cluster.CONCURRENCY_PAGE;
     }
 
     if (argv.mobileDevice) {
