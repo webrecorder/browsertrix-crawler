@@ -1,3 +1,4 @@
 pywb>=2.6.8
 uwsgi
 wacz>=0.4.6
+websockify

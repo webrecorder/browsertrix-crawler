@@ -295,6 +295,7 @@ export class Crawler {
       args: chromeArgs(!process.env.NO_PROXY, this.userAgent, this.extraChromeArgs()),
       userDataDir: this.profileDir,
       defaultViewport: null,
+      waitForInitialPage: false
     };
   }
 

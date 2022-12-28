@@ -4,7 +4,7 @@ ARG BROWSER_VERSION=105
 FROM ${BROWSER_IMAGE_BASE}:${BROWSER_VERSION}
 
 # TODO: Move this into base image
-RUN apt-get update && apt-get install -y jq
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -qqy jq x11vnc
 
 # needed to add args to main build stage
 ARG BROWSER_VERSION
@@ -17,7 +17,8 @@ ENV PROXY_HOST=localhost \
     GEOMETRY=1360x1020x16 \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=google-chrome \
-    OPENSSL_CONF=/app/openssl.conf
+    OPENSSL_CONF=/app/openssl.conf \
+    VNC_PASS=vncpassw0rd!
 
 WORKDIR /app
 

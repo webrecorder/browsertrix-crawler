@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import fs from "fs";
+import fsp from "fs/promises";
 import path from "path";
 import http from "http";
+import { homedir } from "os";
 
 import readline from "readline";
 import child_process from "child_process";
@@ -14,6 +16,7 @@ import { getBrowserExe, loadProfile, saveProfile, chromeArgs, sleep } from "./ut
 import { initStorage } from "./util/storage.js";
 
 const profileHTML = fs.readFileSync(new URL("html/createProfile.html", import.meta.url), {encoding: "utf8"});
+const vncHTML = fs.readFileSync(new URL("html/vnc_lite.html", import.meta.url), {encoding: "utf8"});
 
 const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
@@ -68,7 +71,7 @@ function cliOpts() {
     "windowSize": {
       type: "string",
       describe: "Browser window dimensions, specified as: width,height",
-      default: "1600,900"
+      default: getDefaultWindowSize()
     },
 
     "proxy": {
@@ -82,6 +85,13 @@ function cliOpts() {
       default: 7
     }
   };
+}
+
+function getDefaultWindowSize() {
+  const values = process.env.GEOMETRY.split("x");
+  const x = Number(values[0]);
+  const y = Number(values[1]);
+  return `${x - 10},${y - 10}`;
 }
 
 
@@ -105,6 +115,14 @@ async function main() {
       "+extension",
       "RANDR"
     ]);
+
+    await fsp.mkdir(path.join(homedir(), ".vnc"), {recursive: true});
+
+    child_process.spawnSync("x11vnc", ["-storepasswd", process.env.VNC_PASS, path.join(homedir(), ".vnc", "passwd")]);
+
+    child_process.spawn("x11vnc", ["-forever", "-ncache_cr", "-xdamage", "-usepw", "-shared", "-rfbport", "5900", "-display", process.env.DISPLAY]);
+
+    child_process.spawn("websockify", ["6080", "localhost:5900"]);
   }
 
   let useProxy = false;
@@ -133,6 +151,7 @@ async function main() {
     args: browserArgs,
     userDataDir: profileDir,
     defaultViewport: null,
+    waitForInitialPage: false
   };
 
   if (!params.user && !params.interactive) {
@@ -356,9 +375,19 @@ class InteractiveBrowser {
 
     switch (pathname) {
     case "/":
-      targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${this.targetId}&panel=resources`;
       res.writeHead(200, {"Content-Type": "text/html"});
+      if (this.params.headless) {
+        targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${this.targetId}&panel=resources`;
+      } else {
+        targetUrl = `http://$HOST:9223/vnc/?host=$HOST&port=6080&password=${process.env.VNC_PASS}`;
+      }
       res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl.replaceAll("$HOST", parsedUrl.hostname)));
+      return;
+
+    case "/vnc/":
+    case "/vnc/index.html":
+      res.writeHead(200, {"Content-Type": "text/html"});
+      res.end(vncHTML);
       return;
 
     case "/ping":
@@ -445,6 +474,14 @@ class InteractiveBrowser {
       }
 
       setTimeout(() => process.exit(0), 200);
+      return;
+    }
+
+    if (pathname.startsWith("/vnc/")) {
+      const fileUrl = new URL("node_modules/@novnc/novnc/" + pathname.slice("/vnc/".length), import.meta.url);
+      const file = fs.readFileSync(fileUrl, {encoding: "utf-8"});
+      res.writeHead(200, {"Content-Type": "application/javascript"});
+      res.end(file);
       return;
     }
 
