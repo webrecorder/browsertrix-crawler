@@ -91,7 +91,7 @@ function getDefaultWindowSize() {
   const values = process.env.GEOMETRY.split("x");
   const x = Number(values[0]);
   const y = Number(values[1]);
-  return `${x - 10},${y - 10}`;
+  return `${x},${y}`;
 }
 
 
@@ -120,9 +120,7 @@ async function main() {
 
     child_process.spawnSync("x11vnc", ["-storepasswd", process.env.VNC_PASS, path.join(homedir(), ".vnc", "passwd")]);
 
-    child_process.spawn("x11vnc", ["-forever", "-ncache_cr", "-xdamage", "-usepw", "-shared", "-rfbport", "5900", "-display", process.env.DISPLAY]);
-
-    child_process.spawn("websockify", ["6080", "localhost:5900"]);
+    child_process.spawn("x11vnc", ["-forever", "-ncache_cr", "-xdamage", "-usepw", "-shared", "-rfbport", "6080", "-display", process.env.DISPLAY], {stdio: "inherit"});
   }
 
   let useProxy = false;
@@ -138,6 +136,7 @@ async function main() {
   }
 
   const browserArgs = chromeArgs(useProxy, null, [
+    "--window-position=0,0",
     `--window-size=${params.windowSize}`,
   ]);
 
@@ -407,6 +406,11 @@ class InteractiveBrowser {
     case "/target":
       res.writeHead(200, {"Content-Type": "application/json"});
       res.end(JSON.stringify({targetId: this.targetId}));
+      return;
+
+    case "/vncpass":
+      res.writeHead(200, {"Content-Type": "application/json"});
+      res.end(JSON.stringify({password: process.env.VNC_PASS}));
       return;
 
     case "/navigate":

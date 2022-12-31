@@ -75,7 +75,8 @@
         // This function is called when we are disconnected
         function disconnectedFromServer(e) {
             if (e.detail.clean) {
-                status("Disconnected");
+                status("Disconnected, retrying...");
+                setTimeout(connect, 2000);
             } else {
                 status("Something went wrong, connection is closed");
             }
@@ -147,35 +148,38 @@
         // | | |         | | |
         // | | | Connect | | |
         // v v v         v v v
+        function connect() {
+          status("Connecting");
 
-        status("Connecting");
+          // Build the websocket URL used to connect
+          let url;
+          if (window.location.protocol === "https:") {
+              url = 'wss';
+          } else {
+              url = 'ws';
+          }
+          url += '://' + host;
+          if(port) {
+              url += ':' + port;
+          }
+          url += '/' + path;
 
-        // Build the websocket URL used to connect
-        let url;
-        if (window.location.protocol === "https:") {
-            url = 'wss';
-        } else {
-            url = 'ws';
+          // Creating a new RFB object will start a new connection
+          rfb = new RFB(document.getElementById('screen'), url,
+                        { credentials: { password: password } });
+
+          // Add listeners to important events from the RFB module
+          rfb.addEventListener("connect",  connectedToServer);
+          rfb.addEventListener("disconnect", disconnectedFromServer);
+          rfb.addEventListener("credentialsrequired", credentialsAreRequired);
+          rfb.addEventListener("desktopname", updateDesktopName);
+
+          // Set parameters that can be changed on an active connection
+          rfb.viewOnly = readQueryVariable('view_only', false);
+          rfb.scaleViewport = readQueryVariable('scale', false);
         }
-        url += '://' + host;
-        if(port) {
-            url += ':' + port;
-        }
-        url += '/' + path;
 
-        // Creating a new RFB object will start a new connection
-        rfb = new RFB(document.getElementById('screen'), url,
-                      { credentials: { password: password } });
-
-        // Add listeners to important events from the RFB module
-        rfb.addEventListener("connect",  connectedToServer);
-        rfb.addEventListener("disconnect", disconnectedFromServer);
-        rfb.addEventListener("credentialsrequired", credentialsAreRequired);
-        rfb.addEventListener("desktopname", updateDesktopName);
-
-        // Set parameters that can be changed on an active connection
-        rfb.viewOnly = readQueryVariable('view_only', false);
-        rfb.scaleViewport = readQueryVariable('scale', false);
+        connect();
     </script>
 </head>
 
