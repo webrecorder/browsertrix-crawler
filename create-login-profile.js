@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
 import fs from "fs";
-import fsp from "fs/promises";
 import path from "path";
 import http from "http";
-import { homedir } from "os";
 
 import readline from "readline";
 import child_process from "child_process";
@@ -116,11 +114,23 @@ async function main() {
       "RANDR"
     ]);
 
-    await fsp.mkdir(path.join(homedir(), ".vnc"), {recursive: true});
+    //await fsp.mkdir(path.join(homedir(), ".vnc"), {recursive: true});
 
-    child_process.spawnSync("x11vnc", ["-storepasswd", process.env.VNC_PASS, path.join(homedir(), ".vnc", "passwd")]);
+    //child_process.spawnSync("x11vnc", ["-storepasswd", process.env.VNC_PASS, path.join(homedir(), ".vnc", "passwd")]);
 
-    child_process.spawn("x11vnc", ["-forever", "-ncache_cr", "-xdamage", "-usepw", "-shared", "-rfbport", "6080", "-display", process.env.DISPLAY], {stdio: "inherit"});
+    child_process.spawn("x11vnc", [
+      "-forever",
+      "-ncache_cr",
+      "-xdamage",
+      "-usepw",
+      "-shared",
+      "-rfbport",
+      "6080",
+      "-passwd",
+      process.env.VNC_PASS,
+      "-display",
+      process.env.DISPLAY
+    ]);
   }
 
   let useProxy = false;
