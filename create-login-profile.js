@@ -56,7 +56,7 @@ function cliOpts() {
     },
 
     "interactive": {
-      describe: "Deprecated. Now the default option!"
+      describe: "Deprecated. Now the default option!",
       type: "boolean",
       default: false
     },
