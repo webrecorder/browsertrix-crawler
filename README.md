@@ -15,7 +15,7 @@ Thus far, Browsertrix Crawler supports:
 - Screencasting: Ability to watch crawling in real-time (experimental).
 - Optimized (non-browser) capture of non-HTML resources.
 - Extensible Puppeteer driver script for customizing behavior per crawl or page.
-- Ability to create and reuse browser profiles with user/password login or via interactive login through an embedded browser.
+- Ability to create and reuse browser profiles interactively or via automated user/password login using an embedded browser.
 - Multi-platform support -- prebuilt Docker images available for Intel/AMD and Apple (M1) CPUs.
 
 ## Getting Started
@@ -543,16 +543,68 @@ When The crawler will keep the last `--saveStateHistory` save states and delete 
 Browsertrix Crawler also includes a way to use existing browser profiles when running a crawl. This allows pre-configuring the browser, such as by logging in
 to certain sites or setting other settings, and running a crawl exactly with those settings. By creating a logged in profile, the actual login credentials are not included in the crawl, only (temporary) session cookies.
 
-Browsertrix Crawler includes a script to login to a single website with supplied credentials and then save the profile, as well as a new 'interactive' profile creation mode.
-The script profile creation system also take a screenshot so you can check if the login succeeded. The `--url` parameter should specify the URL of a login page.
 
-For example, to create a profile logged in to Twitter, you can run:
+### Interactive Profile Creation
+
+For creating profiles of more complex sites, or logging in to multiple sites at once, the interactive profile creation mode can be used.
+To use this mode, don't specify --username or --password flags and expose two ports on the Docker container to allow DevTools to connect to the browser and to serve
+a status page.
+
+In profile creation mode, Browsertrix Crawler launches a browser which uses VNC (via noVNC) server running on port 6080 to provide a 'remote desktop' for interacting with the browser.
+
+After interactively logging into desired sites or configuring other settings, the 'Create Profile' should be clicked to initiate profile creation.
+Browsertrix Crawler will then stop the browser, and save the browser profile.
+
+For example, to start in interactive profile creation mode, run:
+
+```
+docker run -p 6080:6080 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles/ -it webrecorder/browsertrix-crawler create-login-profile --url "https://example.com/"
+```
+
+Then, open a browser pointing to `http://localhost:9223/` and use the embedded browser to log in to any sites or configure any settings as needed.
+Click 'Create Profile at the top when done. The profile will then be created in `./crawls/profiles/profile.tar.gz` containing the settings of this browsing session.
+
+It is also possible to extend an existing profiles by also passing in an existing profile via the `--profile` flag. In this way, it is possible to build new profiles by extending previous browsing sessions as needed.
+
+```
+docker run -p 6080:6080 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles -it webrecorder/browsertrix-crawler create-login-profile --url "https://example.com/ --filename /crawls/profiles/newProfile.tar.gz --profile /crawls/profiles/oldProfile.tar.gz"
+```
+
+#### Headless vs Headful Profiles
+
+Browsertrix Crawler supports both 'headful' and headless crawling. We recommend using headful crawling to be most accurate to user experience, however,
+headless crawling may be faster.
+
+To use profiles in headless mode, profiles should also be created with `--headless` flag.
+
+When creating browser profile in headless mode, Browsertrix will use the devtools protocol on port 9222 to stream the browser interface (previously, this was also used
+in headful mode as well).
+
+To create a profile in headless mode, run:
+
+```
+docker run -p 9222:9222 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles/ -it webrecorder/browsertrix-crawler create-login-profile --headless --url "https://example.com/"
+```
+
+### Automated Profile Creation for User Login
+
+If the `--automated` flag is provided, Browsertrix Crawler will attempt to create a profile automatically after logging in to sites with a username and password.
+The username and password can be provided via `--username` and `--password` flags or, if omitted, from a command-line prompt.
+
+When using `--automated` or `--username` / `--password`, Browsertrix Crawler will not launch an interactive browser and instead will attempt to finish automatically.
+
+The automated profile creation system will log in to a single website with supplied credentials and then save the profile
+The script profile creation system also take a screenshot so you can check if the login succeeded.
+
+For example, to launch a browser, and login to Twitter, run:
 
 ```bash
 docker run -v $PWD/crawls/profiles:/crawls/profiles -it webrecorder/browsertrix-crawler create-login-profile --url "https://twitter.com/login"
 ```
 
 The script will then prompt you for login credentials, attempt to login and create a tar.gz file in `./crawls/profiles/profile.tar.gz`.
+
+- The `--url` parameter should specify the URL of a login page.
 
 - To specify a custom filename, pass along `--filename` parameter.
 
@@ -563,35 +615,7 @@ The script will then prompt you for login credentials, attempt to login and crea
 - To specify the window size for the profile creation embedded browser, specify `--windowSize WIDTH,HEIGHT`. (The default is 1600x900)
 
 
-The current profile creation script is still experimental and the script attempts to detect the username and password fields on a site as generically as possible, but may not work for all sites. Additional profile functionality, such as support for custom profile creation scripts, may be added in the future.
-
-
-### Interactive Profile Creation
-
-For creating profiles of more complex sites, or logging in to multiple sites at once, the interactive profile creation mode can be used.
-To use this mode, specify the `--interactive` flag and expose two ports on the Docker container to allow DevTools to connect to the browser and to serve
-a status page.
-
-In this mode, Browsertrix launches a browser connected to DevTools, and allowing the user to use the browser via the devtools device UI.
-
-After interactively logging into desired sites or configuring other settings, the 'Create Profile' should be clicked to initiate profile creation.
-
-Browsertrix Crawler will then create a profile as before using the current state of the browser and disconnect from devtools.
-
-For example, to start in interactive profile creation mode, run:
-
-```
-docker run -p 9222:9222 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles/ -it webrecorder/browsertrix-crawler create-login-profile --interactive --url "https://example.com/"
-```
-
-Then, open a browser pointing to `http://localhost:9223/` and use the embedded browser to log in to any sites or configure any settings as needed.
-Click 'Create Profile at the top when done. The profile will then be created in `./crawls/profiles/profile.tar.gz` containing the settings of this browsing session.
-
-It is also possible to extend an existing profiles by also passing in an existing profile via the `--profile` flag. In this way, it is possible to build new profiles by extending previous browsing sessions as needed.
-
-```
-docker run -p 9222:9222 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles -it webrecorder/browsertrix-crawler create-login-profile --interactive --url "https://example.com/ --filename /crawls/profiles/newProfile.tar.gz --profile /crawls/profiles/oldProfile.tar.gz"
-```
+The current profile creation script is still experimental and the script attempts to detect the username and password fields on a site as generically as possible, but may not work for all sites. Additional automated profile creation functionality, such as support for custom profile creation scripts, may be added in the future.
 
 ### Using Browser Profile with a Crawl
 
