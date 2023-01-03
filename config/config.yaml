@@ -1,5 +1,4 @@
 debug: true
-
  
 proxy:
   coll: ${COLL}
@@ -14,10 +13,6 @@ recorder:
   cache: always
   rollover_size: ${ROLLOVER_SIZE}
   enable_put_custom_record: true
-
-#autoindex: 10
-
-#enable_auto_fetch: true
 
 collections:
   live: $live
