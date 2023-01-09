@@ -1,5 +1,5 @@
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base
-ARG BROWSER_VERSION=brave-test-latest
+ARG BROWSER_VERSION=brave-1.46.144
 
 FROM ${BROWSER_IMAGE_BASE}:${BROWSER_VERSION}
 
