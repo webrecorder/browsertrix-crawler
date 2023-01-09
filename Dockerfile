@@ -46,7 +46,7 @@ ADD config/ /app/
 ADD html/ /app/html/
 
 COPY brave-default-profile.tar.gz /app/
-COPY brave-ad-blocking-disabled-profile.tar.gz /app/
+COPY brave-ad-block-disabled-profile.tar.gz /app/
 
 RUN ln -s /app/main.js /usr/bin/crawl; ln -s /app/create-login-profile.js /usr/bin/create-login-profile
 
