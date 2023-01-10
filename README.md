@@ -596,10 +596,10 @@ When using `--automated` or `--username` / `--password`, Browsertrix Crawler wil
 The automated profile creation system will log in to a single website with supplied credentials and then save the profile
 The script profile creation system also take a screenshot so you can check if the login succeeded.
 
-For example, to launch a browser, and login to Twitter, run:
+For example, to launch a browser, and login to the digipres.club Mastodon instance, run:
 
 ```bash
-docker run -v $PWD/crawls/profiles:/crawls/profiles -it webrecorder/browsertrix-crawler create-login-profile --url "https://twitter.com/login"
+docker run -v $PWD/crawls/profiles:/crawls/profiles -it webrecorder/browsertrix-crawler create-login-profile --url "https://digipres.club/"
 ```
 
 The script will then prompt you for login credentials, attempt to login and create a tar.gz file in `./crawls/profiles/profile.tar.gz`.
@@ -625,7 +625,7 @@ After running the above command, you can now run a crawl with the profile, as fo
 
 ```bash
 
-docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --profile /crawls/profiles/profile.tar.gz --url https://twitter.com/ --generateWACZ --collection test-with-profile
+docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --profile /crawls/profiles/profile.tar.gz --url https://digipres.club/ --generateWACZ --collection test-with-profile
 ```
 
 Profiles can also be loaded from an http/https URL, eg. `--profile https://example.com/path/to/profile.tar.gz`
