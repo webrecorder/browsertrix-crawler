@@ -615,6 +615,11 @@
     "@jridgewell/resolve-uri" "3.1.0"
     "@jridgewell/sourcemap-codec" "1.4.14"
 
+"@novnc/novnc@1.4.0-beta":
+  version "1.4.0-beta"
+  resolved "https://registry.yarnpkg.com/@novnc/novnc/-/novnc-1.4.0-beta.tgz#a9aedc3f0274863dcfd0d382c43615e912f7c006"
+  integrity sha512-iLwlvPucpqZ14yZHIrW6bxeC1Aynd5hNhbe9iSEYTOPtOicpVkbwj5Mpkmyw9rSqYoqwLKerV7OJ8afUg1Yq0g==
+
 "@sinclair/typebox@^0.24.1":
   version "0.24.50"
   resolved "https://registry.yarnpkg.com/@sinclair/typebox/-/typebox-0.24.50.tgz#35ee4db4ab8f3a8ff56490c51f92445d2776451e"

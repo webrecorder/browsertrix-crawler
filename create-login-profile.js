@@ -14,6 +14,7 @@ import { getBrowserExe, loadProfile, saveProfile, chromeArgs, sleep } from "./ut
 import { initStorage } from "./util/storage.js";
 
 const profileHTML = fs.readFileSync(new URL("html/createProfile.html", import.meta.url), {encoding: "utf8"});
+const vncHTML = fs.readFileSync(new URL("html/vnc_lite.html", import.meta.url), {encoding: "utf8"});
 
 const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
@@ -48,10 +49,16 @@ function cliOpts() {
       default: false,
     },
 
-    "interactive": {
-      describe: "Start in interactive mode!",
+    "automated": {
+      describe: "Start in automated mode, no interactive browser",
       type: "boolean",
       default: false,
+    },
+
+    "interactive": {
+      describe: "Deprecated. Now the default option!",
+      type: "boolean",
+      default: false
     },
 
     "shutdownWait": {
@@ -68,7 +75,7 @@ function cliOpts() {
     "windowSize": {
       type: "string",
       describe: "Browser window dimensions, specified as: width,height",
-      default: "1600,900"
+      default: getDefaultWindowSize()
     },
 
     "proxy": {
@@ -82,6 +89,13 @@ function cliOpts() {
       default: 7
     }
   };
+}
+
+function getDefaultWindowSize() {
+  const values = process.env.GEOMETRY.split("x");
+  const x = Number(values[0]);
+  const y = Number(values[1]);
+  return `${x},${y}`;
 }
 
 
@@ -105,6 +119,24 @@ async function main() {
       "+extension",
       "RANDR"
     ]);
+
+    //await fsp.mkdir(path.join(homedir(), ".vnc"), {recursive: true});
+
+    //child_process.spawnSync("x11vnc", ["-storepasswd", process.env.VNC_PASS, path.join(homedir(), ".vnc", "passwd")]);
+
+    child_process.spawn("x11vnc", [
+      "-forever",
+      "-ncache_cr",
+      "-xdamage",
+      "-usepw",
+      "-shared",
+      "-rfbport",
+      "6080",
+      "-passwd",
+      process.env.VNC_PASS,
+      "-display",
+      process.env.DISPLAY
+    ]);
   }
 
   let useProxy = false;
@@ -120,6 +152,7 @@ async function main() {
   }
 
   const browserArgs = chromeArgs(useProxy, null, [
+    "--window-position=0,0",
     `--window-size=${params.windowSize}`,
   ]);
 
@@ -133,13 +166,22 @@ async function main() {
     args: browserArgs,
     userDataDir: profileDir,
     defaultViewport: null,
+    waitForInitialPage: false
   };
 
-  if (!params.user && !params.interactive) {
+  if (params.interactive) {
+    console.log("Note: the '--interactive' flag is now deprecated and is the default profile creation option. Use the --automated flag to specify non-interactive mode");
+  }
+
+  if (params.user || params.password) {
+    params.automated = true;
+  }
+
+  if (!params.user && params.automated) {
     params.user = await promptInput("Enter username: ");
   }
 
-  if (!params.password && !params.interactive) {
+  if (!params.password && params.automated) {
     params.password = await promptInput("Enter password: ", true);
   }
 
@@ -151,25 +193,27 @@ async function main() {
 
   await page.setCacheEnabled(false);
 
-  if (params.interactive) {
+  if (!params.automated) {
     await page.evaluateOnNewDocument("Object.defineProperty(navigator, \"webdriver\", {value: false});");
     // for testing, inject browsertrix-behaviors
     await page.evaluateOnNewDocument(behaviors + ";\nself.__bx_behaviors.init();");
   }
 
-  console.log("loading");
+  console.log(`Loading page: ${params.url}`);
 
   await page.goto(params.url, {waitUntil});
-  
-  console.log("loaded");
 
-  if (params.interactive) {
+  if (!params.automated) {
     new InteractiveBrowser(params, browser, page);
-    return;
+  } else {
+    await automatedProfile(params, browser, page, waitUntil);
   }
+}
 
-
+async function automatedProfile(params, browser, page, waitUntil) {
   let u, p;
+
+  console.log("Looking for username and password entry fields on page...");
 
   try {
     u = await page.waitForXPath("//input[contains(@name, 'user') or contains(@name, 'email')]");
@@ -303,6 +347,12 @@ class InteractiveBrowser {
     const port = 9223;
     httpServer.listen(port);
     console.log(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`);
+
+    if (!params.headless) {
+      console.log("Screencasting with VNC on port 6080");
+    } else {
+      console.log("Screencasting with CDP on port 9222");
+    }
   }
 
   handlePageLoad() {
@@ -356,9 +406,19 @@ class InteractiveBrowser {
 
     switch (pathname) {
     case "/":
-      targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${this.targetId}&panel=resources`;
       res.writeHead(200, {"Content-Type": "text/html"});
+      if (this.params.headless) {
+        targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${this.targetId}&panel=resources`;
+      } else {
+        targetUrl = `http://$HOST:9223/vnc/?host=$HOST&port=6080&password=${process.env.VNC_PASS}`;
+      }
       res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl.replaceAll("$HOST", parsedUrl.hostname)));
+      return;
+
+    case "/vnc/":
+    case "/vnc/index.html":
+      res.writeHead(200, {"Content-Type": "text/html"});
+      res.end(vncHTML);
       return;
 
     case "/ping":
@@ -378,6 +438,11 @@ class InteractiveBrowser {
     case "/target":
       res.writeHead(200, {"Content-Type": "application/json"});
       res.end(JSON.stringify({targetId: this.targetId}));
+      return;
+
+    case "/vncpass":
+      res.writeHead(200, {"Content-Type": "application/json"});
+      res.end(JSON.stringify({password: process.env.VNC_PASS}));
       return;
 
     case "/navigate":
@@ -445,6 +510,14 @@ class InteractiveBrowser {
       }
 
       setTimeout(() => process.exit(0), 200);
+      return;
+    }
+
+    if (pathname.startsWith("/vnc/")) {
+      const fileUrl = new URL("node_modules/@novnc/novnc/" + pathname.slice("/vnc/".length), import.meta.url);
+      const file = fs.readFileSync(fileUrl, {encoding: "utf-8"});
+      res.writeHead(200, {"Content-Type": "application/javascript"});
+      res.end(file);
       return;
     }
 

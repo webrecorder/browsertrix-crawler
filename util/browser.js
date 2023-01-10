@@ -108,7 +108,7 @@ const DEFAULT_PLAYWRIGHT_FLAGS = [
   "--force-color-profile=srgb",
   "--metrics-recording-only",
   "--no-first-run",
-  "--enable-automation",
+  "--no-startup-window",
   "--password-store=basic",
   "--use-mock-keychain",
   // See https://chromium-review.googlesource.com/c/chromium/src/+/2436773
