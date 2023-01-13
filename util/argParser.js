@@ -370,15 +370,17 @@ class ArgParser {
     }
 
     // validate screenshot options
-    let passedScreenshotTypes = argv.screenshot.split(",");
-    argv.screenshot = [];
-    passedScreenshotTypes.forEach((element) => {
-      if (element in screenshotTypes) {
-        argv.screenshot.push(element);
-      } else {
-        console.log(`${element} not found in ${screenshotTypes}`);
-      }
-    });
+    if (argv.screenshot) {
+      const passedScreenshotTypes = argv.screenshot.split(",");
+      argv.screenshot = [];
+      passedScreenshotTypes.forEach((element) => {
+        if (element in screenshotTypes) {
+          argv.screenshot.push(element);
+        } else {
+          console.log(`${element} not found in ${screenshotTypes}`);
+        }
+      });
+    }
 
     // log options
     argv.logging = argv.logging.split(",");
@@ -443,7 +445,8 @@ class ArgParser {
       console.log(`Set netIdleWait to ${argv.netIdleWait} seconds`);
     }
 
-    if (argv.include) {
+    // prefer argv.include only if string or a non-empty array
+    if (argv.include && (typeof(argv.include) === "string" || argv.include.length)) {
       if (argv.scopeType && argv.scopeType !== "custom") {
         console.warn("You've specified a --scopeType and a --scopeIncludeRx / --include regex. The custom scope regex will take precedence, overriding the scopeType");
         argv.scopeType = "custom";
