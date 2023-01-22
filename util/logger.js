@@ -7,7 +7,9 @@ export class Logger
   }
 
   logAsJSON(message, data, context, logLevel="info") {
-    if (typeof data !== "object") {
+    if (data instanceof Error) {
+      data = {"type": "exception", "message": data.message, "stack": data.stack};
+    } else if (typeof data !== "object") {
       data = {"message": data.toString()};
     }
     let dataToLog = {

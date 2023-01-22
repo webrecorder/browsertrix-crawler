@@ -130,8 +130,8 @@ export class MemoryCrawlState extends BaseState
 
   async serialize() {
     const queued = this.queue.map(x => JSON.stringify(x));
-    const pending = Array.from(this.pending.values()).map(x => JSON.stringify(x));
     const done = this.done.map(x => JSON.stringify(x));
+    const pending = (await this.getPendingList()).map(x => JSON.stringify(x));
 
     return {queued, pending, done};
   }
@@ -178,6 +178,10 @@ export class MemoryCrawlState extends BaseState
 
   async numRealPending() {
     return this.pending.size;
+  }
+
+  async getPendingList() {
+    return Array.from(this.pending.values());
   }
 }
 
@@ -362,7 +366,7 @@ return 0;
   async serialize() {
     const queued = await this._iterListKeys(this.qkey);
     const done = await this._iterListKeys(this.dkey);
-    const pending = await this.redis.hvals(this.pkey);
+    const pending = await this.getPendingList();
 
     return {queued, pending, done};
   }
@@ -443,6 +447,10 @@ return 0;
     }
 
     return res;
+  }
+
+  async getPendingList() {
+    return await this.redis.hvals(this.pkey);
   }
 
   async resetPendings() {
