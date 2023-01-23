@@ -132,7 +132,7 @@ export function initStorage() {
     userId: process.env.STORE_USER,
   };
 
-  console.log("Initing Storage...");
+  logger.info("Initing Storage...");
   return new S3StorageSync(storeInfo, opts);
 }
 

@@ -384,7 +384,7 @@ export class Crawler {
 
       if (this.params.screenshot) {
         if (!page.isHTMLPage) {
-          console.log("Skipping screenshots for non-HTML page");
+          this.logger.info("Skipping screenshots for non-HTML page");
         }
         const archiveDir = path.join(this.collDir, "archive");
         const screenshots = new Screenshots({page, url: data.url, directory: archiveDir});
@@ -428,7 +428,7 @@ export class Crawler {
       await this.serializeConfig();
 
     } catch (e) {
-      this.logger.error(`Error crawling page ${data.url}`, e.message);
+      this.logger.error(`Error crawling page ${data.url}`, e);
       await this.markPageFailed(page);
     }
   }
@@ -755,16 +755,16 @@ export class Crawler {
     }
 
     const realSize = await this.crawlState.realSize();
-    const pending = await this.crawlState.numRealPending();
+    const pendingList = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
-    const total = realSize + pending + done;
+    const total = realSize + pendingList.length + done;
     const limit = {max: this.params.limit || 0, hit: this.limitHit};
     const stats = {
       "crawled": done,
       "total": total,
-      "pending": pending,
+      "pending": pendingList.length,
       "limit": limit,
-      "pendingPages": Array.from(this.crawlState.pending.values()).map(x => JSON.stringify(x))
+      "pendingPages": pendingList.map(x => JSON.stringify(x))
     };
 
     this.logger.info("Crawl statistics", stats, "crawlState");
@@ -947,7 +947,7 @@ export class Crawler {
         await this.sleep(5.5);
       }
     } catch (e) {
-      this.logger.warn("Check CF failed, ignoring", e.message);
+      this.logger.warn("Check CF failed, ignoring", e);
     }
   }
 
