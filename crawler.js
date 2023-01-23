@@ -610,9 +610,7 @@ export class Crawler {
 
     await this.initPages();
 
-    //if (this.params.blockAds) {
     this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage, this.logger);
-    //}
 
     if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, this.logger);
