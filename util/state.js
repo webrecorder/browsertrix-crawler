@@ -366,7 +366,7 @@ return 0;
   async serialize() {
     const queued = await this._iterListKeys(this.qkey);
     const done = await this._iterListKeys(this.dkey);
-    const pending = await this.getPendingList();
+    const pending = await this.redis.hvals(this.pkey);
 
     return {queued, pending, done};
   }
@@ -450,7 +450,8 @@ return 0;
   }
 
   async getPendingList() {
-    return await this.redis.hvals(this.pkey);
+    const list = await this.redis.hvals(this.pkey);
+    return list.map(x => JSON.parse(x));
   }
 
   async resetPendings() {

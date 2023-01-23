@@ -161,8 +161,8 @@ export async function evaluateWithCLI(frame, funcString) {
     });
 
   if (exceptionDetails) {
-    logger.fatal(
-      "Behavior Evaluation Failed" + exceptionDetails.text
+    logger.error(
+      "Behavior Evaluation Failed: " + exceptionDetails.text, exceptionDetails.stackTrace || {}
     );
   }
 
