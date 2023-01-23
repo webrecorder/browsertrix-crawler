@@ -448,7 +448,7 @@ export class Crawler {
       return false;
     }
 
-    return await this.adBlockRules.shouldBlock(null, url);
+    return !!(await this.adBlockRules.shouldBlock(null, url));
   }
 
   async createWARCInfo(filename) {
