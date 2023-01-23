@@ -145,6 +145,7 @@ export function chromeArgs (proxy, userAgent=null, extraArgs=[]) {
 
 export async function evaluateWithCLI(frame, funcString) {
   const context = await frame.executionContext();
+  const url = frame.url();
 
   // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
   const contextId = context._contextId;
@@ -161,8 +162,10 @@ export async function evaluateWithCLI(frame, funcString) {
     });
 
   if (exceptionDetails) {
+    const details = exceptionDetails.stackTrace || {};
+    details.url = url;
     logger.error(
-      "Behavior Evaluation Failed: " + exceptionDetails.text, exceptionDetails.stackTrace || {}
+      "Script Evaluation Failed: " + exceptionDetails.text, details
     );
   }
 

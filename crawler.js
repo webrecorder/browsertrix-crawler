@@ -412,7 +412,11 @@ export class Crawler {
         if (!page.isHTMLPage) {
           this.logger.info("Skipping behaviors for non-HTML page", data, "behavior");
         } else {
-          await Promise.allSettled(page.frames().map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();")));
+          await Promise.allSettled(
+            page.frames().
+              filter(frame => this.shouldRunBehavior(frame)).
+              map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();"))
+          );
 
           // also wait for general net idle
           await this.netIdle(page);
@@ -431,6 +435,20 @@ export class Crawler {
       this.logger.error(`Error crawling page ${data.url}`, e);
       await this.markPageFailed(page);
     }
+  }
+
+  async shouldRunBehavior(frame) {
+    if (!frame.parentFrame()) {
+      return true;
+    }
+
+    const url = frame.url();
+
+    if (url === "about:blank") {
+      return false;
+    }
+
+    return await this.adBlockRules.shouldBlock(null, url);
   }
 
   async createWARCInfo(filename) {
@@ -592,9 +610,9 @@ export class Crawler {
 
     await this.initPages();
 
-    if (this.params.blockAds) {
-      this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage, this.logger);
-    }
+    //if (this.params.blockAds) {
+    this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage, this.logger);
+    //}
 
     if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, this.logger);
@@ -794,7 +812,7 @@ export class Crawler {
       }
     }
 
-    if (this.adBlockRules) {
+    if (this.adBlockRules && this.params.blockAds) {
       await this.adBlockRules.initPage(page);
     }
 
