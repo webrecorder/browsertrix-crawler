@@ -143,14 +143,17 @@ export function chromeArgs (proxy, userAgent=null, extraArgs=[]) {
 }
 
 
-export async function evaluateWithCLI(frame, funcString) {
+export async function evaluateWithCLI(frame, funcString, name = "behaviors") {
   const context = await frame.executionContext();
+  const url = frame.url();
+
+  logger.info(`Running ${name}...`, {url});
 
   // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
   const contextId = context._contextId;
   const expression = funcString + "\n//# sourceURL=__puppeteer_evaluation_script__";
 
-  const { exceptionDetails, result: remoteObject } = await context._client
+  const { exceptionDetails, result } = await context._client
     .send("Runtime.evaluate", {
       expression,
       contextId,
@@ -161,12 +164,16 @@ export async function evaluateWithCLI(frame, funcString) {
     });
 
   if (exceptionDetails) {
+    const details = exceptionDetails.stackTrace || {};
+    details.url = url;
     logger.error(
-      "Behavior Evaluation Failed: " + exceptionDetails.text, exceptionDetails.stackTrace || {}
+      `Run ${name} failed: ${exceptionDetails.text}`, details
     );
+  } else {
+    logger.info(`Run ${name} finished`, {url});
   }
 
-  return remoteObject.value;
+  return result.value;
 }
 
 
