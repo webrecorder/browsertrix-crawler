@@ -18,7 +18,7 @@
     "ioredis": "^4.27.1",
     "js-yaml": "^4.1.0",
     "minio": "7.0.26",
-    "puppeteer-cluster": "github:ikreymer/puppeteer-cluster#async-job-queue",
+    "p-queue": "^7.3.0",
     "puppeteer-core": "^17.1.2",
     "request": "^2.88.2",
     "sitemapper": "^3.1.2",

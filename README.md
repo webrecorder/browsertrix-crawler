@@ -1,22 +1,22 @@
 # Browsertrix Crawler
 
-Browsertrix Crawler is a simplified (Chrome)  browser-based high-fidelity crawling system, designed to run a complex, customizable browser-based crawl in a single Docker container. Browsertrix Crawler uses [puppeteer-cluster](https://github.com/thomasdondorf/puppeteer-cluster)
-and [puppeteer](https://github.com/puppeteer/puppeteer) to control one or more browsers in parallel.
+Browsertrix Crawler is a simplified (Chrome) browser-based high-fidelity crawling system, designed to run a complex, customizable browser-based crawl in a single Docker container. Browsertrix Crawler uses [puppeteer](https://github.com/puppeteer/puppeteer) to control one or more browser pages or windows in parallel.
 
 ## Features
 
 Thus far, Browsertrix Crawler supports:
 
-- Single-container, browser based crawling with multiple headless/headful browsers.
-- Support for custom browser behaviors, using [Browsertix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) including autoscroll, video autoplay and site-specific behaviors.
+- Single-container, browser based crawling with a headless/headful browser running multiple pages/windows.
+- Support for custom browser behaviors, using [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) including autoscroll, video autoplay and site-specific behaviors.
 - YAML-based configuration, passed via file or via stdin.
 - Seed lists and per-seed scoping rules.
 - URL blocking rules to block capture of specific URLs (including by iframe URL and/or by iframe contents).
 - Screencasting: Ability to watch crawling in real-time (experimental).
+- Screenshotting: Ability to take thumbnails, full page screenshots, and/or screenshots of the initial page view.
 - Optimized (non-browser) capture of non-HTML resources.
 - Extensible Puppeteer driver script for customizing behavior per crawl or page.
 - Ability to create and reuse browser profiles interactively or via automated user/password login using an embedded browser.
-- Multi-platform support -- prebuilt Docker images available for Intel/AMD and Apple (M1) CPUs.
+- Multi-platform support -- prebuilt Docker images available for Intel/AMD and Apple Silicon (M1/M2) CPUs.
 
 ## Getting Started
 
@@ -663,13 +663,7 @@ Details for each corresponding release tag are also available on GitHub at: http
 
 The Docker container provided here packages up several components used in Browsertrix.
 
-The system uses:
- - `oldwebtoday/chrome` or `oldwebtoday/chromium` - to install a recent version of Chrome (currently chrome:90) or Chromium (see below).
- - `puppeteer-cluster` - for running Chrome browsers in parallel
- - `pywb` - in recording mode for capturing the content
-
-
-The crawl produces a single pywb collection, at `/crawls/collections/<collection name>` in the Docker container.
+The system uses `pywb` in recording mode for capturing the content. The crawl produces a single pywb collection, at `/crawls/collections/<collection name>` in the Docker container.
 
 To access the contents of the crawl, the `/crawls` directory in the container should be mounted to a volume (default in the Docker Compose setup).
 
@@ -697,31 +691,26 @@ docker-compose run crawler crawl --url https://webrecorder.net/ --generateCDX --
 In this example, the crawl data is written to `./crawls/collections/wr-net` by default.
 
 
-While the crawl is running, the status of the crawl (provide by puppeteer-cluster monitoring) prints the progress to the Docker log.
+While the crawl is running, the status of the crawl prints the progress to the JSON log output. This can be disabled by using the `--logging` option and not including `stats`.
 
 
-### Multi-Platform Build / Support for Apple M1
+### Multi-Platform Build / Support for Apple Silicon (M1/M2)
 
-Browsertrix Crawler uses a browser image which supports amd64 and arm64 (currently `oldwebtoday/chrome:91`).
+Browsertrix Crawler uses a browser image which supports amd64 and arm64.
 
-This means Browsertrix Crawler can be built natively on Apple M1 systems using the default settings. Simply running `docker-compose build` on an Apple M1 should build a native version that should work for development.
+This means Browsertrix Crawler can be built natively on Apple Silicon systems using the default settings. Simply running `docker-compose build` on an Apple Silicon should build a native version that should work for development.
 
-On M1 system, the browser used will be Chromium instead of Chrome since there is no Linux build of Chrome for ARM, and this now is handled automatically as part of the build. Note that Chromium is different than Chrome, and for example, some video codecs may not be supported in the ARM / Chromium-based version that would be in the amd64 / Chrome version. For production crawling, it is recommended to run on an amd64 Linux environment.
+On an Apple Silicon system, the browser used will be Chromium instead of Chrome since there is no Linux build of Chrome for ARM, and this now is handled automatically as part of the build. Note that Chromium is different than Chrome, and for example, some video codecs may not be supported in the ARM / Chromium-based version that would be in the amd64 / Chrome version. For production crawling, it is recommended to run on an amd64 Linux environment.
 
 
-### Custom Browser Image
+### Modifying Browser Image
 
-It is also possible to build Browsertrix Crawler with a different browser image. Currently, browser images from `oldwebtoday/chrome` and `oldwebtoday/chromium` are supported.
+It is also possible to build Browsertrix Crawler with a different browser image. Currently, browser images using Chrome/Chromium (depending on host system chip architecture) and Brave Browser are supported via [browsertrix-browser-base](https://github.com/webrecorder/browsertrix-browser-base).
 
-For example, Webrecorder provides the `oldwebtoday/chromium:91-arm` for running Browsertrix Crawler on ARM-based systems.
+The browser base image used is specified and can be changed at the top of the Dockerfile in this repo.
 
-To build with this specific Chromium image on an Apple M1 machine, run:
+Custom browser images can be used by forking [browsertrix-browser-base](https://github.com/webrecorder/browsertrix-browser-base), locally building or publishing an image, and then modifying the Dockerfile in this repo to build from that image.
 
-```
-docker-compose build --build-arg BROWSER_IMAGE_BASE=oldwebtoday/chromium --build-arg "BROWSER_VERSION=91-arm" --build-arg BROWSER_BIN=chromium-browser
-```
-
-The build arguments specify the base image, version and browser binary. This approach can also be used to install a different browser in general from any Debian-based Docker image. Additional browser images may be added in the future.
 
 ### Viewing crawled data with pywb
 
@@ -749,3 +738,29 @@ License
 
 [AGPLv3](https://www.gnu.org/licenses/agpl-3.0) or later, see
 [LICENSE](LICENSE) for more details.
+
+
+Contains portions of code borrowed and refactored from Thomas Dondorf's [puppeteer-cluster](https://github.com/thomasdondorf/puppeteer-cluster), which is licensed with the MIT License, included here in its entirety to comply with its licensing terms:
+
+<details>
+<summary>MIT License
+Copyright (c) 2019 Thomas Dondorf</summary>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</details>

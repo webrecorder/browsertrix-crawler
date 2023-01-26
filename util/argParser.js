@@ -4,16 +4,15 @@ import os from "os";
 
 import yaml from "js-yaml";
 import puppeteer from "puppeteer-core";
-import { Cluster } from "puppeteer-cluster";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
-import { ReuseWindowConcurrency } from "./windowconcur.js";
 import { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
 import { Logger } from "./logger.js";
+import { CONCURRENCY_PAGE, CONCURRENCY_WINDOW } from "./worker.js";
 
 const logger = new Logger();
 
@@ -406,10 +405,10 @@ class ArgParser {
 
     if (argv.workers > 1) {
       logger.info("Window context being used to support >1 workers");
-      argv.newContext = ReuseWindowConcurrency;
+      argv.newContext = CONCURRENCY_WINDOW;
     } else {
       logger.info("Page context being used with 1 worker");
-      argv.newContext = Cluster.CONCURRENCY_PAGE;
+      argv.newContext = CONCURRENCY_PAGE;
     }
 
     if (argv.mobileDevice) {

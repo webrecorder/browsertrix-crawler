@@ -7,8 +7,6 @@ import http from "http";
 import url from "url";
 
 import fetch from "node-fetch";
-import puppeteer from "puppeteer-core";
-import { Cluster } from "puppeteer-cluster";
 import { RedisCrawlState, MemoryCrawlState } from "./util/state.js";
 import AbortController from "abort-controller";
 import Sitemapper from "sitemapper";
@@ -24,6 +22,7 @@ import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { Logger } from "./util/logger.js";
+import { WorkerPool } from "./util/worker.js";
 
 import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
 
@@ -273,7 +272,7 @@ export class Crawler {
   }
 
   get puppeteerArgs() {
-    // Puppeter Options
+    // Puppeteer Options
     return {
       headless: this.params.headless,
       executablePath: this.browserExe,
@@ -586,27 +585,11 @@ export class Crawler {
       this.storage = initStorage();
     }
 
-    // Puppeteer Cluster init and options
-    this.cluster = await Cluster.launch({
-      concurrency: this.params.newContext,
-      maxConcurrency: this.params.workers,
-      skipDuplicateUrls: false,
-      timeout: this.params.timeout * 2,
-      puppeteerOptions: this.puppeteerArgs,
-      puppeteer,
-      monitor: false
-    });
-
-
-    this.cluster.jobQueue = this.crawlState;
-
     await this.crawlState.setStatus("running");
 
     if (this.params.state) {
       await this.crawlState.load(this.params.state, this.params.scopedSeeds, true);
     }
-
-    this.cluster.task((opts) => this.crawlPage(opts));
 
     await this.initPages();
 
@@ -617,10 +600,6 @@ export class Crawler {
     }
 
     this.screencaster = this.initScreenCaster();
-
-    if (this.cluster.browser.setScreencaster) {
-      this.cluster.browser.setScreencaster(this.screencaster);
-    }
 
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
@@ -635,8 +614,19 @@ export class Crawler {
       }
     }
 
-    await this.cluster.idle();
-    await this.cluster.close();
+    this.workerPool = new WorkerPool({
+      concurrency: this.params.newContext,
+      maxConcurrency: this.params.workers,
+      timeout: this.params.timeout * 2,
+      puppeteerOptions: this.puppeteerArgs,
+      crawlState: this.crawlState,
+      screencaster: this.screencaster,
+      task: (opts) => this.crawlPage(opts)
+    });
+
+    await this.workerPool.work();
+
+    await this.workerPool.close();
 
     await this.serializeConfig(true);
 
@@ -968,6 +958,7 @@ export class Crawler {
   }
 
   async queueUrl(seedId, url, depth, extraHops = 0) {
+    this.logger.debug(`Queuing url ${url}`);
     if (this.limitHit) {
       return false;
     }
@@ -986,7 +977,7 @@ export class Crawler {
     if (extraHops) {
       urlData.extraHops = extraHops;
     }
-    this.cluster.queue(urlData);
+    await this.crawlState.push(urlData);
     return true;
   }
 
