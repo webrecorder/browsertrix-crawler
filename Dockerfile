@@ -1,10 +1,7 @@
-ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base
-ARG BROWSER_VERSION=105
+ARG BROWSER_VERSION=109
+ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:chrome-${BROWSER_VERSION}
 
-FROM ${BROWSER_IMAGE_BASE}:${BROWSER_VERSION}
-
-# TODO: Move this into base image
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -qqy jq x11vnc
+FROM ${BROWSER_IMAGE_BASE}
 
 # needed to add args to main build stage
 ARG BROWSER_VERSION
