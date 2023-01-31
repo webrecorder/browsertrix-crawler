@@ -1,10 +1,7 @@
-ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base
-ARG BROWSER_VERSION=105
+ARG BROWSER_VERSION=109
+ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:chrome-${BROWSER_VERSION}
 
-FROM ${BROWSER_IMAGE_BASE}:${BROWSER_VERSION}
-
-# TODO: Move this into base image
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -qqy jq x11vnc
+FROM ${BROWSER_IMAGE_BASE}
 
 # needed to add args to main build stage
 ARG BROWSER_VERSION
@@ -23,7 +20,7 @@ ENV PROXY_HOST=localhost \
 WORKDIR /app
 
 ADD requirements.txt /app/
-RUN pip install 'uwsgi==2.0.20'
+RUN pip install 'uwsgi==2.0.21'
 RUN pip install -U setuptools; pip install -r requirements.txt
 
 ADD package.json /app/
