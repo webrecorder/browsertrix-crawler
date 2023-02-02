@@ -202,6 +202,15 @@ export class Crawler {
   async bootstrap() {
     const logs = path.join(this.collDir, "logs");
 
+    if (this.params.overwrite) {
+      this.logger.info(`Clearing ${this.collDir} before starting`);
+      try {
+        fs.rmSync(this.collDir, { recursive: true, force: true });
+      } catch(e) {
+        this.logger.error(`Unable to clear ${this.collDir}`, e);
+      }
+    }
+
     const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
 
     if (initRes.status) {
@@ -235,15 +244,6 @@ export class Crawler {
     const subprocesses = [];
 
     subprocesses.push(child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio}));
-
-    if (this.params.overwrite) {
-      this.logger.info(`Clearing ${this.collDir} before starting`);
-      try {
-        fs.rmSync(this.collDir, { recursive: true, force: true });
-      } catch(e) {
-        this.logger.error(`Unable to clear ${this.collDir}`, e);
-      }
-    }
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
 
