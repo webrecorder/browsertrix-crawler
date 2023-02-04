@@ -331,7 +331,7 @@ export class Crawler {
     case "info":
       behaviorLine = JSON.stringify(data);
       if (behaviorLine != this._behaviorLastLine) {
-        this.logger.info("Behavior line", data, "behavior");
+        this.logger.info("Behavior log", data, "behavior");
         this._behaviorLastLine = behaviorLine;
       }
       break;
