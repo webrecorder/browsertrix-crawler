@@ -1,5 +1,55 @@
 ## CHANGES
 
+v0.8.0
+- Switch to Chrome/Chromium 109
+- Convert to ESM module
+- Add ad blocking via request interception (#173)
+- new setting: add support for specifying language via the --lang flag by @ikreymer in https://github.com/webrecorder/browsertrix-crawler/pull/186
+- Add screenshot functionality by @tw4l in https://github.com/webrecorder/browsertrix-crawler/pull/188
+- Remove dead pywb configuration by @edsu in https://github.com/webrecorder/browsertrix-crawler/pull/198
+- Use VNC for headful profile creation by @ikreymer in https://github.com/webrecorder/browsertrix-crawler/pull/197
+- arg parsing fix: by @ikreymer in https://github.com/webrecorder/browsertrix-crawler/pull/200
+- Improve crawler logging by @tw4l in https://github.com/webrecorder/browsertrix-crawler/pull/195
+- Add requests[socks] python dependency by @kuechensofa in https://github.com/webrecorder/browsertrix-crawler/pull/201
+- Add RedisCrawlState test by @tw4l in https://github.com/webrecorder/browsertrix-crawler/pull/208
+- crawl state: add getPendingList() to return pending state from either… by @ikreymer in https://github.com/webrecorder/browsertrix-crawler/pull/205
+- Serialize Redis pending pages as JSON objects by @tw4l in https://github.com/webrecorder/browsertrix-crawler/pull/212
+- behaviors: don't run behaviors in iframes that are about:blank or are… by @ikreymer in https://github.com/webrecorder/browsertrix-crawler/pull/211
+- Fix --overwrite CLI flag by @tw4l in https://github.com/webrecorder/browsertrix-crawler/pull/220
+
+v0.7.1
+- Fix for warcio.js by @ikreymer in #178
+- Guard against pre-existing user/group by @edsu in #176
+- Fix incorrect combineWARCs property in README.md by @Georift in #180
+
+v0.7.0
+- Update to Chrome/Chromium 101 - (0.7.0 Beta 0) by @ikreymer in #144
+- Add --netIdleWait, bump dependencies (0.7.0-beta.2) by @ikreymer in #145
+- Update README.md by @atomotic in #147
+- Wait Default + Logging Improvements by @ikreymer in #153
+- Page-reuse concurrency + Browser Repair + Screencaster Cleanup Improvements by @ikreymer in #157
+- Logging and browser improvements: by @ikreymer in #158
+- pending wait: set max pending request wait to 120 seconds by @ikreymer in #161
+- Default Wait-Time Improvements by @ikreymer in #162
+- Interrupt Handling Fixes by @ikreymer in #167
+- Run in Docker as User by @edsu in #171
+
+
+v0.6.0
+
+- Add a --waitOnDone option, which has browsertrix crawler wait when finished (for use with Browsertrix Cloud)
+- When running with redis shared state, set the :status field to running, failing/failed or done to let job controller know crawl is finished.
+- Set redis state to failing in case of exception, set to failed in case of >3 or more failed exits within 60 seconds (but don't mark as failed if all pages are finished and >0 pages.
+- When receiving a SIGUSR1, don't wait on down (assume final exit due to scale down).
+- More efficient screencasting, don't end screencasting when page ends, only when target is destroyed!
+- Keep same screencasting connection from one page to next, as the target are reused in 'window' concurrency mode
+- Size limit (in bytes) via --sizeLimit
+- Total time limit (in bytes) via --timeLimit
+- Overwrite collection (delete existing) via --overwrite
+- Fixes to interrupting a single instance in a shared state crawl
+- force all cookies, including session cookies, to fixed duration in days, configurable via --cookieDays
+
+
 v0.5.0
 - Scope: support for `scopeType: domain` to include all subdomains and ignoring 'www.' if specified in the seed.
 - Profiles: support loading remote profile from URL as well as local file
