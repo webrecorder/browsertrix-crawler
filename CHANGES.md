@@ -16,6 +16,8 @@ v0.8.0
 - Serialize Redis pending pages as JSON objects by @tw4l in https://github.com/webrecorder/browsertrix-crawler/pull/212
 - behaviors: don't run behaviors in iframes that are about:blank or are… by @ikreymer in https://github.com/webrecorder/browsertrix-crawler/pull/211
 - Fix --overwrite CLI flag by @tw4l in https://github.com/webrecorder/browsertrix-crawler/pull/220
+- deps: bump pywb to 2.7.3 by @ikreymer in https://github.com/webrecorder/browsertrix-crawler/pull/222
+- update behaviors to 0.4.1, rename 'Behavior line' -> 'Behavior log' by @ikreymer in https://github.com/webrecorder/browsertrix-crawler/pull/223
 
 v0.7.1
 - Fix for warcio.js by @ikreymer in #178
