@@ -24,7 +24,8 @@ import { Logger, errJSON, setExternalLogStream, setDebugLogging } from "./util/l
 import { WorkerPool } from "./util/worker.js";
 import { sleep, timedRun } from "./util/timing.js";
 
-import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
+// import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
+import { Browser } from "./util/browser2.js";
 
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
@@ -113,6 +114,8 @@ export class Crawler {
     this.done = false;
 
     this.behaviorLastLine = null;
+
+    this.browserCls = new Browser();
   }
 
   configureUA() {
@@ -131,7 +134,7 @@ export class Crawler {
     if (this.emulateDevice) {
       this.userAgent = this.emulateDevice.userAgent;
     } else {
-      this.userAgent = getDefaultUA();
+      this.userAgent = this.browserCls.getDefaultUA();
     }
 
     // suffix to append to default userAgent
@@ -245,7 +248,7 @@ export class Crawler {
       redisStdio = "ignore";
     }
 
-    this.browserExe = getBrowserExe();
+    this.browserExe = this.browserCls.getBrowserExe();
 
     this.configureUA();
 
@@ -280,22 +283,6 @@ export class Crawler {
         "RANDR"
       ]);
     }
-  }
-
-  get puppeteerArgs() {
-    // Puppeteer Options
-    return {
-      headless: this.params.headless,
-      executablePath: this.browserExe,
-      handleSIGINT: false,
-      handleSIGTERM: false,
-      handleSIGHUP: false,
-      ignoreHTTPSErrors: true,
-      args: chromeArgs(!process.env.NO_PROXY, this.userAgent, this.extraChromeArgs()),
-      userDataDir: this.profileDir,
-      defaultViewport: null,
-      waitForInitialPage: false
-    };
   }
 
   extraChromeArgs() {
@@ -375,10 +362,9 @@ export class Crawler {
   async crawlPage(opts) {
     await this.writeStats();
 
-    const {page, data} = opts;
-    const {url} = data;
+    const {browser, page, data} = opts;
 
-    const pageTarget = page.target();
+    const {url} = data;
 
     const logDetails = {page: url, workerid: page._workerid};
 
@@ -389,22 +375,27 @@ export class Crawler {
 
     try {
       if (this.screencaster) {
-        await this.screencaster.screencastTarget(pageTarget, url);
+        await this.screencaster.screencastTarget(page, data.url);
       }
 
+      // TODO: Playwright migration - this won't work in this.browser, which is
+      // actually a BrowserContext. We probably need to create a new browser here
+      // if emulation is being used, which will also require changing newCDPSession
+      // below to newBrowserCDPSession
       if (this.emulateDevice) {
-        await page.emulate(this.emulateDevice);
+        await browser.newContext({...this.emulateDevice});
       }
 
       if (this.params.profile) {
-        await page._client().send("Network.setBypassServiceWorker", {bypass: true});
+        const client = await browser.newCDPSession(page);
+        await client.send("Network.setBypassServiceWorker", {bypass: true});
       }
 
-      await page.evaluateOnNewDocument("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+      await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
       if (this.params.behaviorOpts && !page.__bx_inited) {
         await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, url));
-        await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
+        await page.addInitScript(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
         page.__bx_inited = true;
       }
 
@@ -432,8 +423,7 @@ export class Crawler {
 
       let text = "";
       if (this.params.text && page.isHTMLPage) {
-        this.logger.debug("Extracting text", logDetails, "general");
-        const client = await pageTarget.createCDPSession();
+        const client = await browser.newCDPSession(page);
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
       }
@@ -468,7 +458,7 @@ export class Crawler {
 
     } catch (e) {
       this.logger.error("Page Errored", {...errJSON(e), ...logDetails}, "pageStatus");
-      await this.markPageFailed(page, pageTarget);
+      await this.markPageFailed(page);
       return false;
     }
 
@@ -482,7 +472,7 @@ export class Crawler {
       this.logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
       return await Promise.allSettled(
-        frames.map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => this.browserCls.evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
     } catch (e) {
@@ -590,7 +580,7 @@ export class Crawler {
   }
 
   async crawl() {
-    this.profileDir = await loadProfile(this.params.profile);
+    this.profileDir = await this.browserCls.loadProfile(this.params.profile);
 
     if (this.params.healthCheckPort) {
       this.healthChecker = new HealthChecker(this.params.healthCheckPort, this.params.workers);
@@ -669,13 +659,23 @@ export class Crawler {
     }
 
     this.workerPool = new WorkerPool({
+      browserCls: this.browserCls,
       maxConcurrency: this.params.workers,
-      puppeteerOptions: this.puppeteerArgs,
+      playwrightOptions: {
+        dataDir: this.profileDir,
+        chromeOptions: {
+          proxy: !process.env.NO_PROXY,
+          userAgent: this.params.userAgent,
+          extraArgs: this.extraChromeArgs()
+        }
+      },
       crawlState: this.crawlState,
       healthChecker: this.healthChecker,
       totalTimeout: (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60,
       task: (opts) => this.crawlPage(opts)
     });
+
+    this.logger.debug("Worker pool created - starting to work");
 
     await this.workerPool.work();
 
@@ -906,7 +906,7 @@ export class Crawler {
     });
 
     // more serious page error, mark page session as invalid
-    page.on("error", () => this.markPageFailed(page));
+    page.on("pageerror", () => this.markPageFailed(page));
 
     page.on("console", (msg) => {
       if (this.params.logging.includes("jserrors") && (msg.type() === "error")) {
@@ -914,14 +914,16 @@ export class Crawler {
       }
     });
 
-    const gotoOpts = isHTMLPage ? this.gotoOpts : "domcontentloaded";
+    const gotoOpts = isHTMLPage ? this.gotoOpts : {waitUntil: "domcontentloaded"};
 
     this.logger.info("Awaiting page load", logDetails);
 
     try {
       const resp = await page.goto(url, gotoOpts);
 
-      isHTMLPage = this.isHTMLContentType(resp.headers["content-type"]);
+      const contentType = await resp.headerValue("content-type");
+
+      isHTMLPage = this.isHTMLContentType(contentType);
 
       if (this.healthChecker) {
         this.healthChecker.resetErrors();
@@ -939,7 +941,7 @@ export class Crawler {
 
     page.isHTMLPage = isHTMLPage;
     if (isHTMLPage) {
-      page.__filteredFrames = page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
+      page.__filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
       page.__filteredFrames = null;
     }
@@ -968,13 +970,13 @@ export class Crawler {
     }
   }
 
-  async markPageFailed(page, pageTarget=null) {
+  async markPageFailed(page) {
     page.__failed = true;
     if (this.healthChecker) {
       this.healthChecker.incError();
     }
-    if (this.screencaster && pageTarget) {
-      await this.screencaster.endTarget(pageTarget);
+    if (this.screencaster) {
+      await this.screencaster.endTargetByUrl(page.url());
     }
   }
 
@@ -987,7 +989,7 @@ export class Crawler {
     await sleep(0.5);
 
     try {
-      await page.waitForNetworkIdle({timeout: this.params.netIdleWait * 1000});
+      await page.waitForLoadState("networkidle", {timeout: this.params.netIdleWait * 1000});
     } catch (e) {
       this.logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
@@ -997,11 +999,13 @@ export class Crawler {
   async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}, logDetails) {
     const results = [];
 
-    const loadProp = (selector, extract) => {
+    const loadProp = (options) => {
+      const { selector, extract } = options;
       return [...document.querySelectorAll(selector)].map(elem => elem[extract]);
     };
 
-    const loadAttr = (selector, extract) => {
+    const loadAttr = (options) => {
+      const { selector, extract } = options;
       return [...document.querySelectorAll(selector)].map(elem => elem.getAttribute(extract));
     };
 
@@ -1012,7 +1016,7 @@ export class Crawler {
 
       const linkResults = await Promise.allSettled(
         frames.map(frame => timedRun(
-          frame.evaluate(loadFunc, selector, extract),
+          frame.evaluate(loadFunc, {selector: selector, extract: extract}),
           PAGE_OP_TIMEOUT_SECS,
           "Link extraction timed out",
           logDetails,
@@ -1069,10 +1073,9 @@ export class Crawler {
     try {
       this.logger.debug("Check CF Blocking", logDetails);
 
-      while (await timedRun(
-        page.$("div.cf-browser-verification.cf-im-under-attack"),
-        PAGE_OP_TIMEOUT_SECS
-      )) {
+      const cloudflare = page.locator("div.cf-browser-verification.cf-im-under-attack");
+
+      while (await cloudflare.waitFor({timeout: PAGE_OP_TIMEOUT_SECS})) {
         this.logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
         await sleep(5.5);
       }

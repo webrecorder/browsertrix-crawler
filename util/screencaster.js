@@ -2,6 +2,7 @@ import ws from "ws";
 import http from "http";
 import url from "url";
 import fs from "fs";
+import { v4 as uuidv4 } from "uuid";
 
 import { initRedis } from "./redis.js";
 
@@ -171,22 +172,22 @@ class ScreenCaster
     }
   }
 
-  detectClose(target) {
-    const context = target.browserContext();
+  detectClose(page) {
+    const context = page.context();
 
     if (context.__destroy_added) {
       return;
     }
 
-    context.on("targetdestroyed", (target) => {
-      this.endTarget(target);
+    context.on("targetdestroyed", () => {
+      this.endTargetByUrl(page.url());
     });
 
     context.__destroy_added = true;
   }
 
-  async screencastTarget(target, currUrl) {
-    const id = target._targetId;
+  async screencastTarget(page, currUrl) {
+    const id = uuidv4();
 
     this.urls.set(id, currUrl);
 
@@ -194,9 +195,9 @@ class ScreenCaster
       return;
     }
 
-    this.detectClose(target);
+    this.detectClose(page);
 
-    const cdp = await target.createCDPSession();
+    const cdp = await page.context().newCDPSession(page);
 
     this.targets.set(id, cdp);
     //this.urls.set(id, target.url());
@@ -206,7 +207,7 @@ class ScreenCaster
     cdp.on("Page.screencastFrame", async (resp) => {
       const data = resp.data;
       const sessionId = resp.sessionId;
-      const url = target.url();
+      const url = page.url();
 
       this.caches.set(id, data);
       this.urls.set(id, url);
@@ -235,8 +236,14 @@ class ScreenCaster
     }
   }
 
-  async endTarget(target) {
-    await this.endTargetById(target._targetId);
+  async endTargetByUrl(url) {
+    const targetUrls = this.urls.entries();
+
+    for (const [key, value] of targetUrls) {
+      if (value === url) {
+        await this.endTargetById(key);
+      }
+    }
   }
 
   async endTargetById(id) {

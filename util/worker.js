@@ -1,6 +1,5 @@
 //import { EventEmitter } from "node:events";
 import PQueue from "p-queue";
-import puppeteer from "puppeteer-core";
 
 import { Logger, errJSON } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
@@ -23,6 +22,7 @@ export class Worker
     this.healthChecker = healthChecker;
 
     this.reuseCount = 0;
+    this.context = null;
     this.page = null;
     
     this.startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
@@ -46,28 +46,16 @@ export class Worker
     } else {
       await this.closePage();
     }
-    //open page in a new tab
-    this.pendingTargets = new Map();
-
-    this.browser.on("targetcreated", (target) => {
-      if (target.url() === this.startPage) {
-        this.pendingTargets.set(target._targetId, target);
-      }
-    });
-
+    
     this.reuseCount = 1;
 
     while (true) {
       try {
-        logger.debug("Opening new page", {}, "worker");
-        const mainTarget = this.browser.target();
-        this.cdp = await mainTarget.createCDPSession();
-        let targetId;
-        const res = await this.cdp.send("Target.createTarget", {url: this.startPage, newWindow: true});
-        targetId = res.targetId;
-        const target = this.pendingTargets.get(targetId);
-        this.pendingTargets.delete(targetId);
-        this.page = await target.page();
+        if (!this.context) {
+          this.context = await this.browser.newContext();
+        }
+        this.page = await this.context.newPage();
+        await this.page.goto(this.startPage);
         this.page._workerid = this.id;
         if (this.healthChecker) {
           this.healthChecker.resetErrors();
@@ -99,6 +87,7 @@ export class Worker
     logger.info("Starting page", {"workerid": this.id, "page": url}, "worker");
 
     return await this.task({
+      browser: this.browser,
       page: this.page,
       data: urlData,
     });
@@ -110,8 +99,9 @@ export class Worker
 export class WorkerPool
 {
   constructor(options) {
+    this.browserCls = options.browserCls;
     this.maxConcurrency = options.maxConcurrency;
-    this.puppeteerOptions = options.puppeteerOptions;
+    this.playwrightOptions = options.playwrightOptions;
     this.crawlState = options.crawlState;
     this.healthChecker = options.healthChecker;
     this.totalTimeout = options.totalTimeout || 1e4;
@@ -132,7 +122,7 @@ export class WorkerPool
 
   async createWorkers(numWorkers = 1) {
     if (!this.browser) {
-      this.browser = await puppeteer.launch(this.puppeteerOptions);
+      this.browser = await this.browserCls.launch(this.playwrightOptions);
     }
     logger.info(`Creating ${numWorkers} workers`, {}, "worker");
     for (let i=0; i < numWorkers; i++) {
@@ -155,6 +145,7 @@ export class WorkerPool
     if (this.workersAvailable.length > 0) {
       const worker = this.workersAvailable.shift();
       this.workersBusy.push(worker);
+      logger.debug(`Using available worker ${worker.id}`);
       return worker;
     }
 
@@ -173,15 +164,15 @@ export class WorkerPool
   }
 
   async crawlPageInWorker() {
-    const worker = await this.getAvailableWorker();
-
     const job = await this.crawlState.shift();
 
     if (!job) {
       logger.debug("No jobs available - waiting for pending pages to finish", {}, "worker");
-      this.freeWorker(worker);
+      await sleep(2);
       return;
     }
+
+    const worker = await this.getAvailableWorker();
 
     const result = await timedRun(
       worker.runTask(job),
@@ -197,6 +188,7 @@ export class WorkerPool
       await worker.closePage();
 
       if (job.callbacks) {
+        logger.debug("Calling job reject callback", {job}, "worker");
         job.callbacks.reject("timed out");
       }
       // if (this.healthChecker) {
@@ -208,6 +200,7 @@ export class WorkerPool
       // }
 
       if (job.callbacks) {
+        logger.debug("Calling job resolve callback", {job}, "worker");
         job.callbacks.resolve(result);
       }
     }
@@ -228,6 +221,7 @@ export class WorkerPool
 
       if ((await this.crawlState.realSize()) > 0) {
         (async () => {
+          logger.debug("Adding new job to queue");
           await this.queue.add(() => this.crawlPageInWorker());
         })();
       }
