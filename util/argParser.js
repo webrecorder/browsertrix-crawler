@@ -12,7 +12,6 @@ import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
 import { Logger } from "./logger.js";
-import { CONCURRENCY_PAGE, CONCURRENCY_WINDOW } from "./worker.js";
 
 const logger = new Logger();
 
@@ -401,14 +400,6 @@ class ArgParser {
 
     if (argv.newContext) {
       logger.info("Note: The newContext argument is deprecated in 0.8.0. Values passed to this option will be ignored");
-    }
-
-    if (argv.workers > 1) {
-      logger.info("Window context being used to support >1 workers");
-      argv.newContext = CONCURRENCY_WINDOW;
-    } else {
-      logger.info("Page context being used with 1 worker");
-      argv.newContext = CONCURRENCY_PAGE;
     }
 
     if (argv.mobileDevice) {

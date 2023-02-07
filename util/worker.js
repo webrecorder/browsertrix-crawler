@@ -6,9 +6,6 @@ import { Logger } from "./logger.js";
 
 const logger = new Logger();
 
-export const CONCURRENCY_PAGE = "page";
-export const CONCURRENCY_WINDOW = "window";
-
 class BrowserEmitter extends EventEmitter {}
 const browserEmitter = new BrowserEmitter();
 
@@ -43,10 +40,9 @@ async function timeoutExecute(millis, promise) {
 // ===========================================================================
 export class Worker
 {
-  constructor(id, browser, concurrencyModel, timeout, task, puppeteerOptions, screencaster) {
+  constructor(id, browser, timeout, task, puppeteerOptions, screencaster) {
     this.id = id;
     this.browser = browser;
-    this.concurrencyModel = concurrencyModel;
     this.timeout = timeout;
     this.task = task;
     this.puppeteerOptions = puppeteerOptions;
@@ -56,33 +52,28 @@ export class Worker
   }
 
   async initPage(job) {
-    if (this.concurrencyModel === CONCURRENCY_PAGE) {
-      // if conconcurrency model is page, open a new page
-      this.page = await this.browser.newPage();
-    } else {
-      // if conconcurrency model is window, open a new page in a new window
-      this.pendingTargets = new Map();
+    //open page in a new tab
+    this.pendingTargets = new Map();
 
-      this.browser.on("targetcreated", (target) => {
-        if (target.url() === this.startPage) {
-          this.pendingTargets.set(target._targetId, target);
-        }
-      });
-
-      try {
-        const mainTarget = this.browser.target();
-        this.cdp = await mainTarget.createCDPSession();
-        let targetId;
-        const res = await this.cdp.send("Target.createTarget", {url: this.startPage, newWindow: true});
-        targetId = res.targetId;
-        const target = this.pendingTargets.get(targetId);
-        this.pendingTargets.delete(targetId);
-        this.page = await target.page();
-      } catch (err) {
-        logger.warn("Error getting new page in window context", err);
-        this.repair(job);
+    this.browser.on("targetcreated", (target) => {
+      if (target.url() === this.startPage) {
+        this.pendingTargets.set(target._targetId, target);
       }
-    } 
+    });
+
+    try {
+      const mainTarget = this.browser.target();
+      this.cdp = await mainTarget.createCDPSession();
+      let targetId;
+      const res = await this.cdp.send("Target.createTarget", {url: this.startPage, newWindow: true});
+      targetId = res.targetId;
+      const target = this.pendingTargets.get(targetId);
+      this.pendingTargets.delete(targetId);
+      this.page = await target.page();
+    } catch (err) {
+      logger.warn("Error getting new page in window context", err);
+      this.repair(job);
+    }
   }
 
   async runTask(job) {
@@ -140,7 +131,6 @@ export class Worker
 export class WorkerPool
 {
   constructor(options) {
-    this.concurrencyModel = options.concurrency;
     this.maxConcurrency = options.maxConcurrency;
     this.timeout = options.timeout;
     this.puppeteerOptions = options.puppeteerOptions;
@@ -184,7 +174,6 @@ export class WorkerPool
     const worker = new Worker(
       id,
       this.browser,
-      this.concurrencyModel,
       this.timeout,
       this.task,
       this.puppeteerOptions,

@@ -615,7 +615,6 @@ export class Crawler {
     }
 
     this.workerPool = new WorkerPool({
-      concurrency: this.params.newContext,
       maxConcurrency: this.params.workers,
       timeout: this.params.timeout * 2,
       puppeteerOptions: this.puppeteerArgs,
