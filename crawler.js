@@ -863,7 +863,7 @@ export class Crawler {
 
     await this.netIdle(page);
 
-    await this.sleep(5);
+    //await this.sleep(5);
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
@@ -963,7 +963,7 @@ export class Crawler {
         await this.sleep(5.5);
       }
     } catch (e) {
-      this.logger.warn("Check CF failed, ignoring", e);
+      //this.logger.warn("Check CF failed, ignoring", e);
     }
   }
 
@@ -1090,10 +1090,7 @@ export class Crawler {
 
     const redis = await initRedis("redis://localhost/0");
 
-    // wait for pending requests upto 120 secs, unless canceling
-    const MAX_WAIT = 120;
-
-    for (let i = 0; i < MAX_WAIT && !this.interrupted; i++) {
+    while (!this.interrupted) {
       try {
         const count = Number(await redis.get(`pywb:${this.params.collection}:pending`) || 0);
         if (count <= 0) {
