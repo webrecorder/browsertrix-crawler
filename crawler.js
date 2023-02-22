@@ -326,20 +326,33 @@ export class Crawler {
 
   _behaviorLog({data, type}, pageUrl) {
     let behaviorLine;
-    data.page = pageUrl;
+    let message;
+    let details;
+
+    if (typeof(data) === "string") {
+      message = data;
+      details = {};
+    } else {
+      message = type === "info" ? "Behavior log" : "Behavior debug";
+      details = typeof(data) === "object" ? data : {};
+    }
+
+    if (pageUrl) {
+      details.page = pageUrl;
+    }
 
     switch (type) {
     case "info":
       behaviorLine = JSON.stringify(data);
       if (behaviorLine != this._behaviorLastLine) {
-        this.logger.info("Behavior log", data, "behavior");
+        this.logger.info(message, details, "behaviorScript");
         this._behaviorLastLine = behaviorLine;
       }
       break;
 
     case "debug":
     default:
-      this.logger.debug("Behavior debug", data, "behavior");
+      this.logger.debug(message, details, "behaviorScript");
     }
   }
 
