@@ -424,7 +424,7 @@ export class Crawler {
             this.sleep(behaviorTimeout),
             Promise.allSettled(
               page.frames().
-                filter(frame => this.shouldRunBehavior(frame)).
+                filter(frame => this.shouldRunBehavior(frame, logDetails)).
                 map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
             )
           ]);
@@ -448,18 +448,26 @@ export class Crawler {
     }
   }
 
-  async shouldRunBehavior(frame) {
+  async shouldRunBehavior(frame, logDetails) {
     if (!frame.parentFrame()) {
       return true;
     }
 
     const url = frame.url();
 
+    let res;
+
     if (url === "about:blank") {
-      return false;
+      res = true;
+    } else {
+      res = !(await this.adBlockRules.shouldBlock(null, url, logDetails));
     }
 
-    return !!(await this.adBlockRules.shouldBlock(null, url));
+    if (!res) {
+      this.logger.info("Skipping behavior for frame", {...logDetails, url}, "behavior");
+    }
+
+    return res;
   }
 
   async createWARCInfo(filename) {
