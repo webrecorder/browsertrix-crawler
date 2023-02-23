@@ -147,7 +147,7 @@ export async function evaluateWithCLI(frame, funcString, logData, contextName) {
   const context = await frame.executionContext();
   const url = frame.url();
 
-  let details = {...logData, url};
+  let details = {url, ...logData};
 
   logger.info("Run Script Started", details, contextName);
 
@@ -167,7 +167,7 @@ export async function evaluateWithCLI(frame, funcString, logData, contextName) {
 
   if (exceptionDetails) {
     if (exceptionDetails.stackTrace) {
-      details = {...details, ...exceptionDetails.stackTrace, text: exceptionDetails.text};
+      details = {...exceptionDetails.stackTrace, text: exceptionDetails.text, ...details};
     }
     logger.error("Run Script Failed", details, contextName);
   } else {

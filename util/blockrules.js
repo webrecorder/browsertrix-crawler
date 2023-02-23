@@ -84,13 +84,12 @@ export class BlockRules
 
     await page.setRequestInterception(true);
 
-    const logDetails = {page: page.url()};
-
     page.on("request", async (request) => {
+      const logDetails = {page: page.url()};
       try {
         await this.handleRequest(request, logDetails);
       } catch (e) {
-        this.logger.warn("Error handling request", {...logDetails, ...e}, "blocking");
+        this.logger.warn("Error handling request", {...e, ...logDetails}, "blocking");
       }
     });
   }
@@ -110,7 +109,7 @@ export class BlockRules
       }
 
     } catch (e) {
-      this.logger.debug(`Block: (${blockState}) Failed On: ${url}`, {...logDetails, ...e}, "blocking");
+      this.logger.debug(`Block: (${blockState}) Failed On: ${url}`, {...e, ...logDetails}, "blocking");
     }
   }
 
@@ -157,10 +156,10 @@ export class BlockRules
 
       if (block) {
         if (blockState === BlockState.BLOCK_PAGE_NAV) {
-          this.logger.warn("Block rule match for page request ignored, set --exclude to block full pages", {...logDetails, url}, "blocking");
+          this.logger.warn("Block rule match for page request ignored, set --exclude to block full pages", {url, ...logDetails}, "blocking");
           return BlockState.ALLOW;
         }
-        this.logger.debug("URL Blocked in iframe", {...logDetails, url, frameUrl}, "blocking");
+        this.logger.debug("URL Blocked in iframe", {url, frameUrl, ...logDetails}, "blocking");
         await this.recordBlockMsg(url);
         return blockState;
       }
@@ -210,7 +209,7 @@ export class BlockRules
       return !!text.match(frameTextMatch);
 
     } catch (e) {
-      this.logger.debug("Error determining text match", {...logDetails, ...e}, "blocking");
+      this.logger.debug("Error determining text match", {...e, ...logDetails}, "blocking");
     }
   }
 
@@ -250,13 +249,13 @@ export class AdBlockRules extends BlockRules
 
     await page.setRequestInterception(true);
 
-    const logDetails = {page: page.url()};
-
     page.on("request", async (request) => {
+      const logDetails = {page: page.url()};
+
       try {
         await this.handleRequest(request, logDetails);
       } catch (e) {
-        this.logger.warn("Error handling request", {...logDetails, ...e}, "blocking");
+        this.logger.warn("Error handling request", {...e, ...logDetails}, "blocking");
       }
     });
   }
@@ -265,7 +264,7 @@ export class AdBlockRules extends BlockRules
     const fragments = url.split("/");
     const domain = fragments.length > 2 ? fragments[2] : null;
     if (this.adhosts.includes(domain)) {
-      this.logger.debug("URL blocked for being an ad", {...logDetails, url}, "blocking");
+      this.logger.debug("URL blocked for being an ad", {url, ...logDetails}, "blocking");
       await this.recordBlockMsg(url);
       return BlockState.BLOCK_AD;
     }

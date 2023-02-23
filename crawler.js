@@ -432,7 +432,7 @@ export class Crawler {
           this.logger.info("Skipping behaviors for non-HTML page", logDetails, "behavior");
         } else {
           const behaviorTimeout = this.params.behaviorTimeout / 1000;
-          this.logger.info("Behaviors started", {...logDetails, behaviorTimeout}, "behavior");
+          this.logger.info("Behaviors started", {behaviorTimeout, ...logDetails}, "behavior");
           const res = await Promise.race([
             this.sleep(behaviorTimeout),
             Promise.allSettled(
@@ -442,7 +442,7 @@ export class Crawler {
             )
           ]);
           if (res && res.length) {
-            this.logger.info("Behaviors finished", {...logDetails, finished: res.length}, "behavior");
+            this.logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
           } else {
             this.logger.error("Behaviors timed out", logDetails, "behavior");
           }
@@ -456,7 +456,7 @@ export class Crawler {
       await this.serializeConfig();
 
     } catch (e) {
-      this.logger.error("Page Errored", {...logDetails, ...e}, "pageStatus");
+      this.logger.error("Page Errored", {...e, ...logDetails}, "pageStatus");
       await this.markPageFailed(page);
     }
   }
@@ -477,7 +477,7 @@ export class Crawler {
     }
 
     if (!res) {
-      this.logger.info("Skipping behavior for frame", {...logDetails, url}, "behavior");
+      this.logger.info("Skipping behavior for frame", {url, ...logDetails}, "behavior");
     }
 
     return res;
@@ -882,7 +882,7 @@ export class Crawler {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         const mainMessage = e.name === "TimeoutError" ? "Page Load Timeout" : "Page Load Error";
-        this.logger.error(mainMessage, {...logDetails, msg});
+        this.logger.error(mainMessage, {msg, ...logDetails});
         this.errorCount++;
       }
     }
