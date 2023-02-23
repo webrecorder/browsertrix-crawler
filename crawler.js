@@ -23,7 +23,7 @@ import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screenca
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
-import { Logger } from "./util/logger.js";
+import { Logger, setExternalLogStream } from "./util/logger.js";
 
 import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
 
@@ -50,6 +50,14 @@ export class Crawler {
     const res = parseArgs();
     this.params = res.parsed;
     this.origConfig = res.origConfig;
+
+    // root collections dir
+    this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
+    this.logDir = path.join(this.collDir, "logs");
+    this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString()}.log`);
+    this.logFH = fs.createWriteStream(this.logFilename);
+
+    setExternalLogStream(this.logFH);
 
     const debugLogging = this.params.logging.includes("debug");
     this.logger = new Logger(debugLogging);
@@ -90,9 +98,6 @@ export class Crawler {
       waitUntil: this.params.waitUntil,
       timeout: this.params.timeout
     };
-
-    // root collections dir
-    this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
@@ -200,8 +205,6 @@ export class Crawler {
   }
 
   async bootstrap() {
-    const logs = path.join(this.collDir, "logs");
-
     if (this.params.overwrite) {
       this.logger.info(`Clearing ${this.collDir} before starting`);
       try {
@@ -217,16 +220,16 @@ export class Crawler {
       this.logger.info("wb-manager init failed, collection likely already exists");
     }
 
-    await fsp.mkdir(logs, {recursive: true});
+    await fsp.mkdir(this.logDir, {recursive: true});
 
     let opts = {};
     let redisStdio;
 
     if (this.params.logging.includes("pywb")) {
-      const pywbStderr = fs.openSync(path.join(logs, "pywb.log"), "a");
+      const pywbStderr = fs.openSync(path.join(this.logDir, "pywb.log"), "a");
       const stdio = [process.stdin, pywbStderr, pywbStderr];
 
-      const redisStderr = fs.openSync(path.join(logs, "redis.log"), "a");
+      const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
       redisStdio = [process.stdin, redisStderr, redisStderr];
 
       opts = {stdio, cwd: this.params.cwd};
@@ -716,6 +719,9 @@ export class Crawler {
   }
 
   async generateWACZ() {
+    setExternalLogStream(null);
+    await new Promise(resolve => this.logFH.close(() => resolve()));
+
     this.logger.info("Generating WACZ");
 
     const archiveDir = path.join(this.collDir, "archive");

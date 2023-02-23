@@ -1,5 +1,11 @@
 // ===========================================================================
+let logStream = null;
 
+export function setExternalLogStream(logFH) {
+  logStream = logFH;
+}
+
+// ===========================================================================
 export class Logger
 {
   constructor(debugLogging=false) {
@@ -19,7 +25,11 @@ export class Logger
       "message": message,
       "details": data ? data : {}
     };
-    console.log(JSON.stringify(dataToLog));
+    const string = JSON.stringify(dataToLog);
+    console.log(string);
+    if (logStream) {
+      logStream.write(string + "\n");
+    }
   }
 
   info(message, data={}, context="general") {
