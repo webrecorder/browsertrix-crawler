@@ -881,7 +881,8 @@ export class Crawler {
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
-        this.logger.error("Page Load Error", {...logDetails, msg});
+        const mainMessage = e.name === "TimeoutError" ? "Page Load Timeout" : "Page Load Error";
+        this.logger.error(mainMessage, {...logDetails, msg});
         this.errorCount++;
       }
     }
@@ -897,8 +898,6 @@ export class Crawler {
     await this.checkCF(page, logDetails);
 
     await this.netIdle(page, logDetails);
-
-    //await this.sleep(5);
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {

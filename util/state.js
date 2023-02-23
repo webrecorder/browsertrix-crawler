@@ -326,11 +326,11 @@ return 0;
       data = JSON.parse(json);
     } catch(e) {
       logger.error("Invalid queued json", json);
-      return null;
+      return undefined;
     }
 
     if (!data) {
-      return null;
+      return undefined;
     }
 
     const url = data.url;
