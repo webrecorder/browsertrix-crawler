@@ -695,6 +695,10 @@ export class Crawler {
       await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
     }
 
+    // close file-based log
+    setExternalLogStream(null);
+    await new Promise(resolve => this.logFH.close(() => resolve()));
+
     if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.clearOnExit)) {
       await this.generateWACZ();
 
@@ -719,9 +723,6 @@ export class Crawler {
   }
 
   async generateWACZ() {
-    setExternalLogStream(null);
-    await new Promise(resolve => this.logFH.close(() => resolve()));
-
     this.logger.info("Generating WACZ");
 
     const archiveDir = path.join(this.collDir, "archive");
