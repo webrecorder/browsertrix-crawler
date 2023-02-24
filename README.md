@@ -85,7 +85,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                                            [number] [default: 0]
       --timeout                             Timeout for each page to load (in se
                                             conds)        [number] [default: 90]
-      --scopeType                           A predfined scope of the crawl. For
+      --scopeType                           A predefined scope of the crawl. For
                                             more customization, use 'custom' and
                                              set scopeIncludeRx regexes
   [string] [choices: "page", "page-spa", "prefix", "host", "domain", "any", "cus
@@ -135,7 +135,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                             ors-debug, jserrors
                                                      [string] [default: "stats"]
       --text                                If set, extract text to the pages.js
-                                            onl file  [boolean] [default: false]
+                                            only file  [boolean] [default: false]
       --cwd                                 Crawl working directory for captures
                                              (pywb root). If not set, defaults t
                                             o process.cwd()
@@ -183,7 +183,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                             to store state. Otherwise, using in-
                                             memory store                [string]
       --saveState                           If the crawl state should be seriali
-                                            zed to the crawls/ directory. Defaul
+                                            zed to the crawls/ directory. Default
                                             ts to 'partial', only saved when cra
                                             wl is interrupted
            [string] [choices: "never", "partial", "always"] [default: "partial"]
@@ -212,7 +212,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --netIdleWait                         if set, wait for network idle after
                                             page load and after behaviors are do
                                             ne (in seconds). if -1 (default), de
-                                            termine based on scope
+                                            determine based on scope
                                                           [number] [default: -1]
       --config                              Path to YAML config file
 

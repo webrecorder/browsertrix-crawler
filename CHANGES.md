@@ -120,7 +120,7 @@ v0.3.2
 
 v0.3.1
 - Improved shutdown wait: Instead of waiting for 5 secs, wait until all pending requests are written to WARCs
-- Bug fix: Use async APIs for combine WARC to avoid spurrious issues with multiple crawls
+- Bug fix: Use async APIs for combine WARC to avoid spurious issues with multiple crawls
 - Behaviors Update to Behaviors to 0.2.1, with support for facebook pages
 
 
