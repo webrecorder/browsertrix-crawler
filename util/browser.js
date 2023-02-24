@@ -143,11 +143,12 @@ export function chromeArgs (proxy, userAgent=null, extraArgs=[]) {
 }
 
 
-export async function evaluateWithCLI(frame, funcString, name = "behaviors") {
+export async function evaluateWithCLI(frame, funcString, logData, contextName) {
   const context = await frame.executionContext();
-  const url = frame.url();
 
-  logger.info(`Running ${name}...`, {url});
+  let details = {frameUrl: frame.url(), ...logData};
+
+  logger.info("Run Script Started", details, contextName);
 
   // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
   const contextId = context._contextId;
@@ -164,13 +165,12 @@ export async function evaluateWithCLI(frame, funcString, name = "behaviors") {
     });
 
   if (exceptionDetails) {
-    const details = exceptionDetails.stackTrace || {};
-    details.url = url;
-    logger.error(
-      `Run ${name} failed: ${exceptionDetails.text}`, details
-    );
+    if (exceptionDetails.stackTrace) {
+      details = {...exceptionDetails.stackTrace, text: exceptionDetails.text, ...details};
+    }
+    logger.error("Run Script Failed", details, contextName);
   } else {
-    logger.info(`Run ${name} finished`, {url});
+    logger.info("Run Script Finished", details, contextName);
   }
 
   return result.value;
