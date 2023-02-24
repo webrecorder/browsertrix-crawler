@@ -1,4 +1,4 @@
 pywb>=2.7.3
 uwsgi
-wacz>=0.4.6
+wacz>=0.4.8
 requests[socks]

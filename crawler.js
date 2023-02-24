@@ -57,10 +57,10 @@ export class Crawler {
     this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString()}.log`);
     this.logFH = fs.createWriteStream(this.logFilename);
 
-    setExternalLogStream(this.logFH);
-
     const debugLogging = this.params.logging.includes("debug");
     this.logger = new Logger(debugLogging);
+    this.logger.debug("Writing log to: " + this.logFilename, {}, "init");
+    setExternalLogStream(this.logFH);
 
     this.headers = {};
     this.crawlState = null;
@@ -695,9 +695,7 @@ export class Crawler {
       await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
     }
 
-    // close file-based log
-    setExternalLogStream(null);
-    await new Promise(resolve => this.logFH.close(() => resolve()));
+    await this.closeLog();
 
     if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.clearOnExit)) {
       await this.generateWACZ();
@@ -719,6 +717,16 @@ export class Crawler {
 
       // wait forever until signal
       await new Promise(() => {});
+    }
+  }
+
+  async closeLog() {
+    // close file-based log
+    setExternalLogStream(null);
+    try {
+      await new Promise(resolve => this.logFH.close(() => resolve()));
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -746,7 +754,13 @@ export class Crawler {
     const waczFilename = this.params.collection.concat(".wacz");
     const waczPath = path.join(this.collDir, waczFilename);
 
-    const createArgs = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile];
+    const createArgs = [
+      "create",
+      "--split-seeds",
+      "-o", waczPath,
+      "--pages", this.pagesFile,
+      "--log-directory", this.logDir
+    ];
 
     if (process.env.WACZ_SIGN_URL) {
       createArgs.push("--signing-url");
