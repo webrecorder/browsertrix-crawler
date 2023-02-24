@@ -466,18 +466,18 @@ export class Crawler {
       return true;
     }
 
-    const url = frame.url();
+    const frameUrl = frame.url();
 
     let res;
 
-    if (url === "about:blank") {
-      res = true;
+    if (frameUrl === "about:blank") {
+      res = false;
     } else {
-      res = !(await this.adBlockRules.shouldBlock(null, url, logDetails));
+      res = !(await this.adBlockRules.shouldBlock(null, frameUrl, logDetails));
     }
 
     if (!res) {
-      this.logger.info("Skipping behavior for frame", {url, ...logDetails}, "behavior");
+      this.logger.info("Skipping behavior for frame", {frameUrl, ...logDetails}, "behavior");
     }
 
     return res;

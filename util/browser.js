@@ -145,9 +145,8 @@ export function chromeArgs (proxy, userAgent=null, extraArgs=[]) {
 
 export async function evaluateWithCLI(frame, funcString, logData, contextName) {
   const context = await frame.executionContext();
-  const url = frame.url();
 
-  let details = {url, ...logData};
+  let details = {frameUrl: frame.url(), ...logData};
 
   logger.info("Run Script Started", details, contextName);
 
