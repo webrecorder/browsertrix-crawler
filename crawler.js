@@ -54,7 +54,7 @@ export class Crawler {
     // root collections dir
     this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
     this.logDir = path.join(this.collDir, "logs");
-    this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString()}.log`);
+    this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString().replace(/[^\d]/g, '')}.log`);
     this.logFH = fs.createWriteStream(this.logFilename);
 
     const debugLogging = this.params.logging.includes("debug");
