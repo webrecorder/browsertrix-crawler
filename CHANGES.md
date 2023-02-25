@@ -1,5 +1,10 @@
 ## CHANGES
 
+v0.8.1
+- Logging and Behavior Tweaks by @ikreymer in https://github.com/webrecorder/browsertrix-crawler/pull/229
+- Fix typos by @stavares843 in https://github.com/webrecorder/browsertrix-crawler/pull/232
+- Add crawl log to WACZ by @ikreymer in https://github.com/webrecorder/browsertrix-crawler/pull/231
+
 v0.8.0
 - Switch to Chrome/Chromium 109
 - Convert to ESM module
