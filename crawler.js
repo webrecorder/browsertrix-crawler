@@ -23,7 +23,7 @@ import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screenca
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
-import { Logger } from "./util/logger.js";
+import { Logger, setExternalLogStream } from "./util/logger.js";
 
 import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
 
@@ -51,8 +51,16 @@ export class Crawler {
     this.params = res.parsed;
     this.origConfig = res.origConfig;
 
+    // root collections dir
+    this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
+    this.logDir = path.join(this.collDir, "logs");
+    this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`);
+    this.logFH = fs.createWriteStream(this.logFilename);
+
     const debugLogging = this.params.logging.includes("debug");
     this.logger = new Logger(debugLogging);
+    this.logger.debug("Writing log to: " + this.logFilename, {}, "init");
+    setExternalLogStream(this.logFH);
 
     this.headers = {};
     this.crawlState = null;
@@ -90,9 +98,6 @@ export class Crawler {
       waitUntil: this.params.waitUntil,
       timeout: this.params.timeout
     };
-
-    // root collections dir
-    this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
@@ -200,8 +205,6 @@ export class Crawler {
   }
 
   async bootstrap() {
-    const logs = path.join(this.collDir, "logs");
-
     if (this.params.overwrite) {
       this.logger.info(`Clearing ${this.collDir} before starting`);
       try {
@@ -217,16 +220,16 @@ export class Crawler {
       this.logger.info("wb-manager init failed, collection likely already exists");
     }
 
-    await fsp.mkdir(logs, {recursive: true});
+    await fsp.mkdir(this.logDir, {recursive: true});
 
     let opts = {};
     let redisStdio;
 
     if (this.params.logging.includes("pywb")) {
-      const pywbStderr = fs.openSync(path.join(logs, "pywb.log"), "a");
+      const pywbStderr = fs.openSync(path.join(this.logDir, "pywb.log"), "a");
       const stdio = [process.stdin, pywbStderr, pywbStderr];
 
-      const redisStderr = fs.openSync(path.join(logs, "redis.log"), "a");
+      const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
       redisStdio = [process.stdin, redisStderr, redisStderr];
 
       opts = {stdio, cwd: this.params.cwd};
@@ -692,6 +695,8 @@ export class Crawler {
       await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
     }
 
+    await this.closeLog();
+
     if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.clearOnExit)) {
       await this.generateWACZ();
 
@@ -712,6 +717,16 @@ export class Crawler {
 
       // wait forever until signal
       await new Promise(() => {});
+    }
+  }
+
+  async closeLog() {
+    // close file-based log
+    setExternalLogStream(null);
+    try {
+      await new Promise(resolve => this.logFH.close(() => resolve()));
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -739,7 +754,13 @@ export class Crawler {
     const waczFilename = this.params.collection.concat(".wacz");
     const waczPath = path.join(this.collDir, waczFilename);
 
-    const createArgs = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile];
+    const createArgs = [
+      "create",
+      "--split-seeds",
+      "-o", waczPath,
+      "--pages", this.pagesFile,
+      "--log-directory", this.logDir
+    ];
 
     if (process.env.WACZ_SIGN_URL) {
       createArgs.push("--signing-url");
