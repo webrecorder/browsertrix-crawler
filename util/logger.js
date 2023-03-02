@@ -5,6 +5,10 @@ export function setExternalLogStream(logFH) {
   logStream = logFH;
 }
 
+// to fix serialization of regexes for logging purposes
+RegExp.prototype.toJSON = RegExp.prototype.toString;
+
+
 // ===========================================================================
 export class Logger
 {
