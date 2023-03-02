@@ -83,7 +83,7 @@ class ArgParser {
       },
 
       "scopeType": {
-        describe: "A predfined scope of the crawl. For more customization, use 'custom' and set scopeIncludeRx regexes",
+        describe: "A predefined scope of the crawl. For more customization, use 'custom' and set scopeIncludeRx regexes",
         type: "string",
         choices: ["page", "page-spa", "prefix", "host", "domain", "any", "custom"]
       },

@@ -21,7 +21,7 @@ import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screenca
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
-import { Logger } from "./util/logger.js";
+import { Logger, setExternalLogStream } from "./util/logger.js";
 import { WorkerPool } from "./util/worker.js";
 
 import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
@@ -50,8 +50,16 @@ export class Crawler {
     this.params = res.parsed;
     this.origConfig = res.origConfig;
 
+    // root collections dir
+    this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
+    this.logDir = path.join(this.collDir, "logs");
+    this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`);
+    this.logFH = fs.createWriteStream(this.logFilename);
+
     const debugLogging = this.params.logging.includes("debug");
     this.logger = new Logger(debugLogging);
+    this.logger.debug("Writing log to: " + this.logFilename, {}, "init");
+    setExternalLogStream(this.logFH);
 
     this.headers = {};
     this.crawlState = null;
@@ -89,9 +97,6 @@ export class Crawler {
       waitUntil: this.params.waitUntil,
       timeout: this.params.timeout
     };
-
-    // root collections dir
-    this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
@@ -165,7 +170,7 @@ export class Crawler {
 
       this.logger.info(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
 
-      this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.timeout * 2, os.hostname());
+      this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.behaviorTimeout + this.params.timeout, os.hostname());
 
     } else {
       this.logger.info("Storing state in memory", {}, "state");
@@ -199,7 +204,14 @@ export class Crawler {
   }
 
   async bootstrap() {
-    const logs = path.join(this.collDir, "logs");
+    if (this.params.overwrite) {
+      this.logger.info(`Clearing ${this.collDir} before starting`);
+      try {
+        fs.rmSync(this.collDir, { recursive: true, force: true });
+      } catch(e) {
+        this.logger.error(`Unable to clear ${this.collDir}`, e);
+      }
+    }
 
     const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
 
@@ -207,16 +219,16 @@ export class Crawler {
       this.logger.info("wb-manager init failed, collection likely already exists");
     }
 
-    await fsp.mkdir(logs, {recursive: true});
+    await fsp.mkdir(this.logDir, {recursive: true});
 
     let opts = {};
     let redisStdio;
 
     if (this.params.logging.includes("pywb")) {
-      const pywbStderr = fs.openSync(path.join(logs, "pywb.log"), "a");
+      const pywbStderr = fs.openSync(path.join(this.logDir, "pywb.log"), "a");
       const stdio = [process.stdin, pywbStderr, pywbStderr];
 
-      const redisStderr = fs.openSync(path.join(logs, "redis.log"), "a");
+      const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
       redisStdio = [process.stdin, redisStderr, redisStderr];
 
       opts = {stdio, cwd: this.params.cwd};
@@ -234,15 +246,6 @@ export class Crawler {
     const subprocesses = [];
 
     subprocesses.push(child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio}));
-
-    if (this.params.overwrite) {
-      this.logger.info(`Clearing ${this.collDir} before starting`);
-      try {
-        fs.rmSync(this.collDir, { recursive: true, force: true });
-      } catch(e) {
-        this.logger.error(`Unable to clear ${this.collDir}`, e);
-      }
-    }
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
 
@@ -323,21 +326,35 @@ export class Crawler {
     }
   }
 
-  _behaviorLog({data, type}) {
+  _behaviorLog({data, type}, pageUrl) {
     let behaviorLine;
+    let message;
+    let details;
+
+    if (typeof(data) === "string") {
+      message = data;
+      details = {};
+    } else {
+      message = type === "info" ? "Behavior log" : "Behavior debug";
+      details = typeof(data) === "object" ? data : {};
+    }
+
+    if (pageUrl) {
+      details.page = pageUrl;
+    }
 
     switch (type) {
     case "info":
       behaviorLine = JSON.stringify(data);
       if (behaviorLine != this._behaviorLastLine) {
-        this.logger.info("Behavior line", data, "behavior");
+        this.logger.info(message, details, "behaviorScript");
         this._behaviorLastLine = behaviorLine;
       }
       break;
 
     case "debug":
     default:
-      this.logger.debug("Behavior debug", data, "behavior");
+      this.logger.debug(message, details, "behaviorScript");
     }
   }
 
@@ -348,7 +365,12 @@ export class Crawler {
   }
 
   async crawlPage(opts) {
+    await this.writeStats();
+
     const {page, data} = opts;
+    const {url} = data;
+
+    const logDetails = {page: url};
 
     if (!this.isInScope(data)) {
       this.logger.info("Page no longer in scope", data);
@@ -357,7 +379,7 @@ export class Crawler {
 
     try {
       if (this.screencaster) {
-        await this.screencaster.screencastTarget(page.target(), data.url);
+        await this.screencaster.screencastTarget(page.target(), url);
       }
 
       if (this.emulateDevice) {
@@ -371,7 +393,7 @@ export class Crawler {
       await page.evaluateOnNewDocument("Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
       if (this.params.behaviorOpts && !page.__bx_inited) {
-        await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata));
+        await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, url));
         await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
         page.__bx_inited = true;
       }
@@ -383,10 +405,10 @@ export class Crawler {
 
       if (this.params.screenshot) {
         if (!page.isHTMLPage) {
-          this.logger.info("Skipping screenshots for non-HTML page");
+          this.logger.info("Skipping screenshots for non-HTML page", logDetails);
         }
         const archiveDir = path.join(this.collDir, "archive");
-        const screenshots = new Screenshots({page, url: data.url, directory: archiveDir});
+        const screenshots = new Screenshots({page, url, directory: archiveDir});
         if (this.params.screenshot.includes("view")) {
           await screenshots.take();
         }
@@ -409,45 +431,58 @@ export class Crawler {
 
       if (this.params.behaviorOpts) {
         if (!page.isHTMLPage) {
-          this.logger.info("Skipping behaviors for non-HTML page", data, "behavior");
+          this.logger.info("Skipping behaviors for non-HTML page", logDetails, "behavior");
         } else {
-          await Promise.allSettled(
-            page.frames().
-              filter(frame => this.shouldRunBehavior(frame)).
-              map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();"))
-          );
-
-          // also wait for general net idle
-          await this.netIdle(page);
+          const behaviorTimeout = this.params.behaviorTimeout / 1000;
+          this.logger.info("Behaviors started", {behaviorTimeout, ...logDetails}, "behavior");
+          const res = await Promise.race([
+            this.sleep(behaviorTimeout),
+            Promise.allSettled(
+              page.frames().
+                filter(frame => this.shouldRunBehavior(frame, logDetails)).
+                map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+            )
+          ]);
+          if (res && res.length) {
+            this.logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
+          } else {
+            this.logger.error("Behaviors timed out", logDetails, "behavior");
+          }
         }
       }
 
-      this.logger.info("Page graph data for successfully crawled page", data, "pageGraph");
-
-      await this.writeStats();
+      this.logger.info("Page finished", logDetails, "pageStatus");
 
       await this.checkLimits();
 
       await this.serializeConfig();
 
     } catch (e) {
-      this.logger.error(`Error crawling page ${data.url}`, e);
+      this.logger.error("Page Errored", {...e, ...logDetails}, "pageStatus");
       await this.markPageFailed(page);
     }
   }
 
-  async shouldRunBehavior(frame) {
+  async shouldRunBehavior(frame, logDetails) {
     if (!frame.parentFrame()) {
       return true;
     }
 
-    const url = frame.url();
+    const frameUrl = frame.url();
 
-    if (url === "about:blank") {
-      return false;
+    let res;
+
+    if (frameUrl === "about:blank") {
+      res = false;
+    } else {
+      res = !(await this.adBlockRules.shouldBlock(null, frameUrl, logDetails));
     }
 
-    return !!(await this.adBlockRules.shouldBlock(null, url));
+    if (!res) {
+      this.logger.info("Skipping behavior for frame", {frameUrl, ...logDetails}, "behavior");
+    }
+
+    return res;
   }
 
   async createWARCInfo(filename) {
@@ -634,6 +669,8 @@ export class Crawler {
       await this.pagesFH.close();
     }
 
+    await this.writeStats(true);
+
     // extra wait for all resources to land into WARCs
     await this.awaitPendingClear();
 
@@ -646,7 +683,7 @@ export class Crawler {
       await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
     }
 
-    await this.writeStats(true);
+    await this.closeLog();
 
     if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.clearOnExit)) {
       await this.generateWACZ();
@@ -668,6 +705,16 @@ export class Crawler {
 
       // wait forever until signal
       await new Promise(() => {});
+    }
+  }
+
+  async closeLog() {
+    // close file-based log
+    setExternalLogStream(null);
+    try {
+      await new Promise(resolve => this.logFH.close(() => resolve()));
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -695,7 +742,13 @@ export class Crawler {
     const waczFilename = this.params.collection.concat(".wacz");
     const waczPath = path.join(this.collDir, waczFilename);
 
-    const createArgs = ["create", "--split-seeds", "-o", waczPath, "--pages", this.pagesFile];
+    const createArgs = [
+      "create",
+      "--split-seeds",
+      "-o", waczPath,
+      "--pages", this.pagesFile,
+      "--log-directory", this.logDir
+    ];
 
     if (process.env.WACZ_SIGN_URL) {
       createArgs.push("--signing-url");
@@ -772,7 +825,7 @@ export class Crawler {
       "pendingPages": pendingList.map(x => JSON.stringify(x))
     };
 
-    this.logger.info("Crawl statistics", stats, "crawlState");
+    this.logger.info("Crawl statistics", stats, "crawlStatus");
 
     if (toFile && this.params.statsFilename) {
       try {
@@ -785,6 +838,8 @@ export class Crawler {
 
   async loadPage(page, urlData, selectorOptsList = DEFAULT_SELECTORS) {
     const {url, seedId, depth, extraHops = 0} = urlData;
+
+    const logDetails = {page: url};
 
     let isHTMLPage = true;
 
@@ -829,13 +884,14 @@ export class Crawler {
     try {
       await page.goto(url, gotoOpts);
       if (this.errorCount > 0) {
-        this.logger.info(`Page loaded, resetting error count ${this.errorCount} to 0`);
+        this.logger.info(`Page loaded, resetting error count ${this.errorCount} to 0`, logDetails);
         this.errorCount = 0;
       }
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
-        this.logger.error(`Load Error: ${url}: ${msg}`);
+        const mainMessage = e.name === "TimeoutError" ? "Page Load Timeout" : "Page Load Error";
+        this.logger.error(mainMessage, {msg, ...logDetails});
         this.errorCount++;
       }
     }
@@ -848,11 +904,9 @@ export class Crawler {
 
     const seed = this.params.scopedSeeds[seedId];
 
-    await this.checkCF(page);
+    await this.checkCF(page, logDetails);
 
-    await this.netIdle(page);
-
-    await this.sleep(5);
+    await this.netIdle(page, logDetails);
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
@@ -873,7 +927,7 @@ export class Crawler {
     }
   }
 
-  async netIdle(page) {
+  async netIdle(page, details) {
     if (!this.params.netIdleWait) {
       return;
     }
@@ -884,7 +938,7 @@ export class Crawler {
     try {
       await page.waitForNetworkIdle({timeout: this.params.netIdleWait * 1000});
     } catch (e) {
-      this.logger.info("note: waitForNetworkIdle timed out, ignoring");
+      this.logger.info("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
     }
   }
@@ -945,14 +999,14 @@ export class Crawler {
     }
   }
 
-  async checkCF(page) {
+  async checkCF(page, logDetails) {
     try {
       while (await page.$("div.cf-browser-verification.cf-im-under-attack")) {
-        this.logger.info("Cloudflare Check Detected, waiting for reload...");
+        this.logger.info("Cloudflare Check Detected, waiting for reload...", logDetails);
         await this.sleep(5.5);
       }
     } catch (e) {
-      this.logger.warn("Check CF failed, ignoring", e);
+      //this.logger.warn("Check CF failed, ignoring");
     }
   }
 
@@ -1080,10 +1134,7 @@ export class Crawler {
 
     const redis = await initRedis("redis://localhost/0");
 
-    // wait for pending requests upto 120 secs, unless canceling
-    const MAX_WAIT = 120;
-
-    for (let i = 0; i < MAX_WAIT && !this.interrupted; i++) {
+    while (!this.interrupted) {
       try {
         const count = Number(await redis.get(`pywb:${this.params.collection}:pending`) || 0);
         if (count <= 0) {
