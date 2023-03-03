@@ -2,39 +2,12 @@ import { EventEmitter } from "node:events";
 import PQueue from "p-queue";
 import puppeteer from "puppeteer-core";
 
-import { Logger } from "./logger.js";
+import { Logger, errJSON } from "./logger.js";
 
 const logger = new Logger();
 
 class BrowserEmitter extends EventEmitter {}
 const browserEmitter = new BrowserEmitter();
-
-
-async function timeoutExecute(millis, promise) {
-  // Borrowed from puppeteer-cluster by thomasdondorf:
-  // https://github.com/thomasdondorf/puppeteer-cluster/blob/master/src/util.ts
-  let timeout = null;
-
-  const result = await Promise.race([
-    (async () => {
-      await new Promise((resolve) => {
-        timeout = setTimeout(resolve, millis);
-      });
-      throw new Error(`Timeout hit: ${millis}`);
-    })(),
-    (async () => {
-      try {
-        return await promise;
-      } catch (error) {
-        // Cancel timeout in case of error
-        clearTimeout(timeout);
-        throw error;
-      }
-    })(),
-  ]);
-  clearTimeout(timeout);
-  return result;
-}
 
 
 // ===========================================================================
@@ -70,8 +43,9 @@ export class Worker
       const target = this.pendingTargets.get(targetId);
       this.pendingTargets.delete(targetId);
       this.page = await target.page();
+      this.page._workerid = this.id;
     } catch (err) {
-      logger.warn("Error getting new page in window context", err);
+      logger.warn("Error getting new page in window context", {"workerid": this.id, ...errJSON(err)}, "worker");
       this.repair(job);
     }
   }
@@ -84,23 +58,22 @@ export class Worker
     const urlData = job.data;
     await this.initPage(job);
 
+    const url = job.getUrl();
+    logger.info("Starting page", {"workerid": this.id, "page": url}, "worker");
+
     let result;
     let errorState;
 
-    try {
-      result = await timeoutExecute(
-        this.timeout,
-        this.task({
-          page: this.page,
-          data: urlData
-        }),
-      );
-    } catch (err) {
-      errorState = err;
-      logger.error(`Error crawling ${urlData.url} in worker ${this.id}`, err);
-    }
+    await this.task({
+      page: this.page,
+      data: urlData,
+    });
 
-    await this.page.close();
+    try {
+      await this.page.close();
+    } catch (e) {
+      // ignore
+    }
 
     if (errorState) {
       return {
@@ -116,12 +89,12 @@ export class Worker
   }
 
   repair(job) {
-    logger.info("Starting repair");
+    logger.info("Starting repair", {workerid: this.id}, "worker");
     browserEmitter.emit("repair", this, job);
   }
 
   async shutdown() {
-    logger.info("Shutting down browser");
+    logger.info("Shutting down browser", {workerid: this.id}, "worker");
     browserEmitter.emit("close");
   }
 }
@@ -146,12 +119,15 @@ export class WorkerPool
     this.workersBusy = [];
 
     this.errorCount = 0;
+    this.interrupted = false;
 
     this.createWorkers(this.maxConcurrency);
 
     browserEmitter.on("repair", (worker, job) => {
       setImmediate(() => {
-        this.repair(worker, job);
+        if (!this.interrupted) {
+          this.repair(worker, job);
+        }
       });
     });
 
@@ -164,7 +140,7 @@ export class WorkerPool
     if (!this.browser) {
       this.browser = await puppeteer.launch(this.puppeteerOptions);
     }
-    logger.info(`Creating ${numWorkers} workers`);
+    logger.info(`Creating ${numWorkers} workers`, {}, "worker");
     for (let i=0; i < numWorkers; i++) {
       await this.createWorker(`worker-${i+1}`);
     }
@@ -209,13 +185,10 @@ export class WorkerPool
     const job = await this.crawlState.shift();
 
     if (!job) {
-      logger.info("No jobs available");
+      logger.info("No jobs available", {}, "worker");
       this.freeWorker(worker);
       return;
     }
-
-    const url = job.getUrl();
-    logger.info(`Starting to crawl page: ${url}`);
 
     const result = await worker.runTask(job);
 
@@ -234,9 +207,9 @@ export class WorkerPool
   async work() {
     const queue = new PQueue({concurrency: this.maxConcurrency});
 
-    while (true) {
-      if ((await this.crawlState.realSize()) + (await this.crawlState.numRealPending()) == 0) {
-        return;
+    while (!this.interrupted) {
+      if ((await this.crawlState.realSize()) + (await this.crawlState.numPending()) == 0) {
+        break;
       }
 
       if ((await this.crawlState.realSize()) > 0) {
@@ -248,6 +221,13 @@ export class WorkerPool
       // wait half a second
       await new Promise(resolve => setTimeout(resolve, 500));
     }
+
+    await queue.onIdle();
+  }
+
+  interrupt() {
+    logger.info("Interrupting Crawl", {}, "worker");
+    this.interrupted = true;
   }
 
   async repair (worker, job) {
@@ -261,7 +241,7 @@ export class WorkerPool
     /* eslint-disable no-empty */
     } catch (e) {}
     
-    logger.info(`Re-launching job in worker ${worker.id} with repaired browser`);
+    logger.info(`Re-launching job in worker ${worker.id} with repaired browser`, {}, "worker");
     this.browser = await puppeteer.launch(this.puppeteerOptions);
     await worker.runTask(job);
   }

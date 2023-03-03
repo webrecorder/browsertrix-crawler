@@ -430,7 +430,7 @@ class ArgParser {
       } else {
         argv.netIdleWait = 2;
       }
-      logger.info(`Set netIdleWait to ${argv.netIdleWait} seconds`);
+      //logger.debug(`Set netIdleWait to ${argv.netIdleWait} seconds`);
     }
 
     // prefer argv.include only if string or a non-empty array

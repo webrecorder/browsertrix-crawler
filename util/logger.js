@@ -5,8 +5,15 @@ export function setExternalLogStream(logFH) {
   logStream = logFH;
 }
 
+// ===========================================================================
 // to fix serialization of regexes for logging purposes
 RegExp.prototype.toJSON = RegExp.prototype.toString;
+
+
+// ===========================================================================
+export function errJSON(e) {
+  return {"type": "exception", "message": e.message, "stack": e.stack};
+}
 
 
 // ===========================================================================
@@ -18,7 +25,7 @@ export class Logger
 
   logAsJSON(message, data, context, logLevel="info") {
     if (data instanceof Error) {
-      data = {"type": "exception", "message": data.message, "stack": data.stack};
+      data = errJSON(data);
     } else if (typeof data !== "object") {
       data = {"message": data.toString()};
     }

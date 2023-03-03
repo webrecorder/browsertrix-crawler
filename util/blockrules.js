@@ -1,6 +1,6 @@
 import fs from "fs";
 
-import { Logger } from "./logger.js";
+import { Logger, errJSON } from "./logger.js";
 
 const logger = new Logger();
 
@@ -89,7 +89,7 @@ export class BlockRules
       try {
         await this.handleRequest(request, logDetails);
       } catch (e) {
-        this.logger.warn("Error handling request", {...e, ...logDetails}, "blocking");
+        this.logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }
     });
   }
@@ -109,7 +109,7 @@ export class BlockRules
       }
 
     } catch (e) {
-      this.logger.debug(`Block: (${blockState}) Failed On: ${url}`, {...e, ...logDetails}, "blocking");
+      this.logger.debug(`Block: (${blockState}) Failed On: ${url}`, {...errJSON(e), ...logDetails}, "blocking");
     }
   }
 
@@ -209,7 +209,7 @@ export class BlockRules
       return !!text.match(frameTextMatch);
 
     } catch (e) {
-      this.logger.debug("Error determining text match", {...e, ...logDetails}, "blocking");
+      this.logger.debug("Error determining text match", {...errJSON(e), ...logDetails}, "blocking");
     }
   }
 
@@ -255,7 +255,7 @@ export class AdBlockRules extends BlockRules
       try {
         await this.handleRequest(request, logDetails);
       } catch (e) {
-        this.logger.warn("Error handling request", {...e, ...logDetails}, "blocking");
+        this.logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }
     });
   }

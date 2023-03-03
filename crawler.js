@@ -21,7 +21,7 @@ import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screenca
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
-import { Logger, setExternalLogStream } from "./util/logger.js";
+import { Logger, errJSON, setExternalLogStream } from "./util/logger.js";
 import { WorkerPool } from "./util/worker.js";
 
 import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
@@ -53,6 +53,7 @@ export class Crawler {
     // root collections dir
     this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
     this.logDir = path.join(this.collDir, "logs");
+    fs.mkdirSync(this.logDir, {recursive: true});
     this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`);
     this.logFH = fs.createWriteStream(this.logFilename);
 
@@ -82,13 +83,7 @@ export class Crawler {
     this.lastSaveTime = 0;
     this.saveStateInterval = this.params.saveStateInterval * 1000;    
 
-    if (this.params.profile) {
-      this.logger.info(`With Browser Profile: ${this.params.profile}"`);
-    }
-
     this.emulateDevice = this.params.emulateDevice;
-
-    this.logger.info("Seeds", this.params.scopedSeeds);
 
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
     this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
@@ -204,6 +199,15 @@ export class Crawler {
   }
 
   async bootstrap() {
+    this.infoString = await this.getInfoString();
+    this.logger.info(this.infoString);
+
+    this.logger.info("Seeds", this.params.scopedSeeds);
+
+    if (this.params.profile) {
+      this.logger.info("With Browser Profile", {url: this.params.profile});
+    }
+
     if (this.params.overwrite) {
       this.logger.info(`Clearing ${this.collDir} before starting`);
       try {
@@ -218,8 +222,6 @@ export class Crawler {
     if (initRes.status) {
       this.logger.info("wb-manager init failed, collection likely already exists");
     }
-
-    await fsp.mkdir(this.logDir, {recursive: true});
 
     let opts = {};
     let redisStdio;
@@ -358,10 +360,10 @@ export class Crawler {
     }
   }
 
-  isInScope({seedId, url, depth, extraHops} = {}) {
+  isInScope({seedId, url, depth, extraHops} = {}, logDetails = {}) {
     const seed = this.params.scopedSeeds[seedId];
 
-    return seed.isIncluded(url, depth, extraHops);
+    return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
   async crawlPage(opts) {
@@ -370,9 +372,9 @@ export class Crawler {
     const {page, data} = opts;
     const {url} = data;
 
-    const logDetails = {page: url};
+    const logDetails = {page: url, workerid: page._workerid};
 
-    if (!this.isInScope(data)) {
+    if (!this.isInScope(data, logDetails)) {
       this.logger.info("Page no longer in scope", data);
       return;
     }
@@ -435,14 +437,12 @@ export class Crawler {
         } else {
           const behaviorTimeout = this.params.behaviorTimeout / 1000;
           this.logger.info("Behaviors started", {behaviorTimeout, ...logDetails}, "behavior");
+
           const res = await Promise.race([
             this.sleep(behaviorTimeout),
-            Promise.allSettled(
-              page.frames().
-                filter(frame => this.shouldRunBehavior(frame, logDetails)).
-                map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
-            )
+            this.runBehaviors(page, logDetails)
           ]);
+
           if (res && res.length) {
             this.logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
           } else {
@@ -458,8 +458,21 @@ export class Crawler {
       await this.serializeConfig();
 
     } catch (e) {
-      this.logger.error("Page Errored", {...e, ...logDetails}, "pageStatus");
+      this.logger.error("Page Errored", {...errJSON(e), ...logDetails}, "pageStatus");
       await this.markPageFailed(page);
+    }
+  }
+
+  async runBehaviors(page, logDetails) {
+    try {
+      return await Promise.allSettled(
+        page.frames().
+          filter(frame => this.shouldRunBehavior(frame, logDetails)).
+          map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+      );
+    } catch (e) {
+      this.logger.warn("Behavior run failed", {...errJSON(e), ...logDetails}, "behavior");
+      return null;
     }
   }
 
@@ -485,15 +498,20 @@ export class Crawler {
     return res;
   }
 
-  async createWARCInfo(filename) {
-    const warcVersion = "WARC/1.0";
-    const type = "warcinfo";
+  async getInfoString() {
     const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
     const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
     const pywbVersion = child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
 
+    return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`;
+  }
+
+  async createWARCInfo(filename) {
+    const warcVersion = "WARC/1.0";
+    const type = "warcinfo";
+
     const info = {
-      "software": `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`,
+      "software": this.infoString,
       "format": "WARC File Format 1.0"
     };
 
@@ -552,6 +570,7 @@ export class Crawler {
   gracefulFinish() {
     this.crawlState.setDrain(true);
     this.interrupted = true;
+    this.workerPool.interrupt();
     if (!this.params.waitOnDone) {
       this.finalExit = true;
     }
@@ -620,6 +639,11 @@ export class Crawler {
       this.storage = initStorage();
     }
 
+    if (initState === "finalize") {
+      await this.postCrawl();
+      return;
+    }
+
     await this.crawlState.setStatus("running");
 
     if (this.params.state) {
@@ -674,6 +698,10 @@ export class Crawler {
     // extra wait for all resources to land into WARCs
     await this.awaitPendingClear();
 
+    await this.postCrawl();
+  }
+
+  async postCrawl() {
     if (this.params.combineWARC) {
       await this.combineWARC();
     }
@@ -839,7 +867,7 @@ export class Crawler {
   async loadPage(page, urlData, selectorOptsList = DEFAULT_SELECTORS) {
     const {url, seedId, depth, extraHops = 0} = urlData;
 
-    const logDetails = {page: url};
+    const logDetails = {page: url, workerid: page._workerid};
 
     let isHTMLPage = true;
 
@@ -881,6 +909,8 @@ export class Crawler {
 
     const gotoOpts = isHTMLPage ? this.gotoOpts : "domcontentloaded";
 
+    this.logger.info("Awaiting page load", logDetails);
+
     try {
       await page.goto(url, gotoOpts);
       if (this.errorCount > 0) {
@@ -915,7 +945,7 @@ export class Crawler {
 
     for (const opts of selectorOptsList) {
       const links = await this.extractLinks(page, opts);
-      await this.queueInScopeUrls(seedId, links, depth, extraHops);
+      await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
     }
   }
 
@@ -974,7 +1004,7 @@ export class Crawler {
     return results;
   }
 
-  async queueInScopeUrls(seedId, urls, depth, extraHops = 0) {
+  async queueInScopeUrls(seedId, urls, depth, extraHops = 0, logDetails = {}) {
     try {
       depth += 1;
 
@@ -982,7 +1012,7 @@ export class Crawler {
       const newExtraHops = extraHops + 1;
 
       for (const possibleUrl of urls) {
-        const res = this.isInScope({url: possibleUrl, extraHops: newExtraHops, depth, seedId});
+        const res = this.isInScope({url: possibleUrl, extraHops: newExtraHops, depth, seedId}, logDetails);
 
         if (!res) {
           continue;
