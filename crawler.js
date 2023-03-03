@@ -424,6 +424,7 @@ export class Crawler {
 
       let text = "";
       if (this.params.text && page.isHTMLPage) {
+        this.logger.info("Extracting text", logDetails, "general");
         const client = await page.target().createCDPSession();
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();

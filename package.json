@@ -19,7 +19,7 @@
     "js-yaml": "^4.1.0",
     "minio": "7.0.26",
     "p-queue": "^7.3.0",
-    "puppeteer-core": "^17.1.2",
+    "puppeteer-core": "^19.7.2",
     "request": "^2.88.2",
     "sitemapper": "^3.1.2",
     "uuid": "8.3.2",
