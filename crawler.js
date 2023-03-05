@@ -57,14 +57,11 @@ export class Crawler {
     // root collections dir
     this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
     this.logDir = path.join(this.collDir, "logs");
-    fs.mkdirSync(this.logDir, {recursive: true});
     this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`);
-    this.logFH = fs.createWriteStream(this.logFilename);
 
     const debugLogging = this.params.logging.includes("debug");
     this.logger = new Logger(debugLogging);
     this.logger.debug("Writing log to: " + this.logFilename, {}, "init");
-    setExternalLogStream(this.logFH);
 
     this.headers = {};
     this.crawlState = null;
@@ -203,6 +200,16 @@ export class Crawler {
   }
 
   async bootstrap() {
+    const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
+
+    if (initRes.status) {
+      this.logger.info("wb-manager init failed, collection likely already exists");
+    }
+
+    fs.mkdirSync(this.logDir, {recursive: true});
+    this.logFH = fs.createWriteStream(this.logFilename);
+    setExternalLogStream(this.logFH);
+
     this.infoString = await this.getInfoString();
     this.logger.info(this.infoString);
 
@@ -219,12 +226,6 @@ export class Crawler {
       } catch(e) {
         this.logger.error(`Unable to clear ${this.collDir}`, e);
       }
-    }
-
-    const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
-
-    if (initRes.status) {
-      this.logger.debug("wb-manager init failed, collection likely already exists");
     }
 
     let opts = {};
