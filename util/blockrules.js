@@ -265,7 +265,7 @@ export class AdBlockRules extends BlockRules
     const domain = fragments.length > 2 ? fragments[2] : null;
     return this.adhosts.includes(domain);
   }
- 
+
   async shouldBlock(request, url, logDetails) {
     if (this.isAdUrl(url)) {
       this.logger.debug("URL blocked for being an ad", {url, ...logDetails}, "blocking");

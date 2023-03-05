@@ -167,18 +167,18 @@ export class Crawler {
         }
       }
 
-      this.logger.info(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
+      this.logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
 
       this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.behaviorTimeout + this.params.timeout, os.hostname());
 
     } else {
-      this.logger.info("Storing state in memory", {}, "state");
+      this.logger.debug("Storing state in memory", {}, "state");
 
       this.crawlState = new MemoryCrawlState();
     }
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
-      this.logger.info(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
+      this.logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
     }
 
     return this.crawlState;
@@ -213,7 +213,7 @@ export class Crawler {
     }
 
     if (this.params.overwrite) {
-      this.logger.info(`Clearing ${this.collDir} before starting`);
+      this.logger.debug(`Clearing ${this.collDir} before starting`);
       try {
         fs.rmSync(this.collDir, { recursive: true, force: true });
       } catch(e) {
@@ -224,7 +224,7 @@ export class Crawler {
     const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
 
     if (initRes.status) {
-      this.logger.info("wb-manager init failed, collection likely already exists");
+      this.logger.debug("wb-manager init failed, collection likely already exists");
     }
 
     let opts = {};
@@ -411,7 +411,7 @@ export class Crawler {
 
       if (this.params.screenshot) {
         if (!page.isHTMLPage) {
-          this.logger.info("Skipping screenshots for non-HTML page", logDetails);
+          this.logger.debug("Skipping screenshots for non-HTML page", logDetails);
         }
         const archiveDir = path.join(this.collDir, "archive");
         const screenshots = new Screenshots({page, url, directory: archiveDir});
@@ -428,7 +428,7 @@ export class Crawler {
 
       let text = "";
       if (this.params.text && page.isHTMLPage) {
-        this.logger.info("Extracting text", logDetails, "general");
+        this.logger.debug("Extracting text", logDetails, "general");
         const client = await page.target().createCDPSession();
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
@@ -438,7 +438,7 @@ export class Crawler {
 
       if (this.params.behaviorOpts) {
         if (!page.isHTMLPage) {
-          this.logger.info("Skipping behaviors for non-HTML page", logDetails, "behavior");
+          this.logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
         } else {
           const behaviorTimeout = this.params.behaviorTimeout / 1000;
 
@@ -499,7 +499,7 @@ export class Crawler {
     }
 
     if (!res) {
-      this.logger.info("Skipping processing frame", {frameUrl, ...logDetails}, "behavior");
+      this.logger.debug("Skipping processing frame", {frameUrl, ...logDetails}, "behavior");
     }
 
     return res;
@@ -831,7 +831,7 @@ export class Crawler {
 
   awaitProcess(proc) {
     proc.stdout.on("data", (data) => {
-      this.logger.info(data.toString());
+      this.logger.debug(data.toString());
     });
 
     proc.stderr.on("data", (data) => {
@@ -944,7 +944,7 @@ export class Crawler {
     }
 
     if (!isHTMLPage) {
-      this.logger.info("Skipping link extraction for non-HTML page", logDetails);
+      this.logger.debug("Skipping link extraction for non-HTML page", logDetails);
       return;
     }
 
@@ -986,7 +986,7 @@ export class Crawler {
     try {
       await page.waitForNetworkIdle({timeout: this.params.netIdleWait * 1000});
     } catch (e) {
-      this.logger.info("waitForNetworkIdle timed out, ignoring", details);
+      this.logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
     }
   }
@@ -1062,7 +1062,7 @@ export class Crawler {
       this.logger.debug("Check CF Blocking", logDetails);
 
       while (await page.$("div.cf-browser-verification.cf-im-under-attack")) {
-        this.logger.info("Cloudflare Check Detected, waiting for reload...", logDetails);
+        this.logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
         await this.sleep(5.5);
       }
     } catch (e) {
@@ -1110,10 +1110,10 @@ export class Crawler {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
           header["hasText"] = true;
-          this.logger.info("Text Extraction: Enabled");
+          this.logger.debug("Text Extraction: Enabled");
         } else {
           header["hasText"] = false;
-          this.logger.info("Text Extraction: Disabled");
+          this.logger.debug("Text Extraction: Disabled");
         }
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
