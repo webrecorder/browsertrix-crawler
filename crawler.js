@@ -43,6 +43,10 @@ const HTTP_AGENT = HTTPAgent();
 const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
 
+//todo: move elsewhere?
+const LINK_EXTRACT_TIMEOUT_SECS = 5;
+
+
 // ============================================================================
 export class Crawler {
   constructor() {
@@ -437,7 +441,6 @@ export class Crawler {
           this.logger.info("Skipping behaviors for non-HTML page", logDetails, "behavior");
         } else {
           const behaviorTimeout = this.params.behaviorTimeout / 1000;
-          this.logger.info("Behaviors started", {behaviorTimeout, ...logDetails}, "behavior");
 
           const res = await Promise.race([
             this.sleep(behaviorTimeout),
@@ -466,18 +469,21 @@ export class Crawler {
 
   async runBehaviors(page, logDetails) {
     try {
+      const frames = page.__filteredFrames;
+
+      this.logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
+
       return await Promise.allSettled(
-        page.frames().
-          filter(frame => this.shouldRunBehavior(frame, logDetails)).
-          map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
+
     } catch (e) {
       this.logger.warn("Behavior run failed", {...errJSON(e), ...logDetails}, "behavior");
       return null;
     }
   }
 
-  async shouldRunBehavior(frame, logDetails) {
+  shouldIncludeFrame(frame, logDetails) {
     if (!frame.parentFrame()) {
       return true;
     }
@@ -489,11 +495,11 @@ export class Crawler {
     if (frameUrl === "about:blank") {
       res = false;
     } else {
-      res = !(await this.adBlockRules.shouldBlock(null, frameUrl, logDetails));
+      res = !this.adBlockRules.isAdUrl(frameUrl);
     }
 
     if (!res) {
-      this.logger.info("Skipping behavior for frame", {frameUrl, ...logDetails}, "behavior");
+      this.logger.info("Skipping processing frame", {frameUrl, ...logDetails}, "behavior");
     }
 
     return res;
@@ -913,7 +919,10 @@ export class Crawler {
     this.logger.info("Awaiting page load", logDetails);
 
     try {
-      await page.goto(url, gotoOpts);
+      const resp = await page.goto(url, gotoOpts);
+
+      isHTMLPage = this.isHTMLContentType(resp.headers["content-type"]);
+
       if (this.errorCount > 0) {
         this.logger.info(`Page loaded, resetting error count ${this.errorCount} to 0`, logDetails);
         this.errorCount = 0;
@@ -928,8 +937,14 @@ export class Crawler {
     }
 
     page.isHTMLPage = isHTMLPage;
+    if (isHTMLPage) {
+      page.__filteredFrames = page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
+    } else {
+      page.__filteredFrames = null;
+    }
 
     if (!isHTMLPage) {
+      this.logger.info("Skipping link extraction for non-HTML page", logDetails);
       return;
     }
 
@@ -944,8 +959,10 @@ export class Crawler {
       return;
     }
 
+    this.logger.debug("Extracting links");
+
     for (const opts of selectorOptsList) {
-      const links = await this.extractLinks(page, opts);
+      const links = await this.extractLinks(page, opts, logDetails);
       await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
     }
   }
@@ -974,7 +991,7 @@ export class Crawler {
     }
   }
 
-  async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}) {
+  async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}, logDetails) {
     const results = [];
 
     const loadProp = (selector, extract) => {
@@ -988,14 +1005,24 @@ export class Crawler {
     const loadFunc = isAttribute ? loadAttr : loadProp;
 
     try {
-      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate(loadFunc, selector, extract)));
+      const frames = page.__filteredFrames;
+
+      const linkResults = await Promise.allSettled(
+        frames.map(frame => Promise.race([frame.evaluate(loadFunc, selector, extract), this.sleep(LINK_EXTRACT_TIMEOUT_SECS)]))
+      );
 
       if (linkResults) {
+        let i = 0;
         for (const linkResult of linkResults) {
+          if (!linkResult) {
+            this.logger.warn("Link Extraction timed out in frame", {frameUrl: frames[i].url, ...logDetails});
+            continue;
+          }
           if (!linkResult.value) continue;
           for (const link of linkResult.value) {
             results.push(link);
           }
+          i++;
         }
       }
 
@@ -1032,6 +1059,8 @@ export class Crawler {
 
   async checkCF(page, logDetails) {
     try {
+      this.logger.debug("Check CF Blocking", logDetails);
+
       while (await page.$("div.cf-browser-verification.cf-im-under-attack")) {
         this.logger.info("Cloudflare Check Detected, waiting for reload...", logDetails);
         await this.sleep(5.5);
@@ -1131,24 +1160,27 @@ export class Crawler {
         return true;
       }
 
-      const contentType = resp.headers.get("Content-Type");
+      return this.isHTMLContentType(resp.headers.get("Content-Type"));
 
-      // just load if no content-type
-      if (!contentType) {
-        return true;
-      }
-
-      const mime = contentType.split(";")[0];
-
-      if (HTML_TYPES.includes(mime)) {
-        return true;
-      }
-
-      return false;
     } catch(e) {
       // can't confirm not html, so try in browser
       return true;
     }
+  }
+
+  isHTMLContentType(contentType) {
+    // just load if no content-type
+    if (!contentType) {
+      return true;
+    }
+
+    const mime = contentType.split(";")[0];
+
+    if (HTML_TYPES.includes(mime)) {
+      return true;
+    }
+
+    return false;
   }
 
   async directFetchCapture(url) {
