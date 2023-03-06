@@ -1,8 +1,13 @@
 // ===========================================================================
 let logStream = null;
+let debugLogging = false;
 
 export function setExternalLogStream(logFH) {
   logStream = logFH;
+}
+
+export function setDebugLogging(debugLog) {
+  debugLogging = debugLog;
 }
 
 // ===========================================================================
@@ -19,10 +24,6 @@ export function errJSON(e) {
 // ===========================================================================
 export class Logger
 {
-  constructor(debugLogging=false) {
-    this.debugLogging = debugLogging;
-  }
-
   logAsJSON(message, data, context, logLevel="info") {
     if (data instanceof Error) {
       data = errJSON(data);
@@ -56,7 +57,7 @@ export class Logger
   }
 
   debug(message, data={}, context="general") {
-    if (this.debugLogging) {
+    if (debugLogging) {
       this.logAsJSON(message, data, context, "debug");
     }
   }

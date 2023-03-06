@@ -3,8 +3,6 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import fsp from "fs/promises";
-import http from "http";
-import url from "url";
 
 import fetch from "node-fetch";
 import { RedisCrawlState, MemoryCrawlState } from "./util/state.js";
@@ -15,13 +13,14 @@ import yaml from "js-yaml";
 
 import * as warcio from "warcio";
 
+import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtract } from "./util/textextract.js";
 import { initStorage, getFileSize, getDirSize, interpolateFilename } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
-import { Logger, errJSON, setExternalLogStream } from "./util/logger.js";
+import { Logger, errJSON, setExternalLogStream, setDebugLogging } from "./util/logger.js";
 import { WorkerPool } from "./util/worker.js";
 
 import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
@@ -60,7 +59,9 @@ export class Crawler {
     this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`);
 
     const debugLogging = this.params.logging.includes("debug");
-    this.logger = new Logger(debugLogging);
+    setDebugLogging(debugLogging);
+
+    this.logger = new Logger();
     this.logger.debug("Writing log to: " + this.logFilename, {}, "init");
 
     this.headers = {};
@@ -103,7 +104,7 @@ export class Crawler {
     this.blockRules = null;
     this.adBlockRules = null;
 
-    this.errorCount = 0;
+    this.healthChecker = null;
 
     this.interrupted = false;
     this.finalExit = false;
@@ -529,24 +530,6 @@ export class Crawler {
     return buffer;
   }
 
-  async healthCheck(req, res) {
-    const threshold = this.params.workers * 2;
-    const pathname = url.parse(req.url).pathname;
-    switch (pathname) {
-    case "/healthz":
-      if (this.errorCount < threshold) {
-        this.logger.debug(`health check ok, num errors ${this.errorCount} < ${threshold}`);
-        res.writeHead(200);
-        res.end();
-      }
-      return;
-    }
-
-    this.logger.error(`health check failed: ${this.errorCount} >= ${threshold}`);
-    res.writeHead(503);
-    res.end();
-  }
-
   async checkLimits() {
     let interrupt = false;
 
@@ -604,9 +587,7 @@ export class Crawler {
     this.profileDir = await loadProfile(this.params.profile);
 
     if (this.params.healthCheckPort) {
-      this.healthServer = http.createServer((...args) => this.healthCheck(...args));
-      this.logger.info(`Healthcheck server started on ${this.params.healthCheckPort}`);
-      this.healthServer.listen(this.params.healthCheckPort);
+      this.healthChecker = new HealthChecker(this.params.healthCheckPort, this.params.workers);
     }
 
     try {
@@ -687,6 +668,7 @@ export class Crawler {
       puppeteerOptions: this.puppeteerArgs,
       crawlState: this.crawlState,
       screencaster: this.screencaster,
+      healthChecker: this.healthChecker,
       task: (opts) => this.crawlPage(opts)
     });
 
@@ -924,16 +906,17 @@ export class Crawler {
 
       isHTMLPage = this.isHTMLContentType(resp.headers["content-type"]);
 
-      if (this.errorCount > 0) {
-        this.logger.info(`Page loaded, resetting error count ${this.errorCount} to 0`, logDetails);
-        this.errorCount = 0;
+      if (this.healthChecker) {
+        this.healthChecker.resetErrors();
       }
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         const mainMessage = e.name === "TimeoutError" ? "Page Load Timeout" : "Page Load Error";
         this.logger.error(mainMessage, {msg, ...logDetails});
-        this.errorCount++;
+        if (this.healthChecker) {
+          this.healthChecker.incError();
+        }
       }
     }
 
@@ -970,7 +953,9 @@ export class Crawler {
 
   async markPageFailed(page) {
     page.__failed = true;
-    this.errorCount++;
+    if (this.healthChecker) {
+      this.healthChecker.incError();
+    }
     if (this.screencaster) {
       await this.screencaster.endTarget(page.target());
     }
