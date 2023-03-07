@@ -189,7 +189,7 @@ export class WorkerPool
     const job = await this.crawlState.shift();
 
     if (!job) {
-      logger.info("No jobs available", {}, "worker");
+      logger.debug("No jobs available - waiting for pending pages to finish", {}, "worker");
       this.freeWorker(worker);
       return;
     }
