@@ -143,7 +143,11 @@ export async function getFileSize(filename) {
 }
 
 export async function getDirSize(dir) {
-  return await getFolderSize(dir);
+  const { size, errors } = await getFolderSize(dir);
+  if (errors && errors.length) {
+    logger.warn("Size check errors", {errors}, "sizecheck");
+  }
+  return size;
 }
 
 function checksumFile(hashName, path) {
