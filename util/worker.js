@@ -1,4 +1,4 @@
-import { EventEmitter } from "node:events";
+//import { EventEmitter } from "node:events";
 import PQueue from "p-queue";
 import puppeteer from "puppeteer-core";
 
@@ -6,25 +6,42 @@ import { Logger, errJSON } from "./logger.js";
 
 const logger = new Logger();
 
-class BrowserEmitter extends EventEmitter {}
-const browserEmitter = new BrowserEmitter();
+//class BrowserEmitter extends EventEmitter {}
+//const browserEmitter = new BrowserEmitter();
+
+const MAX_REUSE = 5;
 
 
 // ===========================================================================
 export class Worker
 {
-  constructor(id, browser, timeout, task, puppeteerOptions, screencaster) {
+  constructor(id, browser, task, puppeteerOptions, screencaster, healthChecker) {
     this.id = id;
     this.browser = browser;
-    this.timeout = timeout;
     this.task = task;
     this.puppeteerOptions = puppeteerOptions;
     this.screencaster = screencaster;
+    this.healthChecker = healthChecker;
+
+    this.reuseCount = 0;
+    this.page = null;
     
     this.startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
   }
 
-  async initPage(job) {
+  async initPage() {
+    if (this.page && ++this.reuseCount <= MAX_REUSE) {
+      logger.debug("Reusing page", {reuseCount: this.reuseCount}, "worker");
+      return this.page;
+    } else if (this.page) {
+      try {
+        await this.page.close();
+      } catch (e) {
+        // ignore
+      }
+      this.page = null;
+    }
+
     //open page in a new tab
     this.pendingTargets = new Map();
 
@@ -34,19 +51,33 @@ export class Worker
       }
     });
 
-    try {
-      const mainTarget = this.browser.target();
-      this.cdp = await mainTarget.createCDPSession();
-      let targetId;
-      const res = await this.cdp.send("Target.createTarget", {url: this.startPage, newWindow: true});
-      targetId = res.targetId;
-      const target = this.pendingTargets.get(targetId);
-      this.pendingTargets.delete(targetId);
-      this.page = await target.page();
-      this.page._workerid = this.id;
-    } catch (err) {
-      logger.warn("Error getting new page in window context", {"workerid": this.id, ...errJSON(err)}, "worker");
-      this.repair(job);
+    this.reuseCount = 1;
+
+    while (true) {
+      try {
+        logger.debug("Opening new page", {}, "worker");
+        const mainTarget = this.browser.target();
+        this.cdp = await mainTarget.createCDPSession();
+        let targetId;
+        const res = await this.cdp.send("Target.createTarget", {url: this.startPage, newWindow: true});
+        targetId = res.targetId;
+        const target = this.pendingTargets.get(targetId);
+        this.pendingTargets.delete(targetId);
+        this.page = await target.page();
+        this.page._workerid = this.id;
+        if (this.healthChecker) {
+          this.healthChecker.resetErrors();
+        }
+        break;
+      } catch (err) {
+        logger.warn("Error getting new page in window context", {"workerid": this.id, ...errJSON(err)}, "worker");
+        await sleep(500);
+        logger.warn("Retry getting new page");
+
+        if (this.healthChecker) {
+          this.healthChecker.incError();
+        }
+      }
     }
   }
 
@@ -56,9 +87,11 @@ export class Worker
     }
 
     const urlData = job.data;
-    await this.initPage(job);
+
+    await this.initPage();
 
     const url = job.getUrl();
+
     logger.info("Starting page", {"workerid": this.id, "page": url}, "worker");
 
     let result;
@@ -68,12 +101,6 @@ export class Worker
       page: this.page,
       data: urlData,
     });
-
-    try {
-      await this.page.close();
-    } catch (e) {
-      // ignore
-    }
 
     if (errorState) {
       return {
@@ -87,16 +114,6 @@ export class Worker
       type: "success",
     };
   }
-
-  repair(job) {
-    logger.info("Starting repair", {workerid: this.id}, "worker");
-    browserEmitter.emit("repair", this, job);
-  }
-
-  async shutdown() {
-    logger.info("Shutting down browser", {workerid: this.id}, "worker");
-    browserEmitter.emit("close");
-  }
 }
 
 
@@ -105,10 +122,10 @@ export class WorkerPool
 {
   constructor(options) {
     this.maxConcurrency = options.maxConcurrency;
-    this.timeout = options.timeout;
     this.puppeteerOptions = options.puppeteerOptions;
     this.crawlState = options.crawlState;
     this.screencaster = options.screencaster;
+    this.healthChecker = options.healthChecker;
 
     this.task = options.task;
 
@@ -118,22 +135,9 @@ export class WorkerPool
     this.workersAvailable = [];
     this.workersBusy = [];
 
-    this.errorCount = 0;
     this.interrupted = false;
 
     this.createWorkers(this.maxConcurrency);
-
-    browserEmitter.on("repair", (worker, job) => {
-      setImmediate(() => {
-        if (!this.interrupted) {
-          this.repair(worker, job);
-        }
-      });
-    });
-
-    browserEmitter.on("close", () => {
-      this.close();
-    });
   }
 
   async createWorkers(numWorkers = 1) {
@@ -150,10 +154,10 @@ export class WorkerPool
     const worker = new Worker(
       id,
       this.browser,
-      this.timeout,
       this.task,
       this.puppeteerOptions,
-      this.screencaster
+      this.screencaster,
+      this.healthChecker
     );
     this.workers.push(worker);
     this.workersAvailable.push(worker);
@@ -167,7 +171,7 @@ export class WorkerPool
     }
 
     // wait half a second and try again
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await sleep(500);
 
     return await this.getAvailableWorker();
     
@@ -185,7 +189,7 @@ export class WorkerPool
     const job = await this.crawlState.shift();
 
     if (!job) {
-      logger.info("No jobs available", {}, "worker");
+      logger.debug("No jobs available - waiting for pending pages to finish", {}, "worker");
       this.freeWorker(worker);
       return;
     }
@@ -196,9 +200,17 @@ export class WorkerPool
       if (job.callbacks) {
         job.callbacks.reject(result.error);
       }
-      this.errorCount += 1;
-    } else if (result.type === "success" && job.callbacks) {
-      job.callbacks.resolve(result.data);
+      if (this.healthChecker) {
+        this.healthChecker.incError();
+      }
+    } else if (result.type === "success") {
+      if (this.healthChecker) {
+        this.healthChecker.resetErrors();
+      }
+
+      if (job.callbacks) {
+        job.callbacks.resolve(result.data);
+      }
     }
 
     this.freeWorker(worker);
@@ -219,7 +231,7 @@ export class WorkerPool
       }
 
       // wait half a second
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await sleep(500);
     }
 
     await queue.onIdle();
@@ -228,22 +240,6 @@ export class WorkerPool
   interrupt() {
     logger.info("Interrupting Crawl", {}, "worker");
     this.interrupted = true;
-  }
-
-  async repair (worker, job) {
-    if (this.screencaster) {
-      this.screencaster.endAllTargets();
-    }
-
-    try {
-      // will probably fail, but just in case the repair was not necessary
-      await this.browser.close();
-    /* eslint-disable no-empty */
-    } catch (e) {}
-    
-    logger.info(`Re-launching job in worker ${worker.id} with repaired browser`, {}, "worker");
-    this.browser = await puppeteer.launch(this.puppeteerOptions);
-    await worker.runTask(job);
   }
 
   async close() {
@@ -256,5 +252,7 @@ export class WorkerPool
   }
 }
 
-
+function sleep(millis) {
+  return new Promise(resolve => setTimeout(resolve, millis));
+}
 

@@ -260,10 +260,14 @@ export class AdBlockRules extends BlockRules
     });
   }
 
-  async shouldBlock(request, url, logDetails) {
+  isAdUrl(url) {
     const fragments = url.split("/");
     const domain = fragments.length > 2 ? fragments[2] : null;
-    if (this.adhosts.includes(domain)) {
+    return this.adhosts.includes(domain);
+  }
+
+  async shouldBlock(request, url, logDetails) {
+    if (this.isAdUrl(url)) {
       this.logger.debug("URL blocked for being an ad", {url, ...logDetails}, "blocking");
       await this.recordBlockMsg(url);
       return BlockState.BLOCK_AD;

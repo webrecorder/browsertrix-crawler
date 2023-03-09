@@ -3,8 +3,6 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import fsp from "fs/promises";
-import http from "http";
-import url from "url";
 
 import fetch from "node-fetch";
 import { RedisCrawlState, MemoryCrawlState } from "./util/state.js";
@@ -15,13 +13,14 @@ import yaml from "js-yaml";
 
 import * as warcio from "warcio";
 
+import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtract } from "./util/textextract.js";
 import { initStorage, getFileSize, getDirSize, interpolateFilename } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
-import { Logger, errJSON, setExternalLogStream } from "./util/logger.js";
+import { Logger, errJSON, setExternalLogStream, setDebugLogging } from "./util/logger.js";
 import { WorkerPool } from "./util/worker.js";
 
 import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
@@ -43,6 +42,10 @@ const HTTP_AGENT = HTTPAgent();
 const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
 
+//todo: move elsewhere?
+const LINK_EXTRACT_TIMEOUT_SECS = 5;
+
+
 // ============================================================================
 export class Crawler {
   constructor() {
@@ -53,14 +56,13 @@ export class Crawler {
     // root collections dir
     this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
     this.logDir = path.join(this.collDir, "logs");
-    fs.mkdirSync(this.logDir, {recursive: true});
     this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`);
-    this.logFH = fs.createWriteStream(this.logFilename);
 
     const debugLogging = this.params.logging.includes("debug");
-    this.logger = new Logger(debugLogging);
+    setDebugLogging(debugLogging);
+
+    this.logger = new Logger();
     this.logger.debug("Writing log to: " + this.logFilename, {}, "init");
-    setExternalLogStream(this.logFH);
 
     this.headers = {};
     this.crawlState = null;
@@ -102,7 +104,7 @@ export class Crawler {
     this.blockRules = null;
     this.adBlockRules = null;
 
-    this.errorCount = 0;
+    this.healthChecker = null;
 
     this.interrupted = false;
     this.finalExit = false;
@@ -163,18 +165,18 @@ export class Crawler {
         }
       }
 
-      this.logger.info(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
+      this.logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
 
       this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.behaviorTimeout + this.params.timeout, os.hostname());
 
     } else {
-      this.logger.info("Storing state in memory", {}, "state");
+      this.logger.debug("Storing state in memory", {}, "state");
 
       this.crawlState = new MemoryCrawlState();
     }
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
-      this.logger.info(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
+      this.logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
     }
 
     return this.crawlState;
@@ -199,6 +201,16 @@ export class Crawler {
   }
 
   async bootstrap() {
+    const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
+
+    if (initRes.status) {
+      this.logger.info("wb-manager init failed, collection likely already exists");
+    }
+
+    fs.mkdirSync(this.logDir, {recursive: true});
+    this.logFH = fs.createWriteStream(this.logFilename);
+    setExternalLogStream(this.logFH);
+
     this.infoString = await this.getInfoString();
     this.logger.info(this.infoString);
 
@@ -209,18 +221,12 @@ export class Crawler {
     }
 
     if (this.params.overwrite) {
-      this.logger.info(`Clearing ${this.collDir} before starting`);
+      this.logger.debug(`Clearing ${this.collDir} before starting`);
       try {
         fs.rmSync(this.collDir, { recursive: true, force: true });
       } catch(e) {
         this.logger.error(`Unable to clear ${this.collDir}`, e);
       }
-    }
-
-    const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
-
-    if (initRes.status) {
-      this.logger.info("wb-manager init failed, collection likely already exists");
     }
 
     let opts = {};
@@ -407,7 +413,7 @@ export class Crawler {
 
       if (this.params.screenshot) {
         if (!page.isHTMLPage) {
-          this.logger.info("Skipping screenshots for non-HTML page", logDetails);
+          this.logger.debug("Skipping screenshots for non-HTML page", logDetails);
         }
         const archiveDir = path.join(this.collDir, "archive");
         const screenshots = new Screenshots({page, url, directory: archiveDir});
@@ -424,6 +430,7 @@ export class Crawler {
 
       let text = "";
       if (this.params.text && page.isHTMLPage) {
+        this.logger.debug("Extracting text", logDetails, "general");
         const client = await page.target().createCDPSession();
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
@@ -433,10 +440,9 @@ export class Crawler {
 
       if (this.params.behaviorOpts) {
         if (!page.isHTMLPage) {
-          this.logger.info("Skipping behaviors for non-HTML page", logDetails, "behavior");
+          this.logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
         } else {
           const behaviorTimeout = this.params.behaviorTimeout / 1000;
-          this.logger.info("Behaviors started", {behaviorTimeout, ...logDetails}, "behavior");
 
           const res = await Promise.race([
             this.sleep(behaviorTimeout),
@@ -465,18 +471,21 @@ export class Crawler {
 
   async runBehaviors(page, logDetails) {
     try {
+      const frames = page.__filteredFrames;
+
+      this.logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
+
       return await Promise.allSettled(
-        page.frames().
-          filter(frame => this.shouldRunBehavior(frame, logDetails)).
-          map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
+
     } catch (e) {
       this.logger.warn("Behavior run failed", {...errJSON(e), ...logDetails}, "behavior");
       return null;
     }
   }
 
-  async shouldRunBehavior(frame, logDetails) {
+  shouldIncludeFrame(frame, logDetails) {
     if (!frame.parentFrame()) {
       return true;
     }
@@ -488,11 +497,11 @@ export class Crawler {
     if (frameUrl === "about:blank") {
       res = false;
     } else {
-      res = !(await this.adBlockRules.shouldBlock(null, frameUrl, logDetails));
+      res = !this.adBlockRules.isAdUrl(frameUrl);
     }
 
     if (!res) {
-      this.logger.info("Skipping behavior for frame", {frameUrl, ...logDetails}, "behavior");
+      this.logger.debug("Skipping processing frame", {frameUrl, ...logDetails}, "behavior");
     }
 
     return res;
@@ -519,24 +528,6 @@ export class Crawler {
     const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, warcInfo);
     const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
     return buffer;
-  }
-
-  async healthCheck(req, res) {
-    const threshold = this.params.workers * 2;
-    const pathname = url.parse(req.url).pathname;
-    switch (pathname) {
-    case "/healthz":
-      if (this.errorCount < threshold) {
-        this.logger.debug(`health check ok, num errors ${this.errorCount} < ${threshold}`);
-        res.writeHead(200);
-        res.end();
-      }
-      return;
-    }
-
-    this.logger.error(`health check failed: ${this.errorCount} >= ${threshold}`);
-    res.writeHead(503);
-    res.end();
   }
 
   async checkLimits() {
@@ -596,9 +587,7 @@ export class Crawler {
     this.profileDir = await loadProfile(this.params.profile);
 
     if (this.params.healthCheckPort) {
-      this.healthServer = http.createServer((...args) => this.healthCheck(...args));
-      this.logger.info(`Healthcheck server started on ${this.params.healthCheckPort}`);
-      this.healthServer.listen(this.params.healthCheckPort);
+      this.healthChecker = new HealthChecker(this.params.healthCheckPort, this.params.workers);
     }
 
     try {
@@ -675,10 +664,10 @@ export class Crawler {
 
     this.workerPool = new WorkerPool({
       maxConcurrency: this.params.workers,
-      timeout: this.params.timeout * 2,
       puppeteerOptions: this.puppeteerArgs,
       crawlState: this.crawlState,
       screencaster: this.screencaster,
+      healthChecker: this.healthChecker,
       task: (opts) => this.crawlPage(opts)
     });
 
@@ -824,7 +813,7 @@ export class Crawler {
 
   awaitProcess(proc) {
     proc.stdout.on("data", (data) => {
-      this.logger.info(data.toString());
+      this.logger.debug(data.toString());
     });
 
     proc.stderr.on("data", (data) => {
@@ -912,23 +901,33 @@ export class Crawler {
     this.logger.info("Awaiting page load", logDetails);
 
     try {
-      await page.goto(url, gotoOpts);
-      if (this.errorCount > 0) {
-        this.logger.info(`Page loaded, resetting error count ${this.errorCount} to 0`, logDetails);
-        this.errorCount = 0;
+      const resp = await page.goto(url, gotoOpts);
+
+      isHTMLPage = this.isHTMLContentType(resp.headers["content-type"]);
+
+      if (this.healthChecker) {
+        this.healthChecker.resetErrors();
       }
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         const mainMessage = e.name === "TimeoutError" ? "Page Load Timeout" : "Page Load Error";
         this.logger.error(mainMessage, {msg, ...logDetails});
-        this.errorCount++;
+        if (this.healthChecker) {
+          this.healthChecker.incError();
+        }
       }
     }
 
     page.isHTMLPage = isHTMLPage;
+    if (isHTMLPage) {
+      page.__filteredFrames = page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
+    } else {
+      page.__filteredFrames = null;
+    }
 
     if (!isHTMLPage) {
+      this.logger.debug("Skipping link extraction for non-HTML page", logDetails);
       return;
     }
 
@@ -943,15 +942,19 @@ export class Crawler {
       return;
     }
 
+    this.logger.debug("Extracting links");
+
     for (const opts of selectorOptsList) {
-      const links = await this.extractLinks(page, opts);
+      const links = await this.extractLinks(page, opts, logDetails);
       await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
     }
   }
 
   async markPageFailed(page) {
     page.__failed = true;
-    this.errorCount++;
+    if (this.healthChecker) {
+      this.healthChecker.incError();
+    }
     if (this.screencaster) {
       await this.screencaster.endTarget(page.target());
     }
@@ -968,12 +971,12 @@ export class Crawler {
     try {
       await page.waitForNetworkIdle({timeout: this.params.netIdleWait * 1000});
     } catch (e) {
-      this.logger.info("waitForNetworkIdle timed out, ignoring", details);
+      this.logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
     }
   }
 
-  async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}) {
+  async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}, logDetails) {
     const results = [];
 
     const loadProp = (selector, extract) => {
@@ -987,14 +990,24 @@ export class Crawler {
     const loadFunc = isAttribute ? loadAttr : loadProp;
 
     try {
-      const linkResults = await Promise.allSettled(page.frames().map(frame => frame.evaluate(loadFunc, selector, extract)));
+      const frames = page.__filteredFrames;
+
+      const linkResults = await Promise.allSettled(
+        frames.map(frame => Promise.race([frame.evaluate(loadFunc, selector, extract), this.sleep(LINK_EXTRACT_TIMEOUT_SECS)]))
+      );
 
       if (linkResults) {
+        let i = 0;
         for (const linkResult of linkResults) {
+          if (!linkResult) {
+            this.logger.warn("Link Extraction timed out in frame", {frameUrl: frames[i].url, ...logDetails});
+            continue;
+          }
           if (!linkResult.value) continue;
           for (const link of linkResult.value) {
             results.push(link);
           }
+          i++;
         }
       }
 
@@ -1031,8 +1044,10 @@ export class Crawler {
 
   async checkCF(page, logDetails) {
     try {
+      this.logger.debug("Check CF Blocking", logDetails);
+
       while (await page.$("div.cf-browser-verification.cf-im-under-attack")) {
-        this.logger.info("Cloudflare Check Detected, waiting for reload...", logDetails);
+        this.logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
         await this.sleep(5.5);
       }
     } catch (e) {
@@ -1080,10 +1095,10 @@ export class Crawler {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         if (this.params.text) {
           header["hasText"] = true;
-          this.logger.info("Text Extraction: Enabled");
+          this.logger.debug("Text Extraction: Enabled");
         } else {
           header["hasText"] = false;
-          this.logger.info("Text Extraction: Disabled");
+          this.logger.debug("Text Extraction: Disabled");
         }
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
@@ -1130,24 +1145,27 @@ export class Crawler {
         return true;
       }
 
-      const contentType = resp.headers.get("Content-Type");
+      return this.isHTMLContentType(resp.headers.get("Content-Type"));
 
-      // just load if no content-type
-      if (!contentType) {
-        return true;
-      }
-
-      const mime = contentType.split(";")[0];
-
-      if (HTML_TYPES.includes(mime)) {
-        return true;
-      }
-
-      return false;
     } catch(e) {
       // can't confirm not html, so try in browser
       return true;
     }
+  }
+
+  isHTMLContentType(contentType) {
+    // just load if no content-type
+    if (!contentType) {
+      return true;
+    }
+
+    const mime = contentType.split(";")[0];
+
+    if (HTML_TYPES.includes(mime)) {
+      return true;
+    }
+
+    return false;
   }
 
   async directFetchCapture(url) {
