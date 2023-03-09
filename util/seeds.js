@@ -39,16 +39,16 @@ export class ScopedSeed
     }
   }
 
-  parseUrl(url) {
+  parseUrl(url, logDetails = {}) {
     let parsedUrl = null;
     try {
       parsedUrl = new URL(url.trim());
     } catch (e) {
-      logger.error(`Invalid Seed "${url}" - not a valid URL`);
+      logger.warn("Invalid Seed - not a valid URL", {url, ...logDetails});
     }
 
     if (parsedUrl.protocol !== "http:" && parsedUrl.protocol != "https:") {
-      logger.error(`Invalid Seed "${url}" - URL must start with http:// or https://`);
+      logger.warn("Invalid Seed - URL must start with http:// or https://", {url, ...logDetails});
       parsedUrl = null;
     }
 
@@ -110,12 +110,12 @@ export class ScopedSeed
     return depth >= this.maxDepth;
   }
 
-  isIncluded(url, depth, extraHops = 0) {
+  isIncluded(url, depth, extraHops = 0, logDetails = {}) {
     if (depth > this.maxDepth) {
       return false;
     }
 
-    url = this.parseUrl(url);
+    url = this.parseUrl(url, logDetails);
     if (!url) {
       return false;
     }

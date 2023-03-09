@@ -4,11 +4,9 @@ import os from "os";
 
 import yaml from "js-yaml";
 import puppeteer from "puppeteer-core";
-import { Cluster } from "puppeteer-cluster";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
-import { ReuseWindowConcurrency } from "./windowconcur.js";
 import { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
@@ -404,14 +402,6 @@ class ArgParser {
       logger.info("Note: The newContext argument is deprecated in 0.8.0. Values passed to this option will be ignored");
     }
 
-    if (argv.workers > 1) {
-      logger.info("Window context being used to support >1 workers");
-      argv.newContext = ReuseWindowConcurrency;
-    } else {
-      logger.info("Page context being used with 1 worker");
-      argv.newContext = Cluster.CONCURRENCY_PAGE;
-    }
-
     if (argv.mobileDevice) {
       argv.emulateDevice = puppeteer.devices[argv.mobileDevice];
       if (!argv.emulateDevice) {
@@ -440,7 +430,7 @@ class ArgParser {
       } else {
         argv.netIdleWait = 2;
       }
-      logger.info(`Set netIdleWait to ${argv.netIdleWait} seconds`);
+      //logger.debug(`Set netIdleWait to ${argv.netIdleWait} seconds`);
     }
 
     // prefer argv.include only if string or a non-empty array

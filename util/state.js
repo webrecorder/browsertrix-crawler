@@ -1,8 +1,5 @@
-import mod from "puppeteer-cluster/dist/Job.js";
-
+import { Job } from "./job.js";
 import { Logger } from "./logger.js";
-
-const Job = mod.default;
 
 const logger = new Logger();
 
@@ -73,9 +70,9 @@ export class MemoryCrawlState extends BaseState
     return true;
   }
 
-  push(job) {
-    this.pending.delete(job.data.url);
-    this.queue.unshift(job.data);
+  push(urlData) {
+    this.pending.delete(urlData.url);
+    this.queue.unshift(urlData);
   }
 
   realSize() {
@@ -84,6 +81,10 @@ export class MemoryCrawlState extends BaseState
 
   shift() {
     const data = this.queue.pop();
+
+    if (!data) {
+      return;
+    }
 
     const url = data.url;
 
@@ -117,7 +118,7 @@ export class MemoryCrawlState extends BaseState
       }
     };
 
-    return new Job(data, undefined, callbacks);
+    return new Job(data, callbacks);
   }
 
   has(url) {
@@ -314,8 +315,8 @@ return 0;
     return (res >= 3);
   }
 
-  async push(job) {
-    await this.redis.addqueue(this.pkey, this.qkey, job.data.url, JSON.stringify(job.data));
+  async push(urlData) {
+    await this.redis.addqueue(this.pkey, this.qkey, urlData.url, JSON.stringify(urlData));
   }
 
   async shift() {
@@ -352,7 +353,7 @@ return 0;
       }
     };
 
-    return new Job(data, undefined, callbacks);
+    return new Job(data, callbacks);
   }
 
   async has(url) {

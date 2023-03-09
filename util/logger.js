@@ -1,24 +1,32 @@
 // ===========================================================================
 let logStream = null;
+let debugLogging = false;
 
 export function setExternalLogStream(logFH) {
   logStream = logFH;
 }
 
+export function setDebugLogging(debugLog) {
+  debugLogging = debugLog;
+}
+
+// ===========================================================================
 // to fix serialization of regexes for logging purposes
 RegExp.prototype.toJSON = RegExp.prototype.toString;
 
 
 // ===========================================================================
+export function errJSON(e) {
+  return {"type": "exception", "message": e.message, "stack": e.stack};
+}
+
+
+// ===========================================================================
 export class Logger
 {
-  constructor(debugLogging=false) {
-    this.debugLogging = debugLogging;
-  }
-
   logAsJSON(message, data, context, logLevel="info") {
     if (data instanceof Error) {
-      data = {"type": "exception", "message": data.message, "stack": data.stack};
+      data = errJSON(data);
     } else if (typeof data !== "object") {
       data = {"message": data.toString()};
     }
@@ -49,7 +57,7 @@ export class Logger
   }
 
   debug(message, data={}, context="general") {
-    if (this.debugLogging) {
+    if (debugLogging) {
       this.logAsJSON(message, data, context, "debug");
     }
   }

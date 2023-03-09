@@ -1,6 +1,6 @@
 {
   "name": "browsertrix-crawler",
-  "version": "0.8.1",
+  "version": "0.9.0-beta.0",
   "main": "browsertrix-crawler",
   "type": "module",
   "repository": "https://github.com/webrecorder/browsertrix-crawler",
@@ -8,7 +8,7 @@
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "lint": "eslint *.js util/*.js tests/*.test.js",
-    "test": "yarn node --experimental-vm-modules $(yarn bin jest)"
+    "test": "yarn node --experimental-vm-modules $(yarn bin jest --bail 1)"
   },
   "dependencies": {
     "@novnc/novnc": "1.4.0-beta",
@@ -18,8 +18,8 @@
     "ioredis": "^4.27.1",
     "js-yaml": "^4.1.0",
     "minio": "7.0.26",
-    "puppeteer-cluster": "github:ikreymer/puppeteer-cluster#async-job-queue",
-    "puppeteer-core": "^17.1.2",
+    "p-queue": "^7.3.0",
+    "puppeteer-core": "^19.7.2",
     "request": "^2.88.2",
     "sitemapper": "^3.1.2",
     "uuid": "8.3.2",
