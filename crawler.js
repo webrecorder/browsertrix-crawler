@@ -876,7 +876,6 @@ export class Crawler {
           "Direct fetch capture attempt timed out",
           logDetails
         );
-        this.logger.info("captureResult", captureResult);
         if (captureResult.value) {
           return;
         }
