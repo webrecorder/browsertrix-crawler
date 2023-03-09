@@ -41,8 +41,7 @@ const HTTP_AGENT = HTTPAgent();
 
 const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
-
-//todo: move elsewhere?
+const TIMED_RUN_SECS = 180;
 const LINK_EXTRACT_TIMEOUT_SECS = 5;
 
 
@@ -444,15 +443,18 @@ export class Crawler {
         } else {
           const behaviorTimeout = this.params.behaviorTimeout / 1000;
 
-          const res = await Promise.race([
-            this.sleep(behaviorTimeout),
-            this.runBehaviors(page, logDetails)
-          ]);
+          const res = await this.timedRun(
+            this.runBehaviors(page, logDetails),
+            "Behaviors timed out",
+            logDetails,
+            behaviorTimeout,
+            "behavior"
+          );
 
-          if (res && res.length) {
-            this.logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
-          } else {
-            this.logger.error("Behaviors timed out", logDetails, "behavior");
+          if (res) {
+            // TODO: Get number of behaviors run - something about nestled promises
+            // is preventing it atm
+            this.logger.info("Behaviors finished", logDetails, "behavior");
           }
         }
       }
@@ -860,10 +862,22 @@ export class Crawler {
 
     let isHTMLPage = true;
 
-    if (!await this.isHTML(url)) {
+    const isHTMLResult = await this.timedRun(
+      this.isHTML(url),
+      "HEAD request to determine if URL is HTML page timed out",
+      logDetails,
+      60
+    );
+    if (isHTMLResult && (isHTMLResult.value == false)) {
       isHTMLPage = false;
       try {
-        if (await this.directFetchCapture(url)) {
+        const captureResult = await this.timedRun(
+          this.directFetchCapture(url),
+          "Direct fetch capture attempt timed out",
+          logDetails
+        );
+        this.logger.info("captureResult", captureResult);
+        if (captureResult.value) {
           return;
         }
       } catch (e) {
@@ -993,7 +1007,12 @@ export class Crawler {
       const frames = page.__filteredFrames;
 
       const linkResults = await Promise.allSettled(
-        frames.map(frame => Promise.race([frame.evaluate(loadFunc, selector, extract), this.sleep(LINK_EXTRACT_TIMEOUT_SECS)]))
+        frames.map(frame => this.timedRun(
+          frame.evaluate(loadFunc, selector, extract),
+          "Link extraction timed out",
+          logDetails,
+          LINK_EXTRACT_TIMEOUT_SECS
+        ))
       );
 
       if (linkResults) {
@@ -1195,6 +1214,20 @@ export class Crawler {
 
       await this.sleep(1);
     }
+  }
+
+  async timedRun(promise, message="Promise timed out", logDetails={}, seconds=TIMED_RUN_SECS, context="general") {
+    // return Promise return value or log error if timeout is reached first
+    const timeout = seconds * 1000;
+    const promiseReturn = Promise.race([promise, this.rejectPromiseOnTimeout(timeout)])
+      .catch(() => this.logger.error(message, {"seconds": seconds, ...logDetails}, context));
+    return promiseReturn;
+  }
+
+  rejectPromiseOnTimeout(timeout) {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => (reject("timeout reached")), timeout);
+    });
   }
 
   sleep(seconds) {
