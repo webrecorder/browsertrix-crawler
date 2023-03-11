@@ -41,7 +41,7 @@ const HTTP_AGENT = HTTPAgent();
 
 const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
-const FETCH_TIMEOUT_SECS = 60;
+const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
 
 

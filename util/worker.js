@@ -136,8 +136,9 @@ export class WorkerPool
     this.workersBusy = [];
 
     this.interrupted = false;
+    this.queue = null;
 
-    this.createWorkers(this.maxConcurrency);
+    this.inited = this.createWorkers(this.maxConcurrency);
   }
 
   async createWorkers(numWorkers = 1) {
@@ -146,11 +147,11 @@ export class WorkerPool
     }
     logger.info(`Creating ${numWorkers} workers`, {}, "worker");
     for (let i=0; i < numWorkers; i++) {
-      await this.createWorker(`worker-${i+1}`);
+      this.createWorker(`worker-${i+1}`);
     }
   }
 
-  async createWorker(id) {
+  createWorker(id) {
     const worker = new Worker(
       id,
       this.browser,
@@ -171,6 +172,7 @@ export class WorkerPool
     }
 
     // wait half a second and try again
+    logger.info("Waiting for available worker", {}, "worker");
     await sleep(500);
 
     return await this.getAvailableWorker();
@@ -217,7 +219,10 @@ export class WorkerPool
   }
 
   async work() {
-    const queue = new PQueue({concurrency: this.maxConcurrency});
+    logger.debug("Awaiting worker pool init", {}, "worker");
+    await this.inited;
+
+    this.queue = new PQueue({concurrency: this.maxConcurrency});
 
     while (!this.interrupted) {
       if ((await this.crawlState.realSize()) + (await this.crawlState.numPending()) == 0) {
@@ -226,7 +231,7 @@ export class WorkerPool
 
       if ((await this.crawlState.realSize()) > 0) {
         (async () => {
-          await queue.add(() => this.crawlPageInWorker());
+          await this.queue.add(() => this.crawlPageInWorker());
         })();
       }
 
@@ -234,12 +239,14 @@ export class WorkerPool
       await sleep(500);
     }
 
-    await queue.onIdle();
+    logger.debug("Awaiting queue onIdle()", {}, "worker");
+    await this.queue.onIdle();
   }
 
   interrupt() {
     logger.info("Interrupting Crawl", {}, "worker");
     this.interrupted = true;
+    this.queue.clear();
   }
 
   async close() {
