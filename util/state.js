@@ -269,13 +269,15 @@ local res = redis.call('get', KEYS[3]);
 if not res then
   local json = redis.call('hget', KEYS[1], ARGV[1]);
   if json then
-    local data = cjson.decode(json)
-    data['retry'] = (data['retry'] or 0) + 1
+    local data = cjson.decode(json);
+    data['retry'] = (data['retry'] or 0) + 1;
+    redis.call('hdel', KEYS[1], ARGV[1]);
     if data['retry'] <= ARGV[2] then
-      json = cjson.encode(data)
+      json = cjson.encode(data);
       redis.call('lpush', KEYS[2], json);
-      redis.call('hdel', KEYS[1], ARGV[1]);
-      return 1
+      return 1;
+    else
+      return 2;
     end
   end
 end
@@ -466,10 +468,15 @@ return 0;
     const pendingUrls = await this.redis.hkeys(this.pkey);
 
     for (const url of pendingUrls) {
-      if (await this.redis.requeue(this.pkey, this.qkey, this.pkey + ":" + url, url, this.maxRetryPending)) {
-        logger.info(`Requeued: ${url}`);
-      } else {
-        logger.info(`Not retrying anymore: ${url}`);
+      const res = await this.redis.requeue(this.pkey, this.qkey, this.pkey + ":" + url, url, this.maxRetryPending);
+      switch (res) {
+        case 1:
+          logger.info(`Requeued: ${url}`);
+          break;
+
+        case 2:
+          logger.info(`Not retrying anymore: ${url}`);
+          break;
       }
     }
   }
