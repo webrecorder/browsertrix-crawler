@@ -470,13 +470,13 @@ return 0;
     for (const url of pendingUrls) {
       const res = await this.redis.requeue(this.pkey, this.qkey, this.pkey + ":" + url, url, this.maxRetryPending);
       switch (res) {
-        case 1:
-          logger.info(`Requeued: ${url}`);
-          break;
+      case 1:
+        logger.info(`Requeued: ${url}`);
+        break;
 
-        case 2:
-          logger.info(`Not requeuing anymore: ${url}`);
-          break;
+      case 2:
+        logger.info(`Not requeuing anymore: ${url}`);
+        break;
       }
     }
   }
