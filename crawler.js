@@ -378,6 +378,8 @@ export class Crawler {
     const {page, data} = opts;
     const {url} = data;
 
+    const pageTarget = page.target();
+
     const logDetails = {page: url, workerid: page._workerid};
 
     if (!this.isInScope(data, logDetails)) {
@@ -387,7 +389,7 @@ export class Crawler {
 
     try {
       if (this.screencaster) {
-        await this.screencaster.screencastTarget(page.target(), url);
+        await this.screencaster.screencastTarget(pageTarget, url);
       }
 
       if (this.emulateDevice) {
@@ -431,7 +433,7 @@ export class Crawler {
       let text = "";
       if (this.params.text && page.isHTMLPage) {
         this.logger.debug("Extracting text", logDetails, "general");
-        const client = await page.target().createCDPSession();
+        const client = await pageTarget.createCDPSession();
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
       }
@@ -466,7 +468,7 @@ export class Crawler {
 
     } catch (e) {
       this.logger.error("Page Errored", {...errJSON(e), ...logDetails}, "pageStatus");
-      await this.markPageFailed(page);
+      await this.markPageFailed(page, pageTarget);
       return false;
     }
 
@@ -670,7 +672,6 @@ export class Crawler {
       maxConcurrency: this.params.workers,
       puppeteerOptions: this.puppeteerArgs,
       crawlState: this.crawlState,
-      screencaster: this.screencaster,
       healthChecker: this.healthChecker,
       totalTimeout: (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60,
       task: (opts) => this.crawlPage(opts)
@@ -967,13 +968,13 @@ export class Crawler {
     }
   }
 
-  async markPageFailed(page) {
+  async markPageFailed(page, pageTarget=null) {
     page.__failed = true;
     if (this.healthChecker) {
       this.healthChecker.incError();
     }
-    if (this.screencaster) {
-      await this.screencaster.endTarget(page.target());
+    if (this.screencaster && pageTarget) {
+      await this.screencaster.endTarget(pageTarget);
     }
   }
 
