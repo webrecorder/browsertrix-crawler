@@ -272,7 +272,7 @@ if not res then
     local data = cjson.decode(json);
     data['retry'] = (data['retry'] or 0) + 1;
     redis.call('hdel', KEYS[1], ARGV[1]);
-    if data['retry'] <= ARGV[2] then
+    if tonumber(data['retry']) <= tonumber(ARGV[2]) then
       json = cjson.encode(data);
       redis.call('lpush', KEYS[2], json);
       return 1;
@@ -475,7 +475,7 @@ return 0;
           break;
 
         case 2:
-          logger.info(`Not retrying anymore: ${url}`);
+          logger.info(`Not requeuing anymore: ${url}`);
           break;
       }
     }
