@@ -3,6 +3,7 @@ import PQueue from "p-queue";
 import puppeteer from "puppeteer-core";
 
 import { Logger, errJSON } from "./logger.js";
+import { sleep, timedRun } from "./timing.js";
 
 const logger = new Logger();
 
@@ -15,11 +16,10 @@ const MAX_REUSE = 5;
 // ===========================================================================
 export class Worker
 {
-  constructor(id, browser, task, puppeteerOptions, screencaster, healthChecker) {
+  constructor(id, browser, task, screencaster, healthChecker) {
     this.id = id;
     this.browser = browser;
     this.task = task;
-    this.puppeteerOptions = puppeteerOptions;
     this.screencaster = screencaster;
     this.healthChecker = healthChecker;
 
@@ -29,11 +29,8 @@ export class Worker
     this.startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
   }
 
-  async initPage() {
-    if (this.page && ++this.reuseCount <= MAX_REUSE) {
-      logger.debug("Reusing page", {reuseCount: this.reuseCount}, "worker");
-      return this.page;
-    } else if (this.page) {
+  async closePage() {
+    if (this.page) {
       try {
         await this.page.close();
       } catch (e) {
@@ -41,7 +38,15 @@ export class Worker
       }
       this.page = null;
     }
+  }
 
+  async initPage() {
+    if (this.page && ++this.reuseCount <= MAX_REUSE) {
+      logger.debug("Reusing page", {reuseCount: this.reuseCount}, "worker");
+      return this.page;
+    } else {
+      await this.closePage();
+    }
     //open page in a new tab
     this.pendingTargets = new Map();
 
@@ -71,7 +76,7 @@ export class Worker
         break;
       } catch (err) {
         logger.warn("Error getting new page in window context", {"workerid": this.id, ...errJSON(err)}, "worker");
-        await sleep(500);
+        await sleep(0.5);
         logger.warn("Retry getting new page");
 
         if (this.healthChecker) {
@@ -94,25 +99,10 @@ export class Worker
 
     logger.info("Starting page", {"workerid": this.id, "page": url}, "worker");
 
-    let result;
-    let errorState;
-
-    await this.task({
+    return await this.task({
       page: this.page,
       data: urlData,
     });
-
-    if (errorState) {
-      return {
-        type: "error",
-        error: errorState,
-      };
-    }
-
-    return {
-      data: result,
-      type: "success",
-    };
   }
 }
 
@@ -126,6 +116,7 @@ export class WorkerPool
     this.crawlState = options.crawlState;
     this.screencaster = options.screencaster;
     this.healthChecker = options.healthChecker;
+    this.totalTimeout = options.totalTimeout || 1e4;
 
     this.task = options.task;
 
@@ -156,7 +147,6 @@ export class WorkerPool
       id,
       this.browser,
       this.task,
-      this.puppeteerOptions,
       this.screencaster,
       this.healthChecker
     );
@@ -173,7 +163,7 @@ export class WorkerPool
 
     // wait half a second and try again
     logger.info("Waiting for available worker", {}, "worker");
-    await sleep(500);
+    await sleep(0.5);
 
     return await this.getAvailableWorker();
     
@@ -196,22 +186,32 @@ export class WorkerPool
       return;
     }
 
-    const result = await worker.runTask(job);
+    const result = await timedRun(
+      worker.runTask(job),
+      this.totalTimeout,
+      "Page Worker Timeout",
+      {"workerid": worker.id},
+      "worker"
+    );
 
-    if (result.type === "error") {
+    if (!result) {
+      logger.debug("Resetting failed page", {}, "worker");
+
+      await worker.closePage();
+
       if (job.callbacks) {
-        job.callbacks.reject(result.error);
+        job.callbacks.reject("timed out");
       }
       if (this.healthChecker) {
         this.healthChecker.incError();
       }
-    } else if (result.type === "success") {
+    } else {
       if (this.healthChecker) {
         this.healthChecker.resetErrors();
       }
 
       if (job.callbacks) {
-        job.callbacks.resolve(result.data);
+        job.callbacks.resolve(result);
       }
     }
 
@@ -236,7 +236,7 @@ export class WorkerPool
       }
 
       // wait half a second
-      await sleep(500);
+      await sleep(0.5);
     }
 
     logger.debug("Awaiting queue onIdle()", {}, "worker");
@@ -259,7 +259,4 @@ export class WorkerPool
   }
 }
 
-function sleep(millis) {
-  return new Promise(resolve => setTimeout(resolve, millis));
-}
 

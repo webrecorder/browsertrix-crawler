@@ -22,6 +22,7 @@ import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { Logger, errJSON, setExternalLogStream, setDebugLogging } from "./util/logger.js";
 import { WorkerPool } from "./util/worker.js";
+import { sleep, timedRun } from "./util/timing.js";
 
 import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
 
@@ -160,7 +161,7 @@ export class Crawler {
         } catch (e) {
           //this.logger.fatal("Unable to connect to state store Redis: " + redisUrl);
           this.logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
-          await this.sleep(3);
+          await sleep(3);
         }
       }
 
@@ -381,7 +382,7 @@ export class Crawler {
 
     if (!this.isInScope(data, logDetails)) {
       this.logger.info("Page no longer in scope", data);
-      return;
+      return true;
     }
 
     try {
@@ -443,7 +444,7 @@ export class Crawler {
         } else {
           const behaviorTimeout = this.params.behaviorTimeout / 1000;
 
-          const res = await this.timedRun(
+          const res = await timedRun(
             this.runBehaviors(page, logDetails),
             behaviorTimeout,
             "Behaviors timed out",
@@ -466,7 +467,10 @@ export class Crawler {
     } catch (e) {
       this.logger.error("Page Errored", {...errJSON(e), ...logDetails}, "pageStatus");
       await this.markPageFailed(page);
+      return false;
     }
+
+    return true;
   }
 
   async runBehaviors(page, logDetails) {
@@ -605,7 +609,7 @@ export class Crawler {
     while (initState === "debug") {
       this.logger.info("Paused for debugging, will continue after manual resume");
 
-      await this.sleep(60);
+      await sleep(60);
 
       initState = await this.crawlState.getStatus();
     }
@@ -668,6 +672,7 @@ export class Crawler {
       crawlState: this.crawlState,
       screencaster: this.screencaster,
       healthChecker: this.healthChecker,
+      totalTimeout: (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60,
       task: (opts) => this.crawlPage(opts)
     });
 
@@ -860,7 +865,7 @@ export class Crawler {
 
     let isHTMLPage = true;
 
-    const isHTMLResult = await this.timedRun(
+    const isHTMLResult = await timedRun(
       this.isHTML(url),
       FETCH_TIMEOUT_SECS,
       "HEAD request to determine if URL is HTML page timed out",
@@ -869,7 +874,7 @@ export class Crawler {
     if (isHTMLResult && (isHTMLResult.value == false)) {
       isHTMLPage = false;
       try {
-        const captureResult = await this.timedRun(
+        const captureResult = await timedRun(
           this.directFetchCapture(url),
           FETCH_TIMEOUT_SECS,
           "Direct fetch capture attempt timed out",
@@ -978,7 +983,7 @@ export class Crawler {
     }
     // in case page starts loading via fetch/xhr immediately after page load,
     // we want to ensure we don't exit too early
-    await this.sleep(0.5);
+    await sleep(0.5);
 
     try {
       await page.waitForNetworkIdle({timeout: this.params.netIdleWait * 1000});
@@ -1005,7 +1010,7 @@ export class Crawler {
       const frames = page.__filteredFrames;
 
       const linkResults = await Promise.allSettled(
-        frames.map(frame => this.timedRun(
+        frames.map(frame => timedRun(
           frame.evaluate(loadFunc, selector, extract),
           PAGE_OP_TIMEOUT_SECS,
           "Link extraction timed out",
@@ -1063,12 +1068,12 @@ export class Crawler {
     try {
       this.logger.debug("Check CF Blocking", logDetails);
 
-      while (await this.timedRun(
+      while (await timedRun(
         page.$("div.cf-browser-verification.cf-im-under-attack"),
         PAGE_OP_TIMEOUT_SECS
       )) {
         this.logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
-        await this.sleep(5.5);
+        await sleep(5.5);
       }
     } catch (e) {
       //this.logger.warn("Check CF failed, ignoring");
@@ -1213,26 +1218,8 @@ export class Crawler {
         break;
       }
 
-      await this.sleep(1);
+      await sleep(1);
     }
-  }
-
-  timedRun(promise, seconds, message="Promise timed out", logDetails={}, context="general") {
-    // return Promise return value or log error if timeout is reached first
-    const timeout = seconds * 1000;
-
-    const rejectPromiseOnTimeout = (timeout) => {
-      return new Promise((resolve, reject) => {
-        setTimeout(() => (reject("timeout reached")), timeout);
-      });
-    };
-
-    return Promise.race([promise, rejectPromiseOnTimeout(timeout)])
-      .catch(() => this.logger.error(message, {"seconds": seconds, ...logDetails}, context));
-  }
-
-  sleep(seconds) {
-    return new Promise(resolve => setTimeout(resolve, seconds * 1000));
   }
 
   async parseSitemap(url, seedId) {
