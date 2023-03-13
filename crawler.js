@@ -670,7 +670,6 @@ export class Crawler {
       maxConcurrency: this.params.workers,
       puppeteerOptions: this.puppeteerArgs,
       crawlState: this.crawlState,
-      screencaster: this.screencaster,
       healthChecker: this.healthChecker,
       totalTimeout: (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60,
       task: (opts) => this.crawlPage(opts)

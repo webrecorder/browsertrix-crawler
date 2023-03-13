@@ -16,11 +16,10 @@ const MAX_REUSE = 5;
 // ===========================================================================
 export class Worker
 {
-  constructor(id, browser, task, screencaster, healthChecker) {
+  constructor(id, browser, task, healthChecker) {
     this.id = id;
     this.browser = browser;
     this.task = task;
-    this.screencaster = screencaster;
     this.healthChecker = healthChecker;
 
     this.reuseCount = 0;
@@ -114,7 +113,6 @@ export class WorkerPool
     this.maxConcurrency = options.maxConcurrency;
     this.puppeteerOptions = options.puppeteerOptions;
     this.crawlState = options.crawlState;
-    this.screencaster = options.screencaster;
     this.healthChecker = options.healthChecker;
     this.totalTimeout = options.totalTimeout || 1e4;
 
@@ -147,7 +145,6 @@ export class WorkerPool
       id,
       this.browser,
       this.task,
-      this.screencaster,
       this.healthChecker
     );
     this.workers.push(worker);
