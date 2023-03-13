@@ -199,13 +199,13 @@ export class WorkerPool
       if (job.callbacks) {
         job.callbacks.reject("timed out");
       }
-      if (this.healthChecker) {
-        this.healthChecker.incError();
-      }
+      // if (this.healthChecker) {
+      //   this.healthChecker.incError();
+      // }
     } else {
-      if (this.healthChecker) {
-        this.healthChecker.resetErrors();
-      }
+      // if (this.healthChecker) {
+      //   this.healthChecker.resetErrors();
+      // }
 
       if (job.callbacks) {
         job.callbacks.resolve(result);
