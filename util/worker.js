@@ -221,7 +221,6 @@ export class WorkerPool
 
       if ((await this.crawlState.realSize()) > 0) {
         (async () => {
-          logger.debug("Adding new job to queue");
           await this.queue.add(() => this.crawlPageInWorker());
         })();
       }
