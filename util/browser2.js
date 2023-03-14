@@ -2,6 +2,10 @@ import * as child_process from "child_process";
 import fs from "fs";
 import { chromium } from "playwright-core";
 
+import { Logger } from "./logger.js";
+
+const logger = new Logger();
+
 
 // ==================================================================
 export class Browser
@@ -80,16 +84,23 @@ export class Browser
     return null;
   }
 
-  async evaluateWithCLI(frame, funcString) {
-    const { exceptionDetails, result: remoteObject}  = await frame.evaluate(funcString);
+  async evaluateWithCLI(frame, funcString, logData, contextName) {
+    let details = {frameUrl: frame.url(), ...logData};
+
+    logger.info("Run Script Started", details, contextName);
+
+    const { exceptionDetails, result}  = await frame.evaluate(funcString);
 
     if (exceptionDetails) {
-      throw new Error(
-        "Behavior Evaluation Failed" + exceptionDetails.text
-      );
+      if (exceptionDetails.stackTrace) {
+        details = {...exceptionDetails.stackTrace, text: exceptionDetails.text, ...details};
+      }
+      logger.error("Run Script Failed", details, contextName);
+    } else {
+      logger.info("Run Script Finished", details, contextName);
     }
 
-    return remoteObject.value;
+    return result.value;
   }
 }
 
