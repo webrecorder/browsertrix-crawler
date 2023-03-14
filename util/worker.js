@@ -15,11 +15,12 @@ const MAX_REUSE = 5;
 // ===========================================================================
 export class Worker
 {
-  constructor(id, browser, task, healthChecker) {
+  constructor(id, browser, task, healthChecker, emulateDevice) {
     this.id = id;
     this.browser = browser;
     this.task = task;
     this.healthChecker = healthChecker;
+    this.emulateDevice = emulateDevice;
 
     this.reuseCount = 0;
     this.context = null;
@@ -52,7 +53,11 @@ export class Worker
     while (true) {
       try {
         if (!this.context) {
-          this.context = await this.browser.newContext();
+          if (this.emulateDevice) {
+            this.context = await this.browser.newContext({...this.emulateDevice});
+          } else {
+            this.context = await this.browser.newContext();
+          }
         }
         this.page = await this.context.newPage();
         await this.page.goto(this.startPage);
@@ -87,7 +92,7 @@ export class Worker
     logger.info("Starting page", {"workerid": this.id, "page": url}, "worker");
 
     return await this.task({
-      browser: this.browser,
+      browserContext: this.context,
       page: this.page,
       data: urlData,
     });
@@ -102,6 +107,7 @@ export class WorkerPool
     this.browserCls = options.browserCls;
     this.maxConcurrency = options.maxConcurrency;
     this.playwrightOptions = options.playwrightOptions;
+    this.emulateDevice = options.emulateDevice;
     this.crawlState = options.crawlState;
     this.healthChecker = options.healthChecker;
     this.totalTimeout = options.totalTimeout || 1e4;
@@ -135,7 +141,8 @@ export class WorkerPool
       id,
       this.browser,
       this.task,
-      this.healthChecker
+      this.healthChecker,
+      this.emulateDevice,
     );
     this.workers.push(worker);
     this.workersAvailable.push(worker);

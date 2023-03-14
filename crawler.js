@@ -362,7 +362,7 @@ export class Crawler {
   async crawlPage(opts) {
     await this.writeStats();
 
-    const {browser, page, data} = opts;
+    const {browserContext, page, data} = opts;
 
     const {url} = data;
 
@@ -378,16 +378,8 @@ export class Crawler {
         await this.screencaster.screencastTarget(page, data.url);
       }
 
-      // TODO: Playwright migration - this won't work in this.browser, which is
-      // actually a BrowserContext. We probably need to create a new browser here
-      // if emulation is being used, which will also require changing newCDPSession
-      // below to newBrowserCDPSession
-      if (this.emulateDevice) {
-        await browser.newContext({...this.emulateDevice});
-      }
-
       if (this.params.profile) {
-        const client = await browser.newCDPSession(page);
+        const client = await browserContext.newCDPSession(page);
         await client.send("Network.setBypassServiceWorker", {bypass: true});
       }
 
@@ -423,7 +415,7 @@ export class Crawler {
 
       let text = "";
       if (this.params.text && page.isHTMLPage) {
-        const client = await browser.newCDPSession(page);
+        const client = await browserContext.newCDPSession(page);
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
       }
@@ -669,6 +661,7 @@ export class Crawler {
           extraArgs: this.extraChromeArgs()
         }
       },
+      emulateDevice: this.emulateDevice,
       crawlState: this.crawlState,
       healthChecker: this.healthChecker,
       totalTimeout: (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60,
