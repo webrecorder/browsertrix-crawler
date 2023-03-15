@@ -2,6 +2,8 @@ import { Logger } from "./logger.js";
 
 const logger = new Logger();
 
+export const MAX_DEPTH = 1000000;
+
 
 export class ScopedSeed
 {
@@ -26,7 +28,7 @@ export class ScopedSeed
     this.sitemap = this.resolveSiteMap(sitemap);
     this.allowHash = allowHash;
     this.maxExtraHops = extraHops;
-    this.maxDepth = depth < 0 ? 99999 : depth;
+    this.maxDepth = depth < 0 ? MAX_DEPTH : depth;
   }
 
   parseRx(value) {

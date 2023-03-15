@@ -222,11 +222,14 @@ export class WorkerPool
     this.queue = new PQueue({concurrency: this.maxConcurrency});
 
     while (!this.interrupted) {
-      if ((await this.crawlState.realSize()) + (await this.crawlState.numPending()) == 0) {
+      const size = await this.crawlState.queueSize();
+      const pending = await this.crawlState.numPending();
+
+      if (!(size + pending)) {
         break;
       }
 
-      if ((await this.crawlState.realSize()) > 0) {
+      if (size > 0) {
         (async () => {
           await this.queue.add(() => this.crawlPageInWorker());
         })();

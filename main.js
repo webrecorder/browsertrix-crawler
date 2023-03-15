@@ -24,7 +24,7 @@ async function handleTerminate(signame) {
   }
 
   try {
-    if (!crawler.crawlState.drainMax) {
+    if (!crawler.interrupted) {
       logger.info("SIGNAL: gracefully finishing current pages...");
       crawler.gracefulFinish();
 
