@@ -154,7 +154,7 @@ export class WorkerPool
   async crawlPageInWorker() {
     const worker = await this.getAvailableWorker();
 
-    const data = await this.crawlState.nextFromQueue();
+    const data = await this.crawlState.popFromQueue();
 
     if (!data) {
       logger.debug("No crawl tasks available - waiting for pending pages to finish", {}, "worker");
@@ -176,24 +176,12 @@ export class WorkerPool
       "worker"
     );
 
-    if (!result) {
+    if (!result || page.__failed) {
       logger.debug("Resetting failed page", {}, "worker");
 
       await worker.closePage();
 
       logger.warn("Page Load Failed", {url}, "worker");
-
-      await this.crawlState.markFailed(url);
-
-      // if (this.healthChecker) {
-      //   this.healthChecker.incError();
-      // }
-    } else {
-      // if (this.healthChecker) {
-      //   this.healthChecker.resetErrors();
-      // }
-
-      await this.crawlState.markFinished(url);
     }
 
     this.freeWorker(worker);

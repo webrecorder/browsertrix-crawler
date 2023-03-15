@@ -455,13 +455,15 @@ export class Crawler {
 
       this.logger.info("Page finished", logDetails, "pageStatus");
 
+      await this.crawlState.markFinished(url);
+
       await this.checkLimits();
 
       await this.serializeConfig();
 
     } catch (e) {
       this.logger.error("Page Errored", {...errJSON(e), ...logDetails}, "pageStatus");
-      await this.markPageFailed(page, pageTarget);
+      await this.markPageFailed(url, page, pageTarget);
       return false;
     }
 
@@ -898,7 +900,7 @@ export class Crawler {
     });
 
     // more serious page error, mark page session as invalid
-    page.on("error", () => this.markPageFailed(page));
+    page.on("error", () => this.markPageFailed(url, page));
 
     page.on("console", (msg) => {
       if (this.params.logging.includes("jserrors") && (msg.type() === "error")) {
@@ -930,6 +932,7 @@ export class Crawler {
     }
 
     page.isHTMLPage = isHTMLPage;
+
     if (isHTMLPage) {
       page.__filteredFrames = page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
@@ -960,7 +963,7 @@ export class Crawler {
     }
   }
 
-  async markPageFailed(page, pageTarget=null) {
+  async markPageFailed(url, page, pageTarget=null) {
     page.__failed = true;
     if (this.healthChecker) {
       this.healthChecker.incError();
@@ -968,6 +971,7 @@ export class Crawler {
     if (this.screencaster && pageTarget) {
       await this.screencaster.endTarget(pageTarget);
     }
+    await this.crawlState.markFailed(url);
   }
 
   async netIdle(page, details) {
