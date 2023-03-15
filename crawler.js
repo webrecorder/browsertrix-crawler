@@ -24,8 +24,7 @@ import { Logger, errJSON, setExternalLogStream, setDebugLogging } from "./util/l
 import { WorkerPool } from "./util/worker.js";
 import { sleep, timedRun } from "./util/timing.js";
 
-// import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
-import { Browser } from "./util/browser2.js";
+import { Browser } from "./util/browser.js";
 
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 

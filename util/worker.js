@@ -15,9 +15,9 @@ const MAX_REUSE = 5;
 // ===========================================================================
 export class Worker
 {
-  constructor(id, browser, task, healthChecker, emulateDevice) {
+  constructor(id, browserContext, task, healthChecker, emulateDevice) {
     this.id = id;
-    this.browser = browser;
+    this.browserContext = browserContext;
     this.task = task;
     this.healthChecker = healthChecker;
     this.emulateDevice = emulateDevice;
@@ -52,14 +52,13 @@ export class Worker
 
     while (true) {
       try {
-        if (!this.context) {
-          if (this.emulateDevice) {
-            this.context = await this.browser.newContext({...this.emulateDevice});
-          } else {
-            this.context = await this.browser.newContext();
-          }
+        if (this.emulateDevice) {
+          // TODO: Make emulation work with profiles
+          // Closing the persistentBrowserContext (this.browserContext)
+          // will close the browser. See:
+          // https://playwright.dev/docs/api/class-browsertype#browser-type-launch-persistent-context
         }
-        this.page = await this.context.newPage();
+        this.page = await this.browserContext.newPage();
         await this.page.goto(this.startPage);
         this.page._workerid = this.id;
         if (this.healthChecker) {
@@ -67,7 +66,7 @@ export class Worker
         }
         break;
       } catch (err) {
-        logger.warn("Error getting new page in window context", {"workerid": this.id, ...errJSON(err)}, "worker");
+        logger.warn("Error getting new page", {"workerid": this.id, ...errJSON(err)}, "worker");
         await sleep(0.5);
         logger.warn("Retry getting new page");
 
@@ -114,7 +113,7 @@ export class WorkerPool
 
     this.task = options.task;
 
-    this.browser = null;
+    this.browserContext = null;
 
     this.workers = [];
     this.workersAvailable = [];
@@ -127,8 +126,8 @@ export class WorkerPool
   }
 
   async createWorkers(numWorkers = 1) {
-    if (!this.browser) {
-      this.browser = await this.browserCls.launch(this.playwrightOptions);
+    if (!this.browserContext) {
+      this.browserContext = await this.browserCls.launch(this.playwrightOptions);
     }
     logger.info(`Creating ${numWorkers} workers`, {}, "worker");
     for (let i=0; i < numWorkers; i++) {
@@ -139,7 +138,7 @@ export class WorkerPool
   createWorker(id) {
     const worker = new Worker(
       id,
-      this.browser,
+      this.browserContext,
       this.task,
       this.healthChecker,
       this.emulateDevice,
@@ -247,9 +246,9 @@ export class WorkerPool
   }
 
   async close() {
-    if (this.browser) {
+    if (this.browserContext) {
       try {
-        await this.browser.close();
+        await this.browserContext.close();
       /* eslint-disable no-empty */
       } catch (e) {}
     }
