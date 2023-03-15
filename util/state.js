@@ -1,4 +1,3 @@
-import { Job } from "./job.js";
 import { Logger } from "./logger.js";
 
 import { MAX_DEPTH } from "./seeds.js";
@@ -118,19 +117,19 @@ return 0;
     return new Date().toISOString();
   }
 
-  async _markStarted(url) {
+  async markStarted(url) {
     const started = this._timestamp();
 
     return await this.redis.markstarted(this.pkey, this.pkey + ":" + url, url, started, this.pageTimeout);
   }
 
-  async _finish(url) {
+  async markFinished(url) {
     const finished = this._timestamp();
 
     return await this.redis.movedone(this.pkey, this.dkey, url, finished, "finished");
   }
 
-  async _fail(url) {
+  async markFailed(url) {
     return await this.redis.movedone(this.pkey, this.dkey, url, "1", "failed");
   }
 
@@ -171,11 +170,7 @@ return 0;
     await this.redis.addqueue(this.pkey, this.qkey, this.skey, url, this._getScore(data), JSON.stringify(data));
   }
 
-  _getScore(data) {
-    return (data.depth || 0) + (data.extraHops || 0) * MAX_DEPTH;
-  }
-
-  async shift() {
+  async nextFromQueue() {
     const json = await this._getNext();
     let data;
 
@@ -183,42 +178,21 @@ return 0;
       data = JSON.parse(json);
     } catch(e) {
       logger.error("Invalid queued json", json);
-      return undefined;
+      return null;
     }
 
     if (!data) {
-      return undefined;
+      return null;
     }
 
-    const url = data.url;
+    await this.markStarted(data.url);
 
-    const state = this;
-
-    const callbacks = {
-      async start() {
-        await state._markStarted(url);
-      },
-
-      async resolve() {
-        await state._finish(url);
-      },
-
-      async reject(e) {
-        logger.warn(`Page Load Failed: ${url}`, e.message);
-        await state._fail(url);
-      }
-    };
-
-    return new Job(data, callbacks);
+    return data;
   }
 
   async has(url) {
     return !!await this.redis.sismember(this.skey, url);
   }
-
-  // async add(url) {
-  //   return await this.redis.sadd(this.skey, url);
-  // }
 
   async serialize() {
     //const queued = await this._iterSortKey(this.qkey);
@@ -229,6 +203,10 @@ return 0;
     return {queued, pending, done};
   }
 
+  _getScore(data) {
+    return (data.depth || 0) + (data.extraHops || 0) * MAX_DEPTH;
+  }
+
   async _iterSortedKey(key, inc = 100) {
     const results = [];
 
@@ -236,7 +214,6 @@ return 0;
 
     for (let i = 0; i < len; i += inc) {
       const someResults = await this.redis.zrangebyscore(key, 0, "inf", "limit", i, inc);
-      console.log(someResults);
       results.push(...someResults);
     }
 
