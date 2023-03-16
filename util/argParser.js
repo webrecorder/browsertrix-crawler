@@ -372,7 +372,7 @@ class ArgParser {
         if (element in screenshotTypes) {
           argv.screenshot.push(element);
         } else {
-          console.log(`${element} not found in ${screenshotTypes}`);
+          logger.warn(`${element} not found in ${screenshotTypes}`);
         }
       });
     }
@@ -396,11 +396,17 @@ class ArgParser {
       logger.info("Note: The newContext argument is deprecated in 0.8.0. Values passed to this option will be ignored");
     }
 
+
     if (argv.mobileDevice) {
-      argv.emulateDevice = devices[argv.mobileDevice];
+      argv.emulateDevice = devices[argv.mobileDevice.replace("-", " ")];
       if (!argv.emulateDevice) {
         logger.fatal("Unknown device: " + argv.mobileDevice);
       }
+      if (argv.emulateDevice.defaultBrowserType !== "chromium") {
+        logger.fatal(`Device Browser: ${argv.emulateDevice.defaultBrowserType}\r\nSorry, only Chromium-based devices are supported at this time`);
+      }
+    } else {
+      argv.emulateDevice = {viewport: null};
     }
 
     if (argv.seedFile) {

@@ -19,19 +19,22 @@ export class Browser
 {
   constructor() {}
 
-  async launch(opts = {}) {
-
-    const args = this.chromeArgs(opts.chromeOptions);
-    const userDataDir = opts.dataDir || profileDir;
+  async launch({dataDir, chromeOptions, headless = false, emulateDevice = {viewport: null}} = {}) {
+    const args = this.chromeArgs(chromeOptions);
+    const userDataDir = dataDir || profileDir;
 
     const launchOpts = {
-      args: args,
-      headless: false,
+      ...emulateDevice,
+      args,
+      headless,
       executablePath: this.getBrowserExe(),
-      ignoreHTTPSErrors: true
+      ignoreHTTPSErrors: true,
+      handleSIGHUP: false,
+      handleSIGINT: false,
+      handleSIGTERM: false,
+      serviceWorkers: dataDir ? "block" : "allow",
     };
 
-    // TODO: Playwright migration - make this work with device emulation
     return await chromium.launchPersistentContext(userDataDir, launchOpts);
   }
 

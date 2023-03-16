@@ -15,22 +15,26 @@ const MAX_REUSE = 5;
 // ===========================================================================
 export class Worker
 {
-  constructor(id, browserContext, task, healthChecker, emulateDevice) {
+  constructor(id, browserContext, crawlPage, healthChecker, screencaster) {
     this.id = id;
     this.browserContext = browserContext;
-    this.task = task;
+    this.crawlPage = crawlPage;
     this.healthChecker = healthChecker;
-    this.emulateDevice = emulateDevice;
+    this.screencaster = screencaster;
 
     this.reuseCount = 0;
-    this.context = null;
     this.page = null;
     
-    this.startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
+    //this.startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
   }
 
   async closePage() {
     if (this.page) {
+      if (this.screencaster) {
+        logger.debug("End Screencast", {workerid: this.id}, "screencast");
+        await this.screencaster.endTargetById(this.id);
+      }
+
       try {
         await this.page.close();
       } catch (e) {
@@ -52,18 +56,23 @@ export class Worker
 
     while (true) {
       try {
-        if (this.emulateDevice) {
-          // TODO: Make emulation work with profiles
-          // Closing the persistentBrowserContext (this.browserContext)
-          // will close the browser. See:
-          // https://playwright.dev/docs/api/class-browsertype#browser-type-launch-persistent-context
-        }
         this.page = await this.browserContext.newPage();
-        await this.page.goto(this.startPage);
         this.page._workerid = this.id;
+
+        await this.page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+
+        //TODO: is this still needed?
+        //await this.page.goto(this.startPage);
+
         if (this.healthChecker) {
           this.healthChecker.resetErrors();
         }
+
+        if (this.screencaster) {
+          logger.debug("Start Screencast", {workerid: this.id}, "screencast");
+          await this.screencaster.screencastPage(this.page, this.id);
+        }
+
         break;
       } catch (err) {
         logger.warn("Error getting new page", {"workerid": this.id, ...errJSON(err)}, "worker");
@@ -90,8 +99,7 @@ export class Worker
 
     logger.info("Starting page", {"workerid": this.id, "page": url}, "worker");
 
-    return await this.task({
-      browserContext: this.context,
+    return await this.crawlPage({
       page: this.page,
       data: urlData,
     });
@@ -103,17 +111,14 @@ export class Worker
 export class WorkerPool
 {
   constructor(options) {
-    this.browserCls = options.browserCls;
+    this.browserContext = options.browserContext;
     this.maxConcurrency = options.maxConcurrency;
-    this.playwrightOptions = options.playwrightOptions;
-    this.emulateDevice = options.emulateDevice;
     this.crawlState = options.crawlState;
     this.healthChecker = options.healthChecker;
     this.totalTimeout = options.totalTimeout || 1e4;
+    this.screencaster = options.screencaster;
 
-    this.task = options.task;
-
-    this.browserContext = null;
+    this.crawlPage = options.crawlPage;
 
     this.workers = [];
     this.workersAvailable = [];
@@ -126,9 +131,6 @@ export class WorkerPool
   }
 
   async createWorkers(numWorkers = 1) {
-    if (!this.browserContext) {
-      this.browserContext = await this.browserCls.launch(this.playwrightOptions);
-    }
     logger.info(`Creating ${numWorkers} workers`, {}, "worker");
     for (let i=0; i < numWorkers; i++) {
       this.createWorker(`worker-${i+1}`);
@@ -139,9 +141,9 @@ export class WorkerPool
     const worker = new Worker(
       id,
       this.browserContext,
-      this.task,
+      this.crawlPage,
       this.healthChecker,
-      this.emulateDevice,
+      this.screencaster,
     );
     this.workers.push(worker);
     this.workersAvailable.push(worker);

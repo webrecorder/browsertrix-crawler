@@ -2,7 +2,7 @@ import ws from "ws";
 import http from "http";
 import url from "url";
 import fs from "fs";
-import { v4 as uuidv4 } from "uuid";
+//import { v4 as uuidv4 } from "uuid";
 
 import { initRedis } from "./redis.js";
 
@@ -172,30 +172,24 @@ class ScreenCaster
     }
   }
 
-  detectClose(page) {
+  detectClose(page, id) {
     const context = page.context();
 
-    if (context.__destroy_added) {
-      return;
-    }
-
     context.on("targetdestroyed", () => {
-      this.endTargetByUrl(page.url());
+      this.endTargetById(id);
     });
-
-    context.__destroy_added = true;
   }
 
-  async screencastTarget(page, currUrl) {
-    const id = uuidv4();
+  async screencastPage(page, id) {
+    //const id = uuidv4();
 
-    this.urls.set(id, currUrl);
+    this.urls.set(id, page.url());
 
     if (this.targets.has(id)) {
       return;
     }
 
-    this.detectClose(page);
+    this.detectClose(page, id);
 
     const cdp = await page.context().newCDPSession(page);
 
@@ -233,16 +227,6 @@ class ScreenCaster
 
     for (const key of targetIds) {
       await this.endTargetById(key);
-    }
-  }
-
-  async endTargetByUrl(url) {
-    const targetUrls = this.urls.entries();
-
-    for (const [key, value] of targetUrls) {
-      if (value === url) {
-        await this.endTargetById(key);
-      }
     }
   }
 

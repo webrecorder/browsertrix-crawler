@@ -67,8 +67,6 @@ export class Crawler {
     this.headers = {};
     this.crawlState = null;
 
-    this.emulateDevice = null;
-
     // pages file
     this.pagesFH = null;
 
@@ -79,13 +77,11 @@ export class Crawler {
     // was the limit hit?
     this.limitHit = false;
 
-    this.userAgent = "";
-
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
     this.saveStateInterval = this.params.saveStateInterval * 1000;    
 
-    this.emulateDevice = this.params.emulateDevice;
+    this.emulateDevice = this.params.emulateDevice || {};
 
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
     this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
@@ -120,30 +116,21 @@ export class Crawler {
   configureUA() {
     // override userAgent
     if (this.params.userAgent) {
-
-      if (this.emulateDevice) {
-        this.emulateDevice.userAgent = this.params.userAgent;
-      }
-
-      this.userAgent = this.params.userAgent;
+      this.emulateDevice.userAgent = this.params.userAgent;
       return;
     }
 
     // if device set, it overrides the default Chrome UA
-    if (this.emulateDevice) {
-      this.userAgent = this.emulateDevice.userAgent;
-    } else {
-      this.userAgent = this.browserCls.getDefaultUA();
+    if (!this.emulateDevice.userAgent) {
+      this.emulateDevice.userAgent = this.browserCls.getDefaultUA();
     }
 
     // suffix to append to default userAgent
     if (this.params.userAgentSuffix) {
-      this.userAgent += " " + this.params.userAgentSuffix;
-
-      if (this.emulateDevice) {
-        this.emulateDevice.userAgent += " " + this.params.userAgentSuffix;
-      }
+      this.emulateDevice.userAgent += " " + this.params.userAgentSuffix;
     }
+
+    return this.emulateDevice.userAgent;
   }
 
   async initCrawlState() {
@@ -249,9 +236,7 @@ export class Crawler {
 
     this.browserExe = this.browserCls.getBrowserExe();
 
-    this.configureUA();
-
-    this.headers = {"User-Agent": this.userAgent};
+    this.headers = {"User-Agent": this.configureUA()};
 
     const subprocesses = [];
 
@@ -361,7 +346,7 @@ export class Crawler {
   async crawlPage(opts) {
     await this.writeStats();
 
-    const {browserContext, page, data} = opts;
+    const {page, data} = opts;
 
     const {url} = data;
 
@@ -373,17 +358,6 @@ export class Crawler {
     }
 
     try {
-      if (this.screencaster) {
-        await this.screencaster.screencastTarget(page, data.url);
-      }
-
-      if (this.params.profile) {
-        const client = await browserContext.newCDPSession(page);
-        await client.send("Network.setBypassServiceWorker", {bypass: true});
-      }
-
-      await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
-
       if (this.params.behaviorOpts && !page.__bx_inited) {
         await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, url));
         await page.addInitScript(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
@@ -414,7 +388,7 @@ export class Crawler {
 
       let text = "";
       if (this.params.text && page.isHTMLPage) {
-        const client = await browserContext.newCDPSession(page);
+        const client = await this.browserContext.newCDPSession(page);
         const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
       }
@@ -649,22 +623,26 @@ export class Crawler {
       }
     }
 
+    this.browserContext = await this.browserCls.launch({
+      dataDir: this.profileDir,
+      headless: this.params.headless,
+      emulateDevice: this.emulateDevice,
+      chromeOptions: {
+        proxy: !process.env.NO_PROXY,
+        userAgent: this.emulateDevice.userAgent,
+        extraArgs: this.extraChromeArgs()
+      }
+    });
+
     this.workerPool = new WorkerPool({
-      browserCls: this.browserCls,
+      browserContext: this.browserContext,
       maxConcurrency: this.params.workers,
-      playwrightOptions: {
-        dataDir: this.profileDir,
-        chromeOptions: {
-          proxy: !process.env.NO_PROXY,
-          userAgent: this.params.userAgent,
-          extraArgs: this.extraChromeArgs()
-        }
-      },
+      screencaster: this.screencaster,
       emulateDevice: this.emulateDevice,
       crawlState: this.crawlState,
       healthChecker: this.healthChecker,
       totalTimeout: (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60,
-      task: (opts) => this.crawlPage(opts)
+      crawlPage: (opts) => this.crawlPage(opts),
     });
 
     this.logger.debug("Worker pool created - starting to work");
@@ -967,9 +945,9 @@ export class Crawler {
     if (this.healthChecker) {
       this.healthChecker.incError();
     }
-    if (this.screencaster) {
-      await this.screencaster.endTargetByUrl(page.url());
-    }
+    //if (this.screencaster) {
+    //  await this.screencaster.endTargetByUrl(page.url());
+    //}
   }
 
   async netIdle(page, details) {
