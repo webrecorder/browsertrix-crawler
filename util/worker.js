@@ -186,7 +186,6 @@ export class WorkerPool
     const job = await this.crawlState.shift();
 
     if (!job) {
-      const pending = 
       logger.debug("No jobs available - waiting for pending pages to finish", {pending: this.queue.pending}, "worker");
       await sleep(10);
       return;
