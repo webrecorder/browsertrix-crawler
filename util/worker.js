@@ -138,10 +138,10 @@ export class WorkerPool
     this.interrupted = false;
     this.queue = null;
 
-    this.inited = this.createWorkers(this.maxConcurrency);
+    this.createWorkers(this.maxConcurrency);
   }
 
-  async createWorkers(numWorkers = 1) {
+  createWorkers(numWorkers = 1) {
     logger.info(`Creating ${numWorkers} workers`, {}, "worker");
     for (let i=0; i < numWorkers; i++) {
       this.createWorker(`worker-${i+1}`);
@@ -228,9 +228,6 @@ export class WorkerPool
   }
 
   async work() {
-    logger.debug("Awaiting worker pool init", {}, "worker");
-    await this.inited;
-
     this.queue = new PQueue({concurrency: this.maxConcurrency});
 
     while (!this.interrupted) {
