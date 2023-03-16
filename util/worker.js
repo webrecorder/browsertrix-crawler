@@ -24,6 +24,7 @@ export class Worker
 
     this.reuseCount = 0;
     this.page = null;
+    this.cdp = null;
     
     //this.startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
   }
@@ -32,8 +33,15 @@ export class Worker
     if (this.page) {
       if (this.screencaster) {
         logger.debug("End Screencast", {workerid: this.id}, "screencast");
-        await this.screencaster.endTargetById(this.id);
+        await this.screencaster.stopById(this.id);
       }
+
+      try {
+        await this.cdp.detach();
+      } catch (e) {
+        // ignore
+      }
+      this.cdp = null;
 
       try {
         await this.page.close();
@@ -59,6 +67,8 @@ export class Worker
         this.page = await this.browserContext.newPage();
         this.page._workerid = this.id;
 
+        this.cdp = await this.browserContext.newCDPSession(this.page);
+
         await this.page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
         //TODO: is this still needed?
@@ -70,7 +80,7 @@ export class Worker
 
         if (this.screencaster) {
           logger.debug("Start Screencast", {workerid: this.id}, "screencast");
-          await this.screencaster.screencastPage(this.page, this.id);
+          await this.screencaster.screencastPage(this.page, this.id, this.cdp);
         }
 
         break;
@@ -101,6 +111,7 @@ export class Worker
 
     return await this.crawlPage({
       page: this.page,
+      cdp: this.cdp,
       data: urlData,
     });
   }
@@ -175,8 +186,9 @@ export class WorkerPool
     const job = await this.crawlState.shift();
 
     if (!job) {
-      logger.debug("No jobs available - waiting for pending pages to finish", {}, "worker");
-      await sleep(2);
+      const pending = 
+      logger.debug("No jobs available - waiting for pending pages to finish", {pending: this.queue.pending}, "worker");
+      await sleep(10);
       return;
     }
 

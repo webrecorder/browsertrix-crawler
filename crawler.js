@@ -346,7 +346,7 @@ export class Crawler {
   async crawlPage(opts) {
     await this.writeStats();
 
-    const {page, data} = opts;
+    const {page, cdp, data} = opts;
 
     const {url} = data;
 
@@ -388,8 +388,7 @@ export class Crawler {
 
       let text = "";
       if (this.params.text && page.isHTMLPage) {
-        const client = await this.browserContext.newCDPSession(page);
-        const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
+        const result = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
         text = await new TextExtract(result).parseTextFromDom();
       }
 
@@ -434,10 +433,12 @@ export class Crawler {
     try {
       const frames = page.__filteredFrames;
 
+      const context = page.context();
+
       this.logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
       return await Promise.allSettled(
-        frames.map(frame => this.browserCls.evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => this.browserCls.evaluateWithCLI(context, frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
     } catch (e) {

@@ -129,12 +129,26 @@ export class Browser
     return null;
   }
 
-  async evaluateWithCLI(frame, funcString, logData, contextName) {
+  async evaluateWithCLI(context, frame, funcString, logData, contextName) {
     let details = {frameUrl: frame.url(), ...logData};
 
     logger.info("Run Script Started", details, contextName);
 
-    const { exceptionDetails, result}  = await frame.evaluate(funcString);
+    const cdp = await context.newCDPSession(frame);
+
+    // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
+    //const contextId = context._contextId;
+    const expression = funcString + "\n//# sourceURL=__playwright_evaluation_script__";
+
+    const { exceptionDetails, result } = await cdp
+      .send("Runtime.evaluate", {
+        expression,
+        //contextId,
+        returnByValue: true,
+        awaitPromise: true,
+        userGesture: true,
+        includeCommandLineAPI: true,
+      });
 
     if (exceptionDetails) {
       if (exceptionDetails.stackTrace) {
@@ -143,6 +157,12 @@ export class Browser
       logger.error("Run Script Failed", details, contextName);
     } else {
       logger.info("Run Script Finished", details, contextName);
+    }
+
+    try {
+      await cdp.detach();
+    } catch (e) {
+      logger.warn("Detach failed", details, contextName);
     }
 
     return result.value;
