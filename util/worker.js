@@ -71,7 +71,6 @@ export class PageWorker
     while (true) {
       try {
         this.page = await this.crawler.browserContext.newPage();
-        this.page._workerid = this.id;
 
         this.cdp = await this.crawler.browserContext.newCDPSession(this.page);
         this.opts = {page: this.page, cdp: this.cdp, workerid: this.id};

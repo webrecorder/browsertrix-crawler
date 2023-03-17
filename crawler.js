@@ -365,6 +365,7 @@ export class Crawler {
     const {url} = data;
 
     const logDetails = {page: url, workerid};
+    data.workerid = workerid;
 
     if (!this.isInScope(data, logDetails)) {
       this.logger.info("Page no longer in scope", data);
@@ -377,7 +378,7 @@ export class Crawler {
     const title = await page.title();
 
     if (this.params.screenshot) {
-      if (!page.isHTMLPage) {
+      if (!data.isHTMLPage) {
         this.logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
       const archiveDir = path.join(this.collDir, "archive");
@@ -394,7 +395,7 @@ export class Crawler {
     }
 
     let text = "";
-    if (this.params.text && page.isHTMLPage) {
+    if (this.params.text && data.isHTMLPage) {
       const result = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
       text = await new TextExtract(result).parseTextFromDom();
     }
@@ -402,13 +403,13 @@ export class Crawler {
     await this.writePage(data, title, this.params.text ? text : null);
 
     if (this.params.behaviorOpts) {
-      if (!page.isHTMLPage) {
+      if (!data.isHTMLPage) {
         this.logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
       } else {
         const behaviorTimeout = this.params.behaviorTimeout / 1000;
 
         const res = await timedRun(
-          this.runBehaviors(page, logDetails),
+          this.runBehaviors(page, data.filteredFrames, logDetails),
           behaviorTimeout,
           "Behaviors timed out",
           logDetails,
@@ -436,9 +437,9 @@ export class Crawler {
     return true;
   }
 
-  async runBehaviors(page, logDetails) {
+  async runBehaviors(page, frames, logDetails) {
     try {
-      const frames = page.__filteredFrames;
+      frames = frames || page.frames();
 
       const context = page.context();
 
@@ -830,10 +831,10 @@ export class Crawler {
     }
   }
 
-  async loadPage(page, urlData, selectorOptsList = DEFAULT_SELECTORS) {
-    const {url, seedId, depth, extraHops = 0} = urlData;
+  async loadPage(page, data, selectorOptsList = DEFAULT_SELECTORS) {
+    const {url, seedId, depth, workerid, extraHops = 0} = data;
 
-    const logDetails = {page: url, workerid: page._workerid};
+    const logDetails = {page: url, workerid};
 
     let isHTMLPage = true;
 
@@ -907,12 +908,12 @@ export class Crawler {
       }
     }
 
-    page.isHTMLPage = isHTMLPage;
+    data.isHTMLPage = isHTMLPage;
 
     if (isHTMLPage) {
-      page.__filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
+      data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
-      page.__filteredFrames = null;
+      data.filteredFrames = [];
     }
 
     if (!isHTMLPage) {
@@ -934,7 +935,7 @@ export class Crawler {
     this.logger.debug("Extracting links");
 
     for (const opts of selectorOptsList) {
-      const links = await this.extractLinks(page, opts, logDetails);
+      const links = await this.extractLinks(page, data.filteredFrames, opts, logDetails);
       await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
     }
   }
@@ -962,7 +963,7 @@ export class Crawler {
     }
   }
 
-  async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}, logDetails) {
+  async extractLinks(page, frames, {selector = "a[href]", extract = "href", isAttribute = false} = {}, logDetails) {
     const results = [];
 
     const loadProp = (options) => {
@@ -977,9 +978,9 @@ export class Crawler {
 
     const loadFunc = isAttribute ? loadAttr : loadProp;
 
-    try {
-      const frames = page.__filteredFrames;
+    frames = frames || page.frames();
 
+    try {
       const linkResults = await Promise.allSettled(
         frames.map(frame => timedRun(
           frame.evaluate(loadFunc, {selector: selector, extract: extract}),
