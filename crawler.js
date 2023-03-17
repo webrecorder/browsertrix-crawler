@@ -5,7 +5,7 @@ import os from "os";
 import fsp from "fs/promises";
 
 import fetch from "node-fetch";
-import { RedisCrawlState, MemoryCrawlState } from "./util/state.js";
+import { RedisCrawlState } from "./util/state.js";
 import AbortController from "abort-controller";
 import Sitemapper from "sitemapper";
 import { v4 as uuidv4 } from "uuid";
@@ -134,35 +134,28 @@ export class Crawler {
   }
 
   async initCrawlState() {
-    const redisUrl = this.params.redisStoreUrl;
+    const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
 
-    if (redisUrl) {
-      if (!redisUrl.startsWith("redis://")) {
-        this.logger.fatal("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
-      }
-
-      let redis;
-
-      while (true) {
-        try {
-          redis = await initRedis(redisUrl);
-          break;
-        } catch (e) {
-          //this.logger.fatal("Unable to connect to state store Redis: " + redisUrl);
-          this.logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
-          await sleep(3);
-        }
-      }
-
-      this.logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
-
-      this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.behaviorTimeout + this.params.timeout, os.hostname());
-
-    } else {
-      this.logger.debug("Storing state in memory", {}, "state");
-
-      this.crawlState = new MemoryCrawlState();
+    if (!redisUrl.startsWith("redis://")) {
+      this.logger.fatal("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
     }
+
+    let redis;
+
+    while (true) {
+      try {
+        redis = await initRedis(redisUrl);
+        break;
+      } catch (e) {
+        //this.logger.fatal("Unable to connect to state store Redis: " + redisUrl);
+        this.logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
+        await sleep(3);
+      }
+    }
+
+    this.logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
+
+    this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.behaviorTimeout + this.params.timeout, os.hostname());
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
       this.logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
@@ -416,13 +409,15 @@ export class Crawler {
 
       this.logger.info("Page finished", logDetails, "pageStatus");
 
+      await this.crawlState.markFinished(url);
+
       await this.checkLimits();
 
       await this.serializeConfig();
 
     } catch (e) {
       this.logger.error("Page Errored", {...errJSON(e), ...logDetails}, "pageStatus");
-      await this.markPageFailed(page);
+      await this.markPageFailed(url, page);
       return false;
     }
 
@@ -521,7 +516,6 @@ export class Crawler {
   }
 
   gracefulFinish() {
-    this.crawlState.setDrain(true);
     this.interrupted = true;
     this.workerPool.interrupt();
     if (!this.params.waitOnDone) {
@@ -806,7 +800,7 @@ export class Crawler {
       return;
     }
 
-    const realSize = await this.crawlState.realSize();
+    const realSize = await this.crawlState.queueSize();
     const pendingList = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
     const total = realSize + pendingList.length + done;
@@ -877,7 +871,7 @@ export class Crawler {
     });
 
     // more serious page error, mark page session as invalid
-    page.on("pageerror", () => this.markPageFailed(page));
+    page.on("pageerror", () => this.markPageFailed(url, page));
 
     page.on("console", (msg) => {
       if (this.params.logging.includes("jserrors") && (msg.type() === "error")) {
@@ -911,6 +905,7 @@ export class Crawler {
     }
 
     page.isHTMLPage = isHTMLPage;
+
     if (isHTMLPage) {
       page.__filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
@@ -941,14 +936,12 @@ export class Crawler {
     }
   }
 
-  async markPageFailed(page) {
+  async markPageFailed(url, page) {
     page.__failed = true;
     if (this.healthChecker) {
       this.healthChecker.incError();
     }
-    //if (this.screencaster) {
-    //  await this.screencaster.endTargetByUrl(page.url());
-    //}
+    await this.crawlState.markFailed(url);
   }
 
   async netIdle(page, details) {
@@ -1061,7 +1054,7 @@ export class Crawler {
       return false;
     }
 
-    if (this.params.limit > 0 && (await this.crawlState.numRealSeen() >= this.params.limit)) {
+    if (this.params.limit > 0 && (await this.crawlState.numSeen() >= this.params.limit)) {
       this.limitHit = true;
       return false;
     }
@@ -1070,12 +1063,8 @@ export class Crawler {
       return false;
     }
 
-    await this.crawlState.add(url);
-    const urlData = {url, seedId, depth};
-    if (extraHops) {
-      urlData.extraHops = extraHops;
-    }
-    await this.crawlState.push(urlData);
+    //await this.crawlState.add(url);
+    await this.crawlState.addToQueue({url, seedId, depth, extraHops});
     return true;
   }
 

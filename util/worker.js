@@ -1,4 +1,3 @@
-//import { EventEmitter } from "node:events";
 import PQueue from "p-queue";
 
 import { Logger, errJSON } from "./logger.js";
@@ -6,14 +5,11 @@ import { sleep, timedRun } from "./timing.js";
 
 const logger = new Logger();
 
-//class BrowserEmitter extends EventEmitter {}
-//const browserEmitter = new BrowserEmitter();
-
 const MAX_REUSE = 5;
 
 
 // ===========================================================================
-export class Worker
+export class PageWorker
 {
   constructor(id, browserContext, crawlPage, healthChecker, screencaster) {
     this.id = id;
@@ -94,26 +90,8 @@ export class Worker
         }
       }
     }
-  }
 
-  async runTask(job) {
-    if (job.callbacks) {
-      job.callbacks.start();
-    }
-
-    const urlData = job.data;
-
-    await this.initPage();
-
-    const url = job.getUrl();
-
-    logger.info("Starting page", {"workerid": this.id, "page": url}, "worker");
-
-    return await this.crawlPage({
-      page: this.page,
-      cdp: this.cdp,
-      data: urlData,
-    });
+    return this.page;
   }
 }
 
@@ -149,7 +127,7 @@ export class WorkerPool
   }
 
   createWorker(id) {
-    const worker = new Worker(
+    const worker = new PageWorker(
       id,
       this.browserContext,
       this.crawlPage,
@@ -183,45 +161,36 @@ export class WorkerPool
   }
 
   async crawlPageInWorker() {
-    const job = await this.crawlState.shift();
+    const data = await this.crawlState.nextFromQueue();
 
-    if (!job) {
-      logger.debug("No jobs available - waiting for pending pages to finish", {pending: this.queue.pending}, "worker");
+    if (!data) {
+      logger.debug("No crawl tasks available - waiting for pending pages to finish", {pending: this.queue.pending}, "worker");
       await sleep(10);
       return;
     }
 
     const worker = await this.getAvailableWorker();
 
+    const { url } = data;
+
+    const { page, cdp } = await worker.initPage();
+
+    logger.info("Starting page", {"workerid": worker.id, "page": url}, "worker");
+
     const result = await timedRun(
-      worker.runTask(job),
+      worker.crawlPage({ page, data, cdp }),
       this.totalTimeout,
       "Page Worker Timeout",
       {"workerid": worker.id},
       "worker"
     );
 
-    if (!result) {
+    if (!result || page.__failed) {
       logger.debug("Resetting failed page", {}, "worker");
 
       await worker.closePage();
 
-      if (job.callbacks) {
-        logger.debug("Calling job reject callback", {job}, "worker");
-        job.callbacks.reject("timed out");
-      }
-      // if (this.healthChecker) {
-      //   this.healthChecker.incError();
-      // }
-    } else {
-      // if (this.healthChecker) {
-      //   this.healthChecker.resetErrors();
-      // }
-
-      if (job.callbacks) {
-        logger.debug("Calling job resolve callback", {job}, "worker");
-        job.callbacks.resolve(result);
-      }
+      logger.warn("Page Load Failed", {url}, "worker");
     }
 
     this.freeWorker(worker);
@@ -231,11 +200,14 @@ export class WorkerPool
     this.queue = new PQueue({concurrency: this.maxConcurrency});
 
     while (!this.interrupted) {
-      if ((await this.crawlState.realSize()) + (await this.crawlState.numPending()) == 0) {
+      const size = await this.crawlState.queueSize();
+      const pending = await this.crawlState.numPending();
+
+      if (!(size + pending)) {
         break;
       }
 
-      if ((await this.crawlState.realSize()) > 0) {
+      if (size > 0) {
         (async () => {
           await this.queue.add(() => this.crawlPageInWorker());
         })();
@@ -245,8 +217,11 @@ export class WorkerPool
       await sleep(0.5);
     }
 
-    logger.debug("Awaiting queue onIdle()", {}, "worker");
+    logger.debug("Finishing pending crawl tasks", {pending: this.queue.pending}, "worker");
+
     await this.queue.onIdle();
+
+    logger.debug("Crawl tasks done", {}, "worker");
   }
 
   interrupt() {

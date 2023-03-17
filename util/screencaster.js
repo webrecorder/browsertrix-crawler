@@ -204,9 +204,9 @@ class ScreenCaster
       this.caches.set(id, data);
       this.urls.set(id, url);
 
-      //if (url !== "about:blank") {
-      await this.transport.sendAll({msg, id, data, url});
-      //}
+      if (url && !url.startsWith("about:blank")) {
+        await this.transport.sendAll({msg, id, data, url});
+      }
 
       try {
         await cdp.send("Page.screencastFrameAck", {sessionId});
