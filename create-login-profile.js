@@ -9,6 +9,8 @@ import child_process from "child_process";
 
 import yargs from "yargs";
 
+import { logger } from "./util/logger.js";
+
 import { sleep } from "./util/timing.js";
 import { Browser } from "./util/browser.js";
 import { initStorage } from "./util/storage.js";
@@ -106,8 +108,11 @@ async function main() {
     .option(cliOpts())
     .argv;
 
+  logger.setDebugLogging(true);
+
+
   if (!params.headless) {
-    console.log("Launching XVFB");
+    logger.debug("Launching XVFB");
     child_process.spawn("Xvfb", [
       process.env.DISPLAY,
       "-listen",
@@ -144,7 +149,7 @@ async function main() {
   if (params.proxy) {
     child_process.spawn("wayback", ["--live", "--proxy", "live"], {stdio: "inherit", cwd: "/tmp"});
 
-    console.log("Running with pywb proxy");
+    logger.debug("Running with pywb proxy");
 
     await sleep(3000);
 
@@ -171,7 +176,7 @@ async function main() {
   });
 
   if (params.interactive) {
-    console.log("Note: the '--interactive' flag is now deprecated and is the default profile creation option. Use the --automated flag to specify non-interactive mode");
+    logger.warn("Note: the '--interactive' flag is now deprecated and is the default profile creation option. Use the --automated flag to specify non-interactive mode");
   }
 
   if (params.user || params.password) {
@@ -199,7 +204,7 @@ async function main() {
     await page.addInitScript(behaviors + ";\nself.__bx_behaviors.init();");
   }
 
-  console.log(`Loading page: ${params.url}`);
+  logger.info(`Loading page: ${params.url}`);
 
   await page.goto(params.url, {waitUntil});
 
@@ -216,7 +221,7 @@ async function main() {
 async function automatedProfile(params, browser, page, cdp, waitUntil) {
   let u, p;
 
-  console.log("Looking for username and password entry fields on page...");
+  logger.debug("Looking for username and password entry fields on page...");
 
   try {
     u = await page.waitForSelector("//input[contains(@name, 'user') or contains(@name, 'email')]");
@@ -226,7 +231,7 @@ async function automatedProfile(params, browser, page, cdp, waitUntil) {
     if (params.debugScreenshot) {
       await page.screenshot({path: params.debugScreenshot});
     }
-    console.log("Login form could not be found");
+    logger.debug("Login form could not be found");
     await page.close();
     process.exit(1);
     return;
@@ -255,7 +260,7 @@ async function createProfile(params, browser, page, cdp, targetFilename = "") {
 
   await browser.close();
 
-  console.log("creating profile");
+  logger.info("Creating profile");
 
   const profileFilename = params.filename || "/crawls/profiles/profile.tar.gz";
  
@@ -270,11 +275,11 @@ async function createProfile(params, browser, page, cdp, targetFilename = "") {
 
   const storage = initStorage();
   if (storage) {
-    console.log("Uploading to remote storage...");
+    logger.info("Uploading to remote storage...");
     resource = await storage.uploadFile(profileFilename, targetFilename);
   }
 
-  console.log("done");
+  logger.info("Profile creation done");
   return resource;
 }
 
@@ -311,7 +316,7 @@ function promptInput(msg, hidden = false) {
 
 class InteractiveBrowser {
   constructor(params, browser, page, cdp, targetId) {
-    console.log("Creating Profile Interactively...");
+    logger.info("Creating Profile Interactively...");
     child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
 
     this.params = params;
@@ -342,7 +347,7 @@ class InteractiveBrowser {
     
     if (this.shutdownWait) {
       this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
-      console.log(`Shutting down in ${this.shutdownWait}ms if no ping received`);
+      logger.debug(`Shutting down in ${this.shutdownWait}ms if no ping received`);
     } else {
       this.shutdownTimer = 0;
     }
@@ -350,12 +355,12 @@ class InteractiveBrowser {
     const httpServer = http.createServer((req, res) => this.handleRequest(req, res));
     const port = 9223;
     httpServer.listen(port);
-    console.log(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`);
+    logger.info(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`);
 
     if (!params.headless) {
-      console.log("Screencasting with VNC on port 6080");
+      logger.info("Screencasting with VNC on port 6080");
     } else {
-      console.log("Screencasting with CDP on port 9222");
+      logger.info("Screencasting with CDP on port 9222");
     }
   }
 
@@ -365,7 +370,7 @@ class InteractiveBrowser {
   }
 
   async saveAllCookies() {
-    console.log("Saving all cookies");
+    logger.info("Saving all cookies");
 
     for (const origin of this.originSet.values()) {
       await this.saveCookiesFor(origin + "/");
@@ -392,13 +397,13 @@ class InteractiveBrowser {
       }
       await this.browser.context.addCookies(cookies);
     } catch (e) {
-      console.log("Save Cookie Error: " + e);
+      logger.error("Save Cookie Error: ", e);
     }
   }
 
   addOrigin() {
     const url = this.page.url();
-    console.log("Adding origin for", url);
+    logger.debug("Adding origin", {url});
     if (url.startsWith("http:") || url.startsWith("https:")) {
       this.originSet.add(new URL(url).origin);
     }
@@ -431,7 +436,7 @@ class InteractiveBrowser {
       if (this.shutdownWait) {
         clearInterval(this.shutdownTimer);
         this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
-        console.log(`Ping received, delaying shutdown for ${this.shutdownWait}ms`);
+        logger.debug(`Ping received, delaying shutdown for ${this.shutdownWait}ms`);
       }
 
       origins = Array.from(this.originSet.values());
@@ -468,7 +473,7 @@ class InteractiveBrowser {
       } catch (e) {
         res.writeHead(400, {"Content-Type": "application/json"});
         res.end(JSON.stringify({"error": e.toString()}));
-        console.log(e);
+        logger.warn("HTTP Error", e);
       }
       return;
 
@@ -491,7 +496,7 @@ class InteractiveBrowser {
       } catch (e) {
         res.writeHead(500, {"Content-Type": "application/json"});
         res.end(JSON.stringify({"error": e.toString()}));
-        console.log(e);
+        logger.warn("HTTP Error", e);
       }
 
       setTimeout(() => process.exit(0), 200);
@@ -512,7 +517,7 @@ class InteractiveBrowser {
       } catch (e) {
         res.writeHead(500, {"Content-Type": "text/html"});
         res.end("<html><body>Profile creation failed! See the browsertrix-crawler console for more info");
-        console.log(e);
+        logger.warn("HTTP Error", e);
       }
 
       setTimeout(() => process.exit(0), 200);
