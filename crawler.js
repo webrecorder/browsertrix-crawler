@@ -530,6 +530,7 @@ export class Crawler {
 
   gracefulFinish() {
     this.interrupted = true;
+    this.logger.info("Crawler interrupted, gracefully finishing current pages");
     if (!this.params.waitOnDone) {
       this.finalExit = true;
     }

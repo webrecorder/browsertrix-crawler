@@ -84,8 +84,8 @@ export class PageWorker
         await sleep(0.5);
         logger.warn("Retry getting new page");
 
-        if (this.healthChecker) {
-          this.healthChecker.incError();
+        if (this.crawler.healthChecker) {
+          this.crawler.healthChecker.incError();
         }
       }
     }
