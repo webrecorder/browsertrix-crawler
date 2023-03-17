@@ -51,7 +51,7 @@ export class PageWorker
   async initPage() {
     if (this.page && ++this.reuseCount <= MAX_REUSE) {
       logger.debug("Reusing page", {reuseCount: this.reuseCount}, "worker");
-      return this.page;
+      return {page: this.page, cdp: this.cdp};
     } else {
       await this.closePage();
     }
@@ -91,7 +91,7 @@ export class PageWorker
       }
     }
 
-    return this.page;
+    return {page: this.page, cdp: this.cdp};
   }
 }
 

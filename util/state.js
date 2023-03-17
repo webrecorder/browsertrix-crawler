@@ -170,7 +170,7 @@ return 0;
     await this.redis.addqueue(this.pkey, this.qkey, this.skey, url, this._getScore(data), JSON.stringify(data));
   }
 
-  async popFromQueue() {
+  async nextFromQueue() {
     const json = await this._getNext();
     let data;
 
