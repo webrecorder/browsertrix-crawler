@@ -4,9 +4,8 @@ import fs from "fs";
 import os from "os";
 import fsp from "fs/promises";
 
-import fetch from "node-fetch";
-import { RedisCrawlState, MemoryCrawlState } from "./util/state.js";
-import AbortController from "abort-controller";
+import { RedisCrawlState } from "./util/state.js";
+//import AbortController from "abort-controller";
 import Sitemapper from "sitemapper";
 import { v4 as uuidv4 } from "uuid";
 import yaml from "js-yaml";
@@ -21,10 +20,10 @@ import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { Logger, errJSON, setExternalLogStream, setDebugLogging } from "./util/logger.js";
-import { WorkerPool } from "./util/worker.js";
+import { runWorkers } from "./util/worker.js";
 import { sleep, timedRun } from "./util/timing.js";
 
-import { getBrowserExe, loadProfile, chromeArgs, getDefaultUA, evaluateWithCLI } from "./util/browser.js";
+import { Browser } from "./util/browser.js";
 
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
@@ -67,8 +66,6 @@ export class Crawler {
     this.headers = {};
     this.crawlState = null;
 
-    this.emulateDevice = null;
-
     // pages file
     this.pagesFH = null;
 
@@ -79,13 +76,11 @@ export class Crawler {
     // was the limit hit?
     this.limitHit = false;
 
-    this.userAgent = "";
-
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
     this.saveStateInterval = this.params.saveStateInterval * 1000;    
 
-    this.emulateDevice = this.params.emulateDevice;
+    this.emulateDevice = this.params.emulateDevice || {};
 
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
     this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
@@ -113,67 +108,53 @@ export class Crawler {
     this.done = false;
 
     this.behaviorLastLine = null;
+
+    this.browser = new Browser();
   }
 
   configureUA() {
     // override userAgent
     if (this.params.userAgent) {
-
-      if (this.emulateDevice) {
-        this.emulateDevice.userAgent = this.params.userAgent;
-      }
-
-      this.userAgent = this.params.userAgent;
+      this.emulateDevice.userAgent = this.params.userAgent;
       return;
     }
 
     // if device set, it overrides the default Chrome UA
-    if (this.emulateDevice) {
-      this.userAgent = this.emulateDevice.userAgent;
-    } else {
-      this.userAgent = getDefaultUA();
+    if (!this.emulateDevice.userAgent) {
+      this.emulateDevice.userAgent = this.browser.getDefaultUA();
     }
 
     // suffix to append to default userAgent
     if (this.params.userAgentSuffix) {
-      this.userAgent += " " + this.params.userAgentSuffix;
-
-      if (this.emulateDevice) {
-        this.emulateDevice.userAgent += " " + this.params.userAgentSuffix;
-      }
+      this.emulateDevice.userAgent += " " + this.params.userAgentSuffix;
     }
+
+    return this.emulateDevice.userAgent;
   }
 
   async initCrawlState() {
-    const redisUrl = this.params.redisStoreUrl;
+    const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
 
-    if (redisUrl) {
-      if (!redisUrl.startsWith("redis://")) {
-        this.logger.fatal("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
-      }
-
-      let redis;
-
-      while (true) {
-        try {
-          redis = await initRedis(redisUrl);
-          break;
-        } catch (e) {
-          //this.logger.fatal("Unable to connect to state store Redis: " + redisUrl);
-          this.logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
-          await sleep(3);
-        }
-      }
-
-      this.logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
-
-      this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.behaviorTimeout + this.params.timeout, os.hostname());
-
-    } else {
-      this.logger.debug("Storing state in memory", {}, "state");
-
-      this.crawlState = new MemoryCrawlState();
+    if (!redisUrl.startsWith("redis://")) {
+      this.logger.fatal("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
     }
+
+    let redis;
+
+    while (true) {
+      try {
+        redis = await initRedis(redisUrl);
+        break;
+      } catch (e) {
+        //this.logger.fatal("Unable to connect to state store Redis: " + redisUrl);
+        this.logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
+        await sleep(3);
+      }
+    }
+
+    this.logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
+
+    this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.behaviorTimeout + this.params.timeout, os.hostname());
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
       this.logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
@@ -245,11 +226,7 @@ export class Crawler {
       redisStdio = "ignore";
     }
 
-    this.browserExe = getBrowserExe();
-
-    this.configureUA();
-
-    this.headers = {"User-Agent": this.userAgent};
+    this.headers = {"User-Agent": this.configureUA()};
 
     const subprocesses = [];
 
@@ -280,22 +257,6 @@ export class Crawler {
         "RANDR"
       ]);
     }
-  }
-
-  get puppeteerArgs() {
-    // Puppeteer Options
-    return {
-      headless: this.params.headless,
-      executablePath: this.browserExe,
-      handleSIGINT: false,
-      handleSIGTERM: false,
-      handleSIGHUP: false,
-      ignoreHTTPSErrors: true,
-      args: chromeArgs(!process.env.NO_PROXY, this.userAgent, this.extraChromeArgs()),
-      userDataDir: this.profileDir,
-      defaultViewport: null,
-      waitForInitialPage: false
-    };
   }
 
   extraChromeArgs() {
@@ -334,21 +295,19 @@ export class Crawler {
     }
   }
 
-  _behaviorLog({data, type}, pageUrl) {
+  _behaviorLog({data, type}, pageUrl, workerid) {
     let behaviorLine;
     let message;
     let details;
 
+    const logDetails = {page: pageUrl, workerid};
+
     if (typeof(data) === "string") {
       message = data;
-      details = {};
+      details = logDetails;
     } else {
       message = type === "info" ? "Behavior log" : "Behavior debug";
-      details = typeof(data) === "object" ? data : {};
-    }
-
-    if (pageUrl) {
-      details.page = pageUrl;
+      details = typeof(data) === "object" ? {...data, ...logDetails} : logDetails;
     }
 
     switch (type) {
@@ -372,117 +331,129 @@ export class Crawler {
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
+  async setupPage({page, cdp, workerid}) {
+    await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+
+    if (this.params.logging.includes("jserrors")) {
+      page.on("console", (msg) => {
+        if (msg.type() === "error") {
+          this.logger.warn(msg.text(), {"location": msg.location(), "page": page.url(), workerid}, "jsError");
+        }
+      });
+
+      page.on("pageerror", (e) => {
+        this.logger.warn("Page Error", {...errJSON(e), "page": page.url(), workerid}, "jsError");
+      });
+    }
+
+    if (this.screencaster) {
+      this.logger.debug("Start Screencast", {workerid}, "screencast");
+      await this.screencaster.screencastPage(page, cdp, workerid);
+    }
+
+    if (this.params.behaviorOpts) {
+      await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
+      await page.addInitScript(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
+    }
+  }
+
+  async teardownPage({workerid}) {
+    if (this.screencaster) {
+      this.logger.debug("End Screencast", {workerid}, "screencast");
+      await this.screencaster.stopById(workerid);
+    }
+  }
+
   async crawlPage(opts) {
     await this.writeStats();
 
-    const {page, data} = opts;
+    const {page, cdp, data, workerid} = opts;
+
     const {url} = data;
 
-    const pageTarget = page.target();
-
-    const logDetails = {page: url, workerid: page._workerid};
+    const logDetails = {page: url, workerid};
+    data.workerid = workerid;
 
     if (!this.isInScope(data, logDetails)) {
       this.logger.info("Page no longer in scope", data);
       return true;
     }
 
-    try {
-      if (this.screencaster) {
-        await this.screencaster.screencastTarget(pageTarget, url);
+    // run custom driver here
+    await this.driver({page, data, crawler: this});
+
+    const title = await page.title();
+
+    if (this.params.screenshot) {
+      if (!data.isHTMLPage) {
+        this.logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
-
-      if (this.emulateDevice) {
-        await page.emulate(this.emulateDevice);
+      const archiveDir = path.join(this.collDir, "archive");
+      const screenshots = new Screenshots({page, url, directory: archiveDir});
+      if (this.params.screenshot.includes("view")) {
+        await screenshots.take();
       }
-
-      if (this.params.profile) {
-        await page._client().send("Network.setBypassServiceWorker", {bypass: true});
+      if (this.params.screenshot.includes("fullPage")) {
+        await screenshots.takeFullPage();
       }
-
-      await page.evaluateOnNewDocument("Object.defineProperty(navigator, \"webdriver\", {value: false});");
-
-      if (this.params.behaviorOpts && !page.__bx_inited) {
-        await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, url));
-        await page.evaluateOnNewDocument(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
-        page.__bx_inited = true;
+      if (this.params.screenshot.includes("thumbnail")) {
+        await screenshots.takeThumbnail();
       }
+    }
 
-      // run custom driver here
-      await this.driver({page, data, crawler: this});
+    let text = "";
+    if (this.params.text && data.isHTMLPage) {
+      const result = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
+      text = await new TextExtract(result).parseTextFromDom();
+    }
 
-      const title = await page.title();
+    await this.writePage(data, title, this.params.text ? text : null);
 
-      if (this.params.screenshot) {
-        if (!page.isHTMLPage) {
-          this.logger.debug("Skipping screenshots for non-HTML page", logDetails);
-        }
-        const archiveDir = path.join(this.collDir, "archive");
-        const screenshots = new Screenshots({page, url, directory: archiveDir});
-        if (this.params.screenshot.includes("view")) {
-          await screenshots.take();
-        }
-        if (this.params.screenshot.includes("fullPage")) {
-          await screenshots.takeFullPage();
-        }
-        if (this.params.screenshot.includes("thumbnail")) {
-          await screenshots.takeThumbnail();
-        }
-      }
+    if (this.params.behaviorOpts) {
+      if (!data.isHTMLPage) {
+        this.logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
+      } else {
+        const behaviorTimeout = this.params.behaviorTimeout / 1000;
 
-      let text = "";
-      if (this.params.text && page.isHTMLPage) {
-        this.logger.debug("Extracting text", logDetails, "general");
-        const client = await pageTarget.createCDPSession();
-        const result = await client.send("DOM.getDocument", {"depth": -1, "pierce": true});
-        text = await new TextExtract(result).parseTextFromDom();
-      }
+        const res = await timedRun(
+          this.runBehaviors(page, data.filteredFrames, logDetails),
+          behaviorTimeout,
+          "Behaviors timed out",
+          logDetails,
+          "behavior"
+        );
 
-      await this.writePage(data, title, this.params.text ? text : null);
-
-      if (this.params.behaviorOpts) {
-        if (!page.isHTMLPage) {
-          this.logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
-        } else {
-          const behaviorTimeout = this.params.behaviorTimeout / 1000;
-
-          const res = await timedRun(
-            this.runBehaviors(page, logDetails),
-            behaviorTimeout,
-            "Behaviors timed out",
-            logDetails,
-            "behavior"
-          );
-
-          if (res && res.length) {
-            this.logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
-          }
+        if (res && res.length) {
+          this.logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
         }
       }
+    }
 
-      this.logger.info("Page finished", logDetails, "pageStatus");
+    this.logger.info("Page finished", logDetails, "pageStatus");
 
-      await this.checkLimits();
+    await this.crawlState.markFinished(url);
 
-      await this.serializeConfig();
+    await this.checkLimits();
 
-    } catch (e) {
-      this.logger.error("Page Errored", {...errJSON(e), ...logDetails}, "pageStatus");
-      await this.markPageFailed(page, pageTarget);
-      return false;
+    await this.serializeConfig();
+
+    if (this.healthChecker) {
+      this.healthChecker.resetErrors();
     }
 
     return true;
   }
 
-  async runBehaviors(page, logDetails) {
+  async runBehaviors(page, frames, logDetails) {
     try {
-      const frames = page.__filteredFrames;
+      frames = frames || page.frames();
+
+      const context = page.context();
 
       this.logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
       return await Promise.allSettled(
-        frames.map(frame => evaluateWithCLI(frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => this.browser.evaluateWithCLI(context, frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
     } catch (e) {
@@ -565,9 +536,8 @@ export class Crawler {
   }
 
   gracefulFinish() {
-    this.crawlState.setDrain(true);
     this.interrupted = true;
-    this.workerPool.interrupt();
+    this.logger.info("Crawler interrupted, gracefully finishing current pages");
     if (!this.params.waitOnDone) {
       this.finalExit = true;
     }
@@ -590,7 +560,7 @@ export class Crawler {
   }
 
   async crawl() {
-    this.profileDir = await loadProfile(this.params.profile);
+    this.profileDir = await this.browser.loadProfile(this.params.profile);
 
     if (this.params.healthCheckPort) {
       this.healthChecker = new HealthChecker(this.params.healthCheckPort, this.params.workers);
@@ -668,20 +638,24 @@ export class Crawler {
       }
     }
 
-    this.workerPool = new WorkerPool({
-      maxConcurrency: this.params.workers,
-      puppeteerOptions: this.puppeteerArgs,
-      crawlState: this.crawlState,
-      healthChecker: this.healthChecker,
-      totalTimeout: (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60,
-      task: (opts) => this.crawlPage(opts)
+    await this.browser.launch({
+      dataDir: this.profileDir,
+      headless: this.params.headless,
+      emulateDevice: this.emulateDevice,
+      chromeOptions: {
+        proxy: !process.env.NO_PROXY,
+        userAgent: this.emulateDevice.userAgent,
+        extraArgs: this.extraChromeArgs()
+      }
     });
 
-    await this.workerPool.work();
+    const totalPageTimeout = (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60;
 
-    await this.workerPool.close();
+    await runWorkers(this, this.params.workers, totalPageTimeout);
 
     await this.serializeConfig(true);
+
+    await this.browser.close();
 
     if (this.pagesFH) {
       await this.pagesFH.sync();
@@ -835,7 +809,7 @@ export class Crawler {
       return;
     }
 
-    const realSize = await this.crawlState.realSize();
+    const realSize = await this.crawlState.queueSize();
     const pendingList = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
     const total = realSize + pendingList.length + done;
@@ -859,21 +833,19 @@ export class Crawler {
     }
   }
 
-  async loadPage(page, urlData, selectorOptsList = DEFAULT_SELECTORS) {
-    const {url, seedId, depth, extraHops = 0} = urlData;
+  async loadPage(page, data, selectorOptsList = DEFAULT_SELECTORS) {
+    const {url, seedId, depth, workerid, extraHops = 0} = data;
 
-    const logDetails = {page: url, workerid: page._workerid};
+    const logDetails = {page: url, workerid};
 
-    let isHTMLPage = true;
-
-    const isHTMLResult = await timedRun(
+    let isHTMLPage = await timedRun(
       this.isHTML(url),
       FETCH_TIMEOUT_SECS,
       "HEAD request to determine if URL is HTML page timed out",
       logDetails
     );
-    if (isHTMLResult && (isHTMLResult.value == false)) {
-      isHTMLPage = false;
+
+    if (!isHTMLPage) {
       try {
         const captureResult = await timedRun(
           this.directFetchCapture(url),
@@ -881,7 +853,8 @@ export class Crawler {
           "Direct fetch capture attempt timed out",
           logDetails
         );
-        if (captureResult.value) {
+        if (captureResult) {
+          this.logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
           return;
         }
       } catch (e) {
@@ -905,43 +878,37 @@ export class Crawler {
       ignoreAbort = shouldIgnoreAbort(req);
     });
 
-    // more serious page error, mark page session as invalid
-    page.on("error", () => this.markPageFailed(page));
-
-    page.on("console", (msg) => {
-      if (this.params.logging.includes("jserrors") && (msg.type() === "error")) {
-        this.logger.warn(msg.text(), {"location": msg.location()}, "jsError");
-      }
-    });
-
-    const gotoOpts = isHTMLPage ? this.gotoOpts : "domcontentloaded";
+    const gotoOpts = isHTMLPage ? this.gotoOpts : {waitUntil: "domcontentloaded"};
 
     this.logger.info("Awaiting page load", logDetails);
 
     try {
       const resp = await page.goto(url, gotoOpts);
 
-      isHTMLPage = this.isHTMLContentType(resp.headers["content-type"]);
+      const contentType = await resp.headerValue("content-type");
 
-      if (this.healthChecker) {
-        this.healthChecker.resetErrors();
-      }
+      isHTMLPage = this.isHTMLContentType(contentType);
+
+      //if (this.healthChecker) {
+      //  this.healthChecker.resetErrors();
+      //}
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         const mainMessage = e.name === "TimeoutError" ? "Page Load Timeout" : "Page Load Error";
         this.logger.error(mainMessage, {msg, ...logDetails});
-        if (this.healthChecker) {
-          this.healthChecker.incError();
-        }
+        //if (this.healthChecker) {
+        //  this.healthChecker.incError();
+        //}
       }
     }
 
-    page.isHTMLPage = isHTMLPage;
+    data.isHTMLPage = isHTMLPage;
+
     if (isHTMLPage) {
-      page.__filteredFrames = page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
+      data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
-      page.__filteredFrames = null;
+      data.filteredFrames = [];
     }
 
     if (!isHTMLPage) {
@@ -963,19 +930,16 @@ export class Crawler {
     this.logger.debug("Extracting links");
 
     for (const opts of selectorOptsList) {
-      const links = await this.extractLinks(page, opts, logDetails);
+      const links = await this.extractLinks(page, data.filteredFrames, opts, logDetails);
       await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
     }
   }
 
-  async markPageFailed(page, pageTarget=null) {
-    page.__failed = true;
+  async markPageFailed(url) {
     if (this.healthChecker) {
       this.healthChecker.incError();
     }
-    if (this.screencaster && pageTarget) {
-      await this.screencaster.endTarget(pageTarget);
-    }
+    await this.crawlState.markFailed(url);
   }
 
   async netIdle(page, details) {
@@ -987,32 +951,34 @@ export class Crawler {
     await sleep(0.5);
 
     try {
-      await page.waitForNetworkIdle({timeout: this.params.netIdleWait * 1000});
+      await page.waitForLoadState("networkidle", {timeout: this.params.netIdleWait * 1000});
     } catch (e) {
       this.logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
     }
   }
 
-  async extractLinks(page, {selector = "a[href]", extract = "href", isAttribute = false} = {}, logDetails) {
+  async extractLinks(page, frames, {selector = "a[href]", extract = "href", isAttribute = false} = {}, logDetails) {
     const results = [];
 
-    const loadProp = (selector, extract) => {
+    const loadProp = (options) => {
+      const { selector, extract } = options;
       return [...document.querySelectorAll(selector)].map(elem => elem[extract]);
     };
 
-    const loadAttr = (selector, extract) => {
+    const loadAttr = (options) => {
+      const { selector, extract } = options;
       return [...document.querySelectorAll(selector)].map(elem => elem.getAttribute(extract));
     };
 
     const loadFunc = isAttribute ? loadAttr : loadProp;
 
-    try {
-      const frames = page.__filteredFrames;
+    frames = frames || page.frames();
 
+    try {
       const linkResults = await Promise.allSettled(
         frames.map(frame => timedRun(
-          frame.evaluate(loadFunc, selector, extract),
+          frame.evaluate(loadFunc, {selector: selector, extract: extract}),
           PAGE_OP_TIMEOUT_SECS,
           "Link extraction timed out",
           logDetails,
@@ -1069,10 +1035,9 @@ export class Crawler {
     try {
       this.logger.debug("Check CF Blocking", logDetails);
 
-      while (await timedRun(
-        page.$("div.cf-browser-verification.cf-im-under-attack"),
-        PAGE_OP_TIMEOUT_SECS
-      )) {
+      const cloudflare = page.locator("div.cf-browser-verification.cf-im-under-attack");
+
+      while (await cloudflare.waitFor({timeout: PAGE_OP_TIMEOUT_SECS})) {
         this.logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
         await sleep(5.5);
       }
@@ -1087,7 +1052,7 @@ export class Crawler {
       return false;
     }
 
-    if (this.params.limit > 0 && (await this.crawlState.numRealSeen() >= this.params.limit)) {
+    if (this.params.limit > 0 && (await this.crawlState.numSeen() >= this.params.limit)) {
       this.limitHit = true;
       return false;
     }
@@ -1096,12 +1061,8 @@ export class Crawler {
       return false;
     }
 
-    await this.crawlState.add(url);
-    const urlData = {url, seedId, depth};
-    if (extraHops) {
-      urlData.extraHops = extraHops;
-    }
-    await this.crawlState.push(urlData);
+    //await this.crawlState.add(url);
+    await this.crawlState.addToQueue({url, seedId, depth, extraHops});
     return true;
   }
 
@@ -1195,7 +1156,6 @@ export class Crawler {
   }
 
   async directFetchCapture(url) {
-    //console.log(`Direct capture: ${this.capturePrefix}${url}`);
     const abort = new AbortController();
     const signal = abort.signal;
     const resp = await fetch(this.capturePrefix + url, {signal, headers: this.headers, redirect: "manual"});
@@ -1214,7 +1174,7 @@ export class Crawler {
         if (count <= 0) {
           break;
         }
-        this.logger.debug(`Still waiting for ${count} pending requests to finish...`);
+        this.logger.debug("Waiting for pending requests to finish", {numRequests: count});
       } catch (e) {
         break;
       }

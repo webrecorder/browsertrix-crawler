@@ -1,187 +1,225 @@
-import child_process from "child_process";
+import * as child_process from "child_process";
 import fs from "fs";
-import path from "path";
+import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
+
 import os from "os";
-import request from "request";
-import { initStorage } from "./storage.js";
+import path from "path";
+
 import { Logger } from "./logger.js";
+import { initStorage } from "./storage.js";
+
+import { chromium } from "playwright-core";
 
 const logger = new Logger();
 
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 
-export async function loadProfile(profileFilename) {
-  const targetFilename = "/tmp/profile.tar.gz";
 
-  if (profileFilename &&
-      (profileFilename.startsWith("http:") || profileFilename.startsWith("https:"))) {
+// ==================================================================
+export class Browser
+{
+  constructor() {
+    this.context = null;
 
-    logger.info(`Downloading ${profileFilename} to ${targetFilename}`, {}, "browserProfile");
-
-    const p = new Promise((resolve, reject) => {
-      request.get(profileFilename).
-        on("error", (err) => reject(err)).
-        pipe(fs.createWriteStream(targetFilename)).
-        on("finish", () => resolve());
-    });
-
-    await p;
-      
-    profileFilename = targetFilename;
-  } else if (profileFilename && profileFilename.startsWith("@")) {
-    const storage = initStorage("");
-
-    if (!storage) {
-      logger.fatal("Profile specified relative to s3 storage, but no S3 storage defined");
-    }
-
-    await storage.downloadFile(profileFilename.slice(1), targetFilename);
-
-    profileFilename = targetFilename;
+    this.firstPage = null;
+    this.firstCDP = null;
   }
 
-  if (profileFilename) {
+  async launch({dataDir, chromeOptions, signals = false, headless = false, emulateDevice = {viewport: null}} = {}) {
+    if (this.context) {
+      logger.warn("Context already inited", {}, "context");
+      return this.context;
+    }
+
+    const args = this.chromeArgs(chromeOptions);
+    const userDataDir = dataDir || profileDir;
+
+    const launchOpts = {
+      ...emulateDevice,
+      args,
+      headless,
+      executablePath: this.getBrowserExe(),
+      ignoreDefaultArgs: ["--enable-automation"],
+      ignoreHTTPSErrors: true,
+      handleSIGHUP: signals,
+      handleSIGINT: signals,
+      handleSIGTERM: signals,
+      serviceWorkers: dataDir ? "block" : "allow",
+    };
+
+    this.context = await chromium.launchPersistentContext(userDataDir, launchOpts);
+
+    if (this.context.pages()) {
+      this.firstPage = this.context.pages()[0];
+    } else {
+      this.firstPage = await this.context.newPage();
+    }
+    this.firstCDP = await this.context.newCDPSession(this.firstPage);
+
+    return this.context;
+  }
+
+  async close() {
+    if (this.context) {
+      await this.context.close();
+      this.context = null;
+    }
+  }
+
+  async getFirstPageWithCDP() {
+    return {page: this.firstPage, cdp: this.firstCDP};
+  }
+
+  async newWindowPageWithCDP() {
+    // unique url to detect new pages
+    const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
+
+    const p = new Promise((resolve) => {
+      const listener = (page) => {
+        if (page.url() === startPage) {
+          resolve(page);
+          this.context.removeListener("page", listener);
+        }
+      };
+
+      this.context.on("page", listener);
+    });
+
+    await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+
+    const page = await p;
+
+    const cdp = await this.context.newCDPSession(page);
+
+    return {page, cdp};
+  }
+
+  async loadProfile(profileFilename) {
+    const targetFilename = "/tmp/profile.tar.gz";
+
+    if (profileFilename &&
+        (profileFilename.startsWith("http:") || profileFilename.startsWith("https:"))) {
+
+      logger.info(`Downloading ${profileFilename} to ${targetFilename}`, {}, "browserProfile");
+
+      const resp = await fetch(profileFilename);
+      await pipeline(
+        Readable.fromWeb(resp.body),
+        fs.createWriteStream(targetFilename)
+      );
+
+      profileFilename = targetFilename;
+    } else if (profileFilename && profileFilename.startsWith("@")) {
+      const storage = initStorage("");
+
+      if (!storage) {
+        logger.fatal("Profile specified relative to s3 storage, but no S3 storage defined");
+      }
+
+      await storage.downloadFile(profileFilename.slice(1), targetFilename);
+
+      profileFilename = targetFilename;
+    }
+
+    if (profileFilename) {
+      try {
+        child_process.execSync("tar xvfz " + profileFilename, {cwd: profileDir});
+      } catch (e) {
+        logger.error(`Profile filename ${profileFilename} not a valid tar.gz`);
+      }
+    }
+
+    return profileDir;
+  }
+
+  saveProfile(profileFilename) {
+    child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {cwd: profileDir});
+  }
+
+  chromeArgs({proxy=true, userAgent=null, extraArgs=[]} = {}) {
+    // Chrome Flags, including proxy server
+    const args = [
+      ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
+      //"--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
+      "--no-sandbox",
+      "--disable-background-media-suspend",
+      "--remote-debugging-port=9221",
+      "--autoplay-policy=no-user-gesture-required",
+      "--disable-site-isolation-trials",
+      `--user-agent=${userAgent || this.getDefaultUA()}`,
+      ...extraArgs,
+    ];
+
+    if (proxy) {
+      args.push("--ignore-certificate-errors");
+      args.push(`--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`);
+    }
+
+    return args;
+  }
+
+  getDefaultUA() {
+    let version = process.env.BROWSER_VERSION;
+
     try {
-      child_process.execSync("tar xvfz " + profileFilename, {cwd: profileDir});
+      version = child_process.execFileSync(this.getBrowserExe(), ["--version"], {encoding: "utf8"});
+      version = version.match(/[\d.]+/)[0];
+    } catch(e) {
+      console.error(e);
+    }
+
+    return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
+  }
+
+  getBrowserExe() {
+    const files = [process.env.BROWSER_BIN, "/usr/bin/google-chrome", "/usr/bin/chromium-browser"];
+    for (const file of files) {
+      if (file && fs.existsSync(file)) {
+        return file;
+      }
+    }
+
+    return null;
+  }
+
+  async evaluateWithCLI(context, frame, funcString, logData, contextName) {
+    let details = {frameUrl: frame.url(), ...logData};
+
+    logger.info("Run Script Started", details, contextName);
+
+    const cdp = await context.newCDPSession(frame);
+
+    // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
+    //const contextId = context._contextId;
+    const expression = funcString + "\n//# sourceURL=__playwright_evaluation_script__";
+
+    const { exceptionDetails, result } = await cdp
+      .send("Runtime.evaluate", {
+        expression,
+        //contextId,
+        returnByValue: true,
+        awaitPromise: true,
+        userGesture: true,
+        includeCommandLineAPI: true,
+      });
+
+    if (exceptionDetails) {
+      if (exceptionDetails.stackTrace) {
+        details = {...exceptionDetails.stackTrace, text: exceptionDetails.text, ...details};
+      }
+      logger.error("Run Script Failed", details, contextName);
+    } else {
+      logger.info("Run Script Finished", details, contextName);
+    }
+
+    try {
+      await cdp.detach();
     } catch (e) {
-      logger.error(`Profile filename ${profileFilename} not a valid tar.gz`);
+      logger.warn("Detach failed", details, contextName);
     }
+
+    return result.value;
   }
-
-  return profileDir;
 }
-
-export function saveProfile(profileFilename) {
-  child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {cwd: profileDir});
-}
-
-export function getBrowserExe() {
-  const files = [process.env.BROWSER_BIN, "/usr/bin/google-chrome", "/usr/bin/chromium-browser"];
-  for (const file of files) {
-    if (file && fs.existsSync(file)) {
-      return file;
-    }
-  }
-
-  return null;
-}
-
-
-
-export function getDefaultUA() {
-  let version = process.env.BROWSER_VERSION;
-
-  try {
-    version = child_process.execFileSync(getBrowserExe(), ["--version"], {encoding: "utf8"});
-    version = version.match(/[\d.]+/)[0];
-  } catch(e) {
-    logger.error("Error getting default UserAgent", e);
-  }
-
-  return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
-}
-
-
-
-
-// from https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/chromium/chromium.ts#L327
-const DEFAULT_PLAYWRIGHT_FLAGS = [
-  "--disable-field-trial-config", // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
-  "--disable-background-networking",
-  "--enable-features=NetworkService,NetworkServiceInProcess",
-  "--disable-background-timer-throttling",
-  "--disable-backgrounding-occluded-windows",
-  "--disable-back-forward-cache", // Avoids surprises like main request not being intercepted during page.goBack().
-  "--disable-breakpad",
-  "--disable-client-side-phishing-detection",
-  "--disable-component-extensions-with-background-pages",
-  "--disable-default-apps",
-  "--disable-dev-shm-usage",
-  "--disable-extensions",
-  // AvoidUnnecessaryBeforeUnloadCheckSync - https://github.com/microsoft/playwright/issues/14047
-  // Translate - https://github.com/microsoft/playwright/issues/16126
-  "--disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate",
-  "--allow-pre-commit-input",
-  "--disable-hang-monitor",
-  "--disable-ipc-flooding-protection",
-  "--disable-popup-blocking",
-  "--disable-prompt-on-repost",
-  "--disable-renderer-backgrounding",
-  "--disable-sync",
-  "--force-color-profile=srgb",
-  "--metrics-recording-only",
-  "--no-first-run",
-  "--no-startup-window",
-  "--password-store=basic",
-  "--use-mock-keychain",
-  // See https://chromium-review.googlesource.com/c/chromium/src/+/2436773
-  "--no-service-autorun",
-  "--export-tagged-pdf"
-];
-
-
-export function chromeArgs (proxy, userAgent=null, extraArgs=[]) {
-  // Chrome Flags, including proxy server
-  const args = [
-    ...DEFAULT_PLAYWRIGHT_FLAGS,
-    ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
-    //"--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
-    "--no-sandbox",
-    "--disable-background-media-suspend",
-    "--remote-debugging-port=9221",
-    "--autoplay-policy=no-user-gesture-required",
-    "--disable-site-isolation-trials",
-    `--user-agent=${userAgent || getDefaultUA()}`,
-    ...extraArgs,
-  ];
-
-  if (proxy) {
-    args.push(`--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`);
-  }
-
-  return args;
-}
-
-
-export async function evaluateWithCLI(frame, funcString, logData, contextName) {
-  const context = await frame.executionContext();
-
-  let details = {frameUrl: frame.url(), ...logData};
-
-  logger.info("Run Script Started", details, contextName);
-
-  // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
-  const contextId = context._contextId;
-  const expression = funcString + "\n//# sourceURL=__puppeteer_evaluation_script__";
-
-  const { exceptionDetails, result } = await context._client
-    .send("Runtime.evaluate", {
-      expression,
-      contextId,
-      returnByValue: true,
-      awaitPromise: true,
-      userGesture: true,
-      includeCommandLineAPI: true,
-    });
-
-  if (exceptionDetails) {
-    if (exceptionDetails.stackTrace) {
-      details = {...exceptionDetails.stackTrace, text: exceptionDetails.text, ...details};
-    }
-    logger.error("Run Script Failed", details, contextName);
-  } else {
-    logger.info("Run Script Finished", details, contextName);
-  }
-
-  return result.value;
-}
-
-
-export async function sleep(time) {
-  return new Promise(resolve => setTimeout(resolve, time));
-}
-
-
-
-
 

@@ -7,10 +7,10 @@ import http from "http";
 import readline from "readline";
 import child_process from "child_process";
 
-import puppeteer from "puppeteer-core";
 import yargs from "yargs";
 
-import { getBrowserExe, loadProfile, saveProfile, chromeArgs, sleep } from "./util/browser.js";
+import { sleep } from "./util/timing.js";
+import { Browser } from "./util/browser.js";
 import { initStorage } from "./util/storage.js";
 
 const profileHTML = fs.readFileSync(new URL("html/createProfile.html", import.meta.url), {encoding: "utf8"});
@@ -151,23 +151,24 @@ async function main() {
     useProxy = true;
   }
 
-  const browserArgs = chromeArgs(useProxy, null, [
-    "--window-position=0,0",
-    `--window-size=${params.windowSize}`,
-  ]);
+  const browser = new Browser();
 
-  //await new Promise(resolve => setTimeout(resolve, 2000));
-  const profileDir = await loadProfile(params.profile);
+  const profileDir = await browser.loadProfile(params.profile);
 
-  const args = {
-    headless: !!params.headless,
-    executablePath: getBrowserExe(),
-    ignoreHTTPSErrors: true,
-    args: browserArgs,
-    userDataDir: profileDir,
-    defaultViewport: null,
-    waitForInitialPage: false
-  };
+  await browser.launch({
+    dataDir: profileDir,
+    headless: params.headless,
+    signals: true,
+    chromeOptions: {
+      proxy: useProxy,
+      extraArgs: [
+        "--window-position=0,0",
+        `--window-size=${params.windowSize}`,
+        // to disable the 'stability will suffer' infobar
+        "--test-type"
+      ]
+    }
+  });
 
   if (params.interactive) {
     console.log("Note: the '--interactive' flag is now deprecated and is the default profile creation option. Use the --automated flag to specify non-interactive mode");
@@ -185,18 +186,17 @@ async function main() {
     params.password = await promptInput("Enter password: ", true);
   }
 
-  const browser = await puppeteer.launch(args);
+  const { page, cdp } = await browser.getFirstPageWithCDP();
 
-  const page = await browser.newPage();
+  const waitUntil =  "load";
 
-  const waitUntil =  ["load", "networkidle2"];
-
-  await page.setCacheEnabled(false);
+  //await page.setCacheEnabled(false);
+  await cdp.send("Network.setCacheDisabled", {cacheDisabled: true});
 
   if (!params.automated) {
-    await page.evaluateOnNewDocument("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+    await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
     // for testing, inject browsertrix-behaviors
-    await page.evaluateOnNewDocument(behaviors + ";\nself.__bx_behaviors.init();");
+    await page.addInitScript(behaviors + ";\nself.__bx_behaviors.init();");
   }
 
   console.log(`Loading page: ${params.url}`);
@@ -204,20 +204,23 @@ async function main() {
   await page.goto(params.url, {waitUntil});
 
   if (!params.automated) {
-    new InteractiveBrowser(params, browser, page);
+    const target = await cdp.send("Target.getTargetInfo");
+    const targetId = target.targetInfo.targetId;
+
+    new InteractiveBrowser(params, browser, page, cdp, targetId);
   } else {
-    await automatedProfile(params, browser, page, waitUntil);
+    await automatedProfile(params, browser, page, cdp, waitUntil);
   }
 }
 
-async function automatedProfile(params, browser, page, waitUntil) {
+async function automatedProfile(params, browser, page, cdp, waitUntil) {
   let u, p;
 
   console.log("Looking for username and password entry fields on page...");
 
   try {
-    u = await page.waitForXPath("//input[contains(@name, 'user') or contains(@name, 'email')]");
-    p = await page.waitForXPath("//input[contains(@name, 'pass') and @type='password']");
+    u = await page.waitForSelector("//input[contains(@name, 'user') or contains(@name, 'email')]");
+    p = await page.waitForSelector("//input[contains(@name, 'pass') and @type='password']");
 
   } catch (e) {
     if (params.debugScreenshot) {
@@ -242,13 +245,13 @@ async function automatedProfile(params, browser, page, waitUntil) {
     await page.screenshot({path: params.debugScreenshot});
   }
 
-  await createProfile(params, browser, page);
+  await createProfile(params, browser, page, cdp);
 
   process.exit(0);
 }
 
-async function createProfile(params, browser, page, targetFilename = "") {
-  await page._client().send("Network.clearBrowserCache");
+async function createProfile(params, browser, page, cdp, targetFilename = "") {
+  await cdp.send("Network.clearBrowserCache");
 
   await browser.close();
 
@@ -261,7 +264,7 @@ async function createProfile(params, browser, page, targetFilename = "") {
     fs.mkdirSync(outputDir, {recursive: true});
   }
 
-  saveProfile(profileFilename);
+  browser.saveProfile(profileFilename);
 
   let resource = {};
 
@@ -307,16 +310,17 @@ function promptInput(msg, hidden = false) {
 
 
 class InteractiveBrowser {
-  constructor(params, browser, page) {
+  constructor(params, browser, page, cdp, targetId) {
     console.log("Creating Profile Interactively...");
     child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
 
     this.params = params;
     this.browser = browser;
     this.page = page;
+    this.cdp = cdp;
 
-    const target = page.target();
-    this.targetId = target._targetId;
+    //const target = page.target();
+    this.targetId = targetId;
 
     this.originSet = new Set();
 
@@ -325,10 +329,10 @@ class InteractiveBrowser {
     page.on("load", () => this.handlePageLoad());
 
     page.on("popup", async () => {
-      await this.page._client().send("Target.activateTarget", {targetId: this.targetId});
+      await cdp.send("Target.activateTarget", {targetId: this.targetId});
     });
 
-    page._client().on("Page.windowOpen", async (resp) => {
+    cdp.on("Page.windowOpen", async (resp) => {
       if (resp.url) {
         await page.goto(resp.url);
       }
@@ -374,17 +378,19 @@ class InteractiveBrowser {
         return;
       }
 
-      const cookies = await this.page.cookies(url);
+      const cookies = await this.browser.context.cookies(url);
       for (const cookie of cookies) {
-        cookie.url = url;
         cookie.expires = (new Date().getTime() / 1000) + this.params.cookieDays * 86400;
         delete cookie.size;
         delete cookie.session;
         if (cookie.sameSite && cookie.sameSite !== "Lax" && cookie.sameSite !== "Strict") {
           delete cookie.sameSite;
         }
+        if (!cookie.domain && !cookie.path) {
+          cookie.url = url;
+        }
       }
-      await this.page.setCookie(...cookies);
+      await this.browser.context.addCookies(cookies);
     } catch (e) {
       console.log("Save Cookie Error: " + e);
     }
@@ -477,7 +483,7 @@ class InteractiveBrowser {
 
         await this.saveAllCookies();
 
-        const resource = await createProfile(this.params, this.browser, this.page, targetFilename);
+        const resource = await createProfile(this.params, this.browser, this.page, this.cdp, targetFilename);
         origins = Array.from(this.originSet.values());
 
         res.writeHead(200, {"Content-Type": "application/json"});
@@ -499,7 +505,7 @@ class InteractiveBrowser {
       try {
         await this.saveAllCookies();
 
-        await createProfile(this.params, this.browser, this.page);
+        await createProfile(this.params, this.browser, this.page, this.cdp);
 
         res.writeHead(200, {"Content-Type": "text/html"});
         res.end("<html><body>Profile Created! You may now close this window.</body></html>");

@@ -1,197 +1,13 @@
-import { Job } from "./job.js";
 import { Logger } from "./logger.js";
+
+import { MAX_DEPTH } from "./seeds.js";
 
 const logger = new Logger();
 
-
 // ============================================================================
-export class BaseState
-{
-  constructor() {
-    this.drainMax = 0;
-    this.localOnly = false;
-  }
-
-  async setDrain(localOnly = false) {
-    this.drainMax = (await this.numRealPending()) + (await this.numDone());
-    this.localOnly = localOnly;
-  }
-
-  async size() {
-    return this.drainMax ? 0 : await this.realSize();
-  }
-
-  async isFinished() {
-    return (await this.realSize() == 0) && (await this.numDone() > 0);
-  }
-
-  async numSeen() {
-    return this.drainMax ? this.drainMax : await this.numRealSeen();
-  }
-
-  recheckScope(data, seeds) {
-    const seed = seeds[data.seedId];
-
-    return seed.isIncluded(data.url, data.depth, data.extraHops);
-  }
-
-  numPending(localPending = 0) {
-    if (this.localOnly) {
-      return localPending;
-    }
-
-    return this.numRealPending();
-  }
-}
-
-
-// ============================================================================
-export class MemoryCrawlState extends BaseState
-{
-  constructor() {
-    super();
-    this.seenList = new Set();
-    this.queue = [];
-    this.pending = new Map();
-    this.done = [];
-    this.status = null;
-  }
-
-  setStatus(status) {
-    this.status = status;
-  }
-
-  getStatus() {
-    return this.status;
-  }
-
-  incFailCount() {
-    // memory-only state, no retries
-    return true;
-  }
-
-  push(urlData) {
-    this.pending.delete(urlData.url);
-    this.queue.unshift(urlData);
-  }
-
-  realSize() {
-    return this.queue.length;
-  }
-
-  shift() {
-    const data = this.queue.pop();
-
-    if (!data) {
-      return;
-    }
-
-    const url = data.url;
-
-    const state = this;
-
-    state.pending.set(url, data);
-
-    const callbacks = {
-      start() {
-        data.started = new Date().toISOString();
-
-        state.pending.set(url, data);
-      },
-
-      resolve() {
-        state.pending.delete(url);
-
-        data.finished = new Date().toISOString();
-
-        state.done.unshift(data);
-      },
-
-      reject(e) {
-        logger.warn(`Page Load Failed: ${url}`, e.message);
-
-        state.pending.delete(url);
-
-        data.failed = true;
-
-        state.done.unshift(data);
-      }
-    };
-
-    return new Job(data, callbacks);
-  }
-
-  has(url) {
-    return this.seenList.has(url);
-  }
-
-  add(url) {
-    return this.seenList.add(url);
-  }
-
-  async serialize() {
-    const queued = this.queue.map(x => JSON.stringify(x));
-    const done = this.done.map(x => JSON.stringify(x));
-    const pending = (await this.getPendingList()).map(x => JSON.stringify(x));
-
-    return {queued, pending, done};
-  }
-
-  async load(state, seeds, checkScope=false) {
-    for (const json of state.queued) {
-      const data = JSON.parse(json);
-      if (checkScope && !this.recheckScope(data, seeds)) {
-        continue;
-      }
-      this.queue.push(data);
-      this.seenList.add(data.url);
-    }
-
-    for (const json of state.pending) {
-      const data = JSON.parse(json);
-      if (checkScope && !this.recheckScope(data, seeds)) {
-        continue;
-      }
-      this.queue.push(data);
-      this.seenList.add(data.url);
-    }
-
-    for (const json of state.done) {
-      const data = JSON.parse(json);
-      if (data.failed) {
-        this.queue.push(data);
-      } else {
-        this.done.push(data);
-      }
-      this.seenList.add(data.url);
-    }
-
-    return this.seenList.size;
-  }
-
-  async numDone() {
-    return this.done.length;
-  }
-
-  async numRealSeen() {
-    return this.seenList.size;
-  }
-
-  async numRealPending() {
-    return this.pending.size;
-  }
-
-  async getPendingList() {
-    return Array.from(this.pending.values());
-  }
-}
-
-
-// ============================================================================
-export class RedisCrawlState extends BaseState
+export class RedisCrawlState
 {
   constructor(redis, key, pageTimeout, uid) {
-    super();
     this.redis = redis;
 
     this.maxRetryPending = 1;
@@ -207,10 +23,15 @@ export class RedisCrawlState extends BaseState
     this.skey = this.key + ":s";
     this.dkey = this.key + ":d";
 
+    this._initLuaCommands(this.redis);
+  }
+
+  _initLuaCommands(redis) {
     redis.defineCommand("addqueue", {
-      numberOfKeys: 2,
+      numberOfKeys: 3,
       lua: `
-redis.call('lpush', KEYS[2], ARGV[2]);
+redis.call('sadd', KEYS[3], ARGV[1]);
+redis.call('zadd', KEYS[2], ARGV[2], ARGV[3]);
 redis.call('hdel', KEYS[1], ARGV[1]);
 `
     });
@@ -218,7 +39,8 @@ redis.call('hdel', KEYS[1], ARGV[1]);
     redis.defineCommand("getnext", {
       numberOfKeys: 2,
       lua: `
-local json = redis.call('rpop', KEYS[1]);
+local res = redis.call('zpopmin', KEYS[1]);
+local json = res[1]
 
 if json then
   local data = cjson.decode(json);
@@ -274,7 +96,7 @@ if not res then
     redis.call('hdel', KEYS[1], ARGV[1]);
     if tonumber(data['retry']) <= tonumber(ARGV[2]) then
       json = cjson.encode(data);
-      redis.call('lpush', KEYS[2], json);
+      redis.call('zadd', KEYS[2], 0, json);
       return 1;
     else
       return 2;
@@ -291,20 +113,34 @@ return 0;
     return await this.redis.getnext(this.qkey, this.pkey);
   }
 
-  async _markStarted(url) {
-    const started = new Date().toISOString();
+  _timestamp() {
+    return new Date().toISOString();
+  }
+
+  async markStarted(url) {
+    const started = this._timestamp();
 
     return await this.redis.markstarted(this.pkey, this.pkey + ":" + url, url, started, this.pageTimeout);
   }
 
-  async _finish(url) {
-    const finished = new Date().toISOString();
+  async markFinished(url) {
+    const finished = this._timestamp();
 
     return await this.redis.movedone(this.pkey, this.dkey, url, finished, "finished");
   }
 
-  async _fail(url) {
+  async markFailed(url) {
     return await this.redis.movedone(this.pkey, this.dkey, url, "1", "failed");
+  }
+
+  recheckScope(data, seeds) {
+    const seed = seeds[data.seedId];
+
+    return seed.isIncluded(data.url, data.depth, data.extraHops);
+  }
+
+  async isFinished() {
+    return (await this.queueSize() == 0) && (await this.numDone() > 0);
   }
 
   async setStatus(status_) {
@@ -324,11 +160,17 @@ return 0;
     return (res >= 3);
   }
 
-  async push(urlData) {
-    await this.redis.addqueue(this.pkey, this.qkey, urlData.url, JSON.stringify(urlData));
+  async addToQueue({url, seedId, depth = 0, extraHops = 0} = {}) {
+    const added = this._timestamp();
+    const data = {added, url, seedId, depth};
+    if (extraHops) {
+      data.extraHops = extraHops;
+    }
+
+    await this.redis.addqueue(this.pkey, this.qkey, this.skey, url, this._getScore(data), JSON.stringify(data));
   }
 
-  async shift() {
+  async nextFromQueue() {
     const json = await this._getNext();
     let data;
 
@@ -336,49 +178,46 @@ return 0;
       data = JSON.parse(json);
     } catch(e) {
       logger.error("Invalid queued json", json);
-      return undefined;
+      return null;
     }
 
     if (!data) {
-      return undefined;
+      return null;
     }
 
-    const url = data.url;
+    await this.markStarted(data.url);
 
-    const state = this;
-
-    const callbacks = {
-      async start() {
-        await state._markStarted(url);
-      },
-
-      async resolve() {
-        await state._finish(url);
-      },
-
-      async reject(e) {
-        logger.warn(`Page Load Failed: ${url}`, e.message);
-        await state._fail(url);
-      }
-    };
-
-    return new Job(data, callbacks);
+    return data;
   }
 
   async has(url) {
     return !!await this.redis.sismember(this.skey, url);
   }
 
-  async add(url) {
-    return await this.redis.sadd(this.skey, url);
-  }
-
   async serialize() {
-    const queued = await this._iterListKeys(this.qkey);
+    //const queued = await this._iterSortKey(this.qkey);
+    const queued = await this._iterSortedKey(this.qkey);
     const done = await this._iterListKeys(this.dkey);
     const pending = await this.getPendingList();
 
     return {queued, pending, done};
+  }
+
+  _getScore(data) {
+    return (data.depth || 0) + (data.extraHops || 0) * MAX_DEPTH;
+  }
+
+  async _iterSortedKey(key, inc = 100) {
+    const results = [];
+
+    const len = await this.redis.zcard(key);
+
+    for (let i = 0; i < len; i += inc) {
+      const someResults = await this.redis.zrangebyscore(key, 0, "inf", "limit", i, inc);
+      results.push(...someResults);
+    }
+
+    return results;
   }
 
   async _iterListKeys(key, inc = 100) {
@@ -410,7 +249,7 @@ return 0;
         }
       }
  
-      await this.redis.rpush(this.qkey, json);
+      await this.redis.zadd(this.qkey, this._getScore(data), json);
       seen.push(data.url);
     }
 
@@ -422,14 +261,14 @@ return 0;
         }
       }
 
-      await this.redis.rpush(this.qkey, json);
+      await this.redis.zadd(this.qkey, this._getScore(data), json);
       seen.push(data.url);
     }
 
     for (const json of state.done) {
       const data = JSON.parse(json);
       if (data.failed) {
-        await this.redis.rpush(this.qkey, json);
+        await this.redis.zadd(this.qkey, this._getScore(data), json);
       } else {
         await this.redis.rpush(this.dkey, json);
       }
@@ -444,11 +283,11 @@ return 0;
     return await this.redis.llen(this.dkey);
   }
 
-  async numRealSeen() {
+  async numSeen() {
     return await this.redis.scard(this.skey);
   }
 
-  async numRealPending() {
+  async numPending() {
     const res = await this.redis.hlen(this.pkey);
 
     // reset pendings
@@ -481,8 +320,8 @@ return 0;
     }
   }
 
-  async realSize() {
-    this._lastSize = await this.redis.llen(this.qkey);
+  async queueSize() {
+    this._lastSize = await this.redis.zcard(this.qkey);
     return this._lastSize;
   }
 }

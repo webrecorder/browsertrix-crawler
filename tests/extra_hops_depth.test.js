@@ -5,6 +5,8 @@ import {exec as execCallback } from "child_process";
 
 const exec = util.promisify(execCallback);
 
+const extraHopsTimeout = 180000;
+
 
 test("check that URLs are crawled 2 extra hops beyond depth", async () => {
   try {
@@ -33,4 +35,4 @@ test("check that URLs are crawled 2 extra hops beyond depth", async () => {
     }
     expect(expectedPages.indexOf(url) >= 0).toBe(true);
   }
-});
+}, extraHopsTimeout);

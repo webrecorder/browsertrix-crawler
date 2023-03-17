@@ -2,10 +2,14 @@ import ws from "ws";
 import http from "http";
 import url from "url";
 import fs from "fs";
+//import { v4 as uuidv4 } from "uuid";
 
 import { initRedis } from "./redis.js";
+import { Logger } from "./logger.js";
 
 const indexHTML = fs.readFileSync(new URL("../html/screencast.html", import.meta.url), {encoding: "utf8"});
+
+const logger = new Logger();
 
 
 // ===========================================================================
@@ -53,6 +57,8 @@ class WSTransport
     }
 
     this.allWS.add(ws);
+
+    logger.debug("New Screencast Conn", {total: this.allWS.size}, "screencast");
 
     if (this.allWS.size === 1) {
       this.caster.startCastAll();
@@ -147,7 +153,7 @@ class ScreenCaster
     this.caches = new Map();
     this.urls = new Map();
 
-    this.targets = new Map();
+    this.cdps = new Map();
 
     // todo: make customizable
     this.maxWidth = 640;
@@ -171,34 +177,19 @@ class ScreenCaster
     }
   }
 
-  detectClose(target) {
-    const context = target.browserContext();
+  async screencastPage(page, cdp, id) {
+    //const id = uuidv4();
 
-    if (context.__destroy_added) {
+    this.urls.set(id, page.url());
+
+    if (this.cdps.has(id)) {
+      logger.warn("worker already registered", {workerid: id}, "screencast");
       return;
     }
 
-    context.on("targetdestroyed", (target) => {
-      this.endTarget(target);
-    });
+    //const context = page.context();
 
-    context.__destroy_added = true;
-  }
-
-  async screencastTarget(target, currUrl) {
-    const id = target._targetId;
-
-    this.urls.set(id, currUrl);
-
-    if (this.targets.has(id)) {
-      return;
-    }
-
-    this.detectClose(target);
-
-    const cdp = await target.createCDPSession();
-
-    this.targets.set(id, cdp);
+    this.cdps.set(id, cdp);
     //this.urls.set(id, target.url());
 
     const msg = "screencast";
@@ -206,14 +197,16 @@ class ScreenCaster
     cdp.on("Page.screencastFrame", async (resp) => {
       const data = resp.data;
       const sessionId = resp.sessionId;
-      const url = target.url();
+      const url = page.url();
+
+      logger.debug("screencastFrame", {workerid: id, url}, "screencast");
 
       this.caches.set(id, data);
       this.urls.set(id, url);
 
-      //if (url !== "about:blank") {
-      await this.transport.sendAll({msg, id, data, url});
-      //}
+      if (url && !url.startsWith("about:blank")) {
+        await this.transport.sendAll({msg, id, data, url});
+      }
 
       try {
         await cdp.send("Page.screencastFrameAck", {sessionId});
@@ -223,58 +216,56 @@ class ScreenCaster
     });
 
     if (await this.transport.isActive()) {
-      await this.startCast(cdp);
+      await this.startCast(cdp, id);
     }
   }
 
-  async endAllTargets() {
-    const targetIds = this.targets.keys();
-
-    for (const key of targetIds) {
-      await this.endTargetById(key);
+  async stopAll() {
+    for (const key of this.cdps.keys()) {
+      await this.stopById(key);
     }
   }
 
-  async endTarget(target) {
-    await this.endTargetById(target._targetId);
-  }
-
-  async endTargetById(id) {
+  async stopById(id) {
     this.caches.delete(id);
     this.urls.delete(id);
 
-    const cdp = this.targets.get(id);
+    const cdp = this.cdps.get(id);
 
     if (cdp) {
       try {
-        await this.stopCast(cdp);
-        await cdp.detach();
+        await this.stopCast(cdp, id);
       } catch (e) {
         // already detached
       }
     }
 
-    await this.transport.sendAll({msg: "close", id});
+    //await this.transport.sendAll({msg: "close", id});
 
-    this.targets.delete(id);
+    this.cdps.delete(id);
   }
 
-  async startCast(cdp) {
+  async startCast(cdp, id) {
     if (cdp._startedCast) {
       return;
     }
 
     cdp._startedCast = true;
 
+    logger.info("Started Screencast", {workerid: id}, "screencast");
+
     await cdp.send("Page.startScreencast", {format: "png", everyNthFrame: 2, maxWidth: this.maxWidth, maxHeight: this.maxHeight});
   }
 
-  async stopCast(cdp) {
+  async stopCast(cdp, id) {
     if (!cdp._startedCast) {
       return;
     }
 
     cdp._startedCast = false;
+
+    logger.info("Stopping Screencast", {workerid: id}, "screencast");
+
     try {
       await cdp.send("Page.stopScreencast");
     } catch (e) {
@@ -285,8 +276,8 @@ class ScreenCaster
   startCastAll() {
     const promises = [];
 
-    for (const cdp of this.targets.values()) {
-      promises.push(this.startCast(cdp));
+    for (const [id, cdp] of this.cdps.entries()) {
+      promises.push(this.startCast(cdp, id));
     }
 
     return Promise.allSettled(promises);
@@ -295,8 +286,8 @@ class ScreenCaster
   stopCastAll() {
     const promises = [];
 
-    for (const cdp of this.targets.values()) {
-      promises.push(this.stopCast(cdp));
+    for (const [id, cdp] of this.cdps.entries()) {
+      promises.push(this.stopCast(cdp, id));
     }
 
     return Promise.allSettled(promises);
