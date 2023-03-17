@@ -4,9 +4,8 @@ import fs from "fs";
 import os from "os";
 import fsp from "fs/promises";
 
-//import fetch from "node-fetch";
 import { RedisCrawlState } from "./util/state.js";
-import AbortController from "abort-controller";
+//import AbortController from "abort-controller";
 import Sitemapper from "sitemapper";
 import { v4 as uuidv4 } from "uuid";
 import yaml from "js-yaml";
@@ -110,7 +109,7 @@ export class Crawler {
 
     this.behaviorLastLine = null;
 
-    this.browserCls = new Browser();
+    this.browser = new Browser();
   }
 
   configureUA() {
@@ -122,7 +121,7 @@ export class Crawler {
 
     // if device set, it overrides the default Chrome UA
     if (!this.emulateDevice.userAgent) {
-      this.emulateDevice.userAgent = this.browserCls.getDefaultUA();
+      this.emulateDevice.userAgent = this.browser.getDefaultUA();
     }
 
     // suffix to append to default userAgent
@@ -227,8 +226,6 @@ export class Crawler {
       redisStdio = "ignore";
     }
 
-    this.browserExe = this.browserCls.getBrowserExe();
-
     this.headers = {"User-Agent": this.configureUA()};
 
     const subprocesses = [];
@@ -298,21 +295,19 @@ export class Crawler {
     }
   }
 
-  _behaviorLog({data, type}, pageUrl) {
+  _behaviorLog({data, type}, pageUrl, workerid) {
     let behaviorLine;
     let message;
     let details;
 
+    const logDetails = {page: pageUrl, workerid};
+
     if (typeof(data) === "string") {
       message = data;
-      details = {};
+      details = logDetails;
     } else {
       message = type === "info" ? "Behavior log" : "Behavior debug";
-      details = typeof(data) === "object" ? data : {};
-    }
-
-    if (pageUrl) {
-      details.page = pageUrl;
+      details = typeof(data) === "object" ? {...data, ...logDetails} : logDetails;
     }
 
     switch (type) {
@@ -339,13 +334,25 @@ export class Crawler {
   async setupPage({page, cdp, workerid}) {
     await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
+    if (this.params.logging.includes("jserrors")) {
+      page.on("console", (msg) => {
+        if (msg.type() === "error") {
+          this.logger.warn(msg.text(), {"location": msg.location(), "page": page.url(), workerid}, "jsError");
+        }
+      });
+
+      page.on("pageerror", (e) => {
+        this.logger.warn("Page Error", {...errJSON(e), "page": page.url(), workerid}, "jsError");
+      });
+    }
+
     if (this.screencaster) {
       this.logger.debug("Start Screencast", {workerid}, "screencast");
       await this.screencaster.screencastPage(page, cdp, workerid);
     }
 
     if (this.params.behaviorOpts) {
-      await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url()));
+      await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
       await page.addInitScript(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
     }
   }
@@ -446,7 +453,7 @@ export class Crawler {
       this.logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
       return await Promise.allSettled(
-        frames.map(frame => this.browserCls.evaluateWithCLI(context, frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => this.browser.evaluateWithCLI(context, frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
     } catch (e) {
@@ -553,7 +560,7 @@ export class Crawler {
   }
 
   async crawl() {
-    this.profileDir = await this.browserCls.loadProfile(this.params.profile);
+    this.profileDir = await this.browser.loadProfile(this.params.profile);
 
     if (this.params.healthCheckPort) {
       this.healthChecker = new HealthChecker(this.params.healthCheckPort, this.params.workers);
@@ -631,7 +638,7 @@ export class Crawler {
       }
     }
 
-    this.browserContext = await this.browserCls.launch({
+    await this.browser.launch({
       dataDir: this.profileDir,
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
@@ -648,13 +655,7 @@ export class Crawler {
 
     await this.serializeConfig(true);
 
-    if (this.browserContext) {
-      try {
-        await this.browserContext.close();
-      /* eslint-disable no-empty */
-      } catch (e) {}
-      this.browserContext = null;
-    }
+    await this.browser.close();
 
     if (this.pagesFH) {
       await this.pagesFH.sync();
@@ -837,16 +838,14 @@ export class Crawler {
 
     const logDetails = {page: url, workerid};
 
-    let isHTMLPage = true;
-
-    const isHTMLResult = await timedRun(
+    let isHTMLPage = await timedRun(
       this.isHTML(url),
       FETCH_TIMEOUT_SECS,
       "HEAD request to determine if URL is HTML page timed out",
       logDetails
     );
-    if (isHTMLResult && (isHTMLResult.value == false)) {
-      isHTMLPage = false;
+
+    if (!isHTMLPage) {
       try {
         const captureResult = await timedRun(
           this.directFetchCapture(url),
@@ -854,7 +853,8 @@ export class Crawler {
           "Direct fetch capture attempt timed out",
           logDetails
         );
-        if (captureResult.value) {
+        if (captureResult) {
+          this.logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
           return;
         }
       } catch (e) {
@@ -876,12 +876,6 @@ export class Crawler {
     // if so, don't report as an error
     page.once("requestfailed", (req) => {
       ignoreAbort = shouldIgnoreAbort(req);
-    });
-
-    page.on("console", (msg) => {
-      if (this.params.logging.includes("jserrors") && (msg.type() === "error")) {
-        this.logger.warn(msg.text(), {"location": msg.location()}, "jsError");
-      }
     });
 
     const gotoOpts = isHTMLPage ? this.gotoOpts : {waitUntil: "domcontentloaded"};

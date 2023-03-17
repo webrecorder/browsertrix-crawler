@@ -216,7 +216,7 @@ class ScreenCaster
     });
 
     if (await this.transport.isActive()) {
-      await this.startCast(cdp);
+      await this.startCast(cdp, id);
     }
   }
 
@@ -234,7 +234,7 @@ class ScreenCaster
 
     if (cdp) {
       try {
-        await this.stopCast(cdp);
+        await this.stopCast(cdp, id);
       } catch (e) {
         // already detached
       }
@@ -245,22 +245,27 @@ class ScreenCaster
     this.cdps.delete(id);
   }
 
-  async startCast(cdp) {
+  async startCast(cdp, id) {
     if (cdp._startedCast) {
       return;
     }
 
     cdp._startedCast = true;
 
+    logger.info("Started Screencast", {workerid: id}, "screencast");
+
     await cdp.send("Page.startScreencast", {format: "png", everyNthFrame: 2, maxWidth: this.maxWidth, maxHeight: this.maxHeight});
   }
 
-  async stopCast(cdp) {
+  async stopCast(cdp, id) {
     if (!cdp._startedCast) {
       return;
     }
 
     cdp._startedCast = false;
+
+    logger.info("Stopping Screencast", {workerid: id}, "screencast");
+
     try {
       await cdp.send("Page.stopScreencast");
     } catch (e) {
@@ -271,8 +276,8 @@ class ScreenCaster
   startCastAll() {
     const promises = [];
 
-    for (const cdp of this.cdps.values()) {
-      promises.push(this.startCast(cdp));
+    for (const [id, cdp] of this.cdps.entries()) {
+      promises.push(this.startCast(cdp, id));
     }
 
     return Promise.allSettled(promises);
@@ -281,8 +286,8 @@ class ScreenCaster
   stopCastAll() {
     const promises = [];
 
-    for (const cdp of this.cdps.values()) {
-      promises.push(this.stopCast(cdp));
+    for (const [id, cdp] of this.cdps.entries()) {
+      promises.push(this.stopCast(cdp, id));
     }
 
     return Promise.allSettled(promises);

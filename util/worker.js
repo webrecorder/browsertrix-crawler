@@ -7,6 +7,7 @@ const logger = new Logger();
 
 const MAX_REUSE = 5;
 
+const NEW_WINDOW_TIMEOUT = 10;
 
 
 // ===========================================================================
@@ -36,6 +37,9 @@ export class PageWorker
     this.cdp = null; 
 
     this.opts = null;
+
+    this.failed = false;
+    this.logDetails = {workerid: this.id};
   }
 
   async closePage() {
@@ -67,13 +71,32 @@ export class PageWorker
     }
     
     this.reuseCount = 1;
+    const workerid = this.id;
 
     while (true) {
       try {
-        this.page = await this.crawler.browserContext.newPage();
+        logger.debug("Getting page in new window", {workerid}, "worker");
+        const { page, cdp } = await timedRun(
+          this.crawler.browser.newWindowPageWithCDP(),
+          NEW_WINDOW_TIMEOUT,
+          "New Window Timed Out!",
+          {workerid},
+          "worker"
+        );
 
-        this.cdp = await this.crawler.browserContext.newCDPSession(this.page);
-        this.opts = {page: this.page, cdp: this.cdp, workerid: this.id};
+        this.page = page;
+        this.cdp = cdp;
+        this.opts = {page: this.page, cdp: this.cdp, workerid};
+
+        // updated per page crawl
+        this.failed = false;
+        this.logDetails = {page: this.page.url(), workerid};
+
+        // more serious page crash, mark as failed
+        this.page.on("crash", () => {
+          logger.error("Page Crash", ...this.logDetails, "worker");
+          this.failed = true;
+        });
 
         await this.crawler.setupPage(this.opts);
 
@@ -97,12 +120,9 @@ export class PageWorker
 
     logger.info("Starting page", {workerid, "page": url}, "worker");
 
-    const logDetails = {page: url, workerid};
+    this.logDetails = {page: url, workerid};
 
-    let failed = false;
-
-    // more serious page error, mark page session as invalid
-    this.page.on("pageerror", () => failed = true);
+    this.failed = false;
 
     try {
       const result = await timedRun(
@@ -113,19 +133,19 @@ export class PageWorker
         "worker"
       );
 
-      failed = failed || !result;
+      this.failed = this.failed || !result;
 
     } catch (e) {
-      logger.error("Page Exception", {...errJSON(e), ...logDetails}, "worker");
-      failed = true;
+      logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
+      this.failed = true;
     } finally {
-      if (failed) {
-        logger.warn("Page Load Failed", logDetails, "worker");
+      if (this.failed) {
+        logger.warn("Page Load Failed", this.logDetails, "worker");
         this.crawler.markPageFailed(url);
       }
     }
 
-    return failed;
+    return this.failed;
   }
 
   async run() {

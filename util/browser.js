@@ -1,8 +1,10 @@
 import * as child_process from "child_process";
 import fs from "fs";
+import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
+
 import os from "os";
 import path from "path";
-import request from "request";
 
 import { Logger } from "./logger.js";
 import { initStorage } from "./storage.js";
@@ -17,9 +19,19 @@ const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 // ==================================================================
 export class Browser
 {
-  constructor() {}
+  constructor() {
+    this.context = null;
 
-  async launch({dataDir, chromeOptions, headless = false, emulateDevice = {viewport: null}} = {}) {
+    this.firstPage = null;
+    this.firstCDP = null;
+  }
+
+  async launch({dataDir, chromeOptions, signals = false, headless = false, emulateDevice = {viewport: null}} = {}) {
+    if (this.context) {
+      logger.warn("Context already inited", {}, "context");
+      return this.context;
+    }
+
     const args = this.chromeArgs(chromeOptions);
     const userDataDir = dataDir || profileDir;
 
@@ -28,14 +40,59 @@ export class Browser
       args,
       headless,
       executablePath: this.getBrowserExe(),
+      ignoreDefaultArgs: ["--enable-automation"],
       ignoreHTTPSErrors: true,
-      handleSIGHUP: false,
-      handleSIGINT: false,
-      handleSIGTERM: false,
+      handleSIGHUP: signals,
+      handleSIGINT: signals,
+      handleSIGTERM: signals,
       serviceWorkers: dataDir ? "block" : "allow",
     };
 
-    return await chromium.launchPersistentContext(userDataDir, launchOpts);
+    this.context = await chromium.launchPersistentContext(userDataDir, launchOpts);
+
+    if (this.context.pages()) {
+      this.firstPage = this.context.pages()[0];
+    } else {
+      this.firstPage = await this.context.newPage();
+    }
+    this.firstCDP = await this.context.newCDPSession(this.firstPage);
+
+    return this.context;
+  }
+
+  async close() {
+    if (this.context) {
+      await this.context.close();
+      this.context = null;
+    }
+  }
+
+  async getFirstPageWithCDP() {
+    return {page: this.firstPage, cdp: this.firstCDP};
+  }
+
+  async newWindowPageWithCDP() {
+    // unique url to detect new pages
+    const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
+
+    const p = new Promise((resolve) => {
+      const listener = (page) => {
+        if (page.url() === startPage) {
+          resolve(page);
+          this.context.removeListener("page", listener);
+        }
+      };
+
+      this.context.on("page", listener);
+    });
+
+    await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+
+    const page = await p;
+
+    const cdp = await this.context.newCDPSession(page);
+
+    return {page, cdp};
   }
 
   async loadProfile(profileFilename) {
@@ -46,15 +103,12 @@ export class Browser
 
       logger.info(`Downloading ${profileFilename} to ${targetFilename}`, {}, "browserProfile");
 
-      const p = new Promise((resolve, reject) => {
-        request.get(profileFilename).
-          on("error", (err) => reject(err)).
-          pipe(fs.createWriteStream(targetFilename)).
-          on("finish", () => resolve());
-      });
+      const resp = await fetch(profileFilename);
+      await pipeline(
+        Readable.fromWeb(resp.body),
+        fs.createWriteStream(targetFilename)
+      );
 
-      await p;
-        
       profileFilename = targetFilename;
     } else if (profileFilename && profileFilename.startsWith("@")) {
       const storage = initStorage("");
@@ -88,7 +142,6 @@ export class Browser
     const args = [
       ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
       //"--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
-      "--ignore-certificate-errors",
       "--no-sandbox",
       "--disable-background-media-suspend",
       "--remote-debugging-port=9221",
@@ -99,6 +152,7 @@ export class Browser
     ];
 
     if (proxy) {
+      args.push("--ignore-certificate-errors");
       args.push(`--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`);
     }
 
