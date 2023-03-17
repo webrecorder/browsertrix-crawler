@@ -82,19 +82,18 @@ export class BlockRules
 
     page._btrix_interceptionAdded = true;
 
-    await page.setRequestInterception(true);
-
-    page.on("request", async (request) => {
+    await page.route("**/*", (route) => {
       const logDetails = {page: page.url()};
       try {
-        await this.handleRequest(request, logDetails);
+        this.handleRequest(route, logDetails);
       } catch (e) {
         this.logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }
     });
   }
 
-  async handleRequest(request, logDetails) {
+  async handleRequest(route, logDetails) {
+    const request = route.request();
     const url = request.url();
 
     let blockState;
@@ -103,9 +102,9 @@ export class BlockRules
       blockState = await this.shouldBlock(request, url, logDetails);
 
       if (blockState === BlockState.ALLOW) {
-        await request.continue();
+        await route.continue();
       } else {
-        await request.abort("blockedbyclient");
+        await route.abort("blockedbyclient");
       }
 
     } catch (e) {
@@ -247,13 +246,10 @@ export class AdBlockRules extends BlockRules
 
     page._btrix_adInterceptionAdded = true;
 
-    await page.setRequestInterception(true);
-
-    page.on("request", async (request) => {
+    await page.route("**/*", (route) => {
       const logDetails = {page: page.url()};
-
       try {
-        await this.handleRequest(request, logDetails);
+        this.handleRequest(route, logDetails);
       } catch (e) {
         this.logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }

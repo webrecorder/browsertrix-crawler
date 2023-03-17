@@ -17,7 +17,13 @@ export function timedRun(promise, seconds, message="Promise timed out", logDetai
   };
 
   return Promise.race([promise, rejectPromiseOnTimeout(timeout)])
-    .catch(() => logger.error(message, {"seconds": seconds, ...logDetails}, context));
+    .catch((err) =>  {
+      if (err == "timeout reached") {
+        logger.error(message, {"seconds": seconds, ...logDetails}, context);
+      } else {
+        logger.error("Promise rejected", {...err, ...logDetails}, context);
+      }
+    });
 }
 
 

@@ -1,5 +1,4 @@
 import PQueue from "p-queue";
-import puppeteer from "puppeteer-core";
 
 import { Logger, errJSON } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
@@ -12,20 +11,34 @@ const MAX_REUSE = 5;
 // ===========================================================================
 export class PageWorker
 {
-  constructor(id, browser, task, healthChecker) {
+  constructor(id, browserContext, crawlPage, healthChecker, screencaster) {
     this.id = id;
-    this.browser = browser;
-    this.task = task;
+    this.browserContext = browserContext;
+    this.crawlPage = crawlPage;
     this.healthChecker = healthChecker;
+    this.screencaster = screencaster;
 
     this.reuseCount = 0;
     this.page = null;
+    this.cdp = null;
     
-    this.startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
+    //this.startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
   }
 
   async closePage() {
     if (this.page) {
+      if (this.screencaster) {
+        logger.debug("End Screencast", {workerid: this.id}, "screencast");
+        await this.screencaster.stopById(this.id);
+      }
+
+      try {
+        await this.cdp.detach();
+      } catch (e) {
+        // ignore
+      }
+      this.cdp = null;
+
       try {
         await this.page.close();
       } catch (e) {
@@ -42,35 +55,33 @@ export class PageWorker
     } else {
       await this.closePage();
     }
-    //open page in a new tab
-    this.pendingTargets = new Map();
-
-    this.browser.on("targetcreated", (target) => {
-      if (target.url() === this.startPage) {
-        this.pendingTargets.set(target._targetId, target);
-      }
-    });
-
+    
     this.reuseCount = 1;
 
     while (true) {
       try {
-        logger.debug("Opening new page", {}, "worker");
-        const mainTarget = this.browser.target();
-        this.cdp = await mainTarget.createCDPSession();
-        let targetId;
-        const res = await this.cdp.send("Target.createTarget", {url: this.startPage, newWindow: true});
-        targetId = res.targetId;
-        const target = this.pendingTargets.get(targetId);
-        this.pendingTargets.delete(targetId);
-        this.page = await target.page();
+        this.page = await this.browserContext.newPage();
         this.page._workerid = this.id;
+
+        this.cdp = await this.browserContext.newCDPSession(this.page);
+
+        await this.page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+
+        //TODO: is this still needed?
+        //await this.page.goto(this.startPage);
+
         if (this.healthChecker) {
           this.healthChecker.resetErrors();
         }
+
+        if (this.screencaster) {
+          logger.debug("Start Screencast", {workerid: this.id}, "screencast");
+          await this.screencaster.screencastPage(this.page, this.id, this.cdp);
+        }
+
         break;
       } catch (err) {
-        logger.warn("Error getting new page in window context", {"workerid": this.id, ...errJSON(err)}, "worker");
+        logger.warn("Error getting new page", {"workerid": this.id, ...errJSON(err)}, "worker");
         await sleep(0.5);
         logger.warn("Retry getting new page");
 
@@ -89,15 +100,14 @@ export class PageWorker
 export class WorkerPool
 {
   constructor(options) {
+    this.browserContext = options.browserContext;
     this.maxConcurrency = options.maxConcurrency;
-    this.puppeteerOptions = options.puppeteerOptions;
     this.crawlState = options.crawlState;
     this.healthChecker = options.healthChecker;
     this.totalTimeout = options.totalTimeout || 1e4;
+    this.screencaster = options.screencaster;
 
-    this.task = options.task;
-
-    this.browser = null;
+    this.crawlPage = options.crawlPage;
 
     this.workers = [];
     this.workersAvailable = [];
@@ -106,13 +116,10 @@ export class WorkerPool
     this.interrupted = false;
     this.queue = null;
 
-    this.inited = this.createWorkers(this.maxConcurrency);
+    this.createWorkers(this.maxConcurrency);
   }
 
-  async createWorkers(numWorkers = 1) {
-    if (!this.browser) {
-      this.browser = await puppeteer.launch(this.puppeteerOptions);
-    }
+  createWorkers(numWorkers = 1) {
     logger.info(`Creating ${numWorkers} workers`, {}, "worker");
     for (let i=0; i < numWorkers; i++) {
       this.createWorker(`worker-${i+1}`);
@@ -122,9 +129,10 @@ export class WorkerPool
   createWorker(id) {
     const worker = new PageWorker(
       id,
-      this.browser,
-      this.task,
-      this.healthChecker
+      this.browserContext,
+      this.crawlPage,
+      this.healthChecker,
+      this.screencaster,
     );
     this.workers.push(worker);
     this.workersAvailable.push(worker);
@@ -134,6 +142,7 @@ export class WorkerPool
     if (this.workersAvailable.length > 0) {
       const worker = this.workersAvailable.shift();
       this.workersBusy.push(worker);
+      logger.debug(`Using available worker ${worker.id}`);
       return worker;
     }
 
@@ -152,24 +161,24 @@ export class WorkerPool
   }
 
   async crawlPageInWorker() {
-    const worker = await this.getAvailableWorker();
-
-    const data = await this.crawlState.popFromQueue();
+    const data = await this.crawlState.nextFromQueue();
 
     if (!data) {
-      logger.debug("No crawl tasks available - waiting for pending pages to finish", {}, "worker");
-      this.freeWorker(worker);
+      logger.debug("No crawl tasks available - waiting for pending pages to finish", {pending: this.queue.pending}, "worker");
+      await sleep(10);
       return;
     }
 
+    const worker = await this.getAvailableWorker();
+
     const { url } = data;
 
-    const page = await worker.initPage();
+    const { page, cdp } = await worker.initPage();
 
     logger.info("Starting page", {"workerid": worker.id, "page": url}, "worker");
 
     const result = await timedRun(
-      worker.task({ page, data }),
+      worker.crawlPage({ page, data, cdp }),
       this.totalTimeout,
       "Page Worker Timeout",
       {"workerid": worker.id},
@@ -188,9 +197,6 @@ export class WorkerPool
   }
 
   async work() {
-    logger.debug("Awaiting worker pool init", {}, "worker");
-    await this.inited;
-
     this.queue = new PQueue({concurrency: this.maxConcurrency});
 
     while (!this.interrupted) {
@@ -225,9 +231,9 @@ export class WorkerPool
   }
 
   async close() {
-    if (this.browser) {
+    if (this.browserContext) {
       try {
-        await this.browser.close();
+        await this.browserContext.close();
       /* eslint-disable no-empty */
       } catch (e) {}
     }

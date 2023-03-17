@@ -2,10 +2,14 @@ import ws from "ws";
 import http from "http";
 import url from "url";
 import fs from "fs";
+//import { v4 as uuidv4 } from "uuid";
 
 import { initRedis } from "./redis.js";
+import { Logger } from "./logger.js";
 
 const indexHTML = fs.readFileSync(new URL("../html/screencast.html", import.meta.url), {encoding: "utf8"});
+
+const logger = new Logger();
 
 
 // ===========================================================================
@@ -53,6 +57,8 @@ class WSTransport
     }
 
     this.allWS.add(ws);
+
+    logger.debug("New Screencast Conn", {total: this.allWS.size}, "screencast");
 
     if (this.allWS.size === 1) {
       this.caster.startCastAll();
@@ -147,7 +153,7 @@ class ScreenCaster
     this.caches = new Map();
     this.urls = new Map();
 
-    this.targets = new Map();
+    this.cdps = new Map();
 
     // todo: make customizable
     this.maxWidth = 640;
@@ -171,34 +177,19 @@ class ScreenCaster
     }
   }
 
-  detectClose(target) {
-    const context = target.browserContext();
+  async screencastPage(page, id, cdp) {
+    //const id = uuidv4();
 
-    if (context.__destroy_added) {
+    this.urls.set(id, page.url());
+
+    if (this.cdps.has(id)) {
+      logger.warn("worker already registered", {workerid: id}, "screencast");
       return;
     }
 
-    context.on("targetdestroyed", (target) => {
-      this.endTarget(target);
-    });
+    //const context = page.context();
 
-    context.__destroy_added = true;
-  }
-
-  async screencastTarget(target, currUrl) {
-    const id = target._targetId;
-
-    this.urls.set(id, currUrl);
-
-    if (this.targets.has(id)) {
-      return;
-    }
-
-    this.detectClose(target);
-
-    const cdp = await target.createCDPSession();
-
-    this.targets.set(id, cdp);
+    this.cdps.set(id, cdp);
     //this.urls.set(id, target.url());
 
     const msg = "screencast";
@@ -206,7 +197,9 @@ class ScreenCaster
     cdp.on("Page.screencastFrame", async (resp) => {
       const data = resp.data;
       const sessionId = resp.sessionId;
-      const url = target.url();
+      const url = page.url();
+
+      logger.debug("screencastFrame", {workerid: id, url}, "screencast");
 
       this.caches.set(id, data);
       this.urls.set(id, url);
@@ -227,36 +220,29 @@ class ScreenCaster
     }
   }
 
-  async endAllTargets() {
-    const targetIds = this.targets.keys();
-
-    for (const key of targetIds) {
-      await this.endTargetById(key);
+  async stopAll() {
+    for (const key of this.cdps.keys()) {
+      await this.stopById(key);
     }
   }
 
-  async endTarget(target) {
-    await this.endTargetById(target._targetId);
-  }
-
-  async endTargetById(id) {
+  async stopById(id) {
     this.caches.delete(id);
     this.urls.delete(id);
 
-    const cdp = this.targets.get(id);
+    const cdp = this.cdps.get(id);
 
     if (cdp) {
       try {
         await this.stopCast(cdp);
-        await cdp.detach();
       } catch (e) {
         // already detached
       }
     }
 
-    await this.transport.sendAll({msg: "close", id});
+    //await this.transport.sendAll({msg: "close", id});
 
-    this.targets.delete(id);
+    this.cdps.delete(id);
   }
 
   async startCast(cdp) {
@@ -285,7 +271,7 @@ class ScreenCaster
   startCastAll() {
     const promises = [];
 
-    for (const cdp of this.targets.values()) {
+    for (const cdp of this.cdps.values()) {
       promises.push(this.startCast(cdp));
     }
 
@@ -295,7 +281,7 @@ class ScreenCaster
   stopCastAll() {
     const promises = [];
 
-    for (const cdp of this.targets.values()) {
+    for (const cdp of this.cdps.values()) {
       promises.push(this.stopCast(cdp));
     }
 
