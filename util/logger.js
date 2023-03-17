@@ -1,16 +1,4 @@
 // ===========================================================================
-let logStream = null;
-let debugLogging = false;
-
-export function setExternalLogStream(logFH) {
-  logStream = logFH;
-}
-
-export function setDebugLogging(debugLog) {
-  debugLogging = debugLog;
-}
-
-// ===========================================================================
 // to fix serialization of regexes for logging purposes
 RegExp.prototype.toJSON = RegExp.prototype.toString;
 
@@ -22,8 +10,21 @@ export function errJSON(e) {
 
 
 // ===========================================================================
-export class Logger
+class Logger
 {
+  constructor() {
+    this.logStream = null;
+    this.debugLogging = null;
+  }
+
+  setExternalLogStream(logFH) {
+    this.logStream = logFH;
+  }
+
+  setDebugLogging(debugLog) {
+    this.debugLogging = debugLog;
+  }
+
   logAsJSON(message, data, context, logLevel="info") {
     if (data instanceof Error) {
       data = errJSON(data);
@@ -39,8 +40,8 @@ export class Logger
     };
     const string = JSON.stringify(dataToLog);
     console.log(string);
-    if (logStream) {
-      logStream.write(string + "\n");
+    if (this.logStream) {
+      this.logStream.write(string + "\n");
     }
   }
 
@@ -57,7 +58,7 @@ export class Logger
   }
 
   debug(message, data={}, context="general") {
-    if (debugLogging) {
+    if (this.debugLogging) {
       this.logAsJSON(message, data, context, "debug");
     }
   }
@@ -67,3 +68,5 @@ export class Logger
     process.exit(exitCode);
   }
 }
+
+export const logger = new Logger();

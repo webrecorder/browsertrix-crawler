@@ -1,8 +1,6 @@
 import fs from "fs";
 
-import { Logger, errJSON } from "./logger.js";
-
-const logger = new Logger();
+import { logger, errJSON } from "./logger.js";
 
 const RULE_TYPES = ["block", "allowOnly"];
 

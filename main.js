@@ -1,9 +1,7 @@
 #!/usr/bin/env -S node --experimental-global-webcrypto
 
+import { logger } from "./util/logger.js";
 import { Crawler } from "./crawler.js";
-import { Logger } from "./util/logger.js";
-
-const logger = new Logger();
 
 var crawler = null;
 

@@ -1,8 +1,6 @@
 import http from "http";
 import url from "url";
-import { Logger } from "./logger.js";
-
-const logger = new Logger();
+import { logger } from "./logger.js";
 
 
 // ===========================================================================

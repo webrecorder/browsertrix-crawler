@@ -6,12 +6,10 @@ import { Readable } from "node:stream";
 import os from "os";
 import path from "path";
 
-import { Logger } from "./logger.js";
+import { logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
 import { chromium } from "playwright-core";
-
-const logger = new Logger();
 
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
 

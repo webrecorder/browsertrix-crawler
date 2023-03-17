@@ -1,8 +1,5 @@
-import { Logger } from "./logger.js";
-
-const logger = new Logger();
-
-export const MAX_DEPTH = 1000000;
+import { logger } from "./logger.js";
+import { MAX_DEPTH } from "./constants.js";
 
 
 export class ScopedSeed
