@@ -177,7 +177,7 @@ class ScreenCaster
     }
   }
 
-  async screencastPage(page, id, cdp) {
+  async screencastPage(page, cdp, id) {
     //const id = uuidv4();
 
     this.urls.set(id, page.url());

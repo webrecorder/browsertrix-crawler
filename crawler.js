@@ -4,7 +4,7 @@ import fs from "fs";
 import os from "os";
 import fsp from "fs/promises";
 
-import fetch from "node-fetch";
+//import fetch from "node-fetch";
 import { RedisCrawlState } from "./util/state.js";
 import AbortController from "abort-controller";
 import Sitemapper from "sitemapper";
@@ -21,7 +21,7 @@ import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { Logger, errJSON, setExternalLogStream, setDebugLogging } from "./util/logger.js";
-import { WorkerPool } from "./util/worker.js";
+import { runWorkers } from "./util/worker.js";
 import { sleep, timedRun } from "./util/timing.js";
 
 import { Browser } from "./util/browser.js";
@@ -336,89 +336,101 @@ export class Crawler {
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
+  async setupPage({page, cdp, workerid}) {
+    await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+
+    if (this.screencaster) {
+      this.logger.debug("Start Screencast", {workerid}, "screencast");
+      await this.screencaster.screencastPage(page, cdp, workerid);
+    }
+
+    if (this.params.behaviorOpts) {
+      await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url()));
+      await page.addInitScript(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
+    }
+  }
+
+  async teardownPage({workerid}) {
+    if (this.screencaster) {
+      this.logger.debug("End Screencast", {workerid}, "screencast");
+      await this.screencaster.stopById(workerid);
+    }
+  }
+
   async crawlPage(opts) {
     await this.writeStats();
 
-    const {page, cdp, data} = opts;
+    const {page, cdp, data, workerid} = opts;
 
     const {url} = data;
 
-    const logDetails = {page: url, workerid: page._workerid};
+    const logDetails = {page: url, workerid};
 
     if (!this.isInScope(data, logDetails)) {
       this.logger.info("Page no longer in scope", data);
       return true;
     }
 
-    try {
-      if (this.params.behaviorOpts && !page.__bx_inited) {
-        await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, url));
-        await page.addInitScript(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
-        page.__bx_inited = true;
+    // run custom driver here
+    await this.driver({page, data, crawler: this});
+
+    const title = await page.title();
+
+    if (this.params.screenshot) {
+      if (!page.isHTMLPage) {
+        this.logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
-
-      // run custom driver here
-      await this.driver({page, data, crawler: this});
-
-      const title = await page.title();
-
-      if (this.params.screenshot) {
-        if (!page.isHTMLPage) {
-          this.logger.debug("Skipping screenshots for non-HTML page", logDetails);
-        }
-        const archiveDir = path.join(this.collDir, "archive");
-        const screenshots = new Screenshots({page, url, directory: archiveDir});
-        if (this.params.screenshot.includes("view")) {
-          await screenshots.take();
-        }
-        if (this.params.screenshot.includes("fullPage")) {
-          await screenshots.takeFullPage();
-        }
-        if (this.params.screenshot.includes("thumbnail")) {
-          await screenshots.takeThumbnail();
-        }
+      const archiveDir = path.join(this.collDir, "archive");
+      const screenshots = new Screenshots({page, url, directory: archiveDir});
+      if (this.params.screenshot.includes("view")) {
+        await screenshots.take();
       }
-
-      let text = "";
-      if (this.params.text && page.isHTMLPage) {
-        const result = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
-        text = await new TextExtract(result).parseTextFromDom();
+      if (this.params.screenshot.includes("fullPage")) {
+        await screenshots.takeFullPage();
       }
+      if (this.params.screenshot.includes("thumbnail")) {
+        await screenshots.takeThumbnail();
+      }
+    }
 
-      await this.writePage(data, title, this.params.text ? text : null);
+    let text = "";
+    if (this.params.text && page.isHTMLPage) {
+      const result = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
+      text = await new TextExtract(result).parseTextFromDom();
+    }
 
-      if (this.params.behaviorOpts) {
-        if (!page.isHTMLPage) {
-          this.logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
-        } else {
-          const behaviorTimeout = this.params.behaviorTimeout / 1000;
+    await this.writePage(data, title, this.params.text ? text : null);
 
-          const res = await timedRun(
-            this.runBehaviors(page, logDetails),
-            behaviorTimeout,
-            "Behaviors timed out",
-            logDetails,
-            "behavior"
-          );
+    if (this.params.behaviorOpts) {
+      if (!page.isHTMLPage) {
+        this.logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
+      } else {
+        const behaviorTimeout = this.params.behaviorTimeout / 1000;
 
-          if (res && res.length) {
-            this.logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
-          }
+        const res = await timedRun(
+          this.runBehaviors(page, logDetails),
+          behaviorTimeout,
+          "Behaviors timed out",
+          logDetails,
+          "behavior"
+        );
+
+        if (res && res.length) {
+          this.logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
         }
       }
+    }
 
-      this.logger.info("Page finished", logDetails, "pageStatus");
+    this.logger.info("Page finished", logDetails, "pageStatus");
 
-      await this.crawlState.markFinished(url);
+    await this.crawlState.markFinished(url);
 
-      await this.checkLimits();
+    await this.checkLimits();
 
-      await this.serializeConfig();
+    await this.serializeConfig();
 
-    } catch (e) {
-      this.logger.error("Page Errored", {...errJSON(e), ...logDetails}, "pageStatus");
-      await this.markPageFailed(url, page);
-      return false;
+    if (this.healthChecker) {
+      this.healthChecker.resetErrors();
     }
 
     return true;
@@ -517,7 +529,6 @@ export class Crawler {
 
   gracefulFinish() {
     this.interrupted = true;
-    this.workerPool.interrupt();
     if (!this.params.waitOnDone) {
       this.finalExit = true;
     }
@@ -629,24 +640,19 @@ export class Crawler {
       }
     });
 
-    this.workerPool = new WorkerPool({
-      browserContext: this.browserContext,
-      maxConcurrency: this.params.workers,
-      screencaster: this.screencaster,
-      emulateDevice: this.emulateDevice,
-      crawlState: this.crawlState,
-      healthChecker: this.healthChecker,
-      totalTimeout: (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60,
-      crawlPage: (opts) => this.crawlPage(opts),
-    });
+    const totalPageTimeout = (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60;
 
-    this.logger.debug("Worker pool created - starting to work");
-
-    await this.workerPool.work();
-
-    await this.workerPool.close();
+    await runWorkers(this, this.params.workers, totalPageTimeout);
 
     await this.serializeConfig(true);
+
+    if (this.browserContext) {
+      try {
+        await this.browserContext.close();
+      /* eslint-disable no-empty */
+      } catch (e) {}
+      this.browserContext = null;
+    }
 
     if (this.pagesFH) {
       await this.pagesFH.sync();
@@ -870,9 +876,6 @@ export class Crawler {
       ignoreAbort = shouldIgnoreAbort(req);
     });
 
-    // more serious page error, mark page session as invalid
-    page.on("pageerror", () => this.markPageFailed(url, page));
-
     page.on("console", (msg) => {
       if (this.params.logging.includes("jserrors") && (msg.type() === "error")) {
         this.logger.warn(msg.text(), {"location": msg.location()}, "jsError");
@@ -890,17 +893,17 @@ export class Crawler {
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
-      if (this.healthChecker) {
-        this.healthChecker.resetErrors();
-      }
+      //if (this.healthChecker) {
+      //  this.healthChecker.resetErrors();
+      //}
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         const mainMessage = e.name === "TimeoutError" ? "Page Load Timeout" : "Page Load Error";
         this.logger.error(mainMessage, {msg, ...logDetails});
-        if (this.healthChecker) {
-          this.healthChecker.incError();
-        }
+        //if (this.healthChecker) {
+        //  this.healthChecker.incError();
+        //}
       }
     }
 
@@ -936,8 +939,7 @@ export class Crawler {
     }
   }
 
-  async markPageFailed(url, page) {
-    page.__failed = true;
+  async markPageFailed(url) {
     if (this.healthChecker) {
       this.healthChecker.incError();
     }
@@ -1158,7 +1160,6 @@ export class Crawler {
   }
 
   async directFetchCapture(url) {
-    //console.log(`Direct capture: ${this.capturePrefix}${url}`);
     const abort = new AbortController();
     const signal = abort.signal;
     const resp = await fetch(this.capturePrefix + url, {signal, headers: this.headers, redirect: "manual"});
@@ -1177,7 +1178,7 @@ export class Crawler {
         if (count <= 0) {
           break;
         }
-        this.logger.debug(`Still waiting for ${count} pending requests to finish...`);
+        this.logger.debug("Waiting for pending requests to finish", {numRequests: count});
       } catch (e) {
         break;
       }
