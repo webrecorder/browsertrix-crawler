@@ -7,11 +7,9 @@ import { createHash } from "crypto";
 import Minio from "minio";
 
 import { initRedis } from "./redis.js";
-import { Logger } from "./logger.js";
+import { logger } from "./logger.js";
 
 import getFolderSize from "get-folder-size";
-
-const logger = new Logger();
 
 
 // ===========================================================================

@@ -2,9 +2,7 @@ import fs from "fs";
 import path from "path";
 import * as warcio from "warcio";
 
-import { Logger } from "./logger.js";
-
-const logger = new Logger();
+import { logger } from "./logger.js";
 
 // ============================================================================
 

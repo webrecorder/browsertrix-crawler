@@ -1,8 +1,7 @@
-import { Logger } from "./logger.js";
+import { logger } from "./logger.js";
 
-import { MAX_DEPTH } from "./seeds.js";
+import { MAX_DEPTH } from "./constants.js";
 
-const logger = new Logger();
 
 // ============================================================================
 export class RedisCrawlState

@@ -1,6 +1,4 @@
-import { Logger } from "./logger.js";
-
-const logger = new Logger();
+import { logger } from "./logger.js";
 
 export function sleep(seconds) {
   return new Promise(resolve => setTimeout(resolve, seconds * 1000));

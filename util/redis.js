@@ -1,7 +1,5 @@
 import Redis from "ioredis";
-import { Logger } from "./logger.js";
-
-const logger = new Logger();
+import { logger } from "./logger.js";
 
 const error = console.error;
 

@@ -1,14 +1,9 @@
-//import PQueue from "p-queue";
-
-import { Logger, errJSON } from "./logger.js";
+import { logger, errJSON } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
-
-const logger = new Logger();
 
 const MAX_REUSE = 5;
 
 const NEW_WINDOW_TIMEOUT = 10;
-
 
 // ===========================================================================
 export function runWorkers(crawler, numWorkers, timeout) {

@@ -11,9 +11,7 @@ import { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
-import { Logger } from "./logger.js";
-
-const logger = new Logger();
+import { logger } from "./logger.js";
 
 
 // ============================================================================

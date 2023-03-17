@@ -2,14 +2,11 @@ import ws from "ws";
 import http from "http";
 import url from "url";
 import fs from "fs";
-//import { v4 as uuidv4 } from "uuid";
 
 import { initRedis } from "./redis.js";
-import { Logger } from "./logger.js";
+import { logger } from "./logger.js";
 
 const indexHTML = fs.readFileSync(new URL("../html/screencast.html", import.meta.url), {encoding: "utf8"});
-
-const logger = new Logger();
 
 
 // ===========================================================================
