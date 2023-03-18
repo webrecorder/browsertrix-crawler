@@ -69,6 +69,10 @@ export class Browser
     return {page: this.firstPage, cdp: this.firstCDP};
   }
 
+  numPages() {
+    return this.context ? this.context.pages().length : 0;
+  }
+
   async newWindowPageWithCDP() {
     // unique url to detect new pages
     const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);

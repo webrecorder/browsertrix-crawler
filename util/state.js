@@ -186,7 +186,7 @@ return 0;
 
     await this.markStarted(data.url);
 
-    return data;
+    return new PageState(data);
   }
 
   async has(url) {
@@ -325,3 +325,26 @@ return 0;
   }
 }
 
+
+// ============================================================================
+class PageState
+{
+  constructor(redisData) {
+    this.url = redisData.url;
+    this.seedId = redisData.seedId;
+    this.depth = redisData.depth;
+    this.extraHops = redisData.extraHops;
+
+    this.workerid = null;
+    this.title = null;
+
+    this.isHTMLPage = null;
+    this.text = null;
+
+    this.skipBehaviors = false;
+    this.filteredFrames = [];
+
+    this.pageLoaded = false;
+    this.behaviorsFinished = false;
+  }
+}

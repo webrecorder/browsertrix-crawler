@@ -175,19 +175,15 @@ class ScreenCaster
   }
 
   async screencastPage(page, cdp, id) {
-    //const id = uuidv4();
-
     this.urls.set(id, page.url());
 
-    if (this.cdps.has(id)) {
+    // shouldn't happen, getting duplicate cdp
+    if (this.cdps.get(id) === cdp) {
       logger.warn("worker already registered", {workerid: id}, "screencast");
       return;
     }
 
-    //const context = page.context();
-
     this.cdps.set(id, cdp);
-    //this.urls.set(id, target.url());
 
     const msg = "screencast";
 
@@ -198,10 +194,11 @@ class ScreenCaster
 
       logger.debug("screencastFrame", {workerid: id, url}, "screencast");
 
-      this.caches.set(id, data);
-      this.urls.set(id, url);
-
+      // keep previous data cached if just showing about:blank
       if (url && !url.startsWith("about:blank")) {
+        this.caches.set(id, data);
+        this.urls.set(id, url);
+
         await this.transport.sendAll({msg, id, data, url});
       }
 
@@ -223,7 +220,7 @@ class ScreenCaster
     }
   }
 
-  async stopById(id) {
+  async stopById(id, sendClose=false) {
     this.caches.delete(id);
     this.urls.delete(id);
 
@@ -237,7 +234,9 @@ class ScreenCaster
       }
     }
 
-    //await this.transport.sendAll({msg: "close", id});
+    if (sendClose) {
+      await this.transport.sendAll({msg: "close", id});
+    }
 
     this.cdps.delete(id);
   }

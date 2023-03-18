@@ -355,13 +355,6 @@ export class Crawler {
     }
   }
 
-  async teardownPage({workerid}) {
-    if (this.screencaster) {
-      logger.debug("End Screencast", {workerid}, "screencast");
-      await this.screencaster.stopById(workerid);
-    }
-  }
-
   async crawlPage(opts) {
     await this.writeStats();
 
@@ -370,6 +363,7 @@ export class Crawler {
     const {url} = data;
 
     const logDetails = {page: url, workerid};
+    data.logDetails = logDetails;
     data.workerid = workerid;
 
     if (!this.isInScope(data, logDetails)) {
@@ -380,7 +374,7 @@ export class Crawler {
     // run custom driver here
     await this.driver({page, data, crawler: this});
 
-    const title = await page.title();
+    data.title = await page.title();
 
     if (this.params.screenshot) {
       if (!data.isHTMLPage) {
@@ -399,13 +393,10 @@ export class Crawler {
       }
     }
 
-    let text = "";
     if (this.params.text && data.isHTMLPage) {
       const result = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
-      text = await new TextExtract(result).parseTextFromDom();
+      data.text = await new TextExtract(result).parseTextFromDom();
     }
-
-    await this.writePage(data, title, this.params.text ? text : null);
 
     if (this.params.behaviorOpts) {
       if (!data.isHTMLPage) {
@@ -425,23 +416,53 @@ export class Crawler {
 
         if (res && res.length) {
           logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
+          data.behaviorsFinished = true;
         }
       }
     }
 
-    logger.info("Page finished", logDetails, "pageStatus");
+    return true;
+  }
 
-    await this.crawlState.markFinished(url);
+  async pageFinished(data) {
+    await this.writePage(data);
 
-    await this.checkLimits();
+    // if page loaded, considered page finished successfully
+    // (even if behaviors timed out)
+    if (data.pageLoaded) {
+      logger.info("Page Finished", data.logDetails, "pageStatus");
+
+      await this.crawlState.markFinished(data.url);
+
+      if (this.healthChecker) {
+        this.healthChecker.resetErrors();
+      }
+    } else {
+      logger.warn("Page Load Failed", data.logDetails, "pageStatus");
+
+      await this.crawlState.markFailed(data.url);
+
+      if (this.healthChecker) {
+        this.healthChecker.incError();
+      }
+    }
 
     await this.serializeConfig();
 
-    if (this.healthChecker) {
-      this.healthChecker.resetErrors();
-    }
+    await this.checkLimits();
+  }
 
-    return true;
+  async teardownPage({workerid}) {
+    if (this.screencaster) {
+      await this.screencaster.stopById(workerid);
+    }
+  }
+
+  async workerDone(workerid) {
+    if (this.screencaster) {
+      //logger.debug("End Screencast", {workerid}, "screencast");
+      await this.screencaster.stopById(workerid, true);
+    }
   }
 
   async runBehaviors(page, frames, logDetails) {
@@ -843,9 +864,9 @@ export class Crawler {
   }
 
   async loadPage(page, data, selectorOptsList = DEFAULT_SELECTORS) {
-    const {url, seedId, depth, workerid, extraHops = 0} = data;
+    const {url, seedId, depth, extraHops = 0} = data;
 
-    const logDetails = {page: url, workerid};
+    const logDetails = data.logDetails;
 
     let isHTMLPage = await timedRun(
       this.isHTML(url),
@@ -924,6 +945,7 @@ export class Crawler {
       }
     }
 
+    data.pageLoaded = true;
     data.isHTMLPage = isHTMLPage;
 
     if (isHTMLPage) {
@@ -959,13 +981,6 @@ export class Crawler {
       const links = await this.extractLinks(page, data.filteredFrames, opts, logDetails);
       await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
     }
-  }
-
-  async markPageFailed(url) {
-    if (this.healthChecker) {
-      this.healthChecker.incError();
-    }
-    await this.crawlState.markFailed(url);
   }
 
   async netIdle(page, details) {
@@ -1122,9 +1137,10 @@ export class Crawler {
     }
   }
 
-  async writePage({url, depth}, title, text) {
+  async writePage({url, depth, title, text /*pageLoaded, behaviorsFinished*/}) {
     const id = uuidv4();
-    const row = {"id": id, "url": url, "title": title};
+    // todo: serialize pageLoaded and behaviorsFinished status
+    const row = {id, url, title};
 
     if (depth === 0) {
       row.seed = true;
