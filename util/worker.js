@@ -177,6 +177,8 @@ export class PageWorker
         await this.timedCrawlPage({...opts, data});
 
       } else {
+        // indicate that the worker is empty (mostly for screencasting, status, etc...)
+        this.crawler.workerEmpty(this.id);
 
         // otherwise, see if any pending urls
         const pending = await crawlState.numPending();

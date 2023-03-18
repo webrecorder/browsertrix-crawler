@@ -460,11 +460,15 @@ export class Crawler {
     }
   }
 
-  async workerDone(workerid) {
+  async workerEmpty(workerid) {
     if (this.screencaster) {
       //logger.debug("End Screencast", {workerid}, "screencast");
       await this.screencaster.stopById(workerid, true);
     }
+  }
+
+  async workerDone(/*workerid*/) {
+    // track worker done
   }
 
   async runBehaviors(page, frames, logDetails) {
