@@ -4,7 +4,7 @@ import fs from "fs";
 import os from "os";
 import fsp from "fs/promises";
 
-import { RedisCrawlState } from "./util/state.js";
+import { RedisCrawlState, LoadState } from "./util/state.js";
 import Sitemapper from "sitemapper";
 import { v4 as uuidv4 } from "uuid";
 import yaml from "js-yaml";
@@ -398,6 +398,8 @@ export class Crawler {
       data.text = await new TextExtract(result).parseTextFromDom();
     }
 
+    data.loadState = LoadState.EXTRACTION_DONE;
+
     if (this.params.behaviorOpts) {
       if (!data.isHTMLPage) {
         logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
@@ -416,7 +418,7 @@ export class Crawler {
 
         if (res && res.length) {
           logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
-          data.behaviorsFinished = true;
+          data.loadState = LoadState.BEHAVIORS_DONE;
         }
       }
     }
@@ -429,7 +431,7 @@ export class Crawler {
 
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    if (data.pageLoaded) {
+    if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       logger.info("Page Finished", data.logDetails, "pageStatus");
 
       await this.crawlState.markFinished(data.url);
@@ -908,11 +910,9 @@ export class Crawler {
       ignoreAbort = shouldIgnoreAbort(req);
     });
 
-    let domContentLoaded = false;
-
     if (isHTMLPage) {
       page.once("domcontentloaded", () => {
-        domContentLoaded = true;
+        data.loadState = LoadState.CONTENT_LOADED;
       });
     }
 
@@ -931,7 +931,7 @@ export class Crawler {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         if (e.name === "TimeoutError") {
-          if (!domContentLoaded) {
+          if (data.loadState !== LoadState.CONTENT_LOADED) {
             logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
             throw e;
           } else {
@@ -945,7 +945,8 @@ export class Crawler {
       }
     }
 
-    data.pageLoaded = true;
+    data.loadState = LoadState.FULL_PAGE_LOADED;
+
     data.isHTMLPage = isHTMLPage;
 
     if (isHTMLPage) {
@@ -1137,10 +1138,9 @@ export class Crawler {
     }
   }
 
-  async writePage({url, depth, title, text /*pageLoaded, behaviorsFinished*/}) {
+  async writePage({url, depth, title, text, loadState}) {
     const id = uuidv4();
-    // todo: serialize pageLoaded and behaviorsFinished status
-    const row = {id, url, title};
+    const row = {id, url, title, loadState};
 
     if (depth === 0) {
       row.seed = true;
