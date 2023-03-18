@@ -251,7 +251,7 @@ class ScreenCaster
 
     logger.info("Started Screencast", {workerid: id}, "screencast");
 
-    await cdp.send("Page.startScreencast", {format: "png", everyNthFrame: 2, maxWidth: this.maxWidth, maxHeight: this.maxHeight});
+    await cdp.send("Page.startScreencast", {format: "png", everyNthFrame: 1, maxWidth: this.maxWidth, maxHeight: this.maxHeight});
   }
 
   async stopCast(cdp, id) {

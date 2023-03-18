@@ -74,7 +74,7 @@ export class PageWorker
         const { page, cdp } = await timedRun(
           this.crawler.browser.newWindowPageWithCDP(),
           NEW_WINDOW_TIMEOUT,
-          "New Window Timed Out!",
+          "New Window Timed Out",
           {workerid},
           "worker"
         );

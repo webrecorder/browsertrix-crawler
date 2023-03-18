@@ -1079,10 +1079,9 @@ browserslist@^4.21.3:
     node-releases "^2.0.6"
     update-browserslist-db "^1.0.9"
 
-browsertrix-behaviors@^0.4.2:
-  version "0.4.2"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.4.2.tgz#830f4e37ddebf10dd923237dfd75c734d5d211e9"
-  integrity sha512-5w6kPL3NB/BkmEGxWt3NT3iddAaSzMR1TtDPS7b66fM9kkhpCjCv/R/zR951jWDIeV3flJFBOy09uI5o8asPqg==
+"browsertrix-behaviors@github:webrecorder/browsertrix-behaviors#autoscroll-fix":
+  version "0.5.0-beta.0"
+  resolved "https://codeload.github.com/webrecorder/browsertrix-behaviors/tar.gz/8fed92de2e9e827841d0cdd5675982e3d14b40cb"
 
 bser@2.1.1:
   version "2.1.1"

@@ -5,7 +5,6 @@ import os from "os";
 import fsp from "fs/promises";
 
 import { RedisCrawlState } from "./util/state.js";
-//import AbortController from "abort-controller";
 import Sitemapper from "sitemapper";
 import { v4 as uuidv4 } from "uuid";
 import yaml from "js-yaml";
@@ -411,6 +410,8 @@ export class Crawler {
     if (this.params.behaviorOpts) {
       if (!data.isHTMLPage) {
         logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
+      } else if (data.skipBehaviors) {
+        logger.info("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
         const behaviorTimeout = this.params.behaviorTimeout / 1000;
 
@@ -461,12 +462,21 @@ export class Crawler {
     }
   }
 
-  shouldIncludeFrame(frame, logDetails) {
+  async shouldIncludeFrame(frame, logDetails) {
     if (!frame.parentFrame()) {
-      return true;
+      return frame;
     }
 
     const frameUrl = frame.url();
+
+    const frameElem = await frame.frameElement();
+
+    const tagName = await frame.evaluate(e => e.tagName, frameElem);
+
+    if (tagName !== "IFRAME" && tagName !== "FRAME") {
+      logger.debug("Skipping processing non-frame object", {tagName, frameUrl, ...logDetails}, "behavior");
+      return null;
+    }
 
     let res;
 
@@ -480,7 +490,7 @@ export class Crawler {
       logger.debug("Skipping processing frame", {frameUrl, ...logDetails}, "behavior");
     }
 
-    return res;
+    return res ? frame : null;
   }
 
   async getInfoString() {
@@ -877,6 +887,14 @@ export class Crawler {
       ignoreAbort = shouldIgnoreAbort(req);
     });
 
+    let domContentLoaded = false;
+
+    if (isHTMLPage) {
+      page.once("domcontentloaded", () => {
+        domContentLoaded = true;
+      });
+    }
+
     const gotoOpts = isHTMLPage ? this.gotoOpts : {waitUntil: "domcontentloaded"};
 
     logger.info("Awaiting page load", logDetails);
@@ -888,24 +906,33 @@ export class Crawler {
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
-      //if (this.healthChecker) {
-      //  this.healthChecker.resetErrors();
-      //}
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
-        const mainMessage = e.name === "TimeoutError" ? "Page Load Timeout" : "Page Load Error";
-        logger.error(mainMessage, {msg, ...logDetails});
-        //if (this.healthChecker) {
-        //  this.healthChecker.incError();
-        //}
+        if (e.name === "TimeoutError") {
+          if (!domContentLoaded) {
+            logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
+            throw e;
+          } else {
+            logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
+            data.skipBehaviors = true;
+          }
+        } else {
+          logger.error("Page Load Error, skipping page", {msg, ...logDetails});
+          throw e;
+        }
       }
     }
 
     data.isHTMLPage = isHTMLPage;
 
     if (isHTMLPage) {
-      data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
+      let frames = await page.frames();
+      frames = await Promise.allSettled(frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)));
+
+      data.filteredFrames = frames.filter((x) => x.status === "fulfilled" && x.value).map(x => x.value);
+
+      //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
       data.filteredFrames = [];
     }
@@ -1135,6 +1162,7 @@ export class Crawler {
 
     } catch(e) {
       // can't confirm not html, so try in browser
+      logger.debug("HEAD request failed", {...e, url});
       return true;
     }
   }
