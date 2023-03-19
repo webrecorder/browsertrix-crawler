@@ -431,8 +431,10 @@ export class Crawler {
 
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
+    const { loadState, logDetails } = data;
+
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
-      logger.info("Page Finished", data.logDetails, "pageStatus");
+      logger.info("Page Finished", {loadState, ...logDetails}, "pageStatus");
 
       await this.crawlState.markFinished(data.url);
 
@@ -440,7 +442,7 @@ export class Crawler {
         this.healthChecker.resetErrors();
       }
     } else {
-      logger.warn("Page Load Failed", data.logDetails, "pageStatus");
+      logger.warn("Page Load Failed", {loadState, ...logDetails}, "pageStatus");
 
       await this.crawlState.markFailed(data.url);
 

@@ -31,6 +31,7 @@ export class PageState
     this.filteredFrames = [];
 
     this.loadState = LoadState.FAILED;
+    this.logDetails = {};
   }
 }
 
