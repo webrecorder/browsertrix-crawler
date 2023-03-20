@@ -157,8 +157,6 @@ export class PageWorker
       logger.info("Worker exiting, all tasks complete", {workerid: this.id}, "worker");
     } catch (e) {
       logger.error("Worker errored", e, "worker");
-    } finally {
-      this.crawler.workerDone(this.id);
     }
   }
 
@@ -180,7 +178,7 @@ export class PageWorker
         // indicate that the worker is empty (mostly for screencasting, status, etc...)
         this.crawler.workerEmpty(this.id);
 
-        // otherwise, see if any pending urls
+        // check if any pending urls
         const pending = await crawlState.numPending();
 
         // if pending, sleep and check again

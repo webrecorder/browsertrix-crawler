@@ -469,10 +469,6 @@ export class Crawler {
     }
   }
 
-  async workerDone(/*workerid*/) {
-    // track worker done
-  }
-
   async runBehaviors(page, frames, logDetails) {
     try {
       frames = frames || page.frames();
