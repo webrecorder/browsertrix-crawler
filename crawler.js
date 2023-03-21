@@ -423,6 +423,11 @@ export class Crawler {
       }
     }
 
+    if (this.params.waitAfterInterval) {
+      logger.info(`Waiting ${this.params.waitAfterInterval} seconds before moving on to next page`, logDetails);
+      await sleep(this.params.waitAfterInterval);
+    }
+
     return true;
   }
 

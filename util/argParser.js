@@ -223,6 +223,12 @@ class ArgParser {
         type: "number",
       },
 
+      "waitAfterInterval": {
+        describe: "If >0, amount of time to sleep (in seconds) after behaviors before moving on to next page",
+        default: 0,
+        type: "number",
+      },
+
       "profile": {
         describe: "Path to tar.gz file which will be extracted and used as the browser profile",
         type: "string",
