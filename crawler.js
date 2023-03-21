@@ -688,7 +688,7 @@ export class Crawler {
       }
     });
 
-    const totalPageTimeout = (this.params.behaviorTimeout + this.params.timeout) / 1000 + 60;
+    const totalPageTimeout = (this.params.behaviorTimeout + this.params.waitAfterInterval + this.params.timeout) / 1000 + 60;
 
     await runWorkers(this, this.params.workers, totalPageTimeout);
 
