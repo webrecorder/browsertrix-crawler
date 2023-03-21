@@ -68,13 +68,12 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --crawlId, --id                       A user provided ID for this crawl or
                                              crawl configuration (can also be se
                                             t via CRAWL_ID env var)
-                                              [string] [default: "06bf9a4df9f7"]
+                                              [string] [default: "ce75810e6874"]
       --newContext                          Deprecated as of 0.8.0, any values p
                                             assed will be ignored
                                                         [string] [default: null]
-      --waitUntil                           Puppeteer page.goto() condition to w
-                                            ait for before continuing, can be mu
-                                            ltiple separate by ','
+      --waitUntil                           Playwright page.goto() condition to
+                                            wait for before continuing
                                                                [default: "load"]
       --depth                               The depth of the crawl for all seeds
                                                           [number] [default: -1]
@@ -83,11 +82,11 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                                            [number] [default: 0]
       --limit                               Limit crawl to this number of pages
                                                            [number] [default: 0]
-      --timeout                             Timeout for each page to load (in se
+      --pageLoadTimeout, --timeout          Timeout for each page to load (in se
                                             conds)        [number] [default: 90]
       --scopeType                           A predefined scope of the crawl. For
-                                            more customization, use 'custom' and
-                                             set scopeIncludeRx regexes
+                                             more customization, use 'custom' an
+                                            d set scopeIncludeRx regexes
   [string] [choices: "page", "page-spa", "prefix", "host", "domain", "any", "cus
                                                                            tom"]
       --scopeIncludeRx, --include           Regex of page URLs that should be in
@@ -131,19 +130,20 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --generateWACZ, --generatewacz, --ge  If set, generate wacz
       nerateWacz                                      [boolean] [default: false]
       --logging                             Logging options for crawler, can inc
-                                            lude: stats, pywb, behaviors, behavi
-                                            ors-debug, jserrors
+                                            lude: stats (enabled by default), js
+                                            errors, pywb, debug
                                                      [string] [default: "stats"]
       --text                                If set, extract text to the pages.js
-                                            only file  [boolean] [default: false]
+                                            onl file  [boolean] [default: false]
       --cwd                                 Crawl working directory for captures
                                              (pywb root). If not set, defaults t
                                             o process.cwd()
                                                    [string] [default: "/crawls"]
       --mobileDevice                        Emulate mobile device by name from:
-                                            https://github.com/puppeteer/puppete
-                                            er/blob/main/src/common/DeviceDescri
-                                            ptors.ts                    [string]
+                                            https://github.com/microsoft/playwri
+                                            ght/blob/main/packages/playwright-co
+                                            re/src/server/deviceDescriptorsSourc
+                                            e.json                      [string]
       --userAgent                           Override user-agent with specified s
                                             tring                       [string]
       --userAgentSuffix                     Append suffix to existing browser us
@@ -162,12 +162,16 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                             age behavior will run on each page.
                                             If 0, a behavior can run until finis
                                             h.            [number] [default: 90]
+      --pageExtraDelay, --delay             If >0, amount of time to sleep (in s
+                                            econds) after behaviors before movin
+                                            g on to next page
+                                                           [number] [default: 0]
       --profile                             Path to tar.gz file which will be ex
                                             tracted and used as the browser prof
                                             ile                         [string]
       --screenshot                          Screenshot options for crawler, can
-                                            include: view, thumbnail, fullPage
-                                            (comma-separated list)
+                                            include: view, thumbnail, fullPage (
+                                            comma-separated list)
                                                           [string] [default: ""]
       --screencastPort                      If set to a non-zero value, starts a
                                             n HTTP server with screencast access
@@ -181,9 +185,10 @@ Browsertrix Crawler includes a number of additional command-line options, explai
                                             o record in combined WARCs
       --redisStoreUrl                       If set, url for remote redis server
                                             to store state. Otherwise, using in-
-                                            memory store                [string]
+                                            memory store
+                                  [string] [default: "redis://localhost:6379/0"]
       --saveState                           If the crawl state should be seriali
-                                            zed to the crawls/ directory. Default
+                                            zed to the crawls/ directory. Defaul
                                             ts to 'partial', only saved when cra
                                             wl is interrupted
            [string] [choices: "never", "partial", "always"] [default: "partial"]
@@ -212,8 +217,11 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --netIdleWait                         if set, wait for network idle after
                                             page load and after behaviors are do
                                             ne (in seconds). if -1 (default), de
-                                            determine based on scope
+                                            termine based on scope
                                                           [number] [default: -1]
+      --lang                                if set, sets the language used by th
+                                            e browser, should be ISO 639 languag
+                                            e[-country] code            [string]
       --config                              Path to YAML config file
 
 ```

@@ -74,7 +74,8 @@ class ArgParser {
         type: "number",
       },
 
-      "timeout": {
+      "pageLoadTimeout": {
+        alias: "timeout",
         describe: "Timeout for each page to load (in seconds)",
         default: 90,
         type: "number",
@@ -223,7 +224,8 @@ class ArgParser {
         type: "number",
       },
 
-      "waitAfterInterval": {
+      "pageExtraDelay": {
+        alias: "delay",
         describe: "If >0, amount of time to sleep (in seconds) after behaviors before moving on to next page",
         default: 0,
         type: "number",
@@ -360,7 +362,7 @@ class ArgParser {
       logger.fatal(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
 
-    argv.timeout *= 1000;
+    argv.pageLoadTimeout *= 1000;
 
     // waitUntil condition must be: load, domcontentloaded, networkidle
     // TODO: Playwright migration - for now, can only support one
@@ -394,6 +396,7 @@ class ArgParser {
     if (argv.behaviorTimeout) {
       behaviorOpts.timeout = argv.behaviorTimeout *= 1000;
     }
+    argv.pageExtraDelayMs = argv.pageExtraDelay *= 1000;
     behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 

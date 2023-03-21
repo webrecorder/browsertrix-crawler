@@ -85,7 +85,7 @@ export class Crawler {
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
-      timeout: this.params.timeout
+      timeout: this.params.pageLoadTimeout
     };
 
     // pages directory
@@ -152,7 +152,10 @@ export class Crawler {
 
     logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
 
-    this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.params.behaviorTimeout + this.params.timeout, os.hostname());
+    const pageTimeout = this.params.behaviorTimeout + this.params.pageLoadTimeout * this.params.pageExtraDelayMs;
+    logger.debug(`Page timeout for redis: ${pageTimeout} seconds`, {}, "redis");
+
+    this.crawlState = new RedisCrawlState(redis, this.params.crawlId, pageTimeout, os.hostname());
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
       logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
@@ -423,9 +426,9 @@ export class Crawler {
       }
     }
 
-    if (this.params.waitAfterInterval) {
-      logger.info(`Waiting ${this.params.waitAfterInterval} seconds before moving on to next page`, logDetails);
-      await sleep(this.params.waitAfterInterval);
+    if (this.params.pageExtraDelay) {
+      logger.info(`Waiting ${this.params.pageExtraDelay} seconds before moving on to next page`, logDetails);
+      await sleep(this.params.pageExtraDelay);
     }
 
     return true;
@@ -688,7 +691,8 @@ export class Crawler {
       }
     });
 
-    const totalPageTimeout = (this.params.behaviorTimeout + this.params.waitAfterInterval + this.params.timeout) / 1000 + 60;
+    const pageTimeout = this.params.behaviorTimeout + this.params.pageLoadTimeout + this.params.pageExtraDelayMs;
+    const totalPageTimeout = pageTimeout / 1000 + 60;
 
     await runWorkers(this, this.params.workers, totalPageTimeout);
 
