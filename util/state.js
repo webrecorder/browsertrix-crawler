@@ -4,6 +4,39 @@ import { MAX_DEPTH } from "./constants.js";
 
 
 // ============================================================================
+export const LoadState = {
+  FAILED: 0,
+  CONTENT_LOADED: 1,
+  FULL_PAGE_LOADED: 2,
+  EXTRACTION_DONE: 3,
+  BEHAVIORS_DONE: 4,
+};
+
+// ============================================================================
+export class PageState
+{
+  constructor(redisData) {
+    this.url = redisData.url;
+    this.seedId = redisData.seedId;
+    this.depth = redisData.depth;
+    this.extraHops = redisData.extraHops;
+
+    this.workerid = null;
+    this.title = null;
+
+    this.isHTMLPage = null;
+    this.text = null;
+
+    this.skipBehaviors = false;
+    this.filteredFrames = [];
+
+    this.loadState = LoadState.FAILED;
+    this.logDetails = {};
+  }
+}
+
+
+// ============================================================================
 export class RedisCrawlState
 {
   constructor(redis, key, pageTimeout, uid) {
@@ -186,7 +219,7 @@ return 0;
 
     await this.markStarted(data.url);
 
-    return data;
+    return new PageState(data);
   }
 
   async has(url) {

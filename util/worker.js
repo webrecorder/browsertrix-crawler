@@ -12,7 +12,8 @@ export function runWorkers(crawler, numWorkers, timeout) {
   const workers = [];
 
   for (let i = 0; i < numWorkers; i++) {
-    workers.push(new PageWorker(`worker-${i+1}`, crawler, timeout));
+    //workers.push(new PageWorker(`worker-${i+1}`, crawler, timeout));
+    workers.push(new PageWorker(i, crawler, timeout));
   }
 
   return Promise.allSettled(workers.map((worker) => worker.run()));
@@ -33,35 +34,43 @@ export class PageWorker
 
     this.opts = null;
 
-    this.failed = false;
     this.logDetails = {workerid: this.id};
+
+    this.crashed = false;
+    this.markCrashed = null;
+    this.crashBreak = null;
   }
 
   async closePage() {
     if (this.page) {
-      await this.crawler.teardownPage(this.opts);
 
-      try {
-        await this.cdp.detach();
-      } catch (e) {
-        // ignore
+      if (!this.crashed) {
+        await this.crawler.teardownPage(this.opts);
+      } else {
+        logger.debug("Closing crashed page", {workerid: this.id}, "worker");
       }
-      this.cdp = null;
 
       try {
         await this.page.close();
       } catch (e) {
         // ignore
       }
+
+      if (this.crashed) {
+        const numPagesRemaining = this.crawler.browser.numPages() - 1;
+        logger.debug("Skipping teardown of crashed page", {numPagesRemaining, workerid: this.id}, "worker");
+      }
+
+      this.cdp = null;
       this.page = null;
     }
   }
 
   async initPage() {
-    if (this.page && ++this.reuseCount <= MAX_REUSE) {
+    if (!this.crashed && this.page && ++this.reuseCount <= MAX_REUSE) {
       logger.debug("Reusing page", {reuseCount: this.reuseCount}, "worker");
       return this.opts;
-    } else {
+    } else if (this.page) {
       await this.closePage();
     }
     
@@ -74,7 +83,7 @@ export class PageWorker
         const { page, cdp } = await timedRun(
           this.crawler.browser.newWindowPageWithCDP(),
           NEW_WINDOW_TIMEOUT,
-          "New Window Timed Out!",
+          "New Window Timed Out",
           {workerid},
           "worker"
         );
@@ -84,13 +93,16 @@ export class PageWorker
         this.opts = {page: this.page, cdp: this.cdp, workerid};
 
         // updated per page crawl
-        this.failed = false;
+        this.crashed = false;
+        this.crashBreak = new Promise((resolve, reject) => this.markCrashed = reject);
+
         this.logDetails = {page: this.page.url(), workerid};
 
         // more serious page crash, mark as failed
-        this.page.on("crash", () => {
-          logger.error("Page Crash", ...this.logDetails, "worker");
-          this.failed = true;
+        this.page.on("crash", (details) => {
+          logger.error("Page Crash", {details, ...this.logDetails}, "worker");
+          this.crashed = true;
+          this.markCrashed("crashed");
         });
 
         await this.crawler.setupPage(this.opts);
@@ -111,36 +123,30 @@ export class PageWorker
 
   async timedCrawlPage(opts) {
     const workerid = this.id;
-    const url = opts.data.url;
+    const { data } = opts;
+    const { url } = data;
 
     logger.info("Starting page", {workerid, "page": url}, "worker");
 
     this.logDetails = {page: url, workerid};
 
-    this.failed = false;
-
     try {
-      const result = await timedRun(
-        this.crawler.crawlPage(opts),
-        this.timeout,
-        "Page Worker Timeout",
-        {workerid},
-        "worker"
-      );
-
-      this.failed = this.failed || !result;
+      await Promise.race([
+        timedRun(
+          this.crawler.crawlPage(opts),
+          this.timeout,
+          "Page Worker Timeout",
+          {workerid},
+          "worker"
+        ),
+        this.crashBreak
+      ]);
 
     } catch (e) {
       logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
-      this.failed = true;
     } finally {
-      if (this.failed) {
-        logger.warn("Page Load Failed", this.logDetails, "worker");
-        this.crawler.markPageFailed(url);
-      }
+      await this.crawler.pageFinished(data);
     }
-
-    return this.failed;
   }
 
   async run() {
@@ -166,17 +172,14 @@ export class PageWorker
         const opts = await this.initPage();
 
         // run timed crawl of page
-        const failed = await this.timedCrawlPage({...opts, data});
+        await this.timedCrawlPage({...opts, data});
 
-        // close page if failed
-        if (failed) {
-          logger.debug("Resetting failed page", {}, "worker");
-
-          await this.closePage();
-        }
       } else {
+        // indicate that the worker has no more work (mostly for screencasting, status, etc...)
+        // depending on other works, will either get more work or crawl will end
+        this.crawler.workerIdle(this.id);
 
-        // otherwise, see if any pending urls
+        // check if any pending urls
         const pending = await crawlState.numPending();
 
         // if pending, sleep and check again

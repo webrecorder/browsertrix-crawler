@@ -4,8 +4,7 @@ import fs from "fs";
 import os from "os";
 import fsp from "fs/promises";
 
-import { RedisCrawlState } from "./util/state.js";
-//import AbortController from "abort-controller";
+import { RedisCrawlState, LoadState } from "./util/state.js";
 import Sitemapper from "sitemapper";
 import { v4 as uuidv4 } from "uuid";
 import yaml from "js-yaml";
@@ -356,13 +355,6 @@ export class Crawler {
     }
   }
 
-  async teardownPage({workerid}) {
-    if (this.screencaster) {
-      logger.debug("End Screencast", {workerid}, "screencast");
-      await this.screencaster.stopById(workerid);
-    }
-  }
-
   async crawlPage(opts) {
     await this.writeStats();
 
@@ -371,6 +363,7 @@ export class Crawler {
     const {url} = data;
 
     const logDetails = {page: url, workerid};
+    data.logDetails = logDetails;
     data.workerid = workerid;
 
     if (!this.isInScope(data, logDetails)) {
@@ -381,7 +374,7 @@ export class Crawler {
     // run custom driver here
     await this.driver({page, data, crawler: this});
 
-    const title = await page.title();
+    data.title = await page.title();
 
     if (this.params.screenshot) {
       if (!data.isHTMLPage) {
@@ -400,17 +393,18 @@ export class Crawler {
       }
     }
 
-    let text = "";
     if (this.params.text && data.isHTMLPage) {
       const result = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
-      text = await new TextExtract(result).parseTextFromDom();
+      data.text = await new TextExtract(result).parseTextFromDom();
     }
 
-    await this.writePage(data, title, this.params.text ? text : null);
+    data.loadState = LoadState.EXTRACTION_DONE;
 
     if (this.params.behaviorOpts) {
       if (!data.isHTMLPage) {
         logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
+      } else if (data.skipBehaviors) {
+        logger.info("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
         const behaviorTimeout = this.params.behaviorTimeout / 1000;
 
@@ -424,23 +418,55 @@ export class Crawler {
 
         if (res && res.length) {
           logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
+          data.loadState = LoadState.BEHAVIORS_DONE;
         }
       }
     }
 
-    logger.info("Page finished", logDetails, "pageStatus");
+    return true;
+  }
 
-    await this.crawlState.markFinished(url);
+  async pageFinished(data) {
+    await this.writePage(data);
 
-    await this.checkLimits();
+    // if page loaded, considered page finished successfully
+    // (even if behaviors timed out)
+    const { loadState, logDetails } = data;
+
+    if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
+      logger.info("Page Finished", {loadState, ...logDetails}, "pageStatus");
+
+      await this.crawlState.markFinished(data.url);
+
+      if (this.healthChecker) {
+        this.healthChecker.resetErrors();
+      }
+    } else {
+      logger.warn("Page Load Failed", {loadState, ...logDetails}, "pageStatus");
+
+      await this.crawlState.markFailed(data.url);
+
+      if (this.healthChecker) {
+        this.healthChecker.incError();
+      }
+    }
 
     await this.serializeConfig();
 
-    if (this.healthChecker) {
-      this.healthChecker.resetErrors();
-    }
+    await this.checkLimits();
+  }
 
-    return true;
+  async teardownPage({workerid}) {
+    if (this.screencaster) {
+      await this.screencaster.stopById(workerid);
+    }
+  }
+
+  async workerIdle(workerid) {
+    if (this.screencaster) {
+      //logger.debug("End Screencast", {workerid}, "screencast");
+      await this.screencaster.stopById(workerid, true);
+    }
   }
 
   async runBehaviors(page, frames, logDetails) {
@@ -461,12 +487,21 @@ export class Crawler {
     }
   }
 
-  shouldIncludeFrame(frame, logDetails) {
+  async shouldIncludeFrame(frame, logDetails) {
     if (!frame.parentFrame()) {
-      return true;
+      return frame;
     }
 
     const frameUrl = frame.url();
+
+    const frameElem = await frame.frameElement();
+
+    const tagName = await frame.evaluate(e => e.tagName, frameElem);
+
+    if (tagName !== "IFRAME" && tagName !== "FRAME") {
+      logger.debug("Skipping processing non-frame object", {tagName, frameUrl, ...logDetails}, "behavior");
+      return null;
+    }
 
     let res;
 
@@ -480,7 +515,7 @@ export class Crawler {
       logger.debug("Skipping processing frame", {frameUrl, ...logDetails}, "behavior");
     }
 
-    return res;
+    return res ? frame : null;
   }
 
   async getInfoString() {
@@ -833,9 +868,9 @@ export class Crawler {
   }
 
   async loadPage(page, data, selectorOptsList = DEFAULT_SELECTORS) {
-    const {url, seedId, depth, workerid, extraHops = 0} = data;
+    const {url, seedId, depth, extraHops = 0} = data;
 
-    const logDetails = {page: url, workerid};
+    const logDetails = data.logDetails;
 
     let isHTMLPage = await timedRun(
       this.isHTML(url),
@@ -877,6 +912,12 @@ export class Crawler {
       ignoreAbort = shouldIgnoreAbort(req);
     });
 
+    if (isHTMLPage) {
+      page.once("domcontentloaded", () => {
+        data.loadState = LoadState.CONTENT_LOADED;
+      });
+    }
+
     const gotoOpts = isHTMLPage ? this.gotoOpts : {waitUntil: "domcontentloaded"};
 
     logger.info("Awaiting page load", logDetails);
@@ -888,24 +929,35 @@ export class Crawler {
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
-      //if (this.healthChecker) {
-      //  this.healthChecker.resetErrors();
-      //}
     } catch (e) {
       let msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
-        const mainMessage = e.name === "TimeoutError" ? "Page Load Timeout" : "Page Load Error";
-        logger.error(mainMessage, {msg, ...logDetails});
-        //if (this.healthChecker) {
-        //  this.healthChecker.incError();
-        //}
+        if (e.name === "TimeoutError") {
+          if (data.loadState !== LoadState.CONTENT_LOADED) {
+            logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
+            throw e;
+          } else {
+            logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
+            data.skipBehaviors = true;
+          }
+        } else {
+          logger.error("Page Load Error, skipping page", {msg, ...logDetails});
+          throw e;
+        }
       }
     }
+
+    data.loadState = LoadState.FULL_PAGE_LOADED;
 
     data.isHTMLPage = isHTMLPage;
 
     if (isHTMLPage) {
-      data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
+      let frames = await page.frames();
+      frames = await Promise.allSettled(frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)));
+
+      data.filteredFrames = frames.filter((x) => x.status === "fulfilled" && x.value).map(x => x.value);
+
+      //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
       data.filteredFrames = [];
     }
@@ -932,13 +984,6 @@ export class Crawler {
       const links = await this.extractLinks(page, data.filteredFrames, opts, logDetails);
       await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
     }
-  }
-
-  async markPageFailed(url) {
-    if (this.healthChecker) {
-      this.healthChecker.incError();
-    }
-    await this.crawlState.markFailed(url);
   }
 
   async netIdle(page, details) {
@@ -1095,9 +1140,9 @@ export class Crawler {
     }
   }
 
-  async writePage({url, depth}, title, text) {
+  async writePage({url, depth, title, text, loadState}) {
     const id = uuidv4();
-    const row = {"id": id, "url": url, "title": title};
+    const row = {id, url, title, loadState};
 
     if (depth === 0) {
       row.seed = true;
@@ -1135,6 +1180,7 @@ export class Crawler {
 
     } catch(e) {
       // can't confirm not html, so try in browser
+      logger.debug("HEAD request failed", {...e, url});
       return true;
     }
   }
