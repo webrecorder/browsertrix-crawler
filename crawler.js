@@ -462,7 +462,7 @@ export class Crawler {
     }
   }
 
-  async workerEmpty(workerid) {
+  async workerIdle(workerid) {
     if (this.screencaster) {
       //logger.debug("End Screencast", {workerid}, "screencast");
       await this.screencaster.stopById(workerid, true);
