@@ -74,7 +74,8 @@ class ArgParser {
         type: "number",
       },
 
-      "timeout": {
+      "pageLoadTimeout": {
+        alias: "timeout",
         describe: "Timeout for each page to load (in seconds)",
         default: 90,
         type: "number",
@@ -223,6 +224,13 @@ class ArgParser {
         type: "number",
       },
 
+      "pageExtraDelay": {
+        alias: "delay",
+        describe: "If >0, amount of time to sleep (in seconds) after behaviors before moving on to next page",
+        default: 0,
+        type: "number",
+      },
+
       "profile": {
         describe: "Path to tar.gz file which will be extracted and used as the browser profile",
         type: "string",
@@ -354,10 +362,7 @@ class ArgParser {
       logger.fatal(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
 
-    argv.timeout *= 1000;
-
-    // waitUntil condition must be: load, domcontentloaded, networkidle
-    // TODO: Playwright migration - for now, can only support one
+    // waitUntil condition must be one of WAIT_UNTIL_OPTS: load, domcontentloaded, networkidle
     // (see: https://playwright.dev/docs/api/class-page#page-goto-option-wait-until)
     if (!WAIT_UNTIL_OPTS.includes(argv.waitUntil)) {
       logger.fatal("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
@@ -385,9 +390,6 @@ class ArgParser {
       argv.behaviors = argv.behaviors.split(",");
     }
     argv.behaviors.forEach((x) => behaviorOpts[x] = true);
-    if (argv.behaviorTimeout) {
-      behaviorOpts.timeout = argv.behaviorTimeout *= 1000;
-    }
     behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 

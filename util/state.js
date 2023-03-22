@@ -39,7 +39,7 @@ export class PageState
 // ============================================================================
 export class RedisCrawlState
 {
-  constructor(redis, key, pageTimeout, uid) {
+  constructor(redis, key, maxPageTime, uid) {
     this.redis = redis;
 
     this.maxRetryPending = 1;
@@ -48,7 +48,7 @@ export class RedisCrawlState
 
     this.uid = uid;
     this.key = key;
-    this.pageTimeout = pageTimeout / 1000;
+    this.maxPageTime = maxPageTime;
 
     this.qkey = this.key + ":q";
     this.pkey = this.key + ":p";
@@ -152,7 +152,7 @@ return 0;
   async markStarted(url) {
     const started = this._timestamp();
 
-    return await this.redis.markstarted(this.pkey, this.pkey + ":" + url, url, started, this.pageTimeout);
+    return await this.redis.markstarted(this.pkey, this.pkey + ":" + url, url, started, this.maxPageTime);
   }
 
   async markFinished(url) {

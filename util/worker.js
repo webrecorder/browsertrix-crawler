@@ -6,14 +6,14 @@ const MAX_REUSE = 5;
 const NEW_WINDOW_TIMEOUT = 10;
 
 // ===========================================================================
-export function runWorkers(crawler, numWorkers, timeout) {
+export function runWorkers(crawler, numWorkers, maxPageTime) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
   const workers = [];
 
   for (let i = 0; i < numWorkers; i++) {
-    //workers.push(new PageWorker(`worker-${i+1}`, crawler, timeout));
-    workers.push(new PageWorker(i, crawler, timeout));
+    //workers.push(new PageWorker(`worker-${i+1}`, crawler, maxPageTime));
+    workers.push(new PageWorker(i, crawler, maxPageTime));
   }
 
   return Promise.allSettled(workers.map((worker) => worker.run()));
@@ -23,10 +23,10 @@ export function runWorkers(crawler, numWorkers, timeout) {
 // ===========================================================================
 export class PageWorker
 {
-  constructor(id, crawler, timeout) {
+  constructor(id, crawler, maxPageTime) {
     this.id = id;
     this.crawler = crawler;
-    this.timeout = timeout;
+    this.maxPageTime = maxPageTime;
 
     this.reuseCount = 0;
     this.page = null;
@@ -134,7 +134,7 @@ export class PageWorker
       await Promise.race([
         timedRun(
           this.crawler.crawlPage(opts),
-          this.timeout,
+          this.maxPageTime,
           "Page Worker Timeout",
           {workerid},
           "worker"

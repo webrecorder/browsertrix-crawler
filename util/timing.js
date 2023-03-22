@@ -24,4 +24,8 @@ export function timedRun(promise, seconds, message="Promise timed out", logDetai
     });
 }
 
+export function secondsElapsed(startTime, nowDate = null) {
+  nowDate = nowDate || new Date();
 
+  return (nowDate.getTime() - startTime) / 1000;
+}
