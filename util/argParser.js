@@ -362,10 +362,7 @@ class ArgParser {
       logger.fatal(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
 
-    argv.pageLoadTimeout *= 1000;
-
-    // waitUntil condition must be: load, domcontentloaded, networkidle
-    // TODO: Playwright migration - for now, can only support one
+    // waitUntil condition must be one of WAIT_UNTIL_OPTS: load, domcontentloaded, networkidle
     // (see: https://playwright.dev/docs/api/class-page#page-goto-option-wait-until)
     if (!WAIT_UNTIL_OPTS.includes(argv.waitUntil)) {
       logger.fatal("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
@@ -393,10 +390,6 @@ class ArgParser {
       argv.behaviors = argv.behaviors.split(",");
     }
     argv.behaviors.forEach((x) => behaviorOpts[x] = true);
-    if (argv.behaviorTimeout) {
-      behaviorOpts.timeout = argv.behaviorTimeout *= 1000;
-    }
-    argv.pageExtraDelayMs = argv.pageExtraDelay *= 1000;
     behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 

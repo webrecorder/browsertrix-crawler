@@ -20,7 +20,7 @@ import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { logger, errJSON } from "./util/logger.js";
 import { runWorkers } from "./util/worker.js";
-import { sleep, timedRun } from "./util/timing.js";
+import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 
 import { Browser } from "./util/browser.js";
 
@@ -76,7 +76,11 @@ export class Crawler {
 
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
-    this.saveStateInterval = this.params.saveStateInterval * 1000;    
+
+    // sum of page load + behavior timeouts + 2 x fetch + cloudflare + link extraction timeouts + extra page delay
+    // if exceeded, will interrupt and move on to next page (likely behaviors or some other operation is stuck)
+    this.maxPageTime = this.params.pageLoadTimeout + this.params.behaviorTimeout +
+                       FETCH_TIMEOUT_SECS*2 + PAGE_OP_TIMEOUT_SECS*2 + this.extraPageDelay;
 
     this.emulateDevice = this.params.emulateDevice || {};
 
@@ -152,10 +156,9 @@ export class Crawler {
 
     logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
 
-    const pageTimeout = this.params.behaviorTimeout + this.params.pageLoadTimeout * this.params.pageExtraDelayMs;
-    logger.debug(`Page timeout for redis: ${pageTimeout} seconds`, {}, "redis");
+    logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
 
-    this.crawlState = new RedisCrawlState(redis, this.params.crawlId, pageTimeout, os.hostname());
+    this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.maxPageTime, os.hostname());
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
       logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
@@ -409,11 +412,9 @@ export class Crawler {
       } else if (data.skipBehaviors) {
         logger.info("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
-        const behaviorTimeout = this.params.behaviorTimeout / 1000;
-
         const res = await timedRun(
           this.runBehaviors(page, data.filteredFrames, logDetails),
-          behaviorTimeout,
+          this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
           "behavior"
@@ -565,8 +566,8 @@ export class Crawler {
     }
 
     if (this.params.timeLimit) {
-      const elapsed = (Date.now() - this.startTime) / 1000;
-      if (elapsed > this.params.timeLimit) {
+      const elapsed = secondsElapsed(this.startTime);
+      if (elapsed >= this.params.timeLimit) {
         logger.info(`Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`);
         interrupt = true;
       }
@@ -691,10 +692,10 @@ export class Crawler {
       }
     });
 
-    const pageTimeout = this.params.behaviorTimeout + this.params.pageLoadTimeout + this.params.pageExtraDelayMs;
-    const totalPageTimeout = pageTimeout / 1000 + 60;
-
-    await runWorkers(this, this.params.workers, totalPageTimeout);
+    // --------------
+    // Run Crawl Here!
+    await runWorkers(this, this.params.workers, this.maxPageTime);
+    // --------------
 
     await this.serializeConfig(true);
 
@@ -1368,7 +1369,7 @@ export class Crawler {
 
     if (!done) {
       // if not done, save state only after specified interval has elapsed
-      if ((now.getTime() - this.lastSaveTime) < this.saveStateInterval) {
+      if (secondsElapsed(this.lastSaveTime, now) < this.params.saveStateInterval) {
         return;
       }
     }
