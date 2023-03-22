@@ -80,7 +80,7 @@ export class Crawler {
     // sum of page load + behavior timeouts + 2 x fetch + cloudflare + link extraction timeouts + extra page delay
     // if exceeded, will interrupt and move on to next page (likely behaviors or some other operation is stuck)
     this.maxPageTime = this.params.pageLoadTimeout + this.params.behaviorTimeout +
-                       FETCH_TIMEOUT_SECS*2 + PAGE_OP_TIMEOUT_SECS*2 + this.extraPageDelay;
+                       FETCH_TIMEOUT_SECS*2 + PAGE_OP_TIMEOUT_SECS*2 + this.params.pageExtraDelay;
 
     this.emulateDevice = this.params.emulateDevice || {};
 
@@ -89,7 +89,7 @@ export class Crawler {
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
-      timeout: this.params.pageLoadTimeout
+      timeout: this.params.pageLoadTimeout * 1000
     };
 
     // pages directory
