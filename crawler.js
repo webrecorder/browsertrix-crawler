@@ -13,7 +13,7 @@ import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtract } from "./util/textextract.js";
-import { initStorage, getFileSize, getDirSize, interpolateFilename } from "./util/storage.js";
+import { initStorage, getFileSize, getDirSize, interpolateFilename, getDiskUsage } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
@@ -569,6 +569,15 @@ export class Crawler {
       const elapsed = secondsElapsed(this.startTime);
       if (elapsed >= this.params.timeLimit) {
         logger.info(`Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`);
+        interrupt = true;
+      }
+    }
+
+    if (this.params.diskUtilization) {
+      const diskUsage = await getDiskUsage();
+      const usedPercentage = diskUsage["Use%"].slice(0, -1);
+      if (usedPercentage >= this.params.diskUtilization) {
+        logger.info(`Disk utilization threshold reached ${usedPercentage}% > ${this.params.diskUtilization}%, stopping`, diskUsage);
         interrupt = true;
       }
     }

@@ -291,6 +291,12 @@ class ArgParser {
         default: 0,
       },
 
+      "diskUtilization": {
+        describe: "If set, save state and exit if disk utilization exceeds this percentage value",
+        type: "number",
+        default: 0,
+      },
+
       "timeLimit": {
         describe: "If set, save state and exit after time limit, in seconds",
         type: "number",
@@ -464,6 +470,17 @@ class ArgParser {
     if (argv.statsFilename) {
       argv.statsFilename = path.resolve(argv.cwd, argv.statsFilename);
     }
+
+    if (!argv.diskUtilization) {
+      if (argv.combineWARC && argv.generateWACZ) {
+        argv.diskUtilization = 30;
+      } else if (argv.combineWARC || argv.generateWACZ) {
+        argv.diskUtilization = 45;
+      } else {
+        argv.diskUtilization = 90;
+      }
+    }
+
 
     return true;
   }
