@@ -41,7 +41,6 @@ export class PageWorker
     this.reuseCount = 0;
     this.page = null;
     this.cdp = null; 
-    this.requests = null;
 
     this.opts = null;
 
@@ -52,6 +51,9 @@ export class PageWorker
     this.crashBreak = null;
 
     this.queue = new PQueue({concurrency: 1});
+
+    this.requestsQ = new PQueue({concurrency: 12});
+
     this.initFH(archivesDir);
   }
 
@@ -120,7 +122,6 @@ export class PageWorker
 
         this.page = page;
         this.cdp = cdp;
-        this.requests = [];
         this.opts = {page: this.page, cdp: this.cdp, workerid};
 
         try {
@@ -160,7 +161,7 @@ export class PageWorker
 
   async onNewPage() {
     this.cdp.on("Fetch.requestPaused", (params) => {
-      this.requests.push(this.continueRequest(params, this.cdp));
+      this.requestsQ.add(() => this.continueRequest(params, this.cdp));
       //this.continueRequest(params, this.cdp);
     });
 
@@ -195,9 +196,11 @@ export class PageWorker
       return false;
     }
 
-    if (params.responseStatusCode === 206) {
-      return false;
-    }
+    console.log("BODY", params.request.url, this._getContentLen(params.responseHeaders));
+
+    //if (params.responseStatusCode === 206) {
+    //  return false;
+    //}
 
     if (params.responseStatusCode === 204 || (params.responseStatusCode >= 300 && params.responseStatusCode < 400)) {
       payload = new Uint8Array();
@@ -367,6 +370,18 @@ export class PageWorker
     return null;
   }
 
+  _getContentLen(headers) {
+    for (let header of headers) {
+      if (header.name.toLowerCase() === "content-length") {
+        return header.value;
+      }
+    }
+
+    return null;
+  }
+
+
+
   async timedCrawlPage(opts) {
     const workerid = this.id;
     const { data } = opts;
@@ -388,14 +403,14 @@ export class PageWorker
         this.crashBreak
       ]);
 
-      logger.debug("Finishing Requests", {numRequests: this.requests.length}, "worker");
+      logger.debug("Finishing Requests", {numRequests: this.requestsQ.pending}, "worker");
 
-      await Promise.allSettled(this.requests);
+      await this.requestsQ.onIdle();
 
     } catch (e) {
       logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
     } finally {
-      this.requests = [];
+      await this.requestsQ.clear();
 
       //await this.cdp.send("Fetch.disable");
 
