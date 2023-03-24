@@ -191,22 +191,25 @@ export class PageWorker
   async handleRequestPaused(params) {
     let payload;
 
+    const { request } = params;
+    const { url } = request;
+
     if (params.responseErrorReason) {
-      logger.warn("Skipping failed response", {url: params.request.url, reason: params.responseErrorReason}, "recorder");
+      logger.warn("Skipping failed response", {url, reason: params.responseErrorReason}, "recorder");
       return false;
     }
 
-    console.log("BODY", params.request.url, this._getContentLen(params.responseHeaders));
-
-    //if (params.responseStatusCode === 206) {
-    //  return false;
-    //}
+    if (params.responseStatusCode === 206) {
+      logger.debug("Skip fetch 206", {url}, "recorder");
+      return false;
+    }
 
     if (params.responseStatusCode === 204 || (params.responseStatusCode >= 300 && params.responseStatusCode < 400)) {
       payload = new Uint8Array();
     } else {
       try {
         const { requestId } = params;
+        logger.debug("Fetching response", {size: this._getContentLen(params.responseHeaders), url}, "recorder");
         const { body, base64Encoded } = await this.cdp.send("Fetch.getResponseBody", {requestId});
         payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
       } catch (e) {
@@ -224,9 +227,6 @@ export class PageWorker
     }
 
     payload = result.payload;
-
-    const { request } = params;
-    const { url } = request;
 
     // if (await this.isDupeByUrl(url)) {
     //   logger.warn("Already crawled, skipping dupe", {url}, "record");
