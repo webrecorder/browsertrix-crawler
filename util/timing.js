@@ -29,3 +29,7 @@ export function secondsElapsed(startTime, nowDate = null) {
 
   return (nowDate.getTime() - startTime) / 1000;
 }
+
+export function timestampNow() {
+  return new Date().toISOString().replace(/[^\d]/g, "");
+}

@@ -1,19 +1,27 @@
+import fsp from "fs/promises";
+import path from "path";
+import os from "os";
+
+import PQueue from "p-queue";
+
 import { logger, errJSON } from "./logger.js";
-import { sleep, timedRun } from "./timing.js";
+import { sleep, timedRun, timestampNow } from "./timing.js";
+
+import { WARCRecord, WARCSerializer } from "warcio";
 
 const MAX_REUSE = 5;
 
 const NEW_WINDOW_TIMEOUT = 10;
 
 // ===========================================================================
-export function runWorkers(crawler, numWorkers, maxPageTime) {
+export function runWorkers(crawler, numWorkers, maxPageTime, archivesDir) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
   const workers = [];
 
   for (let i = 0; i < numWorkers; i++) {
     //workers.push(new PageWorker(`worker-${i+1}`, crawler, maxPageTime));
-    workers.push(new PageWorker(i, crawler, maxPageTime));
+    workers.push(new PageWorker(i, crawler, maxPageTime, archivesDir));
   }
 
   return Promise.allSettled(workers.map((worker) => worker.run()));
@@ -23,7 +31,7 @@ export function runWorkers(crawler, numWorkers, maxPageTime) {
 // ===========================================================================
 export class PageWorker
 {
-  constructor(id, crawler, maxPageTime) {
+  constructor(id, crawler, maxPageTime, archivesDir) {
     this.id = id;
     this.crawler = crawler;
     this.maxPageTime = maxPageTime;
@@ -39,6 +47,16 @@ export class PageWorker
     this.crashed = false;
     this.markCrashed = null;
     this.crashBreak = null;
+
+    this.queue = new PQueue({concurrency: 1});
+    this.initFH(archivesDir);
+  }
+
+  async initFH(archivesDir) {
+    await fsp.mkdir(archivesDir, {recursive: true});
+    const crawlId = process.env.CRAWL_ID || os.hostname();
+    this.fh = await fsp.open(path.join(archivesDir, `rec-${crawlId}-${timestampNow()}-${this.id}.warc`), "a");
+    //this.fh = await fsp.open("rec-test.warc", "w");
   }
 
   async closePage() {
@@ -49,6 +67,16 @@ export class PageWorker
       } else {
         logger.debug("Closing crashed page", {workerid: this.id}, "worker");
       }
+
+      if (this.queue) {
+        try {
+          await this.queue.onIdle();
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      await this.page.unroute("**/*");
 
       try {
         await this.page.close();
@@ -92,6 +120,8 @@ export class PageWorker
         this.cdp = cdp;
         this.opts = {page: this.page, cdp: this.cdp, workerid};
 
+        await this.onNewPage();
+
         // updated per page crawl
         this.crashed = false;
         this.crashBreak = new Promise((resolve, reject) => this.markCrashed = reject);
@@ -118,6 +148,189 @@ export class PageWorker
           this.crawler.healthChecker.incError();
         }
       }
+    }
+  }
+
+  async onNewPage() {
+    await this.cdp.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
+    
+    this.cdp.on("Fetch.requestPaused", async (params) => {
+      const { requestId } = params;
+
+      let continued = false;
+
+      try {
+        continued = await this.handleRequestPaused(params);
+      } catch (e) {
+        logger.error("Error handling response, probably skpping URL", ...errJSON(e), "recorder");
+      }
+
+      if (!continued) {
+        await this.cdp.send("Fetch.continueResponse", {requestId});
+      }
+    });
+  }
+
+  async handleRequestPaused(params) {
+    let payload;
+
+    if (params.responseErrorReason) {
+      logger.warn("Skipping failed response", {url: params.request.url, reason: params.responseErrorReason}, "recorder");
+      return false;
+    }
+
+    if (params.responseStatusCode === 206 || (params.responseStatusCode >= 300 && params.responseStatusCode < 400)) {
+      payload = new Uint8Array();
+    } else {
+      try {
+        const { requestId } = params;
+        const { body, base64Encoded} = await this.cdp.send("Fetch.getResponseBody", {requestId});
+        payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
+      } catch (e) {
+        logger.warn("Failed to load response body", {url: params.request.url, ...errJSON(e)}, "recorder");
+        return false;
+      }
+    }
+
+    const { request } = params;
+    const { url } = request;
+
+    if (await checkDupeByUrl(url)) {
+      logger.warn("Already crawled, skipping dupe", {url}, "record");
+      return false;
+    }
+
+    const urlParsed = new URL(url);
+
+    const warcVersion = "WARC/1.1";
+    const date = new Date().toISOString();
+
+    // response
+    const createResponse = () => {
+      const statusline = `HTTP/1.1 ${params.responseStatusCode} ${params.responseStatusText}`;
+
+      const httpHeaders = {};
+      for (const header of params.responseHeaders) {
+        httpHeaders[header.name] = header.value;
+      }
+
+      const responseRecord = await WARCRecord.create({
+        url, date, warcVersion, type: "response",
+        httpHeaders, statusline}, [payload]);
+    }
+
+    // request
+    const writeRequest = () => {
+      const method = request.method;
+
+      const statusline = `${method} ${url.slice(urlParsed.origin.length)} HTTP/1.1`;
+
+      const requestBody = request.postData ? [request.postData] : [];
+
+      const requestRecord = await WARCRecord.create({
+        url, date, warcVersion, type: "request",
+        httpHeaders: request.headers, statusline}, requestBody);
+    };
+
+    const responseRecord = createResponse();
+
+    const digest = responseRecord.warcPayloadDigest;
+
+    if (this.!fh) {
+      return false;
+    }
+
+    this.queue.add(async () => this.fh.writeFile(await WARCSerializer.serialize(responseRecord, {gzip: true})));
+    this.queue.add(async () => this.fh.writeFile(await WARCSerializer.serialize(requestRecord, {gzip: true})));
+
+    return false;
+  }
+
+  async onNewPage2() {
+    await this.page.route("**/*", async (route, request) => {
+      try {
+        const response = await route.fetch();
+        await this.record(route, response, request);
+      } catch (e) {
+        logger.warn("record error", e, "record");
+      }
+    });
+  }
+
+  async record(route, response, request) {
+    // shared
+    const url = request.url();
+    const urlParsed = new URL(url);
+
+    const warcVersion = "WARC/1.1";
+    const date = new Date().toISOString();
+
+    const responseBody = [await response.body()];
+
+    // response
+    const writeResponse = async () => {
+      const responseStatusline = `HTTP/1.1 ${response.status()} ${response.statusText()}`;
+
+      const responseRecord = await WARCRecord.create({
+        url, date, warcVersion, type: "response", 
+        httpHeaders: response.headers(), statusline: responseStatusline
+      }, responseBody);
+
+      if (this.fh) {
+        await this.fh.writeFile(await WARCSerializer.serialize(responseRecord, {gzip: true}));
+      }
+    };
+
+    // request
+    const writeRequest = async () => {
+      const method = request.method();
+
+      const requestStatusline = `${method} ${url.slice(urlParsed.origin.length)} HTTP/1.1`;
+
+      const requestBody = request.postDataBuffer() ? [request.postDataBuffer()] : [];
+
+      const requestRecord = await WARCRecord.create({
+        url, date, warcVersion, type: "request",
+        httpHeaders: request.headers(), statusline: requestStatusline
+      }, requestBody);
+
+      if (this.fh) {
+        await this.fh.writeFile(await WARCSerializer.serialize(requestRecord, {gzip: true}));
+      }
+    };
+
+    //const serializer = new WARCSerializer(record);
+
+    //for await (const data of serializer) {
+    //  await this.fh.writeFile(data);
+    //}
+
+    const doResp = () => writeResponse();
+    const doReq = () => writeRequest();
+
+    if (this.fh) {
+      this.queue.add(doResp);
+      this.queue.add(doReq);
+    } else {
+      console.log("**** already closed?");
+    }
+
+    Promise.allSettled([
+      route.fulfill({ response }),
+      doResp,
+      doReq
+    ]).then(() => response.dispose());
+  }
+
+  async onFinalize() {
+    await this.queue.onIdle();
+
+    const fh = this.fh;
+    this.fh = null;
+
+    if (fh) {
+      await fh.sync();
+      await fh.close();
     }
   }
 
@@ -154,9 +367,13 @@ export class PageWorker
 
     try {
       await this.runLoop();
-      logger.info("Worker exiting, all tasks complete", {workerid: this.id}, "worker");
+      logger.info("Worker done, all tasks complete", {workerid: this.id}, "worker");
     } catch (e) {
       logger.error("Worker errored", e, "worker");
+    } finally {
+      await this.closePage();
+
+      await this.onFinalize();
     }
   }
 

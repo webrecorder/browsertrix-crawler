@@ -186,11 +186,11 @@ export class Crawler {
   }
 
   async bootstrap() {
-    const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
+    //const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
 
-    if (initRes.status) {
-      logger.info("wb-manager init failed, collection likely already exists");
-    }
+    //if (initRes.status) {
+    //  logger.info("wb-manager init failed, collection likely already exists");
+    //}
 
     fs.mkdirSync(this.logDir, {recursive: true});
     this.logFH = fs.createWriteStream(this.logFilename);
@@ -238,7 +238,7 @@ export class Crawler {
 
     opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
 
-    subprocesses.push(child_process.spawn("uwsgi", [new URL("uwsgi.ini", import.meta.url).pathname], opts));
+    //subprocesses.push(child_process.spawn("uwsgi", [new URL("uwsgi.ini", import.meta.url).pathname], opts));
 
     process.on("exit", () => {
       for (const proc of subprocesses) {
@@ -530,7 +530,7 @@ export class Crawler {
   async getInfoString() {
     const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
     const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
-    const pywbVersion = child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
+    const pywbVersion = "0.0";//child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
 
     return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`;
   }
@@ -692,9 +692,11 @@ export class Crawler {
       }
     });
 
+    const archiveDir = path.join(this.collDir, "archive");
+
     // --------------
     // Run Crawl Here!
-    await runWorkers(this, this.params.workers, this.maxPageTime);
+    await runWorkers(this, this.params.workers, this.maxPageTime, archiveDir);
     // --------------
 
     await this.serializeConfig(true);
