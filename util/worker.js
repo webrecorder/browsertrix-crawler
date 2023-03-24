@@ -253,20 +253,25 @@ export class PageWorker
     };
 
     // request
-    const createRequest = () => {
+    const createRequest = (responseRecord) => {
       const method = request.method;
 
-      const statusline = `${method} ${url.slice(urlParsed.origin.length)} HTTP/1.1`;
+      //const statusline = `${method} ${url.slice(urlParsed.origin.length)} HTTP/1.1`;
+      const statusline = `${method} ${url} HTTP/1.1`;
 
       const requestBody = request.postData ? [request.postData] : [];
 
+      const warcHeaders = {
+        "WARC-Concurrent-To": responseRecord.warcHeader("WARC-Record-ID"),
+      };
+
       return WARCRecord.create({
-        url, date, warcVersion, type: "request",
+        url, date, warcVersion, type: "request", warcHeaders,
         httpHeaders: request.headers, statusline}, requestBody);
     };
 
     const responseRecord = await createResponse();
-    const requestRecord = await createRequest();
+    const requestRecord = await createRequest(responseRecord);
 
     this.queue.add(async () => await this.fh.writeFile(await WARCSerializer.serialize(responseRecord, {gzip: true})));
     this.queue.add(async () => await this.fh.writeFile(await WARCSerializer.serialize(requestRecord, {gzip: true})));
