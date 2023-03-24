@@ -42,7 +42,7 @@ export class PageWorker
     this.markCrashed = null;
     this.crashBreak = null;
 
-    this.recorder = new Recorder(archivesDir);
+    this.recorder = new Recorder({workerid: id, archivesDir, crawlState: this.crawler.crawlState});
   }
 
   async closePage() {

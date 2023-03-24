@@ -16,12 +16,15 @@ import { WARCRecord, WARCSerializer } from "warcio";
 // =================================================================
 export class Recorder
 {
-  constructor(archivesDir) {
+  constructor({workerid, archivesDir, crawlState}) {
+    this.workerid = workerid;
+    this.crawlState = crawlState;
+
     this.queue = new PQueue({concurrency: 1});
 
     this.requestsQ = new PQueue({concurrency: 12});
 
-    this.cdp = null;
+    this.logDetails = {};
 
     this.initFH(archivesDir);
   }
@@ -29,7 +32,7 @@ export class Recorder
   async initFH(archivesDir) {
     await fsp.mkdir(archivesDir, {recursive: true});
     const crawlId = process.env.CRAWL_ID || os.hostname();
-    this.fh = await fsp.open(path.join(archivesDir, `rec-${crawlId}-${timestampNow()}-${this.id}.warc`), "a");
+    this.fh = await fsp.open(path.join(archivesDir, `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`), "a");
   }
 
   async onCreatePage({cdp}) {
@@ -48,14 +51,14 @@ export class Recorder
     try {
       continued = await this.handleRequestPaused(params, cdp);
     } catch (e) {
-      logger.error("Error handling response, probably skipping URL", {...errJSON(e)}, "recorder");
+      logger.error("Error handling response, probably skipping URL", {url: params.request.url, ...errJSON(e), ...this.logDetails}, "recorder");
     }
 
     if (!continued) {
       try {
         await cdp.send("Fetch.continueResponse", {requestId});
       } catch (e) {
-        logger.error("Continue failed", e, "recorder");
+        logger.error("continueResponse failed", {url: params.request.url, ...errJSON(e), ...this.logDetails}, "recorder");
       }
     }
   }
@@ -67,12 +70,12 @@ export class Recorder
     const { url } = request;
 
     if (params.responseErrorReason) {
-      logger.warn("Skipping failed response", {url, reason: params.responseErrorReason}, "recorder");
+      logger.warn("Skipping failed response", {url, reason: params.responseErrorReason, ...this.logDetails}, "recorder");
       return false;
     }
 
     if (params.responseStatusCode === 206) {
-      logger.debug("Skip fetch 206", {url}, "recorder");
+      logger.debug("Skip 206 Response", {url, ...this.logDetails}, "recorder");
       return false;
     }
 
@@ -81,11 +84,11 @@ export class Recorder
     } else {
       try {
         const { requestId } = params;
-        logger.debug("Fetching response", {size: this._getContentLen(params.responseHeaders), url}, "recorder");
+        logger.debug("Fetching response", {sizeExpected: this._getContentLen(params.responseHeaders), url, ...this.logDetails}, "recorder");
         const { body, base64Encoded } = await cdp.send("Fetch.getResponseBody", {requestId});
         payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
       } catch (e) {
-        logger.warn("Failed to load response body", {url: params.request.url}, "recorder");
+        logger.warn("Failed to load response body", {url, ...this.logDetails}, "recorder");
         return false;
       }
     }
@@ -95,15 +98,16 @@ export class Recorder
     const changed = result.changed;
 
     if (!this.fh) {
+      logger.debug("No output file, skipping recording", {url, ...this.logDetails}, "recorder");
       return changed;
     }
 
     payload = result.payload;
 
-    // if (await this.isDupeByUrl(url)) {
-    //   logger.warn("Already crawled, skipping dupe", {url}, "record");
-    //   return changed;
-    // }
+    if (await this.isDupeByUrl(url)) {
+      logger.debug("URL already encountered, skipping recording", {url, ...this.logDetails}, "recorder");
+      return changed;
+    }
 
     const urlParsed = new URL(url);
 
@@ -158,15 +162,16 @@ export class Recorder
 
   //todo
   async isDupeByUrl(url) {
-    return !await this.crawler.crawlState.redis.hsetnx("dedup:u", url, "1");
+    return !await this.crawlState.redis.hsetnx("dedup:u", url, "1");
   }
 
-  async onPageStarted({pageid}) {
+  async onPageStarted({pageid, url}) {
     this.pageid = pageid;
+    this.logDetails = {page: url, workerid: this.workerid};
   }
 
-  async onPageFinished(url) {
-    logger.debug("Finishing pending requests for page", {pending: this.requestsQ.pending, url}, "recorder");
+  async onPageFinished() {
+    logger.debug("Finishing pending requests for page", {pending: this.requestsQ.pending, ...this.logDetails}, "recorder");
     await this.requestsQ.onIdle();
   }
 
@@ -195,6 +200,8 @@ export class Recorder
 
     let newString = null;
     let string = null;
+
+    const url = params.request.url;
 
     const ct = this._getContentType(params.responseHeaders);
 
@@ -232,10 +239,8 @@ export class Recorder
     if (newString !== string) {
       extraOpts.rewritten = 1;
       const encoder = new TextEncoder();
-      logger.info("Page Rewritten", {url: params.request.url}, "recorder");
+      logger.debug("Content Rewritten", {url, ...this.logDetails}, "recorder");
       payload = encoder.encode(newString);
-
-      console.log("Rewritten Response for: " + params.request.url);
     }
 
     const base64Str = Buffer.from(newString).toString("base64");
@@ -249,7 +254,7 @@ export class Recorder
         });
       changed = true;
     } catch (e) {
-      console.warn("Fulfill Failed for: " + params.request.url + " " + e);
+      logger.warn("Fulfill Failed", {url, ...this.logDetails, ...errJSON(e)}, "recorder");
     }
 
     return {payload, changed};
