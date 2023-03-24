@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
-    "@webrecorder/archivewebpage": "^0.9.8",
     "browsertrix-behaviors": "^0.5.0-beta.0",
     "get-folder-size": "^4.0.0",
     "ioredis": "^4.27.1",
