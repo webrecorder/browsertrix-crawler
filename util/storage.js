@@ -152,7 +152,7 @@ export async function getDirSize(dir) {
 
 export async function getDiskUsage(path="/") {
   const exec = util.promisify(child_process.exec);
-  const result = await exec(`df -H ${path}`);
+  const result = await exec(`df ${path}`);
   const lines = result.stdout.split("\n");
   const keys = lines[0].split(/\s+/ig);
   const rows = lines.slice(1).map(line => {
