@@ -160,13 +160,14 @@ export class PageWorker
 
   async onNewPage() {
     this.cdp.on("Fetch.requestPaused", (params) => {
-      this.requests.push(this.continueRequest(params));
+      this.requests.push(this.continueRequest(params, this.cdp));
+      //this.continueRequest(params, this.cdp);
     });
 
     await this.cdp.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
   }
 
-  async continueRequest(params) {
+  async continueRequest(params, cdp) {
     const { requestId } = params;
 
     let continued = false;
@@ -177,7 +178,7 @@ export class PageWorker
       logger.error("Error handling response, probably skipping URL", {...errJSON(e)}, "recorder");
     }
 
-    if (!continued) {
+    if (!continued && this.cdp === cdp) {
       try {
         await this.cdp.send("Fetch.continueResponse", {requestId});
       } catch (e) {
@@ -194,15 +195,19 @@ export class PageWorker
       return false;
     }
 
-    if (params.responseStatusCode === 206 || (params.responseStatusCode >= 300 && params.responseStatusCode < 400)) {
+    if (params.responseStatusCode === 206) {
+      return false;
+    }
+
+    if (params.responseStatusCode === 204 || (params.responseStatusCode >= 300 && params.responseStatusCode < 400)) {
       payload = new Uint8Array();
     } else {
       try {
         const { requestId } = params;
-        const { body, base64Encoded} = await this.cdp.send("Fetch.getResponseBody", {requestId});
+        const { body, base64Encoded } = await this.cdp.send("Fetch.getResponseBody", {requestId});
         payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
       } catch (e) {
-        logger.warn("Failed to load response body", {url: params.request.url, ...errJSON(e)}, "recorder");
+        logger.warn("Failed to load response body", {url: params.request.url}, "recorder");
         return false;
       }
     }
@@ -220,10 +225,10 @@ export class PageWorker
     const { request } = params;
     const { url } = request;
 
-    if (await this.isDupeByUrl(url)) {
-      logger.warn("Already crawled, skipping dupe", {url}, "record");
-      return changed;
-    }
+    // if (await this.isDupeByUrl(url)) {
+    //   logger.warn("Already crawled, skipping dupe", {url}, "record");
+    //   return changed;
+    // }
 
     const urlParsed = new URL(url);
 
@@ -284,8 +289,10 @@ export class PageWorker
   }
 
   async rewriteResponse(params, payload, extraOpts) {
+    let changed = false;
+
     if (!payload.length) {
-      return {payload, changed: false};
+      return {payload, changed};
     }
 
     let newString = null;
@@ -321,7 +328,7 @@ export class PageWorker
     }
 
     if (!newString) {
-      return {payload, changed: false};
+      return {payload, changed};
     }
 
     if (newString !== string) {
@@ -342,12 +349,12 @@ export class PageWorker
           "responseHeaders": params.responseHeaders,
           "body": base64Str
         });
-      return {payload, changed: true};
+      changed = true;
     } catch (e) {
       console.warn("Fulfill Failed for: " + params.request.url + " " + e);
     }
 
-    return {payload, changed: false};
+    return {payload, changed};
   }
 
   _getContentType(headers) {
@@ -381,13 +388,13 @@ export class PageWorker
         this.crashBreak
       ]);
 
-    } catch (e) {
-      logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
-    } finally {
-      logger.debug("Finishing Requests", {numRequests: this.requests.length});
+      logger.debug("Finishing Requests", {numRequests: this.requests.length}, "worker");
 
       await Promise.allSettled(this.requests);
 
+    } catch (e) {
+      logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
+    } finally {
       this.requests = [];
 
       //await this.cdp.send("Fetch.disable");
