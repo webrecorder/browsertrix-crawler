@@ -20,7 +20,6 @@ export function runWorkers(crawler, numWorkers, maxPageTime, archivesDir) {
   const workers = [];
 
   for (let i = 0; i < numWorkers; i++) {
-    //workers.push(new PageWorker(`worker-${i+1}`, crawler, maxPageTime));
     workers.push(new PageWorker(i, crawler, maxPageTime, archivesDir));
   }
 
@@ -56,7 +55,6 @@ export class PageWorker
     await fsp.mkdir(archivesDir, {recursive: true});
     const crawlId = process.env.CRAWL_ID || os.hostname();
     this.fh = await fsp.open(path.join(archivesDir, `rec-${crawlId}-${timestampNow()}-${this.id}.warc`), "a");
-    //this.fh = await fsp.open("rec-test.warc", "w");
   }
 
   async closePage() {
@@ -120,7 +118,11 @@ export class PageWorker
         this.cdp = cdp;
         this.opts = {page: this.page, cdp: this.cdp, workerid};
 
-        await this.onNewPage();
+        try {
+          await this.onNewPage();
+        } catch (e) {
+          logger.warn("New Page Error", e, "worker");
+        }
 
         // updated per page crawl
         this.crashed = false;
@@ -152,9 +154,9 @@ export class PageWorker
   }
 
   async onNewPage() {
-    await this.cdp.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
-    
-    this.cdp.on("Fetch.requestPaused", async (params) => {
+    const cdp = this.cdp;
+
+    cdp.on("Fetch.requestPaused", async (params) => {
       const { requestId } = params;
 
       let continued = false;
@@ -162,13 +164,15 @@ export class PageWorker
       try {
         continued = await this.handleRequestPaused(params);
       } catch (e) {
-        logger.error("Error handling response, probably skpping URL", ...errJSON(e), "recorder");
+        logger.error("Error handling response, probably skpping URL", {...errJSON(e)}, "recorder");
       }
 
-      if (!continued) {
-        await this.cdp.send("Fetch.continueResponse", {requestId});
+      if (!continued && this.cdp === cdp) {
+        await cdp.send("Fetch.continueResponse", {requestId});
       }
     });
+
+    await cdp.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
   }
 
   async handleRequestPaused(params) {
@@ -176,6 +180,10 @@ export class PageWorker
 
     if (params.responseErrorReason) {
       logger.warn("Skipping failed response", {url: params.request.url, reason: params.responseErrorReason}, "recorder");
+      return false;
+    }
+
+    if (!this.fh) {
       return false;
     }
 
@@ -195,7 +203,7 @@ export class PageWorker
     const { request } = params;
     const { url } = request;
 
-    if (await checkDupeByUrl(url)) {
+    if (await this.isDupeByUrl(url)) {
       logger.warn("Already crawled, skipping dupe", {url}, "record");
       return false;
     }
@@ -214,112 +222,36 @@ export class PageWorker
         httpHeaders[header.name] = header.value;
       }
 
-      const responseRecord = await WARCRecord.create({
+      return WARCRecord.create({
         url, date, warcVersion, type: "response",
         httpHeaders, statusline}, [payload]);
-    }
+    };
 
     // request
-    const writeRequest = () => {
+    const createRequest = () => {
       const method = request.method;
 
       const statusline = `${method} ${url.slice(urlParsed.origin.length)} HTTP/1.1`;
 
       const requestBody = request.postData ? [request.postData] : [];
 
-      const requestRecord = await WARCRecord.create({
+      return WARCRecord.create({
         url, date, warcVersion, type: "request",
         httpHeaders: request.headers, statusline}, requestBody);
     };
 
-    const responseRecord = createResponse();
+    const responseRecord = await createResponse();
+    const requestRecord = await createRequest();
 
-    const digest = responseRecord.warcPayloadDigest;
-
-    if (this.!fh) {
-      return false;
-    }
-
-    this.queue.add(async () => this.fh.writeFile(await WARCSerializer.serialize(responseRecord, {gzip: true})));
-    this.queue.add(async () => this.fh.writeFile(await WARCSerializer.serialize(requestRecord, {gzip: true})));
+    this.queue.add(async () => await this.fh.writeFile(await WARCSerializer.serialize(responseRecord, {gzip: true})));
+    this.queue.add(async () => await this.fh.writeFile(await WARCSerializer.serialize(requestRecord, {gzip: true})));
 
     return false;
   }
 
-  async onNewPage2() {
-    await this.page.route("**/*", async (route, request) => {
-      try {
-        const response = await route.fetch();
-        await this.record(route, response, request);
-      } catch (e) {
-        logger.warn("record error", e, "record");
-      }
-    });
-  }
-
-  async record(route, response, request) {
-    // shared
-    const url = request.url();
-    const urlParsed = new URL(url);
-
-    const warcVersion = "WARC/1.1";
-    const date = new Date().toISOString();
-
-    const responseBody = [await response.body()];
-
-    // response
-    const writeResponse = async () => {
-      const responseStatusline = `HTTP/1.1 ${response.status()} ${response.statusText()}`;
-
-      const responseRecord = await WARCRecord.create({
-        url, date, warcVersion, type: "response", 
-        httpHeaders: response.headers(), statusline: responseStatusline
-      }, responseBody);
-
-      if (this.fh) {
-        await this.fh.writeFile(await WARCSerializer.serialize(responseRecord, {gzip: true}));
-      }
-    };
-
-    // request
-    const writeRequest = async () => {
-      const method = request.method();
-
-      const requestStatusline = `${method} ${url.slice(urlParsed.origin.length)} HTTP/1.1`;
-
-      const requestBody = request.postDataBuffer() ? [request.postDataBuffer()] : [];
-
-      const requestRecord = await WARCRecord.create({
-        url, date, warcVersion, type: "request",
-        httpHeaders: request.headers(), statusline: requestStatusline
-      }, requestBody);
-
-      if (this.fh) {
-        await this.fh.writeFile(await WARCSerializer.serialize(requestRecord, {gzip: true}));
-      }
-    };
-
-    //const serializer = new WARCSerializer(record);
-
-    //for await (const data of serializer) {
-    //  await this.fh.writeFile(data);
-    //}
-
-    const doResp = () => writeResponse();
-    const doReq = () => writeRequest();
-
-    if (this.fh) {
-      this.queue.add(doResp);
-      this.queue.add(doReq);
-    } else {
-      console.log("**** already closed?");
-    }
-
-    Promise.allSettled([
-      route.fulfill({ response }),
-      doResp,
-      doReq
-    ]).then(() => response.dispose());
+  //todo
+  async isDupeByUrl(url) {
+    return !await this.crawler.crawlState.redis.hsetnx("dedup:u", url, "1");
   }
 
   async onFinalize() {
