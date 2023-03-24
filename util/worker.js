@@ -1,16 +1,8 @@
-import fsp from "fs/promises";
-import path from "path";
-import os from "os";
-
-import PQueue from "p-queue";
+import { v4 as uuidv4 } from "uuid";
 
 import { logger, errJSON } from "./logger.js";
-import { sleep, timedRun, timestampNow } from "./timing.js";
-
-import { WARCRecord, WARCSerializer } from "warcio";
-
-import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
-import { rewriteDASH, rewriteHLS } from "@webrecorder/wabac/src/rewrite/rewriteVideo.js";
+import { sleep, timedRun } from "./timing.js";
+import { Recorder } from "./recorder.js";
 
 const MAX_REUSE = 5;
 
@@ -50,17 +42,7 @@ export class PageWorker
     this.markCrashed = null;
     this.crashBreak = null;
 
-    this.queue = new PQueue({concurrency: 1});
-
-    this.requestsQ = new PQueue({concurrency: 12});
-
-    this.initFH(archivesDir);
-  }
-
-  async initFH(archivesDir) {
-    await fsp.mkdir(archivesDir, {recursive: true});
-    const crawlId = process.env.CRAWL_ID || os.hostname();
-    this.fh = await fsp.open(path.join(archivesDir, `rec-${crawlId}-${timestampNow()}-${this.id}.warc`), "a");
+    this.recorder = new Recorder(archivesDir);
   }
 
   async closePage() {
@@ -72,15 +54,9 @@ export class PageWorker
         logger.debug("Closing crashed page", {workerid: this.id}, "worker");
       }
 
-      if (this.queue) {
-        try {
-          await this.queue.onIdle();
-        } catch (e) {
-          // ignore
-        }
+      if (this.recorder) {
+        await this.recorder.onClosePage();
       }
-
-      await this.page.unroute("**/*");
 
       try {
         await this.page.close();
@@ -124,10 +100,8 @@ export class PageWorker
         this.cdp = cdp;
         this.opts = {page: this.page, cdp: this.cdp, workerid};
 
-        try {
-          await this.onNewPage();
-        } catch (e) {
-          logger.warn("New Page Error", e, "worker");
+        if (this.recorder) {
+          await this.recorder.onCreatePage(this.opts);
         }
 
         // updated per page crawl
@@ -159,234 +133,6 @@ export class PageWorker
     }
   }
 
-  async onNewPage() {
-    this.cdp.on("Fetch.requestPaused", (params) => {
-      this.requestsQ.add(() => this.continueRequest(params, this.cdp));
-      //this.continueRequest(params, this.cdp);
-    });
-
-    await this.cdp.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
-  }
-
-  async continueRequest(params, cdp) {
-    const { requestId } = params;
-
-    let continued = false;
-
-    try {
-      continued = await this.handleRequestPaused(params);
-    } catch (e) {
-      logger.error("Error handling response, probably skipping URL", {...errJSON(e)}, "recorder");
-    }
-
-    if (!continued && this.cdp === cdp) {
-      try {
-        await this.cdp.send("Fetch.continueResponse", {requestId});
-      } catch (e) {
-        logger.error("Continue failed", e, "recorder");
-      }
-    }
-  }
-
-  async handleRequestPaused(params) {
-    let payload;
-
-    const { request } = params;
-    const { url } = request;
-
-    if (params.responseErrorReason) {
-      logger.warn("Skipping failed response", {url, reason: params.responseErrorReason}, "recorder");
-      return false;
-    }
-
-    if (params.responseStatusCode === 206) {
-      logger.debug("Skip fetch 206", {url}, "recorder");
-      return false;
-    }
-
-    if (params.responseStatusCode === 204 || (params.responseStatusCode >= 300 && params.responseStatusCode < 400)) {
-      payload = new Uint8Array();
-    } else {
-      try {
-        const { requestId } = params;
-        logger.debug("Fetching response", {size: this._getContentLen(params.responseHeaders), url}, "recorder");
-        const { body, base64Encoded } = await this.cdp.send("Fetch.getResponseBody", {requestId});
-        payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
-      } catch (e) {
-        logger.warn("Failed to load response body", {url: params.request.url}, "recorder");
-        return false;
-      }
-    }
-
-    const extraOpts = {};
-    const result = await this.rewriteResponse(params, payload, extraOpts);
-    const changed = result.changed;
-
-    if (!this.fh) {
-      return changed;
-    }
-
-    payload = result.payload;
-
-    // if (await this.isDupeByUrl(url)) {
-    //   logger.warn("Already crawled, skipping dupe", {url}, "record");
-    //   return changed;
-    // }
-
-    const urlParsed = new URL(url);
-
-    const warcVersion = "WARC/1.1";
-    const date = new Date().toISOString();
-
-    // response
-    const createResponse = () => {
-      const statusline = `HTTP/1.1 ${params.responseStatusCode} ${params.responseStatusText}`;
-
-      const httpHeaders = {};
-      for (const header of params.responseHeaders) {
-        httpHeaders[header.name] = header.value;
-      }
-
-      return WARCRecord.create({
-        url, date, warcVersion, type: "response",
-        httpHeaders, statusline}, [payload]);
-    };
-
-    // request
-    const createRequest = (responseRecord) => {
-      const method = request.method;
-
-      //const statusline = `${method} ${url.slice(urlParsed.origin.length)} HTTP/1.1`;
-      const statusline = `${method} ${url} HTTP/1.1`;
-
-      const requestBody = request.postData ? [request.postData] : [];
-
-      const warcHeaders = {
-        "WARC-Concurrent-To": responseRecord.warcHeader("WARC-Record-ID"),
-      };
-
-      return WARCRecord.create({
-        url, date, warcVersion, type: "request", warcHeaders,
-        httpHeaders: request.headers, statusline}, requestBody);
-    };
-
-    const responseRecord = await createResponse();
-    const requestRecord = await createRequest(responseRecord);
-
-    this.queue.add(async () => await this.fh.writeFile(await WARCSerializer.serialize(responseRecord, {gzip: true})));
-    this.queue.add(async () => await this.fh.writeFile(await WARCSerializer.serialize(requestRecord, {gzip: true})));
-
-    return changed;
-  }
-
-  //todo
-  async isDupeByUrl(url) {
-    return !await this.crawler.crawlState.redis.hsetnx("dedup:u", url, "1");
-  }
-
-  async onFinalize() {
-    await this.queue.onIdle();
-
-    const fh = this.fh;
-    this.fh = null;
-
-    if (fh) {
-      await fh.sync();
-      await fh.close();
-    }
-  }
-
-  async rewriteResponse(params, payload, extraOpts) {
-    let changed = false;
-
-    if (!payload.length) {
-      return {payload, changed};
-    }
-
-    let newString = null;
-    let string = null;
-
-    const ct = this._getContentType(params.responseHeaders);
-
-    switch (ct) {
-    case "application/x-mpegURL":
-    case "application/vnd.apple.mpegurl":
-      string = payload.toString("utf-8");
-      newString = rewriteHLS(string, {save: extraOpts});
-      break;
-
-    case "application/dash+xml":
-      string = payload.toString("utf-8");
-      newString = rewriteDASH(string, {save: extraOpts});
-      break;
-
-    case "text/html":
-    case "application/json":
-    case "text/javascript":
-    case "application/javascript":
-    case "application/x-javascript": {
-      const rw = baseDSRules.getRewriter(params.request.url);
-
-      if (rw !== baseDSRules.defaultRewriter) {
-        string = payload.toString("utf-8");
-        newString = rw.rewrite(string, {live: true, save: extraOpts});
-      }
-      break;
-    }
-    }
-
-    if (!newString) {
-      return {payload, changed};
-    }
-
-    if (newString !== string) {
-      extraOpts.rewritten = 1;
-      const encoder = new TextEncoder();
-      logger.info("Page Rewritten", {url: params.request.url}, "recorder");
-      payload = encoder.encode(newString);
-
-      console.log("Rewritten Response for: " + params.request.url);
-    }
-
-    const base64Str = Buffer.from(newString).toString("base64");
-
-    try {
-      await this.cdp.send("Fetch.fulfillRequest",
-        {"requestId": params.requestId,
-          "responseCode": params.responseStatusCode,
-          "responseHeaders": params.responseHeaders,
-          "body": base64Str
-        });
-      changed = true;
-    } catch (e) {
-      console.warn("Fulfill Failed for: " + params.request.url + " " + e);
-    }
-
-    return {payload, changed};
-  }
-
-  _getContentType(headers) {
-    for (let header of headers) {
-      if (header.name.toLowerCase() === "content-type") {
-        return header.value.split(";")[0];
-      }
-    }
-
-    return null;
-  }
-
-  _getContentLen(headers) {
-    for (let header of headers) {
-      if (header.name.toLowerCase() === "content-length") {
-        return header.value;
-      }
-    }
-
-    return null;
-  }
-
-
-
   async timedCrawlPage(opts) {
     const workerid = this.id;
     const { data } = opts;
@@ -395,6 +141,14 @@ export class PageWorker
     logger.info("Starting page", {workerid, "page": url}, "worker");
 
     this.logDetails = {page: url, workerid};
+
+    // set new page id
+    const pageid = uuidv4();
+    opts.pageid = pageid;
+
+    if (this.recorder) {
+      await this.recorder.onPageStarted({pageid, url});
+    }
 
     try {
       await Promise.race([
@@ -408,16 +162,12 @@ export class PageWorker
         this.crashBreak
       ]);
 
-      logger.debug("Finishing Requests", {numRequests: this.requestsQ.pending}, "worker");
-
-      await this.requestsQ.onIdle();
-
     } catch (e) {
       logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
     } finally {
-      await this.requestsQ.clear();
-
-      //await this.cdp.send("Fetch.disable");
+      if (this.recorder) {
+        await this.recorder.onPageFinished(url);
+      }
 
       await this.crawler.pageFinished(data);
     }
@@ -432,9 +182,9 @@ export class PageWorker
     } catch (e) {
       logger.error("Worker errored", e, "worker");
     } finally {
-      await this.closePage();
-
-      await this.onFinalize();
+      if (this.recorder) {
+        await this.recorder.onDone();
+      }
     }
   }
 

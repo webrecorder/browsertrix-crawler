@@ -22,6 +22,7 @@ export class PageState
     this.extraHops = redisData.extraHops;
 
     this.workerid = null;
+    this.pageid = null;
     this.title = null;
 
     this.isHTMLPage = null;

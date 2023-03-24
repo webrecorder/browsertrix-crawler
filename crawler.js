@@ -6,7 +6,6 @@ import fsp from "fs/promises";
 
 import { RedisCrawlState, LoadState } from "./util/state.js";
 import Sitemapper from "sitemapper";
-import { v4 as uuidv4 } from "uuid";
 import yaml from "js-yaml";
 
 import * as warcio from "warcio";
@@ -1152,9 +1151,8 @@ export class Crawler {
     }
   }
 
-  async writePage({url, depth, title, text, loadState}) {
-    const id = uuidv4();
-    const row = {id, url, title, loadState};
+  async writePage({pageid, url, depth, title, text, loadState}) {
+    const row = {id: pageid, url, title, loadState};
 
     if (depth === 0) {
       row.seed = true;
