@@ -685,7 +685,7 @@ export class Crawler {
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
       chromeOptions: {
-        proxy: !process.env.NO_PROXY,
+        proxy: false,//!process.env.NO_PROXY,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs()
       }

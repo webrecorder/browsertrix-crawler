@@ -37,33 +37,35 @@ export class Recorder
 
   async onCreatePage({cdp}) {
     cdp.on("Fetch.requestPaused", (params) => {
-      this.requestsQ.add(() => this.continueRequest(params, cdp));
+      this.requestsQ.add(() => this.handleRequestPaused(params, cdp));
     });
 
     await cdp.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
   }
 
-  async continueRequest(params, cdp) {
-    const { requestId } = params;
+  async handleRequestPaused(params, cdp) {
+    const { requestId, request, responseStatusCode, responseErrorReason } = params;
 
     let continued = false;
 
     try {
-      continued = await this.handleRequestPaused(params, cdp);
+      if (responseStatusCode && !responseErrorReason && !this.shouldSkip(request)) {
+        continued = await this.handleFetchResponse(params, cdp);
+      }
     } catch (e) {
-      logger.error("Error handling response, probably skipping URL", {url: params.request.url, ...errJSON(e), ...this.logDetails}, "recorder");
+      logger.error("Error handling response, probably skipping URL", {url: request.url, ...errJSON(e), ...this.logDetails}, "recorder");
     }
 
     if (!continued) {
       try {
         await cdp.send("Fetch.continueResponse", {requestId});
       } catch (e) {
-        logger.error("continueResponse failed", {url: params.request.url, ...errJSON(e), ...this.logDetails}, "recorder");
+        logger.error("continueResponse failed", {url: request.url, ...errJSON(e), ...this.logDetails}, "recorder");
       }
     }
   }
 
-  async handleRequestPaused(params, cdp) {
+  async handleFetchResponse(params, cdp) {
     let payload;
 
     const { request } = params;
@@ -124,8 +126,12 @@ export class Recorder
       }
 
       const warcHeaders = {
-        "WARC-Page-ID": this.pageid
+        "WARC-Page-ID": this.pageid,
       };
+
+      if (Object.keys(extraOpts).length) {
+        warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(extraOpts);
+      }
 
       return WARCRecord.create({
         url, date, warcVersion, type: "response", warcHeaders,
@@ -189,6 +195,32 @@ export class Recorder
       await fh.sync();
       await fh.close();
     }
+  }
+
+  shouldSkip({method, headers, resourceType}) {
+    if (headers && !method) {
+      method = headers[":method"];
+    }
+
+    if (method === "OPTIONS" || method === "HEAD") {
+      return true;
+    }
+
+    if (["EventSource", "WebSocket", "Ping"].includes(resourceType)) {
+      return true;
+    }
+
+    // beacon
+    if (resourceType === "Other" && method === "POST") {
+      return true;
+    }
+
+    // skip eventsource, resourceType may not be set correctly
+    if (headers && (headers["accept"] === "text/event-stream" || headers["Accept"] === "text/event-stream")) {
+      return true;
+    }
+
+    return false;
   }
 
   async rewriteResponse(params, payload, extraOpts, cdp) {
