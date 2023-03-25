@@ -42,7 +42,7 @@ export class PageWorker
     this.markCrashed = null;
     this.crashBreak = null;
 
-    this.recorder = new Recorder({workerid: id, archivesDir, crawlState: this.crawler.crawlState});
+    this.recorder = new Recorder({workerid: id, archivesDir, crawler: this.crawler});
   }
 
   async closePage() {
@@ -133,6 +133,14 @@ export class PageWorker
     }
   }
 
+  async crawlPage(opts) {
+    const res = await this.crawler.crawlPage(opts);
+    if (this.recorder) {
+      await this.recorder.finishPage();
+    }
+    return res;
+  }
+
   async timedCrawlPage(opts) {
     const workerid = this.id;
     const { data } = opts;
@@ -147,13 +155,13 @@ export class PageWorker
     opts.pageid = pageid;
 
     if (this.recorder) {
-      await this.recorder.onPageStarted({pageid, url});
+      this.recorder.startPage({pageid, url});
     }
 
     try {
       await Promise.race([
         timedRun(
-          this.crawler.crawlPage(opts),
+          this.crawlPage(opts),
           this.maxPageTime,
           "Page Worker Timeout",
           {workerid},
@@ -165,10 +173,6 @@ export class PageWorker
     } catch (e) {
       logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
     } finally {
-      if (this.recorder) {
-        await this.recorder.onPageFinished(url);
-      }
-
       await this.crawler.pageFinished(data);
     }
   }

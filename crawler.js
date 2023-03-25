@@ -83,8 +83,9 @@ export class Crawler {
 
     this.emulateDevice = this.params.emulateDevice || {};
 
-    this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
-    this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
+    //this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
+    //this.capturePrefix = "";//process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
+    this.captureBasePrefix = null;
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
@@ -184,7 +185,25 @@ export class Crawler {
     return new ScreenCaster(transport, this.params.workers);
   }
 
+  launchRedis() {
+    let redisStdio;
+
+    if (this.params.logging.includes("redis")) {
+      const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
+      redisStdio = [process.stdin, redisStderr, redisStderr];
+
+    } else {
+      redisStdio = "ignore";
+    }
+
+    return child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio});
+  }
+
   async bootstrap() {
+    const subprocesses = [];
+
+    subprocesses.push(this.launchRedis());
+
     //const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
 
     //if (initRes.status) {
@@ -213,31 +232,7 @@ export class Crawler {
       }
     }
 
-    let opts = {};
-    let redisStdio;
-
-    if (this.params.logging.includes("pywb")) {
-      const pywbStderr = fs.openSync(path.join(this.logDir, "pywb.log"), "a");
-      const stdio = [process.stdin, pywbStderr, pywbStderr];
-
-      const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
-      redisStdio = [process.stdin, redisStderr, redisStderr];
-
-      opts = {stdio, cwd: this.params.cwd};
-    } else {
-      opts = {stdio: "ignore", cwd: this.params.cwd};
-      redisStdio = "ignore";
-    }
-
     this.headers = {"User-Agent": this.configureUA()};
-
-    const subprocesses = [];
-
-    subprocesses.push(child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio}));
-
-    opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
-
-    //subprocesses.push(child_process.spawn("uwsgi", [new URL("uwsgi.ini", import.meta.url).pathname], opts));
 
     process.on("exit", () => {
       for (const proc of subprocesses) {
@@ -710,7 +705,8 @@ export class Crawler {
     await this.writeStats(true);
 
     // extra wait for all resources to land into WARCs
-    await this.awaitPendingClear();
+    // now happens at end of each page
+    // await this.awaitPendingClear();
 
     await this.postCrawl();
   }
@@ -890,22 +886,23 @@ export class Crawler {
       logDetails
     );
 
-    if (!isHTMLPage) {
-      try {
-        const captureResult = await timedRun(
-          this.directFetchCapture(url),
-          FETCH_TIMEOUT_SECS,
-          "Direct fetch capture attempt timed out",
-          logDetails
-        );
-        if (captureResult) {
-          logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
-          return;
-        }
-      } catch (e) {
-        // ignore failed direct fetch attempt, do browser-based capture
-      }
-    }
+    // if (!isHTMLPage) {
+    //   try {
+    //     const captureResult = await timedRun(
+    //       this.directFetchCapture(url),
+    //       FETCH_TIMEOUT_SECS,
+    //       "Direct fetch capture attempt timed out",
+    //       logDetails
+    //     );
+    //     if (captureResult) {
+    //       logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
+    //       return;
+    //     }
+    //   } catch (e) {
+    //     console.log(e);
+    //     // ignore failed direct fetch attempt, do browser-based capture
+    //   }
+    // }
 
     if (this.adBlockRules && this.params.blockAds) {
       await this.adBlockRules.initPage(page);
@@ -1210,33 +1207,33 @@ export class Crawler {
     return false;
   }
 
-  async directFetchCapture(url) {
-    const abort = new AbortController();
-    const signal = abort.signal;
-    const resp = await fetch(this.capturePrefix + url, {signal, headers: this.headers, redirect: "manual"});
-    abort.abort();
-    return resp.status === 200 && !resp.headers.get("set-cookie");
-  }
+  // async directFetchCapture(url) {
+  //   const abort = new AbortController();
+  //   const signal = abort.signal;
+  //   const resp = await fetch(this.capturePrefix + url, {signal, headers: this.headers, redirect: "manual"});
+  //   abort.abort();
+  //   return resp.status === 200 && !resp.headers.get("set-cookie");
+  // }
 
-  async awaitPendingClear() {
-    logger.info("Waiting to ensure pending data is written to WARCs...");
+  // async awaitPendingClear() {
+  //   logger.info("Waiting to ensure pending data is written to WARCs...");
 
-    const redis = await initRedis("redis://localhost/0");
+  //   const redis = await initRedis("redis://localhost/0");
 
-    while (!this.interrupted) {
-      try {
-        const count = Number(await redis.get(`pywb:${this.params.collection}:pending`) || 0);
-        if (count <= 0) {
-          break;
-        }
-        logger.debug("Waiting for pending requests to finish", {numRequests: count});
-      } catch (e) {
-        break;
-      }
+  //   while (!this.interrupted) {
+  //     try {
+  //       const count = Number(await redis.get(`pywb:${this.params.collection}:pending`) || 0);
+  //       if (count <= 0) {
+  //         break;
+  //       }
+  //       logger.debug("Waiting for pending requests to finish", {numRequests: count});
+  //     } catch (e) {
+  //       break;
+  //     }
 
-      await sleep(1);
-    }
-  }
+  //     await sleep(1);
+  //   }
+  // }
 
   async parseSitemap(url, seedId) {
     const sitemapper = new Sitemapper({
