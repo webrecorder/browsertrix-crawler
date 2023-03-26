@@ -73,24 +73,14 @@ export class RequestResponseInfo
     this.resourceType = params.resourceType;
   }
 
-  fillResponseRedirect(params) {
-    this._fillResponse(params.redirectResponse);
-  }
-
-  fillResponseReceived(params) {
-    const response = params.response;
-
+  fillResponse(response) {
     // if initial fetch was a 200, but now replacing with 304, don't!
     if (response.status == 304 && this.status && this.status != 304 && this.url) {
       return;
     }
 
     this.url = response.url.split("#")[0];
-
-    this._fillResponse(response);
-  }
-
-  _fillResponse(response) {
+    
     this.status = response.status;
     this.statusText = response.statusText || getStatusText(this.status);
 
@@ -109,7 +99,7 @@ export class RequestResponseInfo
       this.responseHeadersText = response.headersText;
     }
 
-    this.fromServiceWorker = !!response.fromServiceWorker;
+    this.fromServiceWorker = !!response.fromServiceWorker; 
 
     if (response.securityDetails) {
       const issuer = response.securityDetails.issuer || "";
@@ -119,10 +109,11 @@ export class RequestResponseInfo
   }
 
   fillResponseReceivedExtraInfo(params) {
-    this.responseHeaders = params.headers;
-    if (params.headersText) {
-      this.responseHeadersText = params.headersText;
-    }
+    // this.responseHeaders = params.headers;
+    // if (params.headersText) {
+    //   this.responseHeadersText = params.headersText;
+    // }
+    this.extraOpts.ipType = params.resourceIPAddressSpace;
   }
 
   fillRequestExtraInfo(params) {

@@ -49,12 +49,7 @@ export class Recorder
     cdp.on("Network.responseReceived", (params) => {
       // handling to fill in security details
       logger.debug("Network.responseReceived", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
-      if (params.response) {
-        const reqresp = this.pendingReqResp(params.requestId, true);
-        if (reqresp) {
-          reqresp.fillResponseReceived(params);
-        }
-      }
+      this.handleResponseReceived(params);
     });
 
     cdp.on("Network.responseReceivedExtraInfo", (params) => {
@@ -68,7 +63,8 @@ export class Recorder
     // Request
 
     cdp.on("Network.requestWillBeSent", (params) => {
-      // only handling redirect, committing last response in redirect chain
+      // only handling redirect here, committing last response in redirect chain
+      // request data stored from requestPaused
       if (params.redirectResponse) {
         logger.debug("Network.requestWillBeSent after redirect", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
         this.handleRedirectResponse(params);
@@ -105,14 +101,27 @@ export class Recorder
     await cdp.send("Network.enable");
   }
 
-  async handleRedirectResponse(params) {
-    const { requestId } = params;
+  async handleResponseReceived(params) {
+    const { requestId, response } = params;
 
+    const reqresp = this.pendingReqResp(requestId, true);
+    if (!reqresp) {
+      return;
+    }
+
+    reqresp.fillResponse(response);
+  }
+
+  async handleRedirectResponse(params) {
+    const { requestId, redirectResponse } = params;
+
+    // remove and serialize now as may redirect chain may reuse same requestId
     const reqresp = this.removeReqResp(requestId);
     if (!reqresp) {
       return;
     }
-    reqresp.fillResponseRedirect(params);
+
+    reqresp.fillResponse(redirectResponse);
     this.serializeToWARC(reqresp);
   }
 
@@ -126,6 +135,8 @@ export class Recorder
               reqresp.isValidBinary()) {
         this.serializeToWARC(reqresp);
       } else if (params.errorText === "net::ERR_BLOCKED_BY_CLIENT") {
+        logger.warn("Request blocked", {url: reqresp.url, errorText: params.errorText, ...this.logDetails}, "recorder");
+      } else {
         logger.warn("Request load failed", {url: reqresp.url, errorText: params.errorText, ...this.logDetails}, "recorder");
       }
     }
@@ -185,6 +196,11 @@ export class Recorder
       return false;
     }
 
+    if (await this.isDupeByUrl(url)) {
+      logger.debug("URL already encountered, skipping recording", {url, ...this.logDetails}, "recorder");
+      return false;
+    }
+
     const id = params.networkId || params.requestId;
 
     const reqresp = this.pendingReqResp(id);
@@ -199,8 +215,9 @@ export class Recorder
     } else {
       try {
         const { requestId } = params;
-        logger.debug("Fetching response", {sizeExpected: this._getContentLen(params.responseHeaders), url, ...this.logDetails}, "recorder");
+        logger.debug("Fetching response", {sizeExpected: this._getContentLen(params.responseHeaders), url, requestId: id, ...this.logDetails}, "recorder");
         const { body, base64Encoded } = await cdp.send("Fetch.getResponseBody", {requestId});
+        //logger.debug("Fetch done", {url, requestId: id, ...this.logDetails}, "recorder");
         payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
       } catch (e) {
         logger.warn("Failed to load response body", {url, ...this.logDetails}, "recorder");
@@ -242,6 +259,16 @@ export class Recorder
   async finishPage() {
     const pendingRequests = this.pendingRequests;
     this.skipping = true;
+
+    for (const [requestId, reqresp] of pendingRequests.entries()) {
+      if (reqresp.payload) {
+        this.removeReqResp(requestId);
+        await this.serializeToWARC(reqresp);
+      // no url, likely invalid
+      } else if (!reqresp.url) {
+        this.removeReqResp(requestId);
+      }
+    }
 
     let numPending = pendingRequests.size;
 
@@ -426,10 +453,10 @@ export class Recorder
 
     const url = reqresp.url;
 
-    if (await this.isDupeByUrl(url)) {
-      logger.debug("URL already encountered, skipping recording", {url, ...this.logDetails}, "recorder");
-      return;
-    }
+    // if (await this.isDupeByUrl(url)) {
+    //   logger.debug("URL already encountered, skipping recording", {url, ...this.logDetails}, "recorder");
+    //   return;
+    // }
 
     const urlParsed = new URL(url);
 

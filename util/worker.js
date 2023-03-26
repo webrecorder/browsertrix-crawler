@@ -152,7 +152,7 @@ export class PageWorker
 
     // set new page id
     const pageid = uuidv4();
-    opts.pageid = pageid;
+    data.pageid = pageid;
 
     if (this.recorder) {
       this.recorder.startPage({pageid, url});
