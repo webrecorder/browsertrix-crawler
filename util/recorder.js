@@ -54,7 +54,7 @@ export class Recorder
 
     cdp.on("Network.responseReceivedExtraInfo", (params) => {
       logger.debug("Network.responseReceivedExtraInfo", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
-      const reqresp = this.pendingReqResp(params.requestId, true);
+      const reqresp = this.pendingReqResp(params.requestId);
       if (reqresp) {
         reqresp.fillResponseReceivedExtraInfo(params);
       }
@@ -104,7 +104,7 @@ export class Recorder
   async handleResponseReceived(params) {
     const { requestId, response } = params;
 
-    const reqresp = this.pendingReqResp(requestId, true);
+    const reqresp = this.pendingReqResp(requestId);
     if (!reqresp) {
       return;
     }
