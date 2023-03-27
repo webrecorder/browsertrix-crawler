@@ -16,6 +16,11 @@ import { rewriteDASH, rewriteHLS } from "@webrecorder/wabac/src/rewrite/rewriteV
 
 import { WARCRecord, WARCSerializer } from "warcio";
 
+// =================================================================
+function logNetwork(msg, data) {
+  // logger.debug(msg, data, "recorderNetwork");
+}
+
 
 // =================================================================
 export class Recorder
@@ -51,19 +56,19 @@ export class Recorder
     // Fetch
 
     cdp.on("Fetch.requestPaused", (params) => {
-      logger.debug("Fetch.requestPaused", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
+      logNetwork("Fetch.requestPaused", {requestId: params.requestId, ...this.logDetails});
       this.handleRequestPaused(params, cdp);
     });
 
     // Response
     cdp.on("Network.responseReceived", (params) => {
       // handling to fill in security details
-      logger.debug("Network.responseReceived", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
+      logNetwork("Network.responseReceived", {requestId: params.requestId, ...this.logDetails});
       this.handleResponseReceived(params);
     });
 
     cdp.on("Network.responseReceivedExtraInfo", (params) => {
-      logger.debug("Network.responseReceivedExtraInfo", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
+      logNetwork("Network.responseReceivedExtraInfo", {requestId: params.requestId, ...this.logDetails});
       const reqresp = this.pendingReqResp(params.requestId);
       if (reqresp) {
         reqresp.fillResponseReceivedExtraInfo(params);
@@ -76,18 +81,18 @@ export class Recorder
       // only handling redirect here, committing last response in redirect chain
       // request data stored from requestPaused
       if (params.redirectResponse) {
-        logger.debug("Network.requestWillBeSent after redirect", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
+        logNetwork("Network.requestWillBeSent after redirect", {requestId: params.requestId, ...this.logDetails});
         this.handleRedirectResponse(params);
       }
     });
 
     cdp.on("Network.requestServedFromCache", (params) => {
-      logger.debug("Network.requestServedFromCache", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
+      logNetwork("Network.requestServedFromCache", {requestId: params.requestId, ...this.logDetails});
       this.removeReqResp(params.requestId);
     });
 
     // cdp.on("Network.requestWillBeSentExtraInfo", (params) => {
-    //   logger.debug("Network.requestWillBeSentExtraInfo", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
+    //   logNetwork("Network.requestWillBeSentExtraInfo", {requestId: params.requestId, ...this.logDetails});
     //   if (!this.shouldSkip(null, params.headers, null)) {
     //     const reqresp = this.pendingReqResp(params.requestId, true);
     //     if (reqresp) {
@@ -98,12 +103,12 @@ export class Recorder
 
     // Loading
     cdp.on("Network.loadingFinished", (params) => {
-      logger.debug("Network.loadingFinished", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
+      logNetwork("Network.loadingFinished", {requestId: params.requestId, ...this.logDetails});
       this.handleLoadingFinished(params);
     });
 
     cdp.on("Network.loadingFailed", (params) => {
-      logger.debug("Network.loadingFailed", {requestId: params.requestId, ...this.logDetails}, "recorderNetwork");
+      logNetwork("Network.loadingFailed", {requestId: params.requestId, ...this.logDetails});
       this.handleLoadingFailed(params);
     });
 
@@ -194,15 +199,15 @@ export class Recorder
     const { url } = request;
     const {networkId, requestId, responseErrorReason, responseStatusCode, responseHeaders} = params;
 
-    if (responseErrorReason) {
-      logger.warn("Skipping failed response", {url, reason: params.responseErrorReason, ...this.logDetails}, "recorder");
+    if (await this.isDupeByUrl(url)) {
+      logNetwork("URL already encountered, skipping recording", {url, networkId, ...this.logDetails});
+      this.skipIds.add(networkId);
+      this.removeReqResp(networkId);
       return false;
     }
 
-    if (await this.isDupeByUrl(url)) {
-      logger.debug("URL already encountered, skipping recording", {url, networkId, ...this.logDetails}, "recorder");
-      this.skipIds.add(networkId);
-      this.removeReqResp(networkId);
+    if (responseErrorReason) {
+      logger.warn("Skipping failed response", {url, reason: params.responseErrorReason, ...this.logDetails}, "recorder");
       return false;
     }
 
@@ -214,6 +219,8 @@ export class Recorder
         logger.debug("Keep 206 Response, Full Range", {range, contentLen, url, networkId, ...this.logDetails}, "recorder");
       } else {
         logger.debug("Skip 206 Response", {range, contentLen, url, ...this.logDetails}, "recorder");
+        this.skipIds.add(networkId);
+        this.removeReqResp(networkId);
         return false;
       }
     }
@@ -229,6 +236,8 @@ export class Recorder
       reqresp.payload = new Uint8Array();
       return false;
     }
+
+    await this.addDupeByUrl(url);
 
     if (contentLen && contentLen > 100000000) {
       const payload = new PayloadBuffer(this.tempdir, contentLen);
@@ -250,25 +259,27 @@ export class Recorder
       } else {
         logger.warn("Streaming response size mismatch, skipping", {size: payload.length, expected: contentLen, url, ...this.logDetails}, "recorder");
         this.removeReqResp(networkId);
+        await this.removeDupeByUrl(url);
       }
 
       return true;
     }
 
     try {
-      logger.debug("Fetching response", {sizeExpected: this._getContentLen(params.responseHeaders), url, networkId, ...this.logDetails}, "recorder");
+      logNetwork("Fetching response", {sizeExpected: this._getContentLen(params.responseHeaders), url, networkId, ...this.logDetails});
       const { body, base64Encoded } = await cdp.send("Fetch.getResponseBody", {requestId});
       reqresp.payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
-      logger.debug("Fetch done", {size: reqresp.payload.length, url, networkId, ...this.logDetails}, "recorder");
+      logNetwork("Fetch done", {size: reqresp.payload.length, url, networkId, ...this.logDetails});
     } catch (e) {
       logger.warn("Failed to load response body", {url, ...this.logDetails}, "recorder");
+      await this.removeDupeByUrl(url);
       return false;
     }
 
     const changed = await this.rewriteResponse(params, reqresp, cdp);
 
     if (!this.fh) {
-      logger.debug("No output file, skipping recording", {url, ...this.logDetails}, "recorder");
+      logger.error("No output file, skipping recording", {url, ...this.logDetails}, "recorder");
       return changed;
     }
 
@@ -284,7 +295,15 @@ export class Recorder
   //todo
   async isDupeByUrl(url) {
     //return !await this.crawler.crawlState.redis.hsetnx("dedup:u", url, "1");
-    return await this.crawler.crawlState.redis.sadd("dedup:s", url) === 0;
+    return await this.crawler.crawlState.redis.sismember("dedup:s", url);
+  }
+
+  async addDupeByUrl(url) {
+    return await this.crawler.crawlState.redis.sadd("dedup:s", url);
+  }
+
+  async removeDupeByUrl(url) {
+    return await this.crawler.crawlState.redis.srem("dedup:s", url);
   }
 
   startPage({pageid, url}) {
@@ -484,7 +503,7 @@ export class Recorder
         return null;
       }
       if (this.skipIds.has(requestId)) {
-        logger.debug("Skipping ignored id", {requestId}, "recorder");
+        logNetwork("Skipping ignored id", {requestId});
         return null;
       }
       if (this.skipping) {
@@ -593,8 +612,8 @@ async function writeRecord(fh, record, logDetails) {
     } catch (e) {
       logger.error("Error writing to WARC, corruption possible", {url: record.warcTargetURI, logDetails}, "recorder");
     }
-    if (count > 16) {
-      logger.debug("Writing WARC Chunk", {total, url: record.warcTargetURI, logDetails}, "recorder");
+    if (count > 32) {
+      logNetwork("Writing WARC Chunk", {total, url: record.warcTargetURI, logDetails});
       count = 0;
     }
   }
