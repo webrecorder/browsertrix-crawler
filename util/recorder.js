@@ -284,7 +284,7 @@ export class Recorder
   //todo
   async isDupeByUrl(url) {
     //return !await this.crawler.crawlState.redis.hsetnx("dedup:u", url, "1");
-    await this.crawler.crawlState.redis.sadd("dedup:s", url) === 1;
+    return await this.crawler.crawlState.redis.sadd("dedup:s", url) === 0;
   }
 
   startPage({pageid, url}) {
@@ -576,8 +576,27 @@ export class Recorder
     const responseRecord = await createResponse();
     const requestRecord = await createRequest(responseRecord);
 
-    this.queue.add(async () => await this.fh.writeFile(await WARCSerializer.serialize(responseRecord, {gzip: true})));
-    this.queue.add(async () => await this.fh.writeFile(await WARCSerializer.serialize(requestRecord, {gzip: true})));
+    this.queue.add(() => writeRecord(this.fh, responseRecord, this.logDetails));
+    this.queue.add(() => writeRecord(this.fh, requestRecord, this.logDetails));
+  }
+}
+
+async function writeRecord(fh, record, logDetails) {
+  const serializer = new WARCSerializer(record, {gzip: true});
+  let total = 0;
+  let count = 0;
+  for await (const chunk of serializer) {
+    total += chunk.length;
+    count++;
+    try {
+      await fh.writeFile(chunk);
+    } catch (e) {
+      logger.error("Error writing to WARC, corruption possible", {url: record.warcTargetURI, logDetails}, "recorder");
+    }
+    if (count > 16) {
+      logger.debug("Writing WARC Chunk", {total, url: record.warcTargetURI, logDetails}, "recorder");
+      count = 0;
+    }
   }
 }
 
