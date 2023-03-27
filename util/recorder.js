@@ -1,6 +1,9 @@
 import fsp from "fs/promises";
 import path from "path";
 import os from "os";
+import { v4 as uuidv4 } from "uuid";
+
+import { createHash } from "node:crypto";
 
 import PQueue from "p-queue";
 
@@ -17,22 +20,29 @@ import { WARCRecord, WARCSerializer } from "warcio";
 // =================================================================
 export class Recorder
 {
-  constructor({workerid, archivesDir, crawler}) {
+  constructor({workerid, collDir, crawler}) {
     this.workerid = workerid;
     this.crawler = crawler;
 
     this.queue = new PQueue({concurrency: 1});
 
-    this.pendingRequests = new Map();
+    this.pendingRequests = null;
+    this.skipIds = null;
 
     this.logDetails = {};
     this.skipping = false;
 
-    this.initFH(archivesDir);
+    this.initFH(collDir);
   }
 
-  async initFH(archivesDir) {
+  async initFH(collDir) {
+    const archivesDir = path.join(collDir, "archive");
+    this.tempdir = path.join(collDir, "tmp");
+
+    await fsp.mkdir(this.tempdir, {recursive: true});
+
     await fsp.mkdir(archivesDir, {recursive: true});
+
     const crawlId = process.env.CRAWL_ID || os.hostname();
     this.fh = await fsp.open(path.join(archivesDir, `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`), "a");
   }
@@ -146,7 +156,6 @@ export class Recorder
     const reqresp = this.removeReqResp(params.requestId);
 
     if (!reqresp || !reqresp.url) {
-      //console.log("unknown request finished: " + params.requestId);
       return;
     }
 
@@ -181,64 +190,92 @@ export class Recorder
   }
 
   async handleFetchResponse(params, cdp) {
-    let payload;
-
     const { request } = params;
     const { url } = request;
+    const {networkId, requestId, responseErrorReason, responseStatusCode, responseHeaders} = params;
 
-    if (params.responseErrorReason) {
+    if (responseErrorReason) {
       logger.warn("Skipping failed response", {url, reason: params.responseErrorReason, ...this.logDetails}, "recorder");
       return false;
     }
 
-    if (params.responseStatusCode === 206) {
-      logger.debug("Skip 206 Response", {url, ...this.logDetails}, "recorder");
-      return false;
-    }
-
     if (await this.isDupeByUrl(url)) {
-      logger.debug("URL already encountered, skipping recording", {url, ...this.logDetails}, "recorder");
+      logger.debug("URL already encountered, skipping recording", {url, networkId, ...this.logDetails}, "recorder");
+      this.skipIds.add(networkId);
+      this.removeReqResp(networkId);
       return false;
     }
 
-    const id = params.networkId || params.requestId;
+    const contentLen = this._getContentLen(responseHeaders);
 
-    const reqresp = this.pendingReqResp(id);
+    if (params.responseStatusCode === 206) {
+      const range = this._getContentRange(responseHeaders);
+      if (range === `bytes 0-${contentLen - 1}/${contentLen}`) {
+        logger.debug("Keep 206 Response, Full Range", {range, contentLen, url, networkId, ...this.logDetails}, "recorder");
+      } else {
+        logger.debug("Skip 206 Response", {range, contentLen, url, ...this.logDetails}, "recorder");
+        return false;
+      }
+    }
+
+    const reqresp = this.pendingReqResp(networkId);
     if (!reqresp) {
       return false;
     }
 
     reqresp.fillFetchRequestPaused(params);
 
-    if (this.noResponseForStatus(params.responseStatusCode)) {
-      payload = new Uint8Array();
-    } else {
-      try {
-        const { requestId } = params;
-        logger.debug("Fetching response", {sizeExpected: this._getContentLen(params.responseHeaders), url, requestId: id, ...this.logDetails}, "recorder");
-        const { body, base64Encoded } = await cdp.send("Fetch.getResponseBody", {requestId});
-        //logger.debug("Fetch done", {url, requestId: id, ...this.logDetails}, "recorder");
-        payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
-      } catch (e) {
-        logger.warn("Failed to load response body", {url, ...this.logDetails}, "recorder");
-        return false;
-      }
+    if (this.noResponseForStatus(responseStatusCode)) {
+      reqresp.payload = new Uint8Array();
+      return false;
     }
 
-    const result = await this.rewriteResponse(params, payload, reqresp.extraOpts, cdp);
-    const changed = result.changed;
+    if (contentLen && contentLen > 100000000) {
+      const payload = new PayloadBuffer(this.tempdir, contentLen);
+      reqresp.streaming = payload;
+
+      await payload.load(cdp, requestId);
+
+      // continue with empty body to avoid sending full stream back
+      const body = "".toString("base64");
+
+      await cdp.send("Fetch.fulfillRequest", {
+        requestId, responseHeaders, body,
+        responseCode: params.responseStatusCode,
+      });
+
+      if (payload.length === contentLen) {
+        logger.debug("Streaming fetch done", {size: payload.length, expected: contentLen, url, ...this.logDetails}, "recorder");
+        reqresp.payload = payload;
+      } else {
+        logger.warn("Streaming response size mismatch, skipping", {size: payload.length, expected: contentLen, url, ...this.logDetails}, "recorder");
+        this.removeReqResp(networkId);
+      }
+
+      return true;
+    }
+
+    try {
+      logger.debug("Fetching response", {sizeExpected: this._getContentLen(params.responseHeaders), url, networkId, ...this.logDetails}, "recorder");
+      const { body, base64Encoded } = await cdp.send("Fetch.getResponseBody", {requestId});
+      reqresp.payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
+      logger.debug("Fetch done", {size: reqresp.payload.length, url, networkId, ...this.logDetails}, "recorder");
+    } catch (e) {
+      logger.warn("Failed to load response body", {url, ...this.logDetails}, "recorder");
+      return false;
+    }
+
+    const changed = await this.rewriteResponse(params, reqresp, cdp);
 
     if (!this.fh) {
       logger.debug("No output file, skipping recording", {url, ...this.logDetails}, "recorder");
       return changed;
     }
 
-    payload = result.payload;
-    reqresp.payload = payload;
 
-    if (!payload) {
+    if (!reqresp.payload) {
       logger.error("Unable to get payload skipping recording", {url, ...this.logDetails}, "recorder");
-      this.removeReqResp(id);
+      this.removeReqResp(networkId);
     }
 
     return changed;
@@ -246,13 +283,15 @@ export class Recorder
 
   //todo
   async isDupeByUrl(url) {
-    return !await this.crawler.crawlState.redis.hsetnx("dedup:u", url, "1");
+    //return !await this.crawler.crawlState.redis.hsetnx("dedup:u", url, "1");
+    await this.crawler.crawlState.redis.sadd("dedup:s", url) === 1;
   }
 
   startPage({pageid, url}) {
     this.pageid = pageid;
     this.logDetails = {page: url, workerid: this.workerid};
     this.pendingRequests = new Map();
+    this.skipIds = new Set();
     this.skipping = false;
   }
 
@@ -275,7 +314,13 @@ export class Recorder
     while (numPending && !this.crawler.interrupted) {
       const pending = [];
       for (const [requestId, reqresp] of pendingRequests.entries()) {
-        pending.push({requestId, url: reqresp.url});
+        const url = reqresp.url;
+        const entry = {requestId, url};
+        if (reqresp.streaming) {
+          entry.size = reqresp.streaming.length;
+          entry.expectedSize = reqresp.streaming.expectedSize;
+        }
+        pending.push(entry);
       }
 
       logger.debug("Finishing pending requests for page", {numPending, pending, ...this.logDetails}, "recorder");
@@ -326,11 +371,11 @@ export class Recorder
     return false;
   }
 
-  async rewriteResponse(params, payload, extraOpts, cdp) {
+  async rewriteResponse(params, reqresp, cdp) {
     let changed = false;
 
-    if (!payload.length) {
-      return {payload, changed};
+    if (!reqresp.payload.length) {
+      return changed;
     }
 
     let newString = null;
@@ -343,13 +388,13 @@ export class Recorder
     switch (ct) {
     case "application/x-mpegURL":
     case "application/vnd.apple.mpegurl":
-      string = payload.toString("utf-8");
-      newString = rewriteHLS(string, {save: extraOpts});
+      string = reqresp.payload.toString("utf-8");
+      newString = rewriteHLS(string, {save: reqresp.extraOpts});
       break;
 
     case "application/dash+xml":
-      string = payload.toString("utf-8");
-      newString = rewriteDASH(string, {save: extraOpts});
+      string = reqresp.payload.toString("utf-8");
+      newString = rewriteDASH(string, {save: reqresp.extraOpts});
       break;
 
     case "text/html":
@@ -360,22 +405,22 @@ export class Recorder
       const rw = baseDSRules.getRewriter(params.request.url);
 
       if (rw !== baseDSRules.defaultRewriter) {
-        string = payload.toString("utf-8");
-        newString = rw.rewrite(string, {live: true, save: extraOpts});
+        string = reqresp.payload.toString("utf-8");
+        newString = rw.rewrite(string, {live: true, save: reqresp.extraOpts});
       }
       break;
     }
     }
 
     if (!newString) {
-      return {payload, changed};
+      return changed;
     }
 
     if (newString !== string) {
-      extraOpts.rewritten = 1;
+      reqresp.extraOpts.rewritten = 1;
       const encoder = new TextEncoder();
       logger.debug("Content Rewritten", {url, ...this.logDetails}, "recorder");
-      payload = encoder.encode(newString);
+      reqresp.payload = encoder.encode(newString);
     }
 
     const base64Str = Buffer.from(newString).toString("base64");
@@ -392,7 +437,7 @@ export class Recorder
       logger.warn("Fulfill Failed", {url, ...this.logDetails, ...errJSON(e)}, "recorder");
     }
 
-    return {payload, changed};
+    return changed;
   }
 
   _getContentType(headers) {
@@ -408,6 +453,16 @@ export class Recorder
   _getContentLen(headers) {
     for (let header of headers) {
       if (header.name.toLowerCase() === "content-length") {
+        return Number(header.value);
+      }
+    }
+
+    return -1;
+  }
+
+  _getContentRange(headers) {
+    for (let header of headers) {
+      if (header.name.toLowerCase() === "content-range") {
         return header.value;
       }
     }
@@ -426,6 +481,10 @@ export class Recorder
   pendingReqResp(requestId, reuseOnly = false) {
     if (!this.pendingRequests.has(requestId)) {
       if (reuseOnly || !requestId) {
+        return null;
+      }
+      if (this.skipIds.has(requestId)) {
+        logger.debug("Skipping ignored id", {requestId}, "recorder");
         return null;
       }
       if (this.skipping) {
@@ -474,13 +533,22 @@ export class Recorder
         "WARC-Page-ID": this.pageid,
       };
 
+      let body;
+
+      if (reqresp.payload instanceof PayloadBuffer) {
+        warcHeaders["WARC-Payload-Digest"] = reqresp.payload.payloadDigest;
+        body = reqresp.payload;
+      } else {
+        body = [reqresp.payload];
+      }
+
       if (Object.keys(reqresp.extraOpts).length) {
         warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
       }
 
       return WARCRecord.create({
         url, date, warcVersion, type: "response", warcHeaders,
-        httpHeaders, statusline}, [reqresp.payload]);
+        httpHeaders, statusline}, body);
     };
 
     // request
@@ -510,5 +578,62 @@ export class Recorder
 
     this.queue.add(async () => await this.fh.writeFile(await WARCSerializer.serialize(responseRecord, {gzip: true})));
     this.queue.add(async () => await this.fh.writeFile(await WARCSerializer.serialize(requestRecord, {gzip: true})));
+  }
+}
+
+// =================================================================
+class PayloadBuffer
+{
+  constructor(tempdir, expectedSize) {
+    this.tempdir = tempdir;
+    this.length = 0;
+    this.expectedSize = expectedSize;
+    this.filename = path.join(this.tempdir, `${timestampNow()}-${uuidv4()}.data`);
+
+    this._digest = createHash("sha256");
+  }
+
+  get payloadDigest() {
+    return "sha-256:" + this._digest.digest("hex");
+  }
+
+  async load(cdp, requestId) {
+    let respFH;
+
+    try {
+      const { stream } = await cdp.send("Fetch.takeResponseBodyAsStream", {requestId});
+
+      respFH = await fsp.open(this.filename, "w");
+
+      while (true) {
+        const {data, base64Encoded, eof} = await cdp.send("IO.read", {handle: stream});
+        const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
+        this._digest.update(buff);
+        this.length += buff.length;
+        await respFH.write(buff);
+        if (eof) {
+          break;
+        }
+      }
+      await respFH.sync();
+    } catch (e) {
+      logger.error("Error streaming ot file", {requestId, filename: this.this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
+    } finally {
+      await respFH.close();
+    }
+  }
+
+  async *[Symbol.asyncIterator]() {
+    const respFH = await fsp.open(this.filename);
+    const reader = await respFH.createReadStream();
+    for await (const buff of reader) {
+      yield buff;
+    }
+    try {
+      await respFH.close();
+      await fsp.unlink(this.filename);
+    } catch (e) {
+      logger.error("Error closing buffer file", {filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
+    }
   }
 }

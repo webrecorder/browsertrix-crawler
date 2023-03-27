@@ -686,11 +686,11 @@ export class Crawler {
       }
     });
 
-    const archiveDir = path.join(this.collDir, "archive");
+    //const archiveDir = path.join(this.collDir, "archive");
 
     // --------------
     // Run Crawl Here!
-    await runWorkers(this, this.params.workers, this.maxPageTime, archiveDir);
+    await runWorkers(this, this.params.workers, this.maxPageTime, this.collDir);
     // --------------
 
     await this.serializeConfig(true);

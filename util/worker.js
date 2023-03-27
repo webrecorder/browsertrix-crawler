@@ -9,13 +9,13 @@ const MAX_REUSE = 5;
 const NEW_WINDOW_TIMEOUT = 10;
 
 // ===========================================================================
-export function runWorkers(crawler, numWorkers, maxPageTime, archivesDir) {
+export function runWorkers(crawler, numWorkers, maxPageTime, collDir) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
   const workers = [];
 
   for (let i = 0; i < numWorkers; i++) {
-    workers.push(new PageWorker(i, crawler, maxPageTime, archivesDir));
+    workers.push(new PageWorker(i, crawler, maxPageTime, collDir));
   }
 
   return Promise.allSettled(workers.map((worker) => worker.run()));
@@ -25,7 +25,7 @@ export function runWorkers(crawler, numWorkers, maxPageTime, archivesDir) {
 // ===========================================================================
 export class PageWorker
 {
-  constructor(id, crawler, maxPageTime, archivesDir) {
+  constructor(id, crawler, maxPageTime, collDir) {
     this.id = id;
     this.crawler = crawler;
     this.maxPageTime = maxPageTime;
@@ -42,7 +42,7 @@ export class PageWorker
     this.markCrashed = null;
     this.crashBreak = null;
 
-    this.recorder = new Recorder({workerid: id, archivesDir, crawler: this.crawler});
+    this.recorder = new Recorder({workerid: id, collDir, crawler: this.crawler});
   }
 
   async closePage() {
