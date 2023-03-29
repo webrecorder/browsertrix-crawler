@@ -93,7 +93,19 @@ if json then
   data['started'] = ARGV[2];
   json = cjson.encode(data);
   redis.call('hset', KEYS[1], ARGV[1], json);
-  redis.call('setex', KEYS[2], ARGV[3], "1");
+  redis.call('setex', KEYS[2], ARGV[3], ARGV[4]);
+end
+
+`
+    });
+
+    redis.defineCommand("unmarkpending", {
+      numberOfKeys: 1,
+      lua: `
+local value = redis.call('get', KEYS[1]);
+
+if value == ARGV[1] then
+  redis.call('del', KEYS[1])
 end
 
 `
@@ -152,7 +164,7 @@ return 0;
   async markStarted(url) {
     const started = this._timestamp();
 
-    return await this.redis.markstarted(this.pkey, this.pkey + ":" + url, url, started, this.maxPageTime);
+    return await this.redis.markstarted(this.pkey, this.pkey + ":" + url, url, started, this.maxPageTime, this.uid);
   }
 
   async markFinished(url) {
@@ -333,6 +345,18 @@ return 0;
   async getPendingList() {
     const list = await this.redis.hvals(this.pkey);
     return list.map(x => JSON.parse(x));
+  }
+
+  async clearOwnPending() {
+    try {
+      const pendingUrls = await this.redis.hkeys(this.pkey);
+
+      for (const url of pendingUrls) {
+        await this.redis.unmarkpending(this.pkey + ":" + url, this.uid);
+      }
+    } catch (e) {
+      logger.error("Redis Del Pending Failed", e, "state");
+    }
   }
 
   async resetPendings() {
