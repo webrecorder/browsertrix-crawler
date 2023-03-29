@@ -116,6 +116,13 @@ export class RequestResponseInfo
     this.extraOpts.ipType = params.resourceIPAddressSpace;
   }
 
+  fillFetchResponse(response) {
+    this.responseHeaders = Object.fromEntries(response.headers);
+    this.status = response.status;
+    this.statusText = response.statusText || getStatusText(this.status);
+
+  }
+
   fillRequestExtraInfo(params) {
     this.requestHeaders = params.headers;
   }

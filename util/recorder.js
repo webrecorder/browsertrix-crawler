@@ -27,7 +27,6 @@ function logNetwork(msg, data) {
   // logger.debug(msg, data, "recorderNetwork");
 }
 
-
 // =================================================================
 export class Recorder
 {
@@ -58,6 +57,8 @@ export class Recorder
 
     const crawlId = process.env.CRAWL_ID || os.hostname();
     this.fh = await fsp.open(path.join(archivesDir, `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`), "a");
+
+    this.serializer = new WARCSerializer({gzip: false});
   }
 
   async onCreatePage({cdp}) {
@@ -149,19 +150,29 @@ export class Recorder
   }
 
   handleLoadingFailed(params) {
-    const reqresp = this.removeReqResp(params.requestId);
-    if (reqresp && reqresp.status !== 206) {
+    const { errorText, type, requestId } = params;
+
+    const reqresp = this.removeReqResp(requestId);
+    if (!reqresp) {
+      return;
+    }
+
+    const { url } = reqresp;
+
+    if (errorText === "net::ERR_ABORTED") {
       // check if this is a false positive -- a valid download that's already been fetched
       // the abort is just for page, but download will succeed
-      if (params.type === "Document" && 
-              params.errorText === "net::ERR_ABORTED" &&
-              reqresp.isValidBinary()) {
+      if (type === "Document" && reqresp.isValidBinary()) {
         this.serializeToWARC(reqresp);
-      } else if (params.errorText === "net::ERR_BLOCKED_BY_CLIENT") {
-        logger.warn("Request blocked", {url: reqresp.url, errorText: params.errorText, ...this.logDetails}, "recorder");
       } else {
-        logger.warn("Request load failed", {url: reqresp.url, errorText: params.errorText, ...this.logDetails}, "recorder");
+        logger.warn("Request failed, attempt direct fetch", {url, ...this.logDetails}, "recorder");
       }
+      const fetcher = new AsyncFetcher(this.tempdir, reqresp, -1, this, requestId);
+      this.fetcherQ.add(() => fetcher.load());
+    } else if (params.errorText === "net::ERR_BLOCKED_BY_CLIENT") {
+      logger.warn("Request blocked", {url, errorText, ...this.logDetails}, "recorder");
+    } else {
+      logger.warn("Request failed", {url, errorText, ...this.logDetails}, "recorder");
     }
   }
 
@@ -593,20 +604,21 @@ export class Recorder
 }
 
 async function writeRecord(fh, record, logDetails) {
-  const serializer = new WARCSerializer(record, {gzip: true});
+  const serializer = new WARCSerializer(record, {gzip: false});
   let total = 0;
   let count = 0;
+  const url = record.warcTargetURI;
+
   for await (const chunk of serializer) {
     total += chunk.length;
     count++;
     try {
       await fh.writeFile(chunk);
     } catch (e) {
-      logger.error("Error writing to WARC, corruption possible", {url: record.warcTargetURI, logDetails}, "recorder");
+      logger.error("Error writing to WARC, corruption possible", {url, logDetails}, "recorder");
     }
-    if (count > 32) {
-      logNetwork("Writing WARC Chunk", {total, url: record.warcTargetURI, logDetails});
-      count = 0;
+    if (!(count % 4)) {
+      logger.debug("Writing WARC Chunk", {total, count, url, logDetails}, "recorder");
     }
   }
 }
@@ -638,7 +650,7 @@ class AsyncFetcher
       const { headers } = this.reqresp.getRequestHeadersDict();
       const { method } = this.reqresp;
 
-      const resp = await fetch(url, {method, headers});
+      logger.debug("Async fetch started", {url}, "recorder");
 
       const fetcher = this;
 
@@ -650,6 +662,22 @@ class AsyncFetcher
         },
       });
 
+      const resp = await fetch(url, {method, headers});
+
+      if (this.expectedSize < 0 && resp.headers.get("content-length")) {
+        this.expectedSize = Number(resp.headers.get("content-length"));
+      }
+
+      if (this.expectedSize === 0) {
+        this.reqresp.payload = new Uint8Array();
+        await this.recorder.serializeToWARC(this.reqresp);
+        return;
+
+      } else if (!resp.body) {
+        console.log("**** body empty!", url, method, headers);
+        return;
+      }
+
       await pipeline(
         Readable.fromWeb(resp.body),
         digester,
@@ -658,7 +686,7 @@ class AsyncFetcher
 
       this.recorder.removeReqResp(this.networkId);
 
-      if (this.length === this.expectedSize) {
+      if (this.length === this.expectedSize || this.expectedSize < 0) {
         logger.debug("Streaming fetch done", {size: this.length, expected: this.expectedSize, url, ...this.logDetails}, "recorder");
         
         this.reqresp.payload = this;
