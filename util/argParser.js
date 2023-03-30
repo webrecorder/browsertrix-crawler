@@ -176,6 +176,18 @@ class ArgParser {
         default: "stats",
       },
 
+      "logLevel": {
+        describe: "Comma-separated list of log levels to include in logs",
+        type: "string",
+        default: "",
+      },
+
+      "context": {
+        describe: "Comma-separated list of contexts to include in logs",
+        type: "string",
+        default: "",
+      },
+
       "text": {
         describe: "If set, extract text to the pages.jsonl file",
         type: "boolean",
@@ -383,6 +395,8 @@ class ArgParser {
 
     // log options
     argv.logging = argv.logging.split(",");
+    argv.logLevel = argv.logLevel ? argv.logLevel.split(",") : [];
+    argv.context = argv.context ? argv.context.split(",") : [];
 
     // background behaviors to apply
     const behaviorOpts = {};
