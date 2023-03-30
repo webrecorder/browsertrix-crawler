@@ -13,7 +13,7 @@
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
     "@webrecorder/wabac": "^2.15.3",
-    "browsertrix-behaviors": "^0.5.0-beta.0",
+    "browsertrix-behaviors": "github:webrecorder/browsertrix-behaviors#custom-fetch-header",
     "get-folder-size": "^4.0.0",
     "ioredis": "^4.27.1",
     "js-yaml": "^4.1.0",
@@ -22,7 +22,7 @@
     "playwright-core": "^1.31.2",
     "sitemapper": "^3.1.2",
     "uuid": "8.3.2",
-    "warcio": "^2.0.1",
+    "warcio": "github:webrecorder/warcio.js#streaming-serializer",
     "ws": "^7.4.4",
     "yargs": "^16.0.3"
   },

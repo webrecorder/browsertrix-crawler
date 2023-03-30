@@ -43,6 +43,9 @@ export class RequestResponseInfo
     this.resourceType = null;
 
     this.extraOpts = {};
+
+    this.readSize = 0;
+    this.expectedSize = 0;
   }
 
   fillRequest(params) {

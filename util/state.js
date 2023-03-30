@@ -357,5 +357,13 @@ return 0;
     this._lastSize = await this.redis.zcard(this.qkey);
     return this._lastSize;
   }
+
+  async addIfNoDupe(key, value) {
+    return await this.redis.sadd(key, value) === 1;
+  }
+
+  async removeDupe(key, value) {
+    return await this.redis.srem(key, value);
+  }
 }
 

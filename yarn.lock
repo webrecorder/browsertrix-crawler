@@ -1271,10 +1271,9 @@ browserslist@^4.21.3:
     node-releases "^2.0.6"
     update-browserslist-db "^1.0.9"
 
-browsertrix-behaviors@^0.5.0-beta.0:
+"browsertrix-behaviors@github:webrecorder/browsertrix-behaviors#custom-fetch-header":
   version "0.5.0-beta.0"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.5.0-beta.0.tgz#d1a7c35cda31d740a374df1e833f36bd1890768d"
-  integrity sha512-RQMQlbV4OBAzYyhTI7imoem8p4MTj2XSDzlIZvA5sC5U89OMnJ0VM5KBAJzET3PUJkQlUQEOTiXtnsnodHXTUQ==
+  resolved "https://codeload.github.com/webrecorder/browsertrix-behaviors/tar.gz/d7e57c952c25b2ee1e3b1ad08d73884cb0b74866"
 
 bser@2.1.1:
   version "2.1.1"
@@ -4162,6 +4161,16 @@ warcio@^2.0.1:
   integrity sha512-+1AyOQJ3hjLkZwT0mIn2xGrg+RRbyu+fWXuCpU1A/VG25bVzrcsvj8T0lWToylJU4Xf9Q8W57Jej/iUxGxaHKg==
   dependencies:
     base32-encode "^2.0.0"
+    pako "^1.0.11"
+    uuid-random "^1.3.2"
+    yargs "^17.6.2"
+
+"warcio@github:webrecorder/warcio.js#streaming-serializer":
+  version "2.2.0"
+  resolved "https://codeload.github.com/webrecorder/warcio.js/tar.gz/8cfdab9958c5de147a09e471f40e290d36381304"
+  dependencies:
+    base32-encode "^2.0.0"
+    hash-wasm "^4.9.0"
     pako "^1.0.11"
     uuid-random "^1.3.2"
     yargs "^17.6.2"
