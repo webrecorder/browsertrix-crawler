@@ -14,9 +14,9 @@ import { RequestResponseInfo } from "./reqresp.js";
 import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
 import { rewriteDASH, rewriteHLS } from "@webrecorder/wabac/src/rewrite/rewriteVideo.js";
 
-import { WARCRecord, WARCSerializer, WARCRecordBuffer, StreamingWARCSerializer, AsyncIterReader } from "warcio";
+import { WARCRecord, WARCSerializer, WARCRecordBuffer, StreamingWARCSerializer, AsyncIterReader, concatChunks } from "warcio";
 
-const MAX_BROWSER_FETCH_SIZE = 10000000;
+const MAX_BROWSER_FETCH_SIZE = 2000000;
 
 const ASYNC_FETCH_DUPE_KEY = "s:fetchdupe";
 
@@ -37,9 +37,9 @@ export class Recorder
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
 
-    this.queue = new PQueue({concurrency: 1});
+    this.warcQ = new PQueue({concurrency: 1});
 
-    this.fetcherQ = new PQueue({concurrency: 3});
+    this.fetcherQ = new PQueue({concurrency: 1});
 
     this.fh = null;
 
@@ -53,7 +53,6 @@ export class Recorder
 
     this.allowFull206 = true;
     this.gzip = true;
-    this.useTakeStream = false;
   }
 
   async initFH() {
@@ -241,13 +240,13 @@ export class Recorder
     const {networkId, requestId, responseErrorReason, responseStatusCode, responseHeaders} = params;
 
     if (responseErrorReason) {
-      logger.warn("Skipping failed response", {url, reason: params.responseErrorReason, ...this.logDetails}, "recorder");
+      logger.warn("Skipping failed response", {url, reason: responseErrorReason, ...this.logDetails}, "recorder");
       return false;
     }
 
     const contentLen = this._getContentLen(responseHeaders);
 
-    if (params.responseStatusCode === 206) {
+    if (responseStatusCode === 206) {
       const range = this._getContentRange(responseHeaders);
       if (this.allowFull206 && range === `bytes 0-${contentLen - 1}/${contentLen}`) {
         logger.debug("Keep 206 Response, Full Range", {range, contentLen, url, networkId, ...this.logDetails}, "recorder");
@@ -271,31 +270,62 @@ export class Recorder
       return false;
     }
 
-    if (contentLen && contentLen > MAX_BROWSER_FETCH_SIZE) {
-      const fetcher = new AsyncFetcher({tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId, requestId, cdp, useTakeStream: this.useTakeStream});
-      this.skipIds.add(networkId);
-      this.fetcherQ.add(() => fetcher.load());
-      return this.useTakeStream;
+    let streamingConsume = false;
+
+    if (contentLen < 0 || contentLen > MAX_BROWSER_FETCH_SIZE) {
+      const useTakeStream = (contentLen < 0);
+      const fetcher = new AsyncFetcher({tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId, requestId, cdp, useTakeStream });
+
+      // taking stream, await here and then either call fulFill, or if not started, return false
+      if (useTakeStream) {
+        // didn't get stream, just continue
+        if (!await fetcher.load()) {
+          return false; 
+        }
+        streamingConsume = true;
+      } else {
+        this.fetcherQ.add(() => fetcher.load());
+        return false;
+      }
+
+    } else {
+      try {
+        logNetwork("Fetching response", {sizeExpected: this._getContentLen(responseHeaders), url, networkId, ...this.logDetails});
+        const { body, base64Encoded } = await cdp.send("Fetch.getResponseBody", {requestId});
+        reqresp.payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
+        logNetwork("Fetch done", {size: reqresp.payload.length, url, networkId, ...this.logDetails});
+      } catch (e) {
+        logger.warn("Failed to load response body", {...errJSON(e), url, ...this.logDetails}, "recorder");
+        return false;
+      }
     }
 
-    try {
-      logNetwork("Fetching response", {sizeExpected: this._getContentLen(params.responseHeaders), url, networkId, ...this.logDetails});
-      const { body, base64Encoded } = await cdp.send("Fetch.getResponseBody", {requestId});
-      reqresp.payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
-      logNetwork("Fetch done", {size: reqresp.payload.length, url, networkId, ...this.logDetails});
-    } catch (e) {
-      logger.warn("Failed to load response body", {...errJSON(e), url, ...this.logDetails}, "recorder");
+    const rewritten = await this.rewriteResponse(reqresp);
+
+    // not rewritten, and not streaming, return false to continue
+    if (!rewritten && !streamingConsume) {
+      if (!reqresp.payload) {
+        logger.error("Unable to get payload skipping recording", {url, ...this.logDetails}, "recorder");
+        this.removeReqResp(networkId);
+      }
       return false;
     }
 
-    const changed = await this.rewriteResponse(params, reqresp, cdp);
+    // if has payload, encode it, otherwise return empty string
+    const body = reqresp.payload && reqresp.payload.length ? Buffer.from(reqresp.payload).toString("base64") : "";
 
-    if (!reqresp.payload) {
-      logger.error("Unable to get payload skipping recording", {url, ...this.logDetails}, "recorder");
-      this.removeReqResp(networkId);
+    try {
+      await cdp.send("Fetch.fulfillRequest", {
+        requestId,
+        responseCode: responseStatusCode,
+        responseHeaders,
+        body
+      });
+    } catch (e) {
+      logger.warn("Fulfill Failed", {url, ...this.logDetails, ...errJSON(e)}, "recorder");
     }
 
-    return changed;
+    return true;
   }
 
   startPage({pageid, url}) {
@@ -342,9 +372,6 @@ export class Recorder
       await sleep(5.0);
       numPending = this.pendingRequests.size;
     }
-
-    logger.debug("Finishing Fetcher Queue", this.logDetails, "recorder");
-    await this.fetcherQ.onIdle();
   }
 
   async onClosePage() {
@@ -352,9 +379,11 @@ export class Recorder
   }
 
   async onDone() {
-    logger.debug("Finishing WARC writing", this.logDetails, "recorder");
+    logger.debug("Finishing Fetcher Queue", this.logDetails, "recorder");
+    await this.fetcherQ.onIdle();
 
-    await this.queue.onIdle();
+    logger.debug("Finishing WARC writing", this.logDetails, "recorder");
+    await this.warcQ.onIdle();
 
     if (this.fh) {
       await streamFinish(this.fh);
@@ -387,30 +416,28 @@ export class Recorder
     return false;
   }
 
-  async rewriteResponse(params, reqresp, cdp) {
-    let changed = false;
+  async rewriteResponse(reqresp) {
+    const { url, responseHeadersList, extraOpts, payload } = reqresp;
 
-    if (!reqresp.payload.length) {
-      return changed;
+    if (!payload || !payload.length) {
+      return false;
     }
 
     let newString = null;
     let string = null;
 
-    const url = params.request.url;
-
-    const ct = this._getContentType(params.responseHeaders);
+    const ct = this._getContentType(responseHeadersList);
 
     switch (ct) {
     case "application/x-mpegURL":
     case "application/vnd.apple.mpegurl":
-      string = reqresp.payload.toString("utf-8");
-      newString = rewriteHLS(string, {save: reqresp.extraOpts});
+      string = payload.toString("utf-8");
+      newString = rewriteHLS(string, {save: extraOpts});
       break;
 
     case "application/dash+xml":
-      string = reqresp.payload.toString("utf-8");
-      newString = rewriteDASH(string, {save: reqresp.extraOpts});
+      string = payload.toString("utf-8");
+      newString = rewriteDASH(string, {save: extraOpts});
       break;
 
     case "text/html":
@@ -418,41 +445,30 @@ export class Recorder
     case "text/javascript":
     case "application/javascript":
     case "application/x-javascript": {
-      const rw = baseDSRules.getRewriter(params.request.url);
+      const rw = baseDSRules.getRewriter(url);
 
       if (rw !== baseDSRules.defaultRewriter) {
-        string = reqresp.payload.toString("utf-8");
-        newString = rw.rewrite(string, {live: true, save: reqresp.extraOpts});
+        string = payload.toString("utf-8");
+        newString = rw.rewrite(string, {live: true, save: extraOpts});
       }
       break;
     }
     }
 
     if (!newString) {
-      return changed;
+      return false;
     }
 
     if (newString !== string) {
-      reqresp.extraOpts.rewritten = 1;
+      extraOpts.rewritten = 1;
       logger.debug("Content Rewritten", {url, ...this.logDetails}, "recorder");
       reqresp.payload = encoder.encode(newString);
+      return true;
+    } else {
+      return false;
     }
 
-    const base64Str = Buffer.from(newString).toString("base64");
-
-    try {
-      await cdp.send("Fetch.fulfillRequest",
-        {"requestId": params.requestId,
-          "responseCode": params.responseStatusCode,
-          "responseHeaders": params.responseHeaders,
-          "body": base64Str
-        });
-      changed = true;
-    } catch (e) {
-      logger.warn("Fulfill Failed", {url, ...this.logDetails, ...errJSON(e)}, "recorder");
-    }
-
-    return changed;
+    //return Buffer.from(newString).toString("base64");
   }
 
   _getContentType(headers) {
@@ -537,7 +553,7 @@ export class Recorder
     const responseRecord = createResponse(reqresp, this.pageid);
     const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
 
-    this.queue.add(() => writeRecordPair(this.fh, responseRecord, requestRecord, this.logDetails, this.gzip));
+    this.warcQ.add(() => writeRecordPair(this.fh, responseRecord, requestRecord, this.logDetails, this.gzip));
   }
 }
 
@@ -570,9 +586,11 @@ class AsyncFetcher extends WARCRecordBuffer
 
     const { pageid, crawlState, gzip } = recorder;
 
+    let consumedStream = false;
+
     try {
       if (reqresp.method === "GET" && !await crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url)) {
-        return;
+        return false;
       }
 
       let body = null;
@@ -580,6 +598,7 @@ class AsyncFetcher extends WARCRecordBuffer
       if (useTakeStream && cdp && requestId) {
         logger.debug("Async started: takeStream", {url}, "recorder");
         body = await this._loadTakeStream(cdp, reqresp, requestId);
+        consumedStream = true;
       } else {
         logger.debug("Async started: fetch", {url}, "recorder");
         body = await this._loadFetch(reqresp, crawlState);
@@ -597,14 +616,14 @@ class AsyncFetcher extends WARCRecordBuffer
       } else {
         logger.warn("Async fetch: response size mismatch, skipping", {size: reqresp.readSize, expected: reqresp.expectedSize, url, ...this.logDetails}, "recorder");
         await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
-        return;
+        return consumedStream;
       }
 
       if (Object.keys(reqresp.extraOpts).length) {
         responseRecord.warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
       }
 
-      recorder.queue.add(() => writeRecordPair(recorder.fh, responseRecord, requestRecord, recorder.logDetails, gzip, serializer));
+      recorder.warcQ.add(() => writeRecordPair(recorder.fh, responseRecord, requestRecord, recorder.logDetails, gzip, serializer));
 
     } catch (e) {
       logger.error("Error streaming to file", {url, networkId, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
@@ -613,6 +632,8 @@ class AsyncFetcher extends WARCRecordBuffer
     } finally {
       recorder.removeReqResp(networkId);
     }
+
+    return consumedStream;
   }
 
   async _loadFetch(reqresp, crawlState) {
@@ -622,7 +643,7 @@ class AsyncFetcher extends WARCRecordBuffer
     const resp = await fetch(url, {method, headers, body: reqresp.postData || undefined});
 
     if (reqresp.expectedSize < 0 && resp.headers.get("content-length")) {
-      reqresp.expectedSize = Number(resp.headers.get("content-length"));
+      reqresp.expectedSize = Number(resp.headers.get("content-length") || -1);
     }
 
     if (reqresp.expectedSize === 0) {
@@ -643,25 +664,37 @@ class AsyncFetcher extends WARCRecordBuffer
   async _loadTakeStream(cdp, reqresp, requestId) {
     const { stream } = await cdp.send("Fetch.takeResponseBodyAsStream", {requestId});
 
-    const { responseHeadersList, status, url } = reqresp;
+    const { url } = reqresp;
 
     const logDetails = this.logDetails;
 
+    const buffs = [];
+    let buffLength = 0;
+    let sizeExceeded = false;
+
     async function* takeStreamIter() {
+      //let responded = false;
       try {
         while (true) {
           const {data, base64Encoded, eof} = await cdp.send("IO.read", {handle: stream});
           const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
-          //console.log("takeStream got: ", requestId, buff.length, eof, url);
+          if (buffLength + buff.length < MAX_BROWSER_FETCH_SIZE) {
+            buffs.push(buff);
+            buffLength += buff.length;
+          } else {
+            sizeExceeded = true;
+          }
+
           yield buff;
+
           if (eof) {
             break;
           }
         }
 
-        // just return empty body, too big to stream full response back
-        const body = "";
-        await cdp.send("Fetch.fulfillRequest", {requestId, responseHeaders: responseHeadersList, responseCode: status, body});
+        if (!sizeExceeded) {
+          reqresp.payload = concatChunks(buffs, buffLength);
+        }
       } catch (e) {
         logger.error("Error in takeStream", {...errJSON(e), url, ...logDetails}, "recorder");
       }
@@ -693,14 +726,18 @@ class AsyncFetcher extends WARCRecordBuffer
 
     const url = this.reqresp.url;
 
-    try {
-      const reader = fs.createReadStream(this.filename);
-      for await (const buff of reader) {
-        yield buff;
+    if (this.reqresp.payload) {
+      yield this.reqresp.payload;
+    } else {
+      try {
+        const reader = fs.createReadStream(this.filename);
+        for await (const buff of reader) {
+          yield buff;
+        }
+      } catch (e) {
+        logger.error("Error streaming from file", {url, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
+        return;
       }
-    } catch (e) {
-      logger.error("Error streaming from file", {url, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
-      return;
     }
 
     try {
