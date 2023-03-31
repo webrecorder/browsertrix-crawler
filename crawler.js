@@ -161,7 +161,7 @@ export class Crawler {
     this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.maxPageTime, os.hostname());
 
     // clear any pending URLs from this instance
-    await this.crawlState.clearOwnPending();
+    await this.crawlState.clearOwnPendingLocks();
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
       logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
