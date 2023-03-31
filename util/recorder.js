@@ -16,7 +16,7 @@ import { rewriteDASH, rewriteHLS } from "@webrecorder/wabac/src/rewrite/rewriteV
 
 import { WARCRecord, WARCSerializer, WARCRecordBuffer, StreamingWARCSerializer, AsyncIterReader } from "warcio";
 
-const MAX_BROWSER_FETCH_SIZE = 1000000;
+const MAX_BROWSER_FETCH_SIZE = 10000000;
 
 const ASYNC_FETCH_DUPE_KEY = "s:fetchdupe";
 
@@ -588,8 +588,8 @@ class AsyncFetcher extends WARCRecordBuffer
       const responseRecord = createResponse(reqresp, pageid, body);
       const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
-      const serializer = new StreamingWARCSerializer(responseRecord, this, {gzip});
-      await serializer.bufferRecord();
+      const serializer = new StreamingWARCSerializer({gzip});
+      await serializer.bufferRecord(responseRecord, this);
 
       if (reqresp.readSize === reqresp.expectedSize || reqresp.expectedSize < 0) {
         logger.debug("Async fetch: streaming done", {size: reqresp.readSize, expected: reqresp.expectedSize, networkId, url, ...this.logDetails}, "recorder");
@@ -598,6 +598,10 @@ class AsyncFetcher extends WARCRecordBuffer
         logger.warn("Async fetch: response size mismatch, skipping", {size: reqresp.readSize, expected: reqresp.expectedSize, url, ...this.logDetails}, "recorder");
         await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
         return;
+      }
+
+      if (Object.keys(reqresp.extraOpts).length) {
+        responseRecord.warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
       }
 
       recorder.queue.add(() => writeRecordPair(recorder.fh, responseRecord, requestRecord, recorder.logDetails, gzip, serializer));
