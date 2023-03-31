@@ -100,7 +100,7 @@ end
 `
     });
 
-    redis.defineCommand("unmarkpending", {
+    redis.defineCommand("unlockpending", {
       numberOfKeys: 1,
       lua: `
 local value = redis.call('get', KEYS[1]);
@@ -348,12 +348,12 @@ return 0;
     return list.map(x => JSON.parse(x));
   }
 
-  async clearOwnPending() {
+  async clearOwnPendingLocks() {
     try {
       const pendingUrls = await this.redis.hkeys(this.pkey);
 
       for (const url of pendingUrls) {
-        await this.redis.unmarkpending(this.pkey + ":" + url, this.uid);
+        await this.redis.unlockpending(this.pkey + ":" + url, this.uid);
       }
     } catch (e) {
       logger.error("Redis Del Pending Failed", e, "state");

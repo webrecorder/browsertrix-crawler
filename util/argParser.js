@@ -291,6 +291,12 @@ class ArgParser {
         default: 0,
       },
 
+      "diskUtilization": {
+        describe: "If set, save state and exit if disk utilization exceeds this percentage value",
+        type: "number",
+        default: 90,
+      },
+
       "timeLimit": {
         describe: "If set, save state and exit after time limit, in seconds",
         type: "number",
@@ -463,6 +469,10 @@ class ArgParser {
     // Resolve statsFilename
     if (argv.statsFilename) {
       argv.statsFilename = path.resolve(argv.cwd, argv.statsFilename);
+    }
+
+    if ((argv.diskUtilization < 0 || argv.diskUtilization > 99)) {
+      argv.diskUtilization = 90;
     }
 
     return true;

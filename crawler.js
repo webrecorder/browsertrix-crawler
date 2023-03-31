@@ -12,7 +12,7 @@ import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtract } from "./util/textextract.js";
-import { initStorage, getFileSize, getDirSize, interpolateFilename } from "./util/storage.js";
+import { initStorage, getFileSize, getDirSize, interpolateFilename, getDiskUsage } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
@@ -161,7 +161,7 @@ export class Crawler {
     this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.maxPageTime, os.hostname());
 
     // clear any pending URLs from this instance
-    await this.crawlState.clearOwnPending();
+    await this.crawlState.clearOwnPendingLocks();
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
       logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
@@ -550,11 +550,14 @@ export class Crawler {
   async checkLimits() {
     let interrupt = false;
 
+    let dir;
+    let size;
+    if (this.params.sizeLimit || this.params.diskUtilization) {
+      dir = path.join(this.collDir, "archive");
+      size = await getDirSize(dir);
+    }
+
     if (this.params.sizeLimit) {
-      const dir = path.join(this.collDir, "archive");
-
-      const size = await getDirSize(dir);
-
       if (size >= this.params.sizeLimit) {
         logger.info(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
         interrupt = true;
@@ -566,6 +569,33 @@ export class Crawler {
       const elapsed = secondsElapsed(this.startTime);
       if (elapsed >= this.params.timeLimit) {
         logger.info(`Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`);
+        interrupt = true;
+      }
+    }
+
+    if (this.params.diskUtilization) {
+      // Check that disk usage isn't already above threshold
+      const diskUsage = await getDiskUsage();
+      const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
+      if (usedPercentage >= this.params.diskUtilization) {
+        logger.info(`Disk utilization threshold reached ${usedPercentage}% > ${this.params.diskUtilization}%, stopping`);
+        interrupt = true;
+      }
+
+      // Check that disk usage isn't likely to cross threshold
+      const kbUsed = parseInt(diskUsage["Used"]);
+      const kbTotal = parseInt(diskUsage["1K-blocks"]);
+      let kbArchiveDirSize = Math.floor(size/1024);
+      if (this.params.combineWARC && this.params.generateWACZ) {
+        kbArchiveDirSize *= 4;
+      } else if (this.params.combineWARC || this.params.generateWACZ) {
+        kbArchiveDirSize *= 2;
+      }
+
+      const projectedTotal = kbUsed + kbArchiveDirSize;
+      const projectedUsedPercentage = Math.floor(kbTotal/projectedTotal);
+      if (projectedUsedPercentage >= this.params.diskUtilization) {
+        logger.info(`Disk utilization projected to reach threshold ${projectedUsedPercentage}% > ${this.params.diskUtilization}%, stopping`);
         interrupt = true;
       }
     }

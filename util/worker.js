@@ -1,8 +1,11 @@
+import os from "os";
+
 import { v4 as uuidv4 } from "uuid";
 
 import { logger, errJSON } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
 import { Recorder } from "./recorder.js";
+import { rxEscape } from "./seeds.js";
 
 const MAX_REUSE = 5;
 
@@ -13,9 +16,24 @@ export function runWorkers(crawler, numWorkers, maxPageTime, collDir) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
   const workers = [];
+  let offset = 0;
+
+  // automatically set worker start by ordinal in k8s
+  // if hostname is "crawl-id-name-N"
+  // while CRAWL_ID is "crawl-id-name", then set starting
+  // worker index offset to N * numWorkers
+
+  if (process.env.CRAWL_ID) {
+    const rx = new RegExp(rxEscape(process.env.CRAWL_ID) + "\\-([\\d]+)$");
+    const m = os.hostname().match(rx);
+    if (m) {
+      offset = m[1] * numWorkers;
+      logger.info("Starting workerid index at " + offset, "worker");
+    }
+  }
 
   for (let i = 0; i < numWorkers; i++) {
-    workers.push(new PageWorker(i, crawler, maxPageTime, collDir));
+    workers.push(new PageWorker(i + offset, crawler, maxPageTime, collDir));
   }
 
   return Promise.allSettled(workers.map((worker) => worker.run()));
