@@ -721,6 +721,7 @@ export class Crawler {
 
     if (this.params.generateCDX) {
       logger.info("Generating CDX");
+      await fsp.mkdir(path.join(this.collDir, "indexes"), {recursive: true});
       await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
     }
 
