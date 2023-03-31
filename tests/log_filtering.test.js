@@ -18,7 +18,7 @@ function jsonLinesToArray(string) {
 
 
 test("ensure crawl run with log options passes", async () => {
-  child_process.execSync("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://specs.webrecorder.net --generateWACZ --collection wr-specs-logs --scopeType domain --extraHops 1 --limit 20 --logging debug,stats --logLevel debug,warn --context general");
+  child_process.execSync("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://specs.webrecorder.net --generateWACZ --collection wr-specs-logs --logging debug,stats --logLevel debug,warn --context general");
 });
 
 
