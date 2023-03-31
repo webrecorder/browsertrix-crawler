@@ -425,6 +425,11 @@ The blockRules add a filter to each URL loaded on a page and incur an extra over
 These rules can not be used to prevent entire pages for loading -- use the scope exclusion rules for that. (A warning will be printed if a page resource block rule matches a top-level page).
 
 
+### Ad blocking
+
+With version 0.8.0, Browsertrix Crawler supports blocking ads from being loaded during capture based on [Stephen Black's list of known ad hosts](https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts). To enable ad blocking, use the `--blockAds` option. If `--adBlockMessage` is set, a record with the specified error message will be added in the ad's place.
+
+
 ### Custom Warcinfo Fields
 
 Custom fields can be added to the `warcinfo` WARC record, generated for each combined WARCs. The fields can be specified in the YAML config under `warcinfo` section or specifying individually via the command-line.
