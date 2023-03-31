@@ -1,5 +1,7 @@
+import child_process from "child_process";
 import fs from "fs";
 import fsp from "fs/promises";
+import util from "util";
 
 import os from "os";
 import { createHash } from "crypto";
@@ -146,6 +148,21 @@ export async function getDirSize(dir) {
     logger.warn("Size check errors", {errors}, "sizecheck");
   }
   return size;
+}
+
+export async function getDiskUsage(path="/") {
+  const exec = util.promisify(child_process.exec);
+  const result = await exec(`df ${path}`);
+  const lines = result.stdout.split("\n");
+  const keys = lines[0].split(/\s+/ig);
+  const rows = lines.slice(1).map(line => {
+    const values = line.split(/\s+/ig);
+    return keys.reduce((o, k, index) => {
+      o[k] = values[index];
+      return o;
+    }, {});
+  });
+  return rows[0];
 }
 
 function checksumFile(hashName, path) {
