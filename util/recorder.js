@@ -61,10 +61,14 @@ export class Recorder
     fs.mkdirSync(this.archivesDir, {recursive: true});
   }
 
-  async initFH() {
-    const crawlId = process.env.CRAWL_ID || os.hostname();
+  async getWARCFH() {
+    if (!this.fh) {
+      const crawlId = process.env.CRAWL_ID || os.hostname();
 
-    this.fh = fs.createWriteStream(path.join(this.archivesDir, `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`));
+      this.fh = fs.createWriteStream(path.join(this.archivesDir, `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`));
+    }
+
+    return this.fh;
   }
 
   async onCreatePage({cdp}) {
@@ -550,14 +554,12 @@ export class Recorder
       return;
     }
 
-    if (!this.fh) {
-      await this.initFH();
-    }
+    const fh = await this.getWARCFH();
 
     const responseRecord = createResponse(reqresp, this.pageid);
     const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
 
-    this.warcQ.add(() => writeRecordPair(this.fh, responseRecord, requestRecord, this.logDetails, this.gzip));
+    this.warcQ.add(() => writeRecordPair(fh, responseRecord, requestRecord, this.logDetails, this.gzip));
   }
 }
 
@@ -615,7 +617,9 @@ class AsyncFetcher extends WARCRecordBuffer
         responseRecord.warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
       }
 
-      recorder.warcQ.add(() => writeRecordPair(recorder.fh, responseRecord, requestRecord, recorder.logDetails, gzip, serializer));
+      const fh = await recorder.getWARCFH();
+
+      recorder.warcQ.add(() => writeRecordPair(fh, responseRecord, requestRecord, recorder.logDetails, gzip, serializer));
 
     } catch (e) {
       logger.error("Error streaming to file", {url, networkId, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
