@@ -15,6 +15,8 @@ class Logger
   constructor() {
     this.logStream = null;
     this.debugLogging = null;
+    this.logLevels = [];
+    this.contexts = [];
   }
 
   setExternalLogStream(logFH) {
@@ -25,12 +27,33 @@ class Logger
     this.debugLogging = debugLog;
   }
 
+  setLogLevel(logLevels) {
+    this.logLevels = logLevels;
+  }
+
+  setContext(contexts) {
+    this.contexts = contexts;
+  }
+
   logAsJSON(message, data, context, logLevel="info") {
     if (data instanceof Error) {
       data = errJSON(data);
     } else if (typeof data !== "object") {
       data = {"message": data.toString()};
     }
+
+    if (this.logLevels.length) {
+      if (this.logLevels.indexOf(logLevel) < 0) {
+        return;
+      }
+    }
+
+    if (this.contexts.length) {
+      if (this.contexts.indexOf(context) < 0) {
+        return;
+      }
+    }
+
     let dataToLog = {
       "logLevel": logLevel,
       "timestamp": new Date().toISOString(),
