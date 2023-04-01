@@ -68,8 +68,15 @@ class ArgParser {
         type: "number"
       },
 
-      "limit": {
+      "pageLimit": {
+        alias: "limit",
         describe: "Limit crawl to this number of pages",
+        default: 0,
+        type: "number",
+      },
+
+      "maxPageLimit": {
+        describe: "maximum pages to crawl, overriding pageLimit if both are set",
         default: 0,
         type: "number",
       },
