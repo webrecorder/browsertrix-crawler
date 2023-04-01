@@ -50,6 +50,7 @@ export class Recorder
     this.skipping = false;
 
     this.collDir = collDir;
+    this.tempdir = path.join(this.collDir, "tmp");
 
     this.allowFull206 = true;
     this.gzip = true;
@@ -57,7 +58,6 @@ export class Recorder
 
   async initFH() {
     const archivesDir = path.join(this.collDir, "archive");
-    this.tempdir = path.join(this.collDir, "tmp");
 
     await fsp.mkdir(this.tempdir, {recursive: true});
 
@@ -85,7 +85,7 @@ export class Recorder
 
     cdp.on("Network.responseReceivedExtraInfo", (params) => {
       logNetwork("Network.responseReceivedExtraInfo", {requestId: params.requestId, ...this.logDetails});
-      const reqresp = this.pendingReqResp(params.requestId);
+      const reqresp = this.pendingReqResp(params.requestId, true);
       if (reqresp) {
         reqresp.fillResponseReceivedExtraInfo(params);
       }
@@ -163,7 +163,7 @@ export class Recorder
   handleLoadingFailed(params) {
     const { errorText, type, requestId } = params;
 
-    const reqresp = this.pendingReqResp(requestId);
+    const reqresp = this.pendingReqResp(requestId, true);
     if (!reqresp) {
       return;
     }
@@ -179,7 +179,6 @@ export class Recorder
       // check if this is a false positive -- a valid download that's already been fetched
       // the abort is just for page, but download will succeed
       if (url && type === "Document" && reqresp.isValidBinary()) {
-        this.removeReqResp(requestId);
         this.serializeToWARC(reqresp);
       //} else if (url) {
       } else if (url && reqresp.requestHeaders && reqresp.requestHeaders["x-browsertrix-fetch"]) {
@@ -252,7 +251,6 @@ export class Recorder
         logger.debug("Keep 206 Response, Full Range", {range, contentLen, url, networkId, ...this.logDetails}, "recorder");
       } else {
         logger.debug("Skip 206 Response", {range, contentLen, url, ...this.logDetails}, "recorder");
-        this.skipIds.add(networkId);
         this.removeReqResp(networkId);
         return false;
       }
@@ -273,17 +271,18 @@ export class Recorder
     let streamingConsume = false;
 
     if (contentLen < 0 || contentLen > MAX_BROWSER_FETCH_SIZE) {
-      const useTakeStream = (contentLen < 0);
-      const fetcher = new AsyncFetcher({tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId, requestId, cdp, useTakeStream });
+      const opts = {tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId};
 
-      // taking stream, await here and then either call fulFill, or if not started, return false
-      if (useTakeStream) {
+      // fetching using response stream, await here and then either call fulFill, or if not started, return false
+      if (contentLen < 0) {
+        const fetcher = new ResponseStreamAsyncFetcher({...opts, requestId, cdp, removeOnFinish: false });
         // didn't get stream, just continue
         if (!await fetcher.load()) {
           return false; 
         }
         streamingConsume = true;
       } else {
+        const fetcher = new AsyncFetcher(opts);
         this.fetcherQ.add(() => fetcher.load());
         return false;
       }
@@ -523,16 +522,19 @@ export class Recorder
         return null;
       }
       this.pendingRequests.set(requestId, new RequestResponseInfo(requestId));
-    } else if (requestId !== this.pendingRequests.get(requestId).requestId) {
-      console.error("Wrong Req Id!");
+    } else {
+      const reqresp = this.pendingRequests.get(requestId);
+      if (requestId !== reqresp.requestId) {
+        logger.warn("Invalid request id", {requestId, actualRequestId: reqresp.requestId}, "recorder");
+      }
+      return reqresp;
     }
-
-    return this.pendingRequests.get(requestId);
   }
 
   removeReqResp(requestId) {
     const reqresp = this.pendingRequests.get(requestId);
     this.pendingRequests.delete(requestId);
+    this.skipIds.add(requestId);
     return reqresp;
   }
 
@@ -560,19 +562,17 @@ export class Recorder
 // =================================================================
 class AsyncFetcher extends WARCRecordBuffer
 {
-  constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId, requestId = null, cdp = null, useTakeStream}) {
+  constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId, removeOnFinish = true}) {
     super();
     
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
 
-    this.useTakeStream = useTakeStream;
-
-    this.cdp = cdp;
-    this.requestId = requestId;
     this.networkId = networkId;
 
     this.recorder = recorder;
+
+    this.removeOnFinish = removeOnFinish;
 
     this.fh = null;
 
@@ -581,28 +581,20 @@ class AsyncFetcher extends WARCRecordBuffer
   }
 
   async load() {
-    const { reqresp, recorder, cdp, requestId, useTakeStream, networkId } = this;
+    const { reqresp, recorder, networkId } = this;
     const { url } = reqresp;
 
     const { pageid, crawlState, gzip } = recorder;
 
-    let consumedStream = false;
+    let fetched = false;
 
     try {
       if (reqresp.method === "GET" && !await crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url)) {
-        return false;
+        return fetched;
       }
 
-      let body = null;
-
-      if (useTakeStream && cdp && requestId) {
-        logger.debug("Async started: takeStream", {url}, "recorder");
-        body = await this._loadTakeStream(cdp, reqresp, requestId);
-        consumedStream = true;
-      } else {
-        logger.debug("Async started: fetch", {url}, "recorder");
-        body = await this._loadFetch(reqresp, crawlState);
-      }
+      const body = await this._doFetch();
+      fetched = true;
 
       const responseRecord = createResponse(reqresp, pageid, body);
       const requestRecord = createRequest(reqresp, responseRecord, pageid);
@@ -616,7 +608,6 @@ class AsyncFetcher extends WARCRecordBuffer
       } else {
         logger.warn("Async fetch: response size mismatch, skipping", {size: reqresp.readSize, expected: reqresp.expectedSize, url, ...this.logDetails}, "recorder");
         await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
-        return consumedStream;
       }
 
       if (Object.keys(reqresp.extraOpts).length) {
@@ -628,17 +619,21 @@ class AsyncFetcher extends WARCRecordBuffer
     } catch (e) {
       logger.error("Error streaming to file", {url, networkId, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
       await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
-
     } finally {
-      recorder.removeReqResp(networkId);
+      if (this.removeOnFinish) {
+        recorder.removeReqResp(networkId);
+      }
     }
 
-    return consumedStream;
+    return fetched;
   }
 
-  async _loadFetch(reqresp, crawlState) {
-    const { headers } = reqresp.getRequestHeadersDict();
+  async _doFetch() {
+    const { reqresp, crawlState } = this;
     const { method, url } = reqresp;
+    logger.debug("Async started: fetch", {url}, "recorder");
+
+    const { headers } = reqresp.getRequestHeadersDict();
 
     const resp = await fetch(url, {method, headers, body: reqresp.postData || undefined});
 
@@ -659,48 +654,6 @@ class AsyncFetcher extends WARCRecordBuffer
     reqresp.fillFetchResponse(resp);
 
     return AsyncIterReader.fromReadable(resp.body.getReader());
-  }
-
-  async _loadTakeStream(cdp, reqresp, requestId) {
-    const { stream } = await cdp.send("Fetch.takeResponseBodyAsStream", {requestId});
-
-    const { url } = reqresp;
-
-    const logDetails = this.logDetails;
-
-    const buffs = [];
-    let buffLength = 0;
-    let sizeExceeded = false;
-
-    async function* takeStreamIter() {
-      //let responded = false;
-      try {
-        while (true) {
-          const {data, base64Encoded, eof} = await cdp.send("IO.read", {handle: stream});
-          const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
-          if (buffLength + buff.length < MAX_BROWSER_FETCH_SIZE) {
-            buffs.push(buff);
-            buffLength += buff.length;
-          } else {
-            sizeExceeded = true;
-          }
-
-          yield buff;
-
-          if (eof) {
-            break;
-          }
-        }
-
-        if (!sizeExceeded) {
-          reqresp.payload = concatChunks(buffs, buffLength);
-        }
-      } catch (e) {
-        logger.error("Error in takeStream", {...errJSON(e), url, ...logDetails}, "recorder");
-      }
-    }
-
-    return takeStreamIter();
   }
 
   write(chunk) {
@@ -745,6 +698,60 @@ class AsyncFetcher extends WARCRecordBuffer
     } catch (e) {
       logger.error("Error closing buffer file", {url, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
     }
+  }
+}
+
+// =================================================================
+class ResponseStreamAsyncFetcher extends AsyncFetcher
+{
+  constructor(opts) {
+    super(opts);
+    this.cdp = opts.cdp;
+    this.requestId = opts.requestId;
+  }
+
+  async _doFetch() {
+    const { requestId, reqresp, cdp } = this;
+    const { url } = reqresp;
+    logger.debug("Async started: takeStream", {url}, "recorder");
+
+    const { stream } = await cdp.send("Fetch.takeResponseBodyAsStream", {requestId});
+
+    const logDetails = this.logDetails;
+
+    const buffs = [];
+    let buffLength = 0;
+    let sizeExceeded = false;
+
+    async function* takeStreamIter() {
+      //let responded = false;
+      try {
+        while (true) {
+          const {data, base64Encoded, eof} = await cdp.send("IO.read", {handle: stream});
+          const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
+          if (buffLength + buff.length < MAX_BROWSER_FETCH_SIZE) {
+            buffs.push(buff);
+            buffLength += buff.length;
+          } else {
+            sizeExceeded = true;
+          }
+
+          yield buff;
+
+          if (eof) {
+            break;
+          }
+        }
+
+        if (!sizeExceeded) {
+          reqresp.payload = concatChunks(buffs, buffLength);
+        }
+      } catch (e) {
+        logger.error("Error in takeStream", {...errJSON(e), url, ...logDetails}, "recorder");
+      }
+    }
+
+    return takeStreamIter();
   }
 }
 
