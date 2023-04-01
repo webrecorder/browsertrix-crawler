@@ -49,11 +49,10 @@ ${this.frameTextMatch ? "Frame Text Regex: " + this.frameTextMatch : ""}
 // ===========================================================================
 export class BlockRules
 {
-  constructor(blockRules, blockPutUrl, blockErrMsg, logger) {
+  constructor(blockRules, blockPutUrl, blockErrMsg) {
     this.rules = [];
     this.blockPutUrl = blockPutUrl;
     this.blockErrMsg = blockErrMsg;
-    this.logger = logger;
 
     this.blockedUrlSet = new Set();
 
@@ -62,9 +61,9 @@ export class BlockRules
     }
 
     if (this.rules.length) {
-      this.logger.debug("URL Block Rules:\n", {}, "blocking");
+      logger.debug("URL Block Rules:\n", {}, "blocking");
       for (const rule of this.rules) {
-        this.logger.debug(rule.toString(), {}, "blocking");
+        logger.debug(rule.toString(), {}, "blocking");
       }
     }
   }
@@ -85,7 +84,7 @@ export class BlockRules
       try {
         this.handleRequest(route, logDetails);
       } catch (e) {
-        this.logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
+        logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }
     });
   }
@@ -106,7 +105,7 @@ export class BlockRules
       }
 
     } catch (e) {
-      this.logger.debug(`Block: (${blockState}) Failed On: ${url}`, {...errJSON(e), ...logDetails}, "blocking");
+      logger.debug(`Block: (${blockState}) Failed On: ${url}`, {...errJSON(e), ...logDetails}, "blocking");
     }
   }
 
@@ -153,10 +152,10 @@ export class BlockRules
 
       if (block) {
         if (blockState === BlockState.BLOCK_PAGE_NAV) {
-          this.logger.warn("Block rule match for page request ignored, set --exclude to block full pages", {url, ...logDetails}, "blocking");
+          logger.warn("Block rule match for page request ignored, set --exclude to block full pages", {url, ...logDetails}, "blocking");
           return BlockState.ALLOW;
         }
-        this.logger.debug("URL Blocked in iframe", {url, frameUrl, ...logDetails}, "blocking");
+        logger.debug("URL Blocked in iframe", {url, frameUrl, ...logDetails}, "blocking");
         await this.recordBlockMsg(url);
         return blockState;
       }
@@ -189,7 +188,7 @@ export class BlockRules
       }
 
       const block = await this.isTextMatch(request, reqUrl, frameTextMatch, logDetails) ? !allowOnly : allowOnly;
-      this.logger.debug("URL Conditional rule in iframe",  {...logDetails, url, rule: block ? "BLOCKED" : "ALLOWED", frameUrl}, "blocking");
+      logger.debug("URL Conditional rule in iframe",  {...logDetails, url, rule: block ? "BLOCKED" : "ALLOWED", frameUrl}, "blocking");
       return {block, done: true};
     }
 
@@ -206,7 +205,7 @@ export class BlockRules
       return !!text.match(frameTextMatch);
 
     } catch (e) {
-      this.logger.debug("Error determining text match", {...errJSON(e), ...logDetails}, "blocking");
+      logger.debug("Error determining text match", {...errJSON(e), ...logDetails}, "blocking");
     }
   }
 
@@ -232,8 +231,8 @@ export class BlockRules
 // ===========================================================================
 export class AdBlockRules extends BlockRules
 {
-  constructor(blockPutUrl, blockErrMsg, logger, adhostsFilePath = "../ad-hosts.json") {
-    super([], blockPutUrl, blockErrMsg, logger);
+  constructor(blockPutUrl, blockErrMsg, adhostsFilePath = "../ad-hosts.json") {
+    super([], blockPutUrl, blockErrMsg);
     this.adhosts = JSON.parse(fs.readFileSync(new URL(adhostsFilePath, import.meta.url)));
   }
 
@@ -249,7 +248,7 @@ export class AdBlockRules extends BlockRules
       try {
         this.handleRequest(route, logDetails);
       } catch (e) {
-        this.logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
+        logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }
     });
   }
@@ -262,7 +261,7 @@ export class AdBlockRules extends BlockRules
 
   async shouldBlock(request, url, logDetails) {
     if (this.isAdUrl(url)) {
-      this.logger.debug("URL blocked for being an ad", {url, ...logDetails}, "blocking");
+      logger.debug("URL blocked for being an ad", {url, ...logDetails}, "blocking");
       await this.recordBlockMsg(url);
       return BlockState.BLOCK_AD;
     }
