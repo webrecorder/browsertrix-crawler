@@ -274,7 +274,7 @@ export class Recorder
 
       // fetching using response stream, await here and then either call fulFill, or if not started, return false
       if (contentLen < 0) {
-        const fetcher = new ResponseStreamAsyncFetcher({...opts, requestId, cdp, removeOnFinish: false });
+        const fetcher = new ResponseStreamAsyncFetcher({...opts, requestId, cdp });
         // didn't get stream, just continue
         if (!await fetcher.load()) {
           return false; 
@@ -564,7 +564,7 @@ export class Recorder
 // =================================================================
 class AsyncFetcher extends WARCRecordBuffer
 {
-  constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId, removeOnFinish = true}) {
+  constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId}) {
     super();
     
     this.reqresp = reqresp;
@@ -573,8 +573,6 @@ class AsyncFetcher extends WARCRecordBuffer
     this.networkId = networkId;
 
     this.recorder = recorder;
-
-    this.removeOnFinish = removeOnFinish;
 
     this.fh = null;
 
@@ -610,6 +608,7 @@ class AsyncFetcher extends WARCRecordBuffer
       } else {
         logger.warn("Async fetch: response size mismatch, skipping", {size: reqresp.readSize, expected: reqresp.expectedSize, url, ...this.logDetails}, "recorder");
         await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
+        return fetched;
       }
 
       if (Object.keys(reqresp.extraOpts).length) {
@@ -622,9 +621,7 @@ class AsyncFetcher extends WARCRecordBuffer
       logger.error("Error streaming to file", {url, networkId, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
       await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
     } finally {
-      if (this.removeOnFinish) {
-        recorder.removeReqResp(networkId);
-      }
+      recorder.removeReqResp(networkId);
     }
 
     return fetched;
