@@ -57,6 +57,8 @@ export class Crawler {
 
     const debugLogging = this.params.logging.includes("debug");
     logger.setDebugLogging(debugLogging);
+    logger.setLogLevel(this.params.logLevel);
+    logger.setContext(this.params.context);
 
     logger.debug("Writing log to: " + this.logFilename, {}, "init");
 
