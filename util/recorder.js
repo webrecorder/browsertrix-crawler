@@ -49,23 +49,22 @@ export class Recorder
     this.logDetails = {};
     this.skipping = false;
 
-    this.collDir = collDir;
-    this.tempdir = path.join(this.collDir, "tmp");
-
     this.allowFull206 = true;
     this.gzip = true;
+
+    this.collDir = collDir;
+
+    this.tempdir = path.join(this.collDir, "tmp");
+    this.archivesDir = path.join(this.collDir, "archive");
+
+    fs.mkdirSync(this.tempdir, {recursive: true});
+    fs.mkdirSync(this.archivesDir, {recursive: true});
   }
 
   async initFH() {
-    const archivesDir = path.join(this.collDir, "archive");
-
-    await fsp.mkdir(this.tempdir, {recursive: true});
-
-    await fsp.mkdir(archivesDir, {recursive: true});
-
     const crawlId = process.env.CRAWL_ID || os.hostname();
 
-    this.fh = fs.createWriteStream(path.join(archivesDir, `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`));
+    this.fh = fs.createWriteStream(path.join(this.archivesDir, `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`));
   }
 
   async onCreatePage({cdp}) {
@@ -521,7 +520,9 @@ export class Recorder
         //logger.debug("Skipping request, page already finished", this.logDetails, "recorder");
         return null;
       }
-      this.pendingRequests.set(requestId, new RequestResponseInfo(requestId));
+      const reqresp = new RequestResponseInfo(requestId);
+      this.pendingRequests.set(requestId, reqresp);
+      return reqresp;
     } else {
       const reqresp = this.pendingRequests.get(requestId);
       if (requestId !== reqresp.requestId) {
@@ -540,11 +541,12 @@ export class Recorder
 
   async serializeToWARC(reqresp) {
     if (!reqresp.payload) {
+      logNetwork("Not writing, no payload", {url: reqresp.url});
       return;
     }
 
     if (reqresp.method === "GET" && !await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, reqresp.url)) {
-      //logger.warn("Skipping dupe", {url: reqresp.url}, "recorder");
+      logNetwork("Skipping dupe", {url: reqresp.url});
       return;
     }
 
