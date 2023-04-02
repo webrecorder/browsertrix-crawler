@@ -601,8 +601,8 @@ class AsyncFetcher extends WARCRecordBuffer
       const responseRecord = createResponse(reqresp, pageid, body);
       const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
-      const serializer = new StreamingWARCSerializer({gzip});
-      await serializer.bufferRecord(responseRecord, this);
+      const serializer = new StreamingWARCSerializer(responseRecord, {gzip});
+      await serializer.bufferRecord(this);
 
       if (reqresp.readSize === reqresp.expectedSize || reqresp.expectedSize < 0) {
         logger.debug("Async fetch: streaming done", {size: reqresp.readSize, expected: reqresp.expectedSize, networkId, url, ...this.logDetails}, "recorder");

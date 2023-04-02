@@ -4188,7 +4188,7 @@ warcio@^2.0.1:
 
 "warcio@github:webrecorder/warcio.js#streaming-serializer":
   version "2.2.0"
-  resolved "https://codeload.github.com/webrecorder/warcio.js/tar.gz/80febe68f355b7f96e589b3f46a323456fcc39b8"
+  resolved "https://codeload.github.com/webrecorder/warcio.js/tar.gz/4055290d6eec0a6b7e4fabef648bd054336db81d"
   dependencies:
     base32-encode "^2.0.0"
     hash-wasm "^4.9.0"
