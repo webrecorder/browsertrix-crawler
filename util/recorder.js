@@ -14,7 +14,8 @@ import { RequestResponseInfo } from "./reqresp.js";
 import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
 import { rewriteDASH, rewriteHLS } from "@webrecorder/wabac/src/rewrite/rewriteVideo.js";
 
-import { WARCRecord, WARCSerializer, WARCRecordBuffer, StreamingWARCSerializer, AsyncIterReader, concatChunks } from "warcio";
+import { WARCRecord, StreamingBufferIO, StreamingWARCSerializer, AsyncIterReader, concatChunks } from "warcio";
+import { streamFinish, WARCWriter } from "./warcwriter.js";
 
 const MAX_BROWSER_FETCH_SIZE = 2000000;
 
@@ -41,8 +42,6 @@ export class Recorder
 
     this.fetcherQ = new PQueue({concurrency: 1});
 
-    this.fh = null;
-
     this.pendingRequests = null;
     this.skipIds = null;
 
@@ -50,25 +49,28 @@ export class Recorder
     this.skipping = false;
 
     this.allowFull206 = true;
-    this.gzip = true;
 
     this.collDir = collDir;
 
-    this.tempdir = path.join(this.collDir, "tmp");
     this.archivesDir = path.join(this.collDir, "archive");
+    this.tempdir = path.join(this.collDir, "tmp-dl");
+    this.tempCdxDir = path.join(this.collDir, "tmp-cdx");
 
     fs.mkdirSync(this.tempdir, {recursive: true});
     fs.mkdirSync(this.archivesDir, {recursive: true});
-  }
+    fs.mkdirSync(this.tempCdxDir, {recursive: true});
 
-  async getWARCFH() {
-    if (!this.fh) {
-      const crawlId = process.env.CRAWL_ID || os.hostname();
+    const crawlId = process.env.CRAWL_ID || os.hostname();
+    const filename = `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`;
+    this.gzip = true;
 
-      this.fh = fs.createWriteStream(path.join(this.archivesDir, `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`));
-    }
-
-    return this.fh;
+    this.writer = new WARCWriter({
+      archivesDir: this.archivesDir,
+      tempCdxDir: this.tempCdxDir,
+      filename,
+      gzip: this.gzip, 
+      logDetails: this.logDetails
+    });
   }
 
   async onCreatePage({cdp}) {
@@ -387,9 +389,7 @@ export class Recorder
     logger.debug("Finishing WARC writing", this.logDetails, "recorder");
     await this.warcQ.onIdle();
 
-    if (this.fh) {
-      await streamFinish(this.fh);
-    }
+    await this.writer.flush();
   }
 
   shouldSkip(method, headers, resourceType) {
@@ -554,17 +554,15 @@ export class Recorder
       return;
     }
 
-    const fh = await this.getWARCFH();
-
     const responseRecord = createResponse(reqresp, this.pageid);
     const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
 
-    this.warcQ.add(() => writeRecordPair(fh, responseRecord, requestRecord, this.logDetails, this.gzip));
+    this.warcQ.add(() => this.writer.writeRecordPair(responseRecord, requestRecord));
   }
 }
 
 // =================================================================
-class AsyncFetcher extends WARCRecordBuffer
+class AsyncFetcher extends StreamingBufferIO
 {
   constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId}) {
     super();
@@ -601,8 +599,8 @@ class AsyncFetcher extends WARCRecordBuffer
       const responseRecord = createResponse(reqresp, pageid, body);
       const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
-      const serializer = new StreamingWARCSerializer(responseRecord, {gzip});
-      await serializer.bufferRecord(this);
+      const serializer = new StreamingWARCSerializer(responseRecord, {gzip}, this);
+      await serializer.bufferRecord();
 
       if (reqresp.readSize === reqresp.expectedSize || reqresp.expectedSize < 0) {
         logger.debug("Async fetch: streaming done", {size: reqresp.readSize, expected: reqresp.expectedSize, networkId, url, ...this.logDetails}, "recorder");
@@ -617,9 +615,7 @@ class AsyncFetcher extends WARCRecordBuffer
         responseRecord.warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
       }
 
-      const fh = await recorder.getWARCFH();
-
-      recorder.warcQ.add(() => writeRecordPair(fh, responseRecord, requestRecord, recorder.logDetails, gzip, serializer));
+      recorder.warcQ.add(() => recorder.writer.writeRecordPair(responseRecord, requestRecord, serializer));
 
     } catch (e) {
       logger.error("Error streaming to file", {url, networkId, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
@@ -810,43 +806,4 @@ function createRequest(reqresp, responseRecord, pageid) {
   return WARCRecord.create({
     url, date, warcVersion, type: "request", warcHeaders,
     httpHeaders, statusline}, requestBody);
-}
-
-// =================================================================
-async function writeRecordPair(fh, responseRecord, requestRecord, logDetails, gzip = true, responseSerializer = null) {
-  if (!responseSerializer) {
-    responseSerializer = new WARCSerializer(responseRecord, {gzip});
-  }
-
-  await writeRecord(fh, responseRecord, responseSerializer, logDetails);
-  await writeRecord(fh, requestRecord, new WARCSerializer(requestRecord, {gzip}), logDetails);
-}
-
-// =================================================================
-async function writeRecord(fh, record, serializer, logDetails) {
-  let total = 0;
-  let count = 0;
-  const url = record.warcTargetURI;
-
-  for await (const chunk of serializer) {
-    total += chunk.length;
-    count++;
-    try {
-      fh.write(chunk);
-    } catch (e) {
-      logger.error("Error writing to WARC, corruption possible", {...errJSON(e), url, logDetails}, "recorder");
-    }
-    if (!(count % 10)) {
-      logNetwork("Writing WARC Chunk", {total, count, url, logDetails});
-    }
-  }
-}
-
-// =================================================================
-function streamFinish(fh) {
-  const p = new Promise(resolve => {
-    fh.once("finish", () => resolve());
-  });
-  fh.end();
-  return p;
 }
