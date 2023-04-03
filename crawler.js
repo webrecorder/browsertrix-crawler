@@ -75,6 +75,12 @@ export class Crawler {
 
     // was the limit hit?
     this.limitHit = false;
+    this.pageLimit = this.params.pageLimit;
+
+    // resolve maxPageLimit and ensure pageLimit is no greater than maxPageLimit
+    if (this.params.maxPageLimit) {
+      this.pageLimit = this.pageLimit ? Math.min(this.pageLimit, this.params.maxPageLimit) : this.params.maxPageLimit;
+    }
 
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
@@ -892,7 +898,7 @@ export class Crawler {
     const pendingList = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
     const total = realSize + pendingList.length + done;
-    const limit = {max: this.params.limit || 0, hit: this.limitHit};
+    const limit = {max: this.pageLimit || 0, hit: this.limitHit};
     const stats = {
       "crawled": done,
       "total": total,
@@ -1141,7 +1147,7 @@ export class Crawler {
       return false;
     }
 
-    if (this.params.limit > 0 && (await this.crawlState.numSeen() >= this.params.limit)) {
+    if (this.pageLimit > 0 && (await this.crawlState.numSeen() >= this.pageLimit)) {
       this.limitHit = true;
       return false;
     }

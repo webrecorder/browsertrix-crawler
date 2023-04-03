@@ -37,7 +37,7 @@ Here's how you can use some of the command-line options to configure the crawl:
 
 - To include automated text extraction for full text search, add the `--text` flag.
 
-- To limit the crawl to a maximum number of pages, add `--limit P` where P is the number of pages that will be crawled.
+- To limit the crawl to a maximum number of pages, add `--pageLimit P` where P is the number of pages that will be crawled.
 
 - To limit the crawl to a maximum size, set `--sizeLimit` (size in bytes)
 
@@ -81,7 +81,10 @@ Options:
       --extraHops                           Number of extra 'hops' to follow, be
                                             yond the current scope
                                                            [number] [default: 0]
-      --limit                               Limit crawl to this number of pages
+      --pageLimit, --limit                  Limit crawl to this number of pages
+                                                           [number] [default: 0]
+      --maxPageLimit                        Maximum pages to crawl, overriding 
+                                            pageLimit if both are set
                                                            [number] [default: 0]
       --pageLoadTimeout, --timeout          Timeout for each page to load (in se
                                             conds)        [number] [default: 90]
