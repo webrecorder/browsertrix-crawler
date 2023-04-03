@@ -48,23 +48,13 @@ export class WARCWriter
 
     this.recordLength = await this._writeRecord(responseRecord, responseSerializer);
 
-    if (this.indexer) {
-      this.indexer.indexRecord(responseRecord, this, this.filename);
-    }
+    this._writeCDX(responseRecord);
 
-    this.offset += this.recordLength;
+    const requestSerializer = new WARCSerializer(requestRecord, opts);
+    this.recordLength = await this._writeRecord(requestRecord, requestSerializer);
 
-    this.recordLength = await this._writeRecord(requestRecord, new WARCSerializer(requestRecord, opts));
+    this._writeCDX(requestRecord);
 
-    if (this.indexer) {
-      const cdx = this.indexer.indexRecord(requestRecord, this, this.filename);
-
-      if (cdx && this.cdxFH) {
-        this.indexer.write(cdx, this.cdxFH);
-      }
-    }
-
-    this.offset += this.recordLength;
   }
 
   async _writeRecord(record, serializer) {
@@ -88,6 +78,18 @@ export class WARCWriter
     return total;
   }
 
+  _writeCDX(record) {
+    if (this.indexer) {
+      const cdx = this.indexer.indexRecord(record, this, this.filename);
+
+      if (this.indexer && this.cdxFH && cdx) {
+        this.indexer.write(cdx, this.cdxFH);
+      }
+    }
+
+    this.offset += this.recordLength;
+  }
+
   async flush() {
     if (this.fh) {
       await streamFinish(this.fh);
@@ -95,10 +97,7 @@ export class WARCWriter
     }
 
     if (this.cdxFH) {
-      const cdx = this.indexer.indexRecord(null, this.parserData, this.filename);
-      if (cdx) {
-        this.indexer.write(cdx, this.cdxFH);
-      }
+      this._writeCDX(null);
 
       await streamFinish(this.cdxFH);
       this.cdxFH = null;
