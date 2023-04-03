@@ -23,6 +23,6 @@ if [ "$MY_GID" != "$VOLUME_GID" ] || [ "$MY_UID" != "$VOLUME_UID" ]; then
     cmd="cd $PWD; $@"
     su btrix -c "$cmd"
 else
-    exec $@
+    exec "$@"
 fi
 

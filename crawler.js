@@ -841,9 +841,19 @@ export class Crawler {
       }
     }
 
+    if (this.params.title) {
+      createArgs.push("--title");
+      createArgs.push(this.params.title);
+    }
+
+    if (this.params.description) {
+      createArgs.push("--desc");
+      createArgs.push(this.params.description);
+    }
+
     createArgs.push("-f");
 
-    warcFileList.forEach((val, index) => createArgs.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
+    warcFileList.forEach((val, index) => createArgs.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars    
 
     // create WACZ
     const waczResult = await this.awaitProcess(child_process.spawn("wacz" , createArgs));

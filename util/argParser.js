@@ -349,6 +349,17 @@ class ArgParser {
       "lang": {
         describe: "if set, sets the language used by the browser, should be ISO 639 language[-country] code",
         type: "string"
+      },
+
+      "title": {
+        describe: "If set, write supplied title into WACZ datapackage.json metadata",
+        type: "string"
+      },
+
+      "description": {
+        alias: ["desc"],
+        describe: "If set, write supplied description into WACZ datapackage.json metadata",
+        type: "string"
       }
     };
   }
