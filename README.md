@@ -1,12 +1,12 @@
 # Browsertrix Crawler
 
-Browsertrix Crawler is a simplified (Chrome) browser-based high-fidelity crawling system, designed to run a complex, customizable browser-based crawl in a single Docker container. Browsertrix Crawler uses [puppeteer](https://github.com/puppeteer/puppeteer) to control one or more browser pages or windows in parallel.
+Browsertrix Crawler is a simplified (Chrome) browser-based high-fidelity crawling system, designed to run a complex, customizable browser-based crawl in a single Docker container. Browsertrix Crawler uses [Playwright](https://github.com/microsoft/playwright) to control one or more browser windows in parallel.
 
 ## Features
 
 Thus far, Browsertrix Crawler supports:
 
-- Single-container, browser based crawling with a headless/headful browser running multiple pages/windows.
+- Single-container, browser based crawling with a headless/headful browser running pages in multiple windows.
 - Support for custom browser behaviors, using [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) including autoscroll, video autoplay and site-specific behaviors.
 - YAML-based configuration, passed via file or via stdin.
 - Seed lists and per-seed scoping rules.
@@ -14,7 +14,7 @@ Thus far, Browsertrix Crawler supports:
 - Screencasting: Ability to watch crawling in real-time (experimental).
 - Screenshotting: Ability to take thumbnails, full page screenshots, and/or screenshots of the initial page view.
 - Optimized (non-browser) capture of non-HTML resources.
-- Extensible Puppeteer driver script for customizing behavior per crawl or page.
+- Extensible Playwright driver script for customizing behavior per crawl or page.
 - Ability to create and reuse browser profiles interactively or via automated user/password login using an embedded browser.
 - Multi-platform support -- prebuilt Docker images available for Intel/AMD and Apple Silicon (M1/M2) CPUs.
 
@@ -29,7 +29,7 @@ the following commands. Replace `[URL]` with the web site you'd like to crawl.
 
 1. Run `docker pull webrecorder/browsertrix-crawler`
 2. `docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --url [URL] --generateWACZ --text --collection test`
-3. The crawl will now run and progress of the crawl will be output to the console. Depending on the size of the site, this may take a bit!
+3. The crawl will now run and logs in [JSON Lines](https://jsonlines.org/) format will be output to the console. Depending on the size of the site, this may take a bit!
 4. Once the crawl is finished, a WACZ file will be created in `crawls/collection/test/test.wacz` from the directory you ran the crawl!
 5. You can go to [ReplayWeb.page](https://replayweb.page) and open the generated WACZ file and browse your newly crawled archive!
 
@@ -56,6 +56,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       <summary><b>The Browsertrix Crawler docker image currently accepts the following parameters:</b></summary>
 
 ```
+Options:
       --help                                Show help                  [boolean]
       --version                             Show version number        [boolean]
       --seeds, --url                        The URL to start crawling from
@@ -68,7 +69,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --crawlId, --id                       A user provided ID for this crawl or
                                              crawl configuration (can also be se
                                             t via CRAWL_ID env var)
-                                              [string] [default: "ce75810e6874"]
+                                              [string] [default: "c69e2434da85"]
       --newContext                          Deprecated as of 0.8.0, any values p
                                             assed will be ignored
                                                         [string] [default: null]
@@ -202,6 +203,9 @@ Browsertrix Crawler includes a number of additional command-line options, explai
       --sizeLimit                           If set, save state and exit if size
                                             limit exceeds this value
                                                            [number] [default: 0]
+      --diskUtilization                     If set, save state and exit if disk
+                                            utilization exceeds this percentage
+                                            value         [number] [default: 90]
       --timeLimit                           If set, save state and exit after ti
                                             me limit, in seconds
                                                            [number] [default: 0]
@@ -232,15 +236,17 @@ Browsertrix Crawler includes a number of additional command-line options, explai
 
 One of the key nuances of browser-based crawling is determining when a page is finished loading. This can be configured with the `--waitUntil` flag.
 
-The default is `load,networkidle2`, which waits until page load and <=2 requests remain, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example). The `--waitUntil networkidle0` may make sense for sites, where absolutely all requests must be waited until before proceeding.
+The default is `load`, which waits until page load, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example). The `--waitUntil networkidle` may make sense for sites where absolutely all requests must be waited until before proceeding.
 
-See [page.goto waitUntil options](https://pptr.dev/api/puppeteer.page.goto#remarks) for more info on the options that can be used with this flag from the Puppeteer docs.
+See [page.goto waitUntil options](https://playwright.dev/docs/api/class-page#page-goto-option-wait-until) for more info on the options that can be used with this flag from the Playwright docs.
+
+The `--pageLoadTimeout`/`--timeout` option sets the timeout in seconds for page load, defaulting to 90 seconds. Behaviors will run on the page once either the page load condition or the page load timeout is met, whichever happens first.
 
 
 ### YAML Crawl Config
 
 Browsertix Crawler supports the use of a yaml file to set parameters for a crawl. This can be used by passing a valid yaml file to the `--config` option.
-
+ 
 The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used. For example, the following should start a crawl with config in `crawl-config.yaml`.
 
 
@@ -419,6 +425,11 @@ The blockRules add a filter to each URL loaded on a page and incur an extra over
 These rules can not be used to prevent entire pages for loading -- use the scope exclusion rules for that. (A warning will be printed if a page resource block rule matches a top-level page).
 
 
+### Ad blocking
+
+With version 0.8.0, Browsertrix Crawler supports blocking ads from being loaded during capture based on [Stephen Black's list of known ad hosts](https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts). To enable ad blocking, use the `--blockAds` option. If `--adBlockMessage` is set, a record with the specified error message will be added in the ad's place.
+
+
 ### Custom Warcinfo Fields
 
 Custom fields can be added to the `warcinfo` WARC record, generated for each combined WARCs. The fields can be specified in the YAML config under `warcinfo` section or specifying individually via the command-line.
@@ -443,14 +454,15 @@ via command-line:
 
 ### Behaviors
 
-Browsertrix Crawler also supports automatically running customized in-browser behaviors. The behaviors auto-play videos (when possible),
-and auto-fetch content that is not loaded by default, and also run custom behaviors on certain sites.
+Browsertrix Crawler also supports automatically running customized in-browser behaviors. The behaviors auto-play videos (when possible), and auto-fetch content that is not loaded by default, and also run custom behaviors on certain sites.
 
 Behaviors to run can be specified via a comma-separated list passed to the `--behaviors` option. All behaviors are enabled by default, the equivalent of `--behaviors autoscroll,autoplay,autofetch,siteSpecific`. To enable only a single behavior, such as autoscroll, use `--behaviors autoscroll`.
 
 The site-specific behavior (or autoscroll) will start running after the page is finished its initial load (as defined by the `--waitUntil` settings). The behavior will then run until finished or until the behavior timeout is exceeded. This timeout can be set (in seconds) via the `--behaviorTimeout` flag (90 seconds by default). Setting the timeout to 0 will allow the behavior to run until it is finished.
 
 See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for more info on all of the currently available behaviors.
+
+With version 0.9.0, Browsertrix Crawler includes a `--pageExtraDelay`/`--delay` option, which can be used to have the crawler sleep for a configurable number of seconds after behaviors before moving on to the next page.
 
 ### Screenshots
 
@@ -462,7 +474,7 @@ Three screenshot options are available:
 - `--fullPage`: Takes a png screenshot of the full page
 - `--thumbnail`: Takes a jpeg thumbnail of the initially visible viewport (1920x1080)
 
-These can be combined using a comma-separated list passed to the `--screenshot option`, e.g.: `--screenshot thumbnail,view,fullPage`.
+These can be combined using a comma-separated list passed to the `--screenshot` option, e.g.: `--screenshot thumbnail,view,fullPage`.
 
 Screenshots are written into a `screenshots.warc.gz` WARC file in the `archives/` directory. If the `--generateWACZ` command line option is used, the screenshots WARC is written into the `archive` directory of the WACZ file and indexed alongside the other WARCs.
 
@@ -517,12 +529,12 @@ The webhook URL can be an HTTP URL which receives a JSON POST request OR a Redis
 
 </details>
 
-### Configuring chromium / puppeteer / pywb
+### Configuring Chromium / Playwright / pywb
 
 There is a few environment variables you can set to configure chromium and pywb:
 
-- CHROME_FLAGS will be split by spaces and passed to chromium (via `args` in puppeteer). Note that setting some options is not supported such as `--proxy-server` since they are set by browsertrix itself.
-- SOCKS_HOST and SOCKS_PORT are read by pywb0 to proxy upstream traffic
+- CHROME_FLAGS will be split by spaces and passed to Chromium (via `args` in Playwright). Note that setting some options is not supported such as `--proxy-server` since they are set by browsertrix itself.
+- SOCKS_HOST and SOCKS_PORT are read by pywb to proxy upstream traffic
 
 Here's some examples use cases:
 
