@@ -7,7 +7,7 @@ import md5 from "md5";
 
 
 test("ensure basic crawl run with docker run passes", async () => {
-  child_process.execSync("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://www.example.com/ --generateWACZ  --text --collection wr-net --combineWARC --rolloverSize 10000 --workers 2");
+  child_process.execSync("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://www.example.com/ --generateWACZ  --text --collection wr-net --combineWARC --rolloverSize 10000 --workers 2 --title \"test title\" --description \"test description\"");
 
   child_process.execSync("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler wacz validate --file collections/wr-net/wr-net.wacz");
 
@@ -63,3 +63,11 @@ test("check that the hash in the pages folder and in the unzipped wacz folders m
 
 });
 
+test("check that the supplied title and description made it into datapackage.json", () => {
+  expect(fs.existsSync("test-crawls/collections/wr-net/wacz/datapackage.json")).toBe(true);
+
+  const data = fs.readFileSync("test-crawls/collections/wr-net/wacz/datapackage.json", "utf8");
+  const dataPackageJSON = JSON.parse(data);
+  expect(dataPackageJSON.title).toEqual("test title");
+  expect(dataPackageJSON.description).toEqual("test description");
+});

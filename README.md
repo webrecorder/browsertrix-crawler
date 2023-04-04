@@ -69,7 +69,7 @@ Options:
       --crawlId, --id                       A user provided ID for this crawl or
                                              crawl configuration (can also be se
                                             t via CRAWL_ID env var)
-                                              [string] [default: "c69e2434da85"]
+                                              [string] [default: "454230b33b8f"]
       --newContext                          Deprecated as of 0.8.0, any values p
                                             assed will be ignored
                                                         [string] [default: null]
@@ -83,7 +83,7 @@ Options:
                                                            [number] [default: 0]
       --pageLimit, --limit                  Limit crawl to this number of pages
                                                            [number] [default: 0]
-      --maxPageLimit                        Maximum pages to crawl, overriding 
+      --maxPageLimit                        Maximum pages to crawl, overriding
                                             pageLimit if both are set
                                                            [number] [default: 0]
       --pageLoadTimeout, --timeout          Timeout for each page to load (in se
@@ -137,6 +137,12 @@ Options:
                                             lude: stats (enabled by default), js
                                             errors, pywb, debug
                                                      [string] [default: "stats"]
+      --logLevel                            Comma-separated list of log levels t
+                                            o include in logs
+                                                          [string] [default: ""]
+      --context                             Comma-separated list of contexts to
+                                            include in logs
+                                                          [string] [default: ""]
       --text                                If set, extract text to the pages.js
                                             onl file  [boolean] [default: false]
       --cwd                                 Crawl working directory for captures
@@ -229,6 +235,11 @@ Options:
       --lang                                if set, sets the language used by th
                                             e browser, should be ISO 639 languag
                                             e[-country] code            [string]
+      --title                               If set, write supplied title into WA
+                                            CZ datapackage.json metadata[string]
+      --description, --desc                 If set, write supplied description i
+                                            nto WACZ datapackage.json metadata
+                                                                        [string]
       --config                              Path to YAML config file
 
 ```
