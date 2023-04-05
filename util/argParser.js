@@ -360,6 +360,12 @@ class ArgParser {
         alias: ["desc"],
         describe: "If set, write supplied description into WACZ datapackage.json metadata",
         type: "string"
+      },
+
+      "logErrorsToRedis": {
+        descripe: "If set, write error messages to redis",
+        type: "boolean",
+        default: false,
       }
     };
   }
