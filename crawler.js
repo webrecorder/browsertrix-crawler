@@ -27,6 +27,7 @@ import { Browser } from "./util/browser.js";
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
+import { OriginOverride } from "./util/originoverride.js";
 
 // to ignore HTTPS error for HEAD check
 import { Agent as HTTPAgent } from "http";
@@ -709,6 +710,10 @@ export class Crawler {
 
     this.screencaster = this.initScreenCaster();
 
+    if (this.params.originOverride) {
+      this.originOverride = new OriginOverride(this.params.originOverride);
+    }
+
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
       if (!await this.queueUrl(i, seed.url, 0, 0)) {
@@ -963,6 +968,10 @@ export class Crawler {
 
     if (this.blockRules) {
       await this.blockRules.initPage(page);
+    }
+
+    if (this.originOverride) {
+      await this.originOverride.initPage(page);
     }
 
     let ignoreAbort = false;
