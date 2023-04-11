@@ -175,6 +175,11 @@ export class Crawler {
       logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
     }
 
+    if (this.params.logErrorsToRedis) {
+      logger.setLogErrorsToRedis(true);
+      logger.setCrawlState(this.crawlState);
+    }
+
     return this.crawlState;
   }
 
