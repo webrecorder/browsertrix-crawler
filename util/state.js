@@ -344,7 +344,8 @@ return 0;
   }
 
   async numDone() {
-    return await this.redis.get(this.dkey);
+    const done = await this.redis.get(this.dkey);
+    return parseInt(done);
   }
 
   async numSeen() {
