@@ -912,12 +912,14 @@ export class Crawler {
     const realSize = await this.crawlState.queueSize();
     const pendingList = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
-    const total = realSize + pendingList.length + done;
+    const failed = await this.crawlState.numFailed();
+    const total = realSize + pendingList.length + done + failed;
     const limit = {max: this.pageLimit || 0, hit: this.limitHit};
     const stats = {
       "crawled": done,
       "total": total,
       "pending": pendingList.length,
+      "failed": failed,
       "limit": limit,
       "pendingPages": pendingList.map(x => JSON.stringify(x))
     };

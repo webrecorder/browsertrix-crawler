@@ -362,6 +362,10 @@ return 0;
     return res;
   }
 
+  async numFailed() {
+    return await this.redis.llen(this.fkey);
+  }
+
   async getPendingList() {
     const list = await this.redis.hvals(this.pkey);
     return list.map(x => JSON.parse(x));
