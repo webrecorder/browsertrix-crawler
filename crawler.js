@@ -332,17 +332,17 @@ export class Crawler {
     }
 
     switch (type) {
-      case "info":
-        behaviorLine = JSON.stringify(data);
-        if (behaviorLine != this._behaviorLastLine) {
-          logger.info(message, details, "behaviorScript");
-          this._behaviorLastLine = behaviorLine;
-        }
-        break;
+    case "info":
+      behaviorLine = JSON.stringify(data);
+      if (behaviorLine != this._behaviorLastLine) {
+        logger.info(message, details, "behaviorScript");
+        this._behaviorLastLine = behaviorLine;
+      }
+      break;
 
-      case "debug":
-      default:
-        logger.debug(message, details, "behaviorScript");
+    case "debug":
+    default:
+      logger.debug(message, details, "behaviorScript");
     }
   }
 
@@ -1411,21 +1411,21 @@ export class Crawler {
 
   async serializeConfig(done = false) {
     switch (this.params.saveState) {
-      case "never":
+    case "never":
+      return;
+
+    case "partial":
+      if (!done) {
         return;
+      }
+      if (await this.crawlState.isFinished()) {
+        return;
+      }
+      break;
 
-      case "partial":
-        if (!done) {
-          return;
-        }
-        if (await this.crawlState.isFinished()) {
-          return;
-        }
-        break;
-
-      case "always":
-      default:
-        break;
+    case "always":
+    default:
+      break;
     }
 
     const now = new Date();

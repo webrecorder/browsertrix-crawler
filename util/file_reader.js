@@ -1,10 +1,13 @@
+import fs from "fs";
+import path from "path";
+
 const MAX_DEPTH = 2;
 
-function collectAllFileSources(fileOrDir, ext = null, depth = 0) {
+export function collectAllFileSources(fileOrDir, ext = null, depth = 0) {
   const resolvedPath = path.resolve(fileOrDir);
 
   if (depth >= MAX_DEPTH) {
-    console.warn(`WARN: MAX_DEPTH of ${MAX_DEPTH} reached traversing "${resolvedPath}"`)
+    console.warn(`WARN: MAX_DEPTH of ${MAX_DEPTH} reached traversing "${resolvedPath}"`);
     return [];
   }
 
@@ -19,12 +22,12 @@ function collectAllFileSources(fileOrDir, ext = null, depth = 0) {
     const files = fs.readdirSync(resolvedPath);
     return files.reduce((acc, next) => {
       const nextPath = path.join(fileOrDir, next);
-      return [...acc, ...collectAllFileSources(nextPath, ext, depth + 1)]
+      return [...acc, ...collectAllFileSources(nextPath, ext, depth + 1)];
     }, []);
   }
 
   if (depth === 0) {
-    console.warn(`WARN: The provided path "${resolvedPath}" is not a .js file or directory.`)
+    console.warn(`WARN: The provided path "${resolvedPath}" is not a .js file or directory.`);
     return [];
   }
 }
