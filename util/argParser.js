@@ -366,7 +366,12 @@ class ArgParser {
         descripe: "If set, write error messages to redis",
         type: "boolean",
         default: false,
-      }
+      },
+
+      "customBehaviors": {
+        describe: "injects a custom behavior file or set of behavior files in a directory",
+        type: ["string"]
+      },
     };
   }
 
@@ -392,7 +397,7 @@ class ArgParser {
       .check((argv) => this.validateArgs(argv))
       .argv;
 
-    return {parsed, origConfig};
+    return { parsed, origConfig };
   }
 
 
@@ -400,7 +405,7 @@ class ArgParser {
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
 
     // Check that the collection name is valid.
-    if (argv.collection.search(/^[\w][\w-]*$/) === -1){
+    if (argv.collection.search(/^[\w][\w-]*$/) === -1) {
       logger.fatal(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
 
@@ -430,7 +435,7 @@ class ArgParser {
 
     // background behaviors to apply
     const behaviorOpts = {};
-    if (typeof argv.behaviors != "object"){
+    if (typeof argv.behaviors != "object") {
       argv.behaviors = argv.behaviors.split(",");
     }
     argv.behaviors.forEach((x) => behaviorOpts[x] = true);
@@ -451,14 +456,14 @@ class ArgParser {
         logger.fatal(`Device Browser: ${argv.emulateDevice.defaultBrowserType}\r\nSorry, only Chromium-based devices are supported at this time`);
       }
     } else {
-      argv.emulateDevice = {viewport: null};
+      argv.emulateDevice = { viewport: null };
     }
 
     if (argv.seedFile) {
       const urlSeedFile = fs.readFileSync(argv.seedFile, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
 
-      if (typeof(argv.seeds) === "string") {
+      if (typeof (argv.seeds) === "string") {
         argv.seeds = [argv.seeds];
       }
 
@@ -479,7 +484,7 @@ class ArgParser {
     }
 
     // prefer argv.include only if string or a non-empty array
-    if (argv.include && (typeof(argv.include) === "string" || argv.include.length)) {
+    if (argv.include && (typeof (argv.include) === "string" || argv.include.length)) {
       if (argv.scopeType && argv.scopeType !== "custom") {
         logger.info("You've specified a --scopeType and a --scopeIncludeRx / --include regex. The custom scope regex will take precedence, overriding the scopeType");
         argv.scopeType = "custom";
@@ -498,10 +503,10 @@ class ArgParser {
     argv.scopedSeeds = [];
 
     for (let seed of argv.seeds) {
-      if (typeof(seed) === "string") {
-        seed = {url: seed};
+      if (typeof (seed) === "string") {
+        seed = { url: seed };
       }
-      argv.scopedSeeds.push(new ScopedSeed({...scopeOpts, ...seed}));
+      argv.scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...seed }));
     }
 
     // Resolve statsFilename
