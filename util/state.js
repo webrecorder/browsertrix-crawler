@@ -179,7 +179,7 @@ return 0;
   }
 
   async markFailed(url) {
-    await this.redis.movefailed(this.pkey, this.dkey, url, "1", "failed");
+    await this.redis.movefailed(this.pkey, this.fkey, url, "1", "failed");
 
     return await this.redis.incr(this.dkey);
   }
