@@ -913,7 +913,7 @@ export class Crawler {
     const pendingList = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
-    const total = realSize + pendingList.length + done + failed;
+    const total = realSize + pendingList.length + done;
     const limit = {max: this.pageLimit || 0, hit: this.limitHit};
     const stats = {
       "crawled": done,
