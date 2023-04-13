@@ -179,7 +179,9 @@ return 0;
   }
 
   async markFailed(url) {
-    return await this.redis.movefailed(this.pkey, this.dkey, url, "1", "failed");
+    await this.redis.movefailed(this.pkey, this.dkey, url, "1", "failed");
+
+    return await this.redis.incr(this.dkey);
   }
 
   recheckScope(data, seeds) {
