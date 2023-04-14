@@ -36,7 +36,7 @@ RUN mkdir -p /tmp/ads && cd /tmp/ads && \
     cat ad-hosts.txt | grep '^0.0.0.0 '| awk '{ print $2; }' | grep -v '0.0.0.0' | jq --raw-input --slurp 'split("\n")' > /app/ad-hosts.json && \
     rm /tmp/ads/ad-hosts.txt
 
-RUN yarn install
+RUN yarn install --network-timeout 1000000
 
 ADD *.js /app/
 ADD util/*.js /app/util/

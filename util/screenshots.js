@@ -38,7 +38,9 @@ export class Screenshots {
 
   async take(screenshotType="view") {
     try {
-      await this.page.setViewportSize({width: 1920, height: 1080});
+      if (screenshotType !== "fullPage") {
+        await this.page.setViewportSize({width: 1920, height: 1080});
+      }
       const options = screenshotTypes[screenshotType];
       const screenshotBuffer = await this.page.screenshot(options);
       const warcRecord = await this.wrap(screenshotBuffer, screenshotType, options.type);

@@ -55,6 +55,7 @@ export class RedisCrawlState
     this.pkey = this.key + ":p";
     this.skey = this.key + ":s";
     this.dkey = this.key + ":d";
+    this.ekey = this.key + ":e";
 
     this._initLuaCommands(this.redis);
   }
@@ -244,8 +245,9 @@ return 0;
     const queued = await this._iterSortedKey(this.qkey);
     const done = await this._iterListKeys(this.dkey);
     const pending = await this.getPendingList();
+    const errors = await this.getErrorList();
 
-    return {queued, pending, done};
+    return {queued, pending, done, errors};
   }
 
   _getScore(data) {
@@ -285,6 +287,7 @@ return 0;
     await this.redis.del(this.pkey);
     await this.redis.del(this.dkey);
     await this.redis.del(this.skey);
+    await this.redis.del(this.ekey);
 
     for (const json of state.queued) {
       const data = JSON.parse(json);
@@ -320,6 +323,10 @@ return 0;
       seen.push(data.url);
     }
 
+    for (const json of state.errors) {
+      await this.logError(json);
+    }
+
     await this.redis.sadd(this.skey, seen);
     return seen.length;
   }
@@ -346,6 +353,10 @@ return 0;
   async getPendingList() {
     const list = await this.redis.hvals(this.pkey);
     return list.map(x => JSON.parse(x));
+  }
+
+  async getErrorList() {
+    return await this.redis.lrange(this.ekey, 0, -1);
   }
 
   async clearOwnPendingLocks() {
@@ -388,6 +399,10 @@ return 0;
 
   async removeDupe(key, value) {
     return await this.redis.srem(key, value);
+  }
+
+  async logError(error) {
+    return await this.redis.lpush(this.ekey, error);
   }
 }
 

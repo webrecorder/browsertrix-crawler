@@ -20,9 +20,8 @@ if [ "$MY_GID" != "$VOLUME_GID" ] || [ "$MY_UID" != "$VOLUME_UID" ]; then
     useradd -ms /bin/bash -g $VOLUME_GID btrix
     usermod -o -u $VOLUME_UID btrix > /dev/null
 
-    cmd="cd $PWD; $@"
-    su btrix -c "$cmd"
+    su btrix -c '"$@"' -- argv0-ignore "$@"
 else
-    exec $@
+    exec "$@"
 fi
 

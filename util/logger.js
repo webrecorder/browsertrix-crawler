@@ -15,8 +15,10 @@ class Logger
   constructor() {
     this.logStream = null;
     this.debugLogging = null;
+    this.logErrorsToRedis = false;
     this.logLevels = [];
     this.contexts = [];
+    this.crawlState = null;
   }
 
   setExternalLogStream(logFH) {
@@ -27,12 +29,20 @@ class Logger
     this.debugLogging = debugLog;
   }
 
+  setLogErrorsToRedis(logErrorsToRedis) {
+    this.logErrorsToRedis = logErrorsToRedis;
+  }
+
   setLogLevel(logLevels) {
     this.logLevels = logLevels;
   }
 
   setContext(contexts) {
     this.contexts = contexts;
+  }
+
+  setCrawlState(crawlState) {
+    this.crawlState = crawlState;
   }
 
   logAsJSON(message, data, context, logLevel="info") {
@@ -65,6 +75,10 @@ class Logger
     console.log(string);
     if (this.logStream) {
       this.logStream.write(string + "\n");
+    }
+
+    if (this.logErrorsToRedis && logLevel === "error") {
+      this.crawlState.logError(string);
     }
   }
 

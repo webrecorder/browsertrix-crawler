@@ -68,8 +68,15 @@ class ArgParser {
         type: "number"
       },
 
-      "limit": {
+      "pageLimit": {
+        alias: "limit",
         describe: "Limit crawl to this number of pages",
+        default: 0,
+        type: "number",
+      },
+
+      "maxPageLimit": {
+        describe: "Maximum pages to crawl, overriding  pageLimit if both are set",
         default: 0,
         type: "number",
       },
@@ -342,6 +349,23 @@ class ArgParser {
       "lang": {
         describe: "if set, sets the language used by the browser, should be ISO 639 language[-country] code",
         type: "string"
+      },
+
+      "title": {
+        describe: "If set, write supplied title into WACZ datapackage.json metadata",
+        type: "string"
+      },
+
+      "description": {
+        alias: ["desc"],
+        describe: "If set, write supplied description into WACZ datapackage.json metadata",
+        type: "string"
+      },
+
+      "logErrorsToRedis": {
+        descripe: "If set, write error messages to redis",
+        type: "boolean",
+        default: false,
       }
     };
   }

@@ -74,6 +74,12 @@ export class Crawler {
 
     // was the limit hit?
     this.limitHit = false;
+    this.pageLimit = this.params.pageLimit;
+
+    // resolve maxPageLimit and ensure pageLimit is no greater than maxPageLimit
+    if (this.params.maxPageLimit) {
+      this.pageLimit = this.pageLimit ? Math.min(this.pageLimit, this.params.maxPageLimit) : this.params.maxPageLimit;
+    }
 
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
@@ -167,6 +173,11 @@ export class Crawler {
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
       logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
+    }
+
+    if (this.params.logErrorsToRedis) {
+      logger.setLogErrorsToRedis(true);
+      logger.setCrawlState(this.crawlState);
     }
 
     return this.crawlState;
@@ -689,10 +700,10 @@ export class Crawler {
 
     await this.initPages();
 
-    this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage, logger);
+    this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage);
 
     if (this.params.blockRules && this.params.blockRules.length) {
-      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage, logger);
+      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
     }
 
     this.screencaster = this.initScreenCaster();
@@ -833,6 +844,16 @@ export class Crawler {
       }
     }
 
+    if (this.params.title) {
+      createArgs.push("--title");
+      createArgs.push(this.params.title);
+    }
+
+    if (this.params.description) {
+      createArgs.push("--desc");
+      createArgs.push(this.params.description);
+    }
+
     createArgs.push("-f");
 
     warcFileList.forEach((val, index) => createArgs.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
@@ -890,7 +911,7 @@ export class Crawler {
     const pendingList = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
     const total = realSize + pendingList.length + done;
-    const limit = {max: this.params.limit || 0, hit: this.limitHit};
+    const limit = {max: this.pageLimit || 0, hit: this.limitHit};
     const stats = {
       "crawled": done,
       "total": total,
@@ -1140,7 +1161,7 @@ export class Crawler {
       return false;
     }
 
-    if (this.params.limit > 0 && (await this.crawlState.numSeen() >= this.params.limit)) {
+    if (this.pageLimit > 0 && (await this.crawlState.numSeen() >= this.pageLimit)) {
       this.limitHit = true;
       return false;
     }
