@@ -176,6 +176,11 @@ export class Crawler {
       logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
     }
 
+    if (this.params.logErrorsToRedis) {
+      logger.setLogErrorsToRedis(true);
+      logger.setCrawlState(this.crawlState);
+    }
+
     return this.crawlState;
   }
 
@@ -912,12 +917,14 @@ export class Crawler {
     const realSize = await this.crawlState.queueSize();
     const pendingList = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
+    const failed = await this.crawlState.numFailed();
     const total = realSize + pendingList.length + done;
     const limit = {max: this.pageLimit || 0, hit: this.limitHit};
     const stats = {
       "crawled": done,
       "total": total,
       "pending": pendingList.length,
+      "failed": failed,
       "limit": limit,
       "pendingPages": pendingList.map(x => JSON.stringify(x))
     };

@@ -53,7 +53,12 @@ export class RedisCrawlState
     this.qkey = this.key + ":q";
     this.pkey = this.key + ":p";
     this.skey = this.key + ":s";
+    // done (integer)
     this.dkey = this.key + ":d";
+    // failed
+    this.fkey = this.key + ":f";
+    // crawler errors
+    this.ekey = this.key + ":e";
 
     this._initLuaCommands(this.redis);
   }
@@ -111,7 +116,7 @@ end
 `
     });
 
-    redis.defineCommand("movedone", {
+    redis.defineCommand("movefailed", {
       numberOfKeys: 2,
       lua: `
 local json = redis.call('hget', KEYS[1], ARGV[1]);
@@ -168,13 +173,15 @@ return 0;
   }
 
   async markFinished(url) {
-    const finished = this._timestamp();
+    await this.redis.call("hdel", this.pkey, url);
 
-    return await this.redis.movedone(this.pkey, this.dkey, url, finished, "finished");
+    return await this.redis.incr(this.dkey);
   }
 
   async markFailed(url) {
-    return await this.redis.movedone(this.pkey, this.dkey, url, "1", "failed");
+    await this.redis.movefailed(this.pkey, this.fkey, url, "1", "failed");
+
+    return await this.redis.incr(this.dkey);
   }
 
   recheckScope(data, seeds) {
@@ -240,11 +247,13 @@ return 0;
 
   async serialize() {
     //const queued = await this._iterSortKey(this.qkey);
+    const done = await this.numDone();
     const queued = await this._iterSortedKey(this.qkey);
-    const done = await this._iterListKeys(this.dkey);
     const pending = await this.getPendingList();
+    const failed = await this._iterListKeys(this.fkey);
+    const errors = await this.getErrorList();
 
-    return {queued, pending, done};
+    return {done, queued, pending, failed, errors};
   }
 
   _getScore(data) {
@@ -283,7 +292,9 @@ return 0;
     await this.redis.del(this.qkey);
     await this.redis.del(this.pkey);
     await this.redis.del(this.dkey);
+    await this.redis.del(this.fkey);
     await this.redis.del(this.skey);
+    await this.redis.del(this.ekey);
 
     for (const json of state.queued) {
       const data = JSON.parse(json);
@@ -309,14 +320,25 @@ return 0;
       seen.push(data.url);
     }
 
+    // retained in modified form for backwards compatibility
     for (const json of state.done) {
       const data = JSON.parse(json);
       if (data.failed) {
         await this.redis.zadd(this.qkey, this._getScore(data), json);
       } else {
-        await this.redis.rpush(this.dkey, json);
+        await this.redis.incr(this.dkey);
       }
       seen.push(data.url);
+    }
+
+    for (const json of state.failed) {
+      const data = JSON.parse(json);
+      await this.redis.zadd(this.qkey, this._getScore(data), json);
+      seen.push(data.url);
+    }
+
+    for (const json of state.errors) {
+      await this.logError(json);
     }
 
     await this.redis.sadd(this.skey, seen);
@@ -324,7 +346,8 @@ return 0;
   }
 
   async numDone() {
-    return await this.redis.llen(this.dkey);
+    const done = await this.redis.get(this.dkey);
+    return parseInt(done);
   }
 
   async numSeen() {
@@ -342,9 +365,17 @@ return 0;
     return res;
   }
 
+  async numFailed() {
+    return await this.redis.llen(this.fkey);
+  }
+
   async getPendingList() {
     const list = await this.redis.hvals(this.pkey);
     return list.map(x => JSON.parse(x));
+  }
+
+  async getErrorList() {
+    return await this.redis.lrange(this.ekey, 0, -1);
   }
 
   async clearOwnPendingLocks() {
@@ -379,6 +410,10 @@ return 0;
   async queueSize() {
     this._lastSize = await this.redis.zcard(this.qkey);
     return this._lastSize;
+  }
+
+  async logError(error) {
+    return await this.redis.lpush(this.ekey, error);
   }
 }
 

@@ -367,6 +367,12 @@ class ArgParser {
         type: "array",
         default: [],
       },
+
+      "logErrorsToRedis": {
+        descripe: "If set, write error messages to redis",
+        type: "boolean",
+        default: false,
+      }
     };
   }
 
