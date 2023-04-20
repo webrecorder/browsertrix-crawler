@@ -569,12 +569,10 @@ export class Crawler {
   async checkLimits() {
     let interrupt = false;
 
-    let dir;
-    let size;
-    if (this.params.sizeLimit || this.params.diskUtilization) {
-      dir = path.join(this.collDir, "archive");
-      size = await getDirSize(dir);
-    }
+    const dir = path.join(this.collDir, "archive");
+    const size = await getDirSize(dir);
+
+    await this.crawlState.setArchiveSize(size);
 
     if (this.params.sizeLimit) {
       if (size >= this.params.sizeLimit) {

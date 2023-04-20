@@ -60,6 +60,8 @@ export class RedisCrawlState
     // crawler errors
     this.ekey = this.key + ":e";
 
+    this.crawlSizeKey = "crawl-size";
+
     this._initLuaCommands(this.redis);
   }
 
@@ -200,6 +202,10 @@ return 0;
 
   async getStatus() {
     return await this.redis.hget(`${this.key}:status`, this.uid);
+  }
+
+  async setArchiveSize(size) {
+    return await this.redis.hset(this.crawlSizeKey, this.uid, size);
   }
 
   async incFailCount() {
