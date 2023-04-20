@@ -235,7 +235,7 @@ export class PageWorker
         // if pending, sleep and check again
         if (pending) {
           logger.debug("No crawl tasks, but pending tasks remain, waiting", {pending, workerid: this.id}, "worker");
-          await sleep(10);
+          await sleep(0.5);
         } else {
           // if no pending and queue size is still empty, we're done!
           if (!await crawlState.queueSize()) {
