@@ -347,7 +347,7 @@ export class Crawler {
   }
 
   async setupPage({page, cdp, workerid}) {
-    await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+    await this.browser.setupPage({page, cdp});
 
     if (this.params.logging.includes("jserrors")) {
       page.on("console", (msg) => {
@@ -644,8 +644,6 @@ export class Crawler {
   }
 
   async crawl() {
-    this.profileDir = await this.browser.loadProfile(this.params.profile);
-
     if (this.params.healthCheckPort) {
       this.healthChecker = new HealthChecker(this.params.healthCheckPort, this.params.workers);
     }
@@ -723,7 +721,7 @@ export class Crawler {
     }
 
     await this.browser.launch({
-      dataDir: this.profileDir,
+      profileUrl: this.params.profile,
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
       chromeOptions: {

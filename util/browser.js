@@ -11,8 +11,6 @@ import { initStorage } from "./storage.js";
 
 import { chromium } from "playwright-core";
 
-const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
-
 
 // ==================================================================
 export class Browser
@@ -22,16 +20,22 @@ export class Browser
 
     this.firstPage = null;
     this.firstCDP = null;
+
+    this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
+    this.customProfile = false;
   }
 
-  async launch({dataDir, chromeOptions, signals = false, headless = false, emulateDevice = {viewport: null}} = {}) {
+  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {viewport: null}} = {}) {
     if (this.context) {
       logger.warn("Context already inited", {}, "context");
       return this.context;
     }
 
+    if (profileUrl) {
+      this.customProfile = await this.loadProfile(profileUrl);
+    }
+
     const args = this.chromeArgs(chromeOptions);
-    const userDataDir = dataDir || profileDir;
 
     const launchOpts = {
       ...emulateDevice,
@@ -43,10 +47,10 @@ export class Browser
       handleSIGHUP: signals,
       handleSIGINT: signals,
       handleSIGTERM: signals,
-      serviceWorkers: dataDir ? "block" : "allow",
+      serviceWorkers: "allow"
     };
 
-    this.context = await chromium.launchPersistentContext(userDataDir, launchOpts);
+    this.context = await chromium.launchPersistentContext(this.profileDir, launchOpts);
 
     if (this.context.pages()) {
       this.firstPage = this.context.pages()[0];
@@ -62,6 +66,16 @@ export class Browser
     if (this.context) {
       await this.context.close();
       this.context = null;
+    }
+  }
+
+  async setupPage({page, cdp}) {
+    await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+
+    if (this.customProfile) {
+      logger.info("Disabling Service Workers for profile", {}, "browser");
+
+      await cdp.send("Network.setBypassServiceWorker", {bypass: true});
     }
   }
 
@@ -126,17 +140,18 @@ export class Browser
 
     if (profileFilename) {
       try {
-        child_process.execSync("tar xvfz " + profileFilename, {cwd: profileDir});
+        child_process.execSync("tar xvfz " + profileFilename, {cwd: this.profileDir});
+        return true;
       } catch (e) {
         logger.error(`Profile filename ${profileFilename} not a valid tar.gz`);
       }
     }
 
-    return profileDir;
+    return false;
   }
 
   saveProfile(profileFilename) {
-    child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {cwd: profileDir});
+    child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {cwd: this.profileDir});
   }
 
   chromeArgs({proxy=true, userAgent=null, extraArgs=[]} = {}) {
