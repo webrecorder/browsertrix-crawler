@@ -27,6 +27,7 @@ import { Browser } from "./util/browser.js";
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
+import { OriginOverride } from "./util/originoverride.js";
 
 // to ignore HTTPS error for HEAD check
 import { Agent as HTTPAgent } from "http";
@@ -173,6 +174,11 @@ export class Crawler {
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
       logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
+    }
+
+    if (this.params.logErrorsToRedis) {
+      logger.setLogErrorsToRedis(true);
+      logger.setCrawlState(this.crawlState);
     }
 
     return this.crawlState;
@@ -564,12 +570,10 @@ export class Crawler {
   async checkLimits() {
     let interrupt = false;
 
-    let dir;
-    let size;
-    if (this.params.sizeLimit || this.params.diskUtilization) {
-      dir = path.join(this.collDir, "archive");
-      size = await getDirSize(dir);
-    }
+    const dir = path.join(this.collDir, "archive");
+    const size = await getDirSize(dir);
+
+    await this.crawlState.setArchiveSize(size);
 
     if (this.params.sizeLimit) {
       if (size >= this.params.sizeLimit) {
@@ -706,6 +710,10 @@ export class Crawler {
     }
 
     this.screencaster = this.initScreenCaster();
+
+    if (this.params.originOverride) {
+      this.originOverride = new OriginOverride(this.params.originOverride);
+    }
 
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
@@ -905,12 +913,14 @@ export class Crawler {
     const realSize = await this.crawlState.queueSize();
     const pendingList = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
+    const failed = await this.crawlState.numFailed();
     const total = realSize + pendingList.length + done;
     const limit = {max: this.pageLimit || 0, hit: this.limitHit};
     const stats = {
       "crawled": done,
       "total": total,
       "pending": pendingList.length,
+      "failed": failed,
       "limit": limit,
       "pendingPages": pendingList.map(x => JSON.stringify(x))
     };
@@ -961,6 +971,10 @@ export class Crawler {
 
     if (this.blockRules) {
       await this.blockRules.initPage(page);
+    }
+
+    if (this.originOverride) {
+      await this.originOverride.initPage(page);
     }
 
     let ignoreAbort = false;

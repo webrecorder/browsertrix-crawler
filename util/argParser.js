@@ -360,6 +360,18 @@ class ArgParser {
         alias: ["desc"],
         describe: "If set, write supplied description into WACZ datapackage.json metadata",
         type: "string"
+      },
+
+      "originOverride": {
+        describe: "if set, will redirect requests from each origin in key to origin in the value, eg. --originOverride https://host:port=http://alt-host:alt-port",
+        type: "array",
+        default: [],
+      },
+
+      "logErrorsToRedis": {
+        descripe: "If set, write error messages to redis",
+        type: "boolean",
+        default: false,
       }
     };
   }
