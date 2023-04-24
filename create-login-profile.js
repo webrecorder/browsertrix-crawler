@@ -199,7 +199,8 @@ async function main() {
   await cdp.send("Network.setCacheDisabled", {cacheDisabled: true});
 
   if (!params.automated) {
-    await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+    await browser.setupPage({page, cdp});
+
     // for testing, inject browsertrix-behaviors
     await page.addInitScript(behaviors + ";\nself.__bx_behaviors.init();");
   }
