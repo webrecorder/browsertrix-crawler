@@ -22,7 +22,7 @@ import { logger, errJSON } from "./util/logger.js";
 import { runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 
-import { Browser } from "./util/browser.js";
+import { PersistentContextBrowser, NewContextBrowser } from "./util/browser.js";
 
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
@@ -120,7 +120,11 @@ export class Crawler {
 
     this.behaviorLastLine = null;
 
-    this.browser = new Browser();
+    if (this.params.profile) {
+      this.browser = new PersistentContextBrowser();
+    } else {
+      this.browser = new NewContextBrowser();
+    }
   }
 
   configureUA() {

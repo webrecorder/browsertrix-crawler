@@ -16,19 +16,13 @@ import { chromium } from "playwright-core";
 export class Browser
 {
   constructor() {
-    this.context = null;
-
-    this.firstPage = null;
-    this.firstCDP = null;
-
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
     this.customProfile = false;
   }
 
   async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {viewport: null}} = {}) {
-    if (this.context) {
-      logger.warn("Context already inited", {}, "context");
-      return this.context;
+    if (this.isLaunched()) {
+      return;
     }
 
     if (profileUrl) {
@@ -50,23 +44,7 @@ export class Browser
       serviceWorkers: "allow"
     };
 
-    this.context = await chromium.launchPersistentContext(this.profileDir, launchOpts);
-
-    if (this.context.pages()) {
-      this.firstPage = this.context.pages()[0];
-    } else {
-      this.firstPage = await this.context.newPage();
-    }
-    this.firstCDP = await this.context.newCDPSession(this.firstPage);
-
-    return this.context;
-  }
-
-  async close() {
-    if (this.context) {
-      await this.context.close();
-      this.context = null;
-    }
+    await this._init(launchOpts);
   }
 
   async setupPage({page, cdp}) {
@@ -81,34 +59,6 @@ export class Browser
 
   async getFirstPageWithCDP() {
     return {page: this.firstPage, cdp: this.firstCDP};
-  }
-
-  numPages() {
-    return this.context ? this.context.pages().length : 0;
-  }
-
-  async newWindowPageWithCDP() {
-    // unique url to detect new pages
-    const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
-
-    const p = new Promise((resolve) => {
-      const listener = (page) => {
-        if (page.url() === startPage) {
-          resolve(page);
-          this.context.removeListener("page", listener);
-        }
-      };
-
-      this.context.on("page", listener);
-    });
-
-    await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
-
-    const page = await p;
-
-    const cdp = await this.context.newCDPSession(page);
-
-    return {page, cdp};
   }
 
   async loadProfile(profileFilename) {
@@ -239,4 +189,151 @@ export class Browser
     return result.value;
   }
 }
+
+// ==================================================================
+export class NewContextBrowser extends Browser
+{
+  constructor() {
+    super();
+    this.browser = null;
+    this.contexts = new Map();
+
+    this.launchOpts = null;
+  }
+
+  isLaunched() {
+    if (this.browser) {
+      logger.warn("Browser already inited", {}, "browser");
+      return true;
+    }
+
+    return false;
+  }
+
+  async close() {
+    for (const context of this.contexts.values()) {
+      await context.close();
+    }
+    this.contexts.clear();
+
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
+  }
+
+  async closePage(page) {
+    try {
+      await page.close();
+    } catch (e) {
+      // ignore
+    }
+
+    const context = this.contexts.get(page);
+    if (context) {
+      await context.close();
+      this.contexts.delete(page);
+    }
+  }
+
+  async _init(launchOpts) {
+    if (this.customProfile) {
+      throw new Error("not supported yet");
+    }
+    
+    this.browser = await chromium.launch(launchOpts);
+    this.launchOpts = launchOpts;
+  }
+
+  numPages() {
+    return this.contexts.length;
+  }
+
+  async newWindowPageWithCDP(storageState) {
+    const context = await this.browser.newContext({...this.launchOpts, storageState});
+
+    const page = await context.newPage();
+
+    const cdp = await context.newCDPSession(page);
+
+    this.contexts.set(page, context);
+
+    return {page, cdp};
+  }
+}
+
+
+// ==================================================================
+export class PersistentContextBrowser extends Browser
+{
+  constructor() {
+    super();
+    this.context = null;
+
+    this.firstPage = null;
+    this.firstCDP = null;
+  }
+
+  isLaunched() {
+    if (this.context) {
+      logger.warn("Context already inited", {}, "context");
+      return true;
+    }
+
+    return false;
+  }
+
+  async close() {
+    if (this.context) {
+      await this.context.close();
+      this.context = null;
+    }
+  }
+
+  async closePage(page) {
+    await page.close();
+  }
+
+  async _init(launchOpts) {
+    this.context = await chromium.launchPersistentContext(this.profileDir, launchOpts);
+
+    if (this.context.pages().length) {
+      this.firstPage = this.context.pages()[0];
+    } else {
+      this.firstPage = await this.context.newPage();
+    }
+    this.firstCDP = await this.context.newCDPSession(this.firstPage);
+  }
+
+
+  numPages() {
+    return this.context ? this.context.pages().length : 0;
+  }
+
+  async newWindowPageWithCDP() {
+    // unique url to detect new pages
+    const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
+
+    const p = new Promise((resolve) => {
+      const listener = (page) => {
+        if (page.url() === startPage) {
+          resolve(page);
+          this.context.removeListener("page", listener);
+        }
+      };
+
+      this.context.on("page", listener);
+    });
+
+    await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+
+    const page = await p;
+
+    const cdp = await this.context.newCDPSession(page);
+
+    return {page, cdp};
+  }
+}
+
+
 

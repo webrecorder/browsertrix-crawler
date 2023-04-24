@@ -3,7 +3,7 @@ import { logger, errJSON } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
 import { rxEscape } from "./seeds.js";
 
-const MAX_REUSE = 5;
+const MAX_REUSE = 2;
 
 const NEW_WINDOW_TIMEOUT = 10;
 
@@ -68,7 +68,7 @@ export class PageWorker
       }
 
       try {
-        await this.page.close();
+        await this.crawler.browser.closePage(this.page);
       } catch (e) {
         // ignore
       }
@@ -88,6 +88,12 @@ export class PageWorker
       logger.debug("Reusing page", {reuseCount: this.reuseCount}, "worker");
       return this.opts;
     } else if (this.page) {
+      try {
+        this.pageState = await this.page.context().storageState();
+      } catch (e) {
+        this.pageState = null;
+      }
+
       await this.closePage();
     }
     
@@ -98,7 +104,7 @@ export class PageWorker
       try {
         logger.debug("Getting page in new window", {workerid}, "worker");
         const { page, cdp } = await timedRun(
-          this.crawler.browser.newWindowPageWithCDP(),
+          this.crawler.browser.newWindowPageWithCDP(this.storageState),
           NEW_WINDOW_TIMEOUT,
           "New Window Timed Out",
           {workerid},
