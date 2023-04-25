@@ -352,6 +352,14 @@ export class Crawler {
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
+  isSeedUrl(url) {
+    const seeds = this.params.scopedSeeds.map(seed => seed.url);
+    if (seeds.indexOf(url) != -1){
+      return true;
+    }
+    return false;
+  }
+
   async setupPage({page, cdp, workerid}) {
     await this.browser.setupPage({page, cdp});
 
@@ -941,6 +949,8 @@ export class Crawler {
 
     const logDetails = data.logDetails;
 
+    const failCrawlOnError = (this.isSeedUrl(url) && this.params.failOnFailedSeed);
+
     let isHTMLPage = await timedRun(
       this.isHTML(url),
       FETCH_TIMEOUT_SECS,
@@ -1000,9 +1010,13 @@ export class Crawler {
 
       const status = resp.status();
       if (status === 400) {
-        // pywb error, mark as page load failed
-        logger.error("Page Load Error, skipping page", {status, ...logDetails});
-        throw new Error(`Page ${url} returned 400 error`);
+        if (failCrawlOnError) {
+          logger.fatal("Page Load Error on Seed, failing crawl", {status, ...logDetails});
+        } else {
+          logger.error("Page Load Error, skipping page", {status, ...logDetails});
+          throw new Error(`Page ${url} returned 400 error`);
+        }
+        
       }
 
       const contentType = await resp.headerValue("content-type");
@@ -1014,15 +1028,23 @@ export class Crawler {
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         if (e.name === "TimeoutError") {
           if (data.loadState !== LoadState.CONTENT_LOADED) {
-            logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
-            throw e;
+            if (failCrawlOnError) {
+              logger.fatal("Page Load Timeout on Seed, failing crawl", {msg, ...logDetails});
+            } else {
+              logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
+              throw e;
+            }
           } else {
             logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
             data.skipBehaviors = true;
           }
         } else {
-          logger.error("Page Load Error, skipping page", {msg, ...logDetails});
-          throw e;
+          if (failCrawlOnError) {
+            logger.fatal("Page Load Timeout on Seed, failing crawl", {msg, ...logDetails});
+          } else {
+            logger.error("Page Load Error, skipping page", {msg, ...logDetails});
+            throw e;
+          }
         }
       }
     }

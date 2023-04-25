@@ -372,6 +372,12 @@ class ArgParser {
         descripe: "If set, write error messages to redis",
         type: "boolean",
         default: false,
+      },
+
+      "failOnFailedSeed": {
+        describe: "If set, crawler will fail with exit code 1 if initial seed fails",
+        type: "boolean",
+        default: false
       }
     };
   }
