@@ -97,7 +97,7 @@ export class Crawler {
     this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
 
     //if (this.params.browserdriver === "puppeteer" && this.params.waitUntil === "load") {
-      //this.params.waitUntil = ["load", "networkidle0"];
+    //this.params.waitUntil = ["load", "networkidle0"];
     //}
 
     this.gotoOpts = {

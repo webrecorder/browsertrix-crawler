@@ -383,6 +383,10 @@ export class PersistentContextBrowser extends PlaywrightBrowser
   async _init(launchOpts) {
     this.context = await chromium.launchPersistentContext(this.profileDir, launchOpts);
 
+    await this._initFirst();
+  }
+
+  async _initFirst() {
     if (this.context.pages().length) {
       this.firstPage = this.context.pages()[0];
     } else {
@@ -390,7 +394,6 @@ export class PersistentContextBrowser extends PlaywrightBrowser
     }
     this.firstCDP = await this.context.newCDPSession(this.firstPage);
   }
-
 
   numPages() {
     return this.context ? this.context.pages().length : 0;
@@ -411,7 +414,13 @@ export class PersistentContextBrowser extends PlaywrightBrowser
       this.context.on("page", listener);
     });
 
-    await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+    try {
+      await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+    } catch (e) {
+      await this._initFirst();
+
+      await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+    }
 
     const page = await p;
 
@@ -490,7 +499,15 @@ export class PuppeteerPersistentContextBrowser extends Browser
       this.browser.on("targetcreated", listener);
     });
 
-    await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+    try {
+      await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+    } catch (e) {
+      const target = this.browser.target();
+
+      this.firstCDP = await target.createCDPSession();
+
+      await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+    }
 
     const target = await p;
 
