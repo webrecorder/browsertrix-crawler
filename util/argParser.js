@@ -369,10 +369,16 @@ class ArgParser {
       },
 
       "logErrorsToRedis": {
-        descripe: "If set, write error messages to redis",
+        describe: "If set, write error messages to redis",
         type: "boolean",
         default: false,
-      }
+      },
+
+      "browserdriver": {
+        describe: "playwright, playwright-new-context, puppeteer",
+        type: "string",
+        default: "playwright"
+      },
     };
   }
 

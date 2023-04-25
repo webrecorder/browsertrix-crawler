@@ -89,9 +89,9 @@ export class PageWorker
       return this.opts;
     } else if (this.page) {
       try {
-        this.pageState = await this.page.context().storageState();
+        this.storageState = await this.page.context().storageState();
       } catch (e) {
-        this.pageState = null;
+        this.storageState = null;
       }
 
       await this.closePage();

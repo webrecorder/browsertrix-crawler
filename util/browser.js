@@ -10,6 +10,7 @@ import { logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
 import { chromium } from "playwright-core";
+import puppeteer from "puppeteer-core";
 
 
 // ==================================================================
@@ -48,7 +49,7 @@ export class Browser
   }
 
   async setupPage({page, cdp}) {
-    await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+    await this.addInitScript(page, "Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
     if (this.customProfile) {
       logger.info("Disabling Service Workers for profile", {}, "browser");
@@ -150,7 +151,7 @@ export class Browser
     return null;
   }
 
-  async evaluateWithCLI(context, frame, funcString, logData, contextName) {
+  async evaluateWithCLI_(context, frame, funcString, logData, contextName) {
     let details = {frameUrl: frame.url(), ...logData};
 
     logger.info("Run Script Started", details, contextName);
@@ -191,7 +192,25 @@ export class Browser
 }
 
 // ==================================================================
-export class NewContextBrowser extends Browser
+export class PlaywrightBrowser extends Browser
+{
+  addInitScript(page, script) {
+    return page.addInitScript(script);
+  }
+
+  async responseHeader(resp, header) {
+    return await resp.headerValue(header);
+  }
+
+  async evaluateWithCLI(page, frame, funcString, logData, contextName) {
+    const context = page.context();
+    return await this.evaluateWithCLI_(context, frame, funcString, logData, contextName);
+  }
+}
+
+
+// ==================================================================
+export class NewContextBrowser extends PlaywrightBrowser
 {
   constructor() {
     super();
@@ -264,7 +283,7 @@ export class NewContextBrowser extends Browser
 
 
 // ==================================================================
-export class PersistentContextBrowser extends Browser
+export class PersistentContextBrowser extends PlaywrightBrowser
 {
   constructor() {
     super();
@@ -336,4 +355,91 @@ export class PersistentContextBrowser extends Browser
 }
 
 
+// ==================================================================
+export class PuppeteerPersistentContextBrowser extends Browser
+{
+  constructor() {
+    super();
+    this.browser = null;
 
+    this.firstPage = null;
+    this.firstCDP = null;
+  }
+
+  isLaunched() {
+    if (this.browser) {
+      logger.warn("Context already inited", {}, "browser");
+      return true;
+    }
+
+    return false;
+  }
+
+  async close() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
+  }
+
+  addInitScript(page, script) {
+    return page.evaluateOnNewDocument(script);
+  }
+
+  async closePage(page) {
+    await page.close();
+  }
+
+  async _init(launchOpts) {
+    launchOpts = {...launchOpts,
+      defaultViewport: null,
+      waitForInitialPage: false,
+      userDataDir: this.profileDir
+    };
+
+    this.browser = await puppeteer.launch(launchOpts);
+
+    const target = this.browser.target();
+
+    this.firstCDP = await target.createCDPSession();
+  }
+
+  numPages() {
+    return this.browser ? this.browser.pages().length : 0;
+  }
+
+  async newWindowPageWithCDP() {
+    // unique url to detect new pages
+    const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
+
+    const p = new Promise((resolve) => {
+      const listener = (target) => {
+        if (target.url() === startPage) {
+          resolve(target);
+          this.browser.removeListener("targetcreated", listener);
+        }
+      };
+
+      this.browser.on("targetcreated", listener);
+    });
+
+    await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+
+    const target = await p;
+
+    const page = await target.page();
+
+    const cdp = await target.createCDPSession();
+
+    return {page, cdp};
+  }
+
+  async responseHeader(resp, header) {
+    return await resp.headers()[header];
+  }
+
+  async evaluateWithCLI(_, frame, funcString, logData, contextName) {
+    const context = await frame.executionContext();
+    return await this.evaluateWithCLI_(context, frame, funcString, logData, contextName);
+  }
+}

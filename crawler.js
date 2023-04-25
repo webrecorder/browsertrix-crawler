@@ -22,7 +22,7 @@ import { logger, errJSON } from "./util/logger.js";
 import { runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 
-import { PersistentContextBrowser, NewContextBrowser } from "./util/browser.js";
+import { PersistentContextBrowser, PuppeteerPersistentContextBrowser, NewContextBrowser } from "./util/browser.js";
 
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
@@ -96,6 +96,10 @@ export class Crawler {
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
     this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
 
+    if (this.params.browserdriver === "puppeteer" && this.params.waitUntil === "load") {
+      this.params.waitUntil = ["load", "networkidle0"];
+    }
+
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
       timeout: this.params.pageLoadTimeout * 1000
@@ -120,11 +124,21 @@ export class Crawler {
 
     this.behaviorLastLine = null;
 
-    if (this.params.profile) {
-      this.browser = new PersistentContextBrowser();
-    } else {
+    switch (this.params.browserdriver) {
+    case "playwright-new-context":
       this.browser = new NewContextBrowser();
+      break;
+
+    case "puppeteer":
+      this.browser = new PuppeteerPersistentContextBrowser();
+      break;
+
+    case "playwright":
+    default:
+      this.browser = new PersistentContextBrowser();
     }
+
+    logger.info("Browser Driver: " + this.browser.constructor.name);
   }
 
   configureUA() {
@@ -378,7 +392,7 @@ export class Crawler {
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
-      await page.addInitScript(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
+      await this.browser.addInitScript(page, behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
     }
   }
 
@@ -503,12 +517,10 @@ export class Crawler {
     try {
       frames = frames || page.frames();
 
-      const context = page.context();
-
       logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
       return await Promise.allSettled(
-        frames.map(frame => this.browser.evaluateWithCLI(context, frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => this.browser.evaluateWithCLI(page, frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
     } catch (e) {
@@ -707,11 +719,11 @@ export class Crawler {
 
     await this.initPages();
 
-    this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage);
+    //this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage);
 
-    if (this.params.blockRules && this.params.blockRules.length) {
-      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
-    }
+    //if (this.params.blockRules && this.params.blockRules.length) {
+    //  this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
+    //}
 
     this.screencaster = this.initScreenCaster();
 
@@ -1011,7 +1023,7 @@ export class Crawler {
     try {
       const resp = await page.goto(url, gotoOpts);
 
-      const contentType = await resp.headerValue("content-type");
+      const contentType = await this.browser.responseHeader(resp, "content-type");
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
