@@ -68,7 +68,7 @@ export class BlockRules
     }
   }
 
-  async initPage(page) {
+  async initPage(page, cdp, browser) {
     if (!this.rules.length) {
       return;
     }
@@ -79,7 +79,8 @@ export class BlockRules
 
     page._btrix_interceptionAdded = true;
 
-    await page.route("**/*", (route) => {
+    //await page.route("**/*", (route) => {
+    await browser.addIntercept(cdp, (route) => {
       const logDetails = {page: page.url()};
       try {
         this.handleRequest(route, logDetails);
@@ -101,7 +102,7 @@ export class BlockRules
       if (blockState === BlockState.ALLOW) {
         await route.continue();
       } else {
-        await route.abort("blockedbyclient");
+        await route.abort("BlockedByClient");
       }
 
     } catch (e) {
@@ -116,29 +117,29 @@ export class BlockRules
 
     const isNavReq = request.isNavigationRequest();
 
-    const frame = request.frame();
+    //const frame = request.frame();
 
     let frameUrl = "";
     let blockState;
 
     if (isNavReq) {
-      const parentFrame = frame.parentFrame();
-      if (parentFrame) {
-        frameUrl = parentFrame.url();
-        blockState = BlockState.BLOCK_IFRAME_NAV;
-      } else {
-        frameUrl = frame.url();
-        blockState = BlockState.BLOCK_PAGE_NAV;
-      }
+      //const parentFrame = frame.parentFrame();
+      //if (parentFrame) {
+      //frameUrl = parentFrame.url();
+      //blockState = BlockState.BLOCK_IFRAME_NAV;
+      //} else {
+      //frameUrl = frame.url();
+      blockState = BlockState.BLOCK_PAGE_NAV;
+      //}
     } else {
-      frameUrl = frame ? frame.url() : "";
+      //frameUrl = frame ? frame.url() : "";
       blockState = BlockState.BLOCK_OTHER;
     }
 
     // ignore initial page
-    if (frameUrl === "about:blank") {
-      return BlockState.ALLOW;
-    }
+    // if (frameUrl === "about:blank") {
+    //   return BlockState.ALLOW;
+    // }
 
     // always allow special pywb proxy script
     for (const allowUrl of ALWAYS_ALLOW) {
@@ -148,14 +149,14 @@ export class BlockRules
     }
 
     for (const rule of this.rules) {
-      const {done, block} = await this.ruleCheck(rule, request, url, frameUrl, isNavReq, logDetails);
+      const {done, block} = await this.ruleCheck(rule, request, url, isNavReq, logDetails);
 
       if (block) {
         if (blockState === BlockState.BLOCK_PAGE_NAV) {
           logger.warn("Block rule match for page request ignored, set --exclude to block full pages", {url, ...logDetails}, "blocking");
           return BlockState.ALLOW;
         }
-        logger.debug("URL Blocked in iframe", {url, frameUrl, ...logDetails}, "blocking");
+        logger.debug("URL Blocked in iframe", {url, ...logDetails}, "blocking");
         await this.recordBlockMsg(url);
         return blockState;
       }
@@ -167,15 +168,17 @@ export class BlockRules
     return BlockState.ALLOW;
   }
 
-  async ruleCheck(rule, request, reqUrl, frameUrl, isNavReq, logDetails) {
+  async ruleCheck(rule, request, reqUrl, isNavReq, logDetails) {
     const {url, inFrameUrl, frameTextMatch} = rule;
+    let frameUrl = "";
 
     const type = rule.type || "block";
     const allowOnly = (type === "allowOnly");
 
     // not a frame match, skip rule
-    if (inFrameUrl && !frameUrl.match(inFrameUrl)) {
-      return {block: false, done: false};
+    if (inFrameUrl) {
+      //!frameUrl.match(inFrameUrl)
+      //return {block: false, done: false};
     }
 
     const urlMatched = (url && reqUrl.match(url));
@@ -236,14 +239,15 @@ export class AdBlockRules extends BlockRules
     this.adhosts = JSON.parse(fs.readFileSync(new URL(adhostsFilePath, import.meta.url)));
   }
 
-  async initPage(page) {
+  async initPage(page, cdp, browser) {
     if (page._btrix_adInterceptionAdded) {
       return true;
     }
 
     page._btrix_adInterceptionAdded = true;
 
-    await page.route("**/*", (route) => {
+    //await page.route("**/*", (route) => {
+    await browser.addIntercept(cdp, (route) => {
       const logDetails = {page: page.url()};
       try {
         this.handleRequest(route, logDetails);

@@ -373,6 +373,18 @@ export class Crawler {
   async setupPage({page, cdp, workerid}) {
     await this.browser.setupPage({page, cdp});
 
+    if (this.adBlockRules && this.params.blockAds) {
+      await this.adBlockRules.initPage(page, cdp, this.browser);
+    }
+
+    if (this.blockRules) {
+      await this.blockRules.initPage(page, cdp, this.browser);
+    }
+
+    if (this.originOverride) {
+      await this.originOverride.initPage(page);
+    }
+
     if (this.params.logging.includes("jserrors")) {
       page.on("console", (msg) => {
         if (msg.type() === "error") {
@@ -448,7 +460,7 @@ export class Crawler {
         logger.info("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
         const res = await timedRun(
-          this.runBehaviors(page, data.filteredFrames, logDetails),
+          this.runBehaviors(page, cdp, data.filteredFrames, logDetails),
           this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
@@ -513,14 +525,14 @@ export class Crawler {
     }
   }
 
-  async runBehaviors(page, frames, logDetails) {
+  async runBehaviors(page, cdp, frames, logDetails) {
     try {
       frames = frames || page.frames();
 
       logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
       return await Promise.allSettled(
-        frames.map(frame => this.browser.evaluateWithCLI(page, frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => this.browser.evaluateWithCLI(page, frame, cdp, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
     } catch (e) {
@@ -719,11 +731,11 @@ export class Crawler {
 
     await this.initPages();
 
-    //this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage);
+    this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage);
 
-    //if (this.params.blockRules && this.params.blockRules.length) {
-    //  this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
-    //}
+    if (this.params.blockRules && this.params.blockRules.length) {
+      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
+    }
 
     this.screencaster = this.initScreenCaster();
 
@@ -988,18 +1000,6 @@ export class Crawler {
       } catch (e) {
         // ignore failed direct fetch attempt, do browser-based capture
       }
-    }
-
-    if (this.adBlockRules && this.params.blockAds) {
-      await this.adBlockRules.initPage(page);
-    }
-
-    if (this.blockRules) {
-      await this.blockRules.initPage(page);
-    }
-
-    if (this.originOverride) {
-      await this.originOverride.initPage(page);
     }
 
     let ignoreAbort = false;

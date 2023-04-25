@@ -151,21 +151,19 @@ export class Browser
     return null;
   }
 
-  async evaluateWithCLI_(context, frame, funcString, logData, contextName) {
+  async evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName) {
     let details = {frameUrl: frame.url(), ...logData};
 
     logger.info("Run Script Started", details, contextName);
 
-    const cdp = await context.newCDPSession(frame);
-
     // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
     //const contextId = context._contextId;
-    const expression = funcString + "\n//# sourceURL=__playwright_evaluation_script__";
+    const expression = funcString + "\n//# sourceURL=__evaluation_script__";
 
     const { exceptionDetails, result } = await cdp
       .send("Runtime.evaluate", {
         expression,
-        //contextId,
+        contextId: cdpContextId,
         returnByValue: true,
         awaitPromise: true,
         userGesture: true,
@@ -181,15 +179,67 @@ export class Browser
       logger.info("Run Script Finished", details, contextName);
     }
 
-    try {
-      await cdp.detach();
-    } catch (e) {
-      logger.warn("Detach failed", details, contextName);
-    }
-
     return result.value;
   }
+
+  async addIntercept(cdp, handler) {
+    await cdp.send("Fetch.enable", {"patterns": [{"requestStage": "Request", "urlPattern": "*"}]});
+
+    await cdp.on("Fetch.requestPaused", (resp) => {
+      const route = new Route(cdp, resp);
+      // console.log("*** intercepted: " + resp.request.url);
+      handler(route);
+    });
+  }
 }
+
+
+// ==================================================================
+class Route
+{
+  constructor(cdp, resp) {
+    this.cdp = cdp;
+    this.resp = resp;
+    this.requestId = resp.requestId;
+  }
+
+  abort(reason) {
+    //console.log("abort: " + this.resp.request.url);
+    return this.cdp.send("Fetch.failRequest", {requestId: this.requestId, errorReason: reason});
+  }
+
+  continue() {
+    //console.log("continued: " + this.resp.request.url);
+    return this.cdp.send("Fetch.continueResponse", {requestId: this.requestId});
+  }
+
+  request() {
+    return new Request(this.resp.request.url, this.resp.resourceType === "Document");
+  }
+}
+
+
+// ==================================================================
+class Request
+{
+  constructor(url, isNav) {
+    this._url = url;
+    this._isNav = isNav;
+  }
+
+  url() {
+    return this._url;
+  }
+
+  isNavigationRequest() {
+    return this._isNav;
+  }
+
+  frame() {
+    return null;
+  }
+}
+
 
 // ==================================================================
 export class PlaywrightBrowser extends Browser
@@ -202,9 +252,26 @@ export class PlaywrightBrowser extends Browser
     return await resp.headerValue(header);
   }
 
-  async evaluateWithCLI(page, frame, funcString, logData, contextName) {
-    const context = page.context();
-    return await this.evaluateWithCLI_(context, frame, funcString, logData, contextName);
+  async evaluateWithCLI(page, frame, cdp, funcString, logData, contextName) {
+
+    if (frame !== page.mainFrame()) {
+      const context = page.context();
+      cdp = await context.newCDPSession(frame);
+    }
+
+    console.log("is top", frame === page.mainFrame());
+    
+    const res = await this.evaluateWithCLI_(cdp, frame, undefined, funcString, logData, contextName);
+
+    if (frame !== page.mainFrame()) {
+      try {
+        await cdp.detach();
+      } catch (e) {
+        logger.warn("Detach failed", logData, contextName);
+      }
+    }
+
+    return res;
   }
 }
 
@@ -438,8 +505,12 @@ export class PuppeteerPersistentContextBrowser extends Browser
     return await resp.headers()[header];
   }
 
-  async evaluateWithCLI(_, frame, funcString, logData, contextName) {
+  async evaluateWithCLI(_, frame, cdp, funcString, logData, contextName) {
     const context = await frame.executionContext();
-    return await this.evaluateWithCLI_(context, frame, funcString, logData, contextName);
+    cdp = context._client;
+    const cdpContextId = context._contextId;
+    //const target = page.target();
+    //const cdp = await target.createCDPSession();
+    return await this.evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName);
   }
 }
