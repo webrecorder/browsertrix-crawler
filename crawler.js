@@ -96,9 +96,9 @@ export class Crawler {
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
     this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
 
-    if (this.params.browserdriver === "puppeteer" && this.params.waitUntil === "load") {
-      this.params.waitUntil = ["load", "networkidle0"];
-    }
+    //if (this.params.browserdriver === "puppeteer" && this.params.waitUntil === "load") {
+      //this.params.waitUntil = ["load", "networkidle0"];
+    //}
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
