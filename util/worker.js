@@ -3,7 +3,7 @@ import { logger, errJSON } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
 import { rxEscape } from "./seeds.js";
 
-const MAX_REUSE = 2;
+const MAX_REUSE = 5;
 
 const NEW_WINDOW_TIMEOUT = 10;
 

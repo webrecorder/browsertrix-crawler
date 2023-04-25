@@ -909,6 +909,14 @@ export class Crawler {
     });
   }
 
+  logMemory() {
+    const memUsage = process.memoryUsage();
+    const { heapUsed, heapTotal } = memUsage;
+    this.maxHeapUsed = Math.max(this.maxHeapUsed || 0, heapUsed);
+    this.maxHeapTotal = Math.max(this.maxHeapTotal || 0, heapTotal);
+    logger.info("Memory", {maxHeapUsed: this.maxHeapUsed, maxHeapTotal: this.maxHeapTotal, ...memUsage}, "memory");
+  }
+
   async writeStats(toFile=false) {
     if (!this.params.logging.includes("stats")) {
       return;
@@ -930,6 +938,7 @@ export class Crawler {
     };
 
     logger.info("Crawl statistics", stats, "crawlStatus");
+    this.logMemory();
 
     if (toFile && this.params.statsFilename) {
       try {
