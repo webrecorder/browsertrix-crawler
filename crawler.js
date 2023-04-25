@@ -998,6 +998,13 @@ export class Crawler {
     try {
       const resp = await page.goto(url, gotoOpts);
 
+      const status = resp.status();
+      if (status === 400) {
+        // pywb error, mark as page load failed
+        logger.error("Page Load Error, skipping page", {status, ...logDetails});
+        throw new Error(`Page ${url} returned 400 error`);
+      }
+
       const contentType = await resp.headerValue("content-type");
 
       isHTMLPage = this.isHTMLContentType(contentType);
