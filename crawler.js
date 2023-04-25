@@ -1008,15 +1008,15 @@ export class Crawler {
     try {
       const resp = await page.goto(url, gotoOpts);
 
-      const status = resp.status();
-      if (status === 400) {
+      // Handle 4xx or 5xx response as a page load error
+      const statusCode = resp.status();
+      if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
         if (failCrawlOnError) {
-          logger.fatal("Page Load Error on Seed, failing crawl", {status, ...logDetails});
+          logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails});
         } else {
-          logger.error("Page Load Error, skipping page", {status, ...logDetails});
-          throw new Error(`Page ${url} returned 400 error`);
+          logger.error("Page Load Error, skipping page", {statusCode, ...logDetails});
+          throw new Error(`Page ${url} returned status code ${statusCode}`);
         }
-        
       }
 
       const contentType = await resp.headerValue("content-type");
@@ -1029,7 +1029,7 @@ export class Crawler {
         if (e.name === "TimeoutError") {
           if (data.loadState !== LoadState.CONTENT_LOADED) {
             if (failCrawlOnError) {
-              logger.fatal("Page Load Timeout on Seed, failing crawl", {msg, ...logDetails});
+              logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
             } else {
               logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
               throw e;
@@ -1040,7 +1040,7 @@ export class Crawler {
           }
         } else {
           if (failCrawlOnError) {
-            logger.fatal("Page Load Timeout on Seed, failing crawl", {msg, ...logDetails});
+            logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
           } else {
             logger.error("Page Load Error, skipping page", {msg, ...logDetails});
             throw e;
