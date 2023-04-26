@@ -21,14 +21,15 @@ export const screenshotTypes = {
   "fullPage": {
     type: "png",
     omitBackground: true,
-    fullPage: false
+    fullPage: true
   }
 };
 
 
 export class Screenshots {
 
-  constructor({page, url, date, directory}) {
+  constructor({browser, page, url, date, directory}) {
+    this.browser = browser;
     this.page = page;
     this.url = url;
     this.directory = directory;
@@ -39,7 +40,7 @@ export class Screenshots {
   async take(screenshotType="view") {
     try {
       if (screenshotType !== "fullPage") {
-        await this.page.setViewportSize({width: 1920, height: 1080});
+        await this.browser.setViewport(this.page, {width: 1920, height: 1080});
       }
       const options = screenshotTypes[screenshotType];
       const screenshotBuffer = await this.page.screenshot(options);

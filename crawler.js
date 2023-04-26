@@ -347,7 +347,25 @@ export class Crawler {
   }
 
   async setupPage({page, cdp, workerid}) {
-    await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+    await this.browser.setupPage({page, cdp});
+
+    if ((this.adBlockRules && this.params.blockAds) ||
+        this.blockRules || this.originOverride) {
+
+      await page.setRequestInterception(true);
+
+      if (this.adBlockRules && this.params.blockAds) {
+        await this.adBlockRules.initPage(this.browser, page);
+      }
+
+      if (this.blockRules) {
+        await this.blockRules.initPage(this.browser, page);
+      }
+
+      if (this.originOverride) {
+        await this.originOverride.initPage(this.browser, page);
+      }
+    }
 
     if (this.params.logging.includes("jserrors")) {
       page.on("console", (msg) => {
@@ -368,7 +386,7 @@ export class Crawler {
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
-      await page.addInitScript(behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
+      await this.browser.addInitScript(page, behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
     }
   }
 
@@ -398,7 +416,7 @@ export class Crawler {
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
       const archiveDir = path.join(this.collDir, "archive");
-      const screenshots = new Screenshots({page, url, directory: archiveDir});
+      const screenshots = new Screenshots({browser: this.browser, page, url, directory: archiveDir});
       if (this.params.screenshot.includes("view")) {
         await screenshots.take();
       }
@@ -424,7 +442,7 @@ export class Crawler {
         logger.info("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
         const res = await timedRun(
-          this.runBehaviors(page, data.filteredFrames, logDetails),
+          this.runBehaviors(page, cdp, data.filteredFrames, logDetails),
           this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
@@ -489,16 +507,14 @@ export class Crawler {
     }
   }
 
-  async runBehaviors(page, frames, logDetails) {
+  async runBehaviors(page, cdp, frames, logDetails) {
     try {
       frames = frames || page.frames();
-
-      const context = page.context();
 
       logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
       return await Promise.allSettled(
-        frames.map(frame => this.browser.evaluateWithCLI(context, frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => this.browser.evaluateWithCLI(page, frame, cdp, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
     } catch (e) {
@@ -642,8 +658,6 @@ export class Crawler {
   }
 
   async crawl() {
-    this.profileDir = await this.browser.loadProfile(this.params.profile);
-
     if (this.params.healthCheckPort) {
       this.healthChecker = new HealthChecker(this.params.healthCheckPort, this.params.workers);
     }
@@ -707,7 +721,7 @@ export class Crawler {
 
     this.screencaster = this.initScreenCaster();
 
-    if (this.params.originOverride) {
+    if (this.params.originOverride.length) {
       this.originOverride = new OriginOverride(this.params.originOverride);
     }
 
@@ -725,7 +739,7 @@ export class Crawler {
     }
 
     await this.browser.launch({
-      dataDir: this.profileDir,
+      profileUrl: this.params.profile,
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
       chromeOptions: {
@@ -905,6 +919,14 @@ export class Crawler {
     });
   }
 
+  logMemory() {
+    const memUsage = process.memoryUsage();
+    const { heapUsed, heapTotal } = memUsage;
+    this.maxHeapUsed = Math.max(this.maxHeapUsed || 0, heapUsed);
+    this.maxHeapTotal = Math.max(this.maxHeapTotal || 0, heapTotal);
+    logger.debug("Memory", {maxHeapUsed: this.maxHeapUsed, maxHeapTotal: this.maxHeapTotal, ...memUsage}, "memory");
+  }
+
   async writeStats(toFile=false) {
     if (!this.params.logging.includes("stats")) {
       return;
@@ -926,6 +948,7 @@ export class Crawler {
     };
 
     logger.info("Crawl statistics", stats, "crawlStatus");
+    this.logMemory();
 
     if (toFile && this.params.statsFilename) {
       try {
@@ -966,18 +989,6 @@ export class Crawler {
     //   }
     // }
 
-    if (this.adBlockRules && this.params.blockAds) {
-      await this.adBlockRules.initPage(page);
-    }
-
-    if (this.blockRules) {
-      await this.blockRules.initPage(page);
-    }
-
-    if (this.originOverride) {
-      await this.originOverride.initPage(page);
-    }
-
     let ignoreAbort = false;
 
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
@@ -999,7 +1010,7 @@ export class Crawler {
     try {
       const resp = await page.goto(url, gotoOpts);
 
-      const contentType = await resp.headerValue("content-type");
+      const contentType = await this.browser.responseHeader(resp, "content-type");
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
@@ -1069,7 +1080,7 @@ export class Crawler {
     await sleep(0.5);
 
     try {
-      await page.waitForLoadState("networkidle", {timeout: this.params.netIdleWait * 1000});
+      await this.browser.waitForNetworkIdle(page, {timeout: this.params.netIdleWait * 1000});
     } catch (e) {
       logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
@@ -1096,7 +1107,7 @@ export class Crawler {
     try {
       const linkResults = await Promise.allSettled(
         frames.map(frame => timedRun(
-          frame.evaluate(loadFunc, {selector: selector, extract: extract}),
+          frame.evaluate(loadFunc, {selector, extract}),
           PAGE_OP_TIMEOUT_SECS,
           "Link extraction timed out",
           logDetails,
@@ -1153,9 +1164,10 @@ export class Crawler {
     try {
       logger.debug("Check CF Blocking", logDetails);
 
-      const cloudflare = page.locator("div.cf-browser-verification.cf-im-under-attack");
-
-      while (await cloudflare.waitFor({timeout: PAGE_OP_TIMEOUT_SECS})) {
+      while (await timedRun(
+        page.$("div.cf-browser-verification.cf-im-under-attack"),
+        PAGE_OP_TIMEOUT_SECS
+      )) {
         logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
         await sleep(5.5);
       }

@@ -19,7 +19,7 @@
     "js-yaml": "^4.1.0",
     "minio": "7.0.26",
     "p-queue": "^7.3.4",
-    "playwright-core": "^1.31.2",
+    "puppeteer-core": "^19.11.1",
     "sitemapper": "^3.1.2",
     "uuid": "8.3.2",
     "warcio": "github:webrecorder/warcio.js#streaming-serializer",

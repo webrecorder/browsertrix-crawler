@@ -68,29 +68,19 @@ export class BlockRules
     }
   }
 
-  async initPage(page) {
-    if (!this.rules.length) {
-      return;
-    }
-
-    if (page._btrix_interceptionAdded) {
-      return true;
-    }
-
-    page._btrix_interceptionAdded = true;
-
-    await page.route("**/*", (route) => {
+  async initPage(browser, page) {
+    const onRequest = async (request) => {
       const logDetails = {page: page.url()};
       try {
-        this.handleRequest(route, logDetails);
+        await this.handleRequest(request, logDetails);
       } catch (e) {
         logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }
-    });
+    };
+    await browser.interceptRequest(page, onRequest);
   }
 
-  async handleRequest(route, logDetails) {
-    const request = route.request();
+  async handleRequest(request, logDetails) {
     const url = request.url();
 
     let blockState;
@@ -99,9 +89,9 @@ export class BlockRules
       blockState = await this.shouldBlock(request, url, logDetails);
 
       if (blockState === BlockState.ALLOW) {
-        await route.continue();
+        await request.continue({}, 1);
       } else {
-        await route.abort("blockedbyclient");
+        await request.abort("blockedbyclient", 1);
       }
 
     } catch (e) {
@@ -234,23 +224,6 @@ export class AdBlockRules extends BlockRules
   constructor(blockPutUrl, blockErrMsg, adhostsFilePath = "../ad-hosts.json") {
     super([], blockPutUrl, blockErrMsg);
     this.adhosts = JSON.parse(fs.readFileSync(new URL(adhostsFilePath, import.meta.url)));
-  }
-
-  async initPage(page) {
-    if (page._btrix_adInterceptionAdded) {
-      return true;
-    }
-
-    page._btrix_adInterceptionAdded = true;
-
-    await page.route("**/*", (route) => {
-      const logDetails = {page: page.url()};
-      try {
-        this.handleRequest(route, logDetails);
-      } catch (e) {
-        logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
-      }
-    });
   }
 
   isAdUrl(url) {
