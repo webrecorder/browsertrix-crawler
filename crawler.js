@@ -357,6 +357,7 @@ export class Crawler {
 
     if ((this.adBlockRules && this.params.blockAds) ||
         this.blockRules || this.originOverride) {
+
       await page.setRequestInterception(true);
 
       if (this.adBlockRules && this.params.blockAds) {
@@ -726,7 +727,7 @@ export class Crawler {
 
     this.screencaster = this.initScreenCaster();
 
-    if (this.params.originOverride) {
+    if (this.params.originOverride.length) {
       this.originOverride = new OriginOverride(this.params.originOverride);
     }
 
