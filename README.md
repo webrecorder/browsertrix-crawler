@@ -1,6 +1,6 @@
 # Browsertrix Crawler
 
-Browsertrix Crawler is a simplified (Chrome) browser-based high-fidelity crawling system, designed to run a complex, customizable browser-based crawl in a single Docker container. Browsertrix Crawler uses [Playwright](https://github.com/microsoft/playwright) to control one or more browser windows in parallel.
+Browsertrix Crawler is a simplified (Chrome) browser-based high-fidelity crawling system, designed to run a complex, customizable browser-based crawl in a single Docker container. Browsertrix Crawler uses [Puppeteer](https://github.com/puppeteer/puppeteer) to control one or more browser windows in parallel.
 
 ## Features
 
@@ -14,7 +14,7 @@ Thus far, Browsertrix Crawler supports:
 - Screencasting: Ability to watch crawling in real-time (experimental).
 - Screenshotting: Ability to take thumbnails, full page screenshots, and/or screenshots of the initial page view.
 - Optimized (non-browser) capture of non-HTML resources.
-- Extensible Playwright driver script for customizing behavior per crawl or page.
+- Extensible Puppeteer driver script for customizing behavior per crawl or page.
 - Ability to create and reuse browser profiles interactively or via automated user/password login using an embedded browser.
 - Multi-platform support -- prebuilt Docker images available for Intel/AMD and Apple Silicon (M1/M2) CPUs.
 
@@ -69,13 +69,14 @@ Options:
       --crawlId, --id                       A user provided ID for this crawl or
                                              crawl configuration (can also be se
                                             t via CRAWL_ID env var)
-                                              [string] [default: "454230b33b8f"]
+                                              [string] [default: "97792ef37eaf"]
       --newContext                          Deprecated as of 0.8.0, any values p
                                             assed will be ignored
                                                         [string] [default: null]
-      --waitUntil                           Playwright page.goto() condition to
-                                            wait for before continuing
-                                                               [default: "load"]
+      --waitUntil                           Puppeteer page.goto() condition to w
+                                            ait for before continuing, can be mu
+                                            ltiple separated by ','
+                                                  [default: "load,networkidle2"]
       --depth                               The depth of the crawl for all seeds
                                                           [number] [default: -1]
       --extraHops                           Number of extra 'hops' to follow, be
@@ -150,10 +151,9 @@ Options:
                                             o process.cwd()
                                                    [string] [default: "/crawls"]
       --mobileDevice                        Emulate mobile device by name from:
-                                            https://github.com/microsoft/playwri
-                                            ght/blob/main/packages/playwright-co
-                                            re/src/server/deviceDescriptorsSourc
-                                            e.json                      [string]
+                                            https://github.com/puppeteer/puppete
+                                            er/blob/main/src/common/DeviceDescri
+                                            ptors.ts                    [string]
       --userAgent                           Override user-agent with specified s
                                             tring                       [string]
       --userAgentSuffix                     Append suffix to existing browser us
@@ -240,6 +240,13 @@ Options:
       --description, --desc                 If set, write supplied description i
                                             nto WACZ datapackage.json metadata
                                                                         [string]
+      --originOverride                      if set, will redirect requests from
+                                            each origin in key to origin in the
+                                            value, eg. --originOverride https://
+                                            host:port=http://alt-host:alt-port
+                                                           [array] [default: []]
+      --logErrorsToRedis                    If set, write error messages to redi
+                                            s         [boolean] [default: false]
       --config                              Path to YAML config file
 
 ```
@@ -250,9 +257,9 @@ Options:
 
 One of the key nuances of browser-based crawling is determining when a page is finished loading. This can be configured with the `--waitUntil` flag.
 
-The default is `load`, which waits until page load, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example). The `--waitUntil networkidle` may make sense for sites where absolutely all requests must be waited until before proceeding.
+The default is `load,networkidle2`, which waits until page load and <=2 requests remain, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example). `--waitUntil networkidle0` may make sense for sites where absolutely all requests must be waited until before proceeding.
 
-See [page.goto waitUntil options](https://playwright.dev/docs/api/class-page#page-goto-option-wait-until) for more info on the options that can be used with this flag from the Playwright docs.
+See [page.goto waitUntil options](https://pptr.dev/api/puppeteer.page.goto#remarks) for more info on the options that can be used with this flag from the Puppeteer docs.
 
 The `--pageLoadTimeout`/`--timeout` option sets the timeout in seconds for page load, defaulting to 90 seconds. Behaviors will run on the page once either the page load condition or the page load timeout is met, whichever happens first.
 
@@ -543,11 +550,11 @@ The webhook URL can be an HTTP URL which receives a JSON POST request OR a Redis
 
 </details>
 
-### Configuring Chromium / Playwright / pywb
+### Configuring Chromium / Puppeteer / pywb
 
 There is a few environment variables you can set to configure chromium and pywb:
 
-- CHROME_FLAGS will be split by spaces and passed to Chromium (via `args` in Playwright). Note that setting some options is not supported such as `--proxy-server` since they are set by browsertrix itself.
+- CHROME_FLAGS will be split by spaces and passed to Chromium (via `args` in Puppeteer). Note that setting some options is not supported such as `--proxy-server` since they are set by browsertrix itself.
 - SOCKS_HOST and SOCKS_PORT are read by pywb to proxy upstream traffic
 
 Here's some examples use cases:
