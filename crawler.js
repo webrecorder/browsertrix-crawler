@@ -352,14 +352,6 @@ export class Crawler {
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  isSeedUrl(url) {
-    const seeds = this.params.scopedSeeds.map(seed => seed.url);
-    if (seeds.indexOf(url) != -1){
-      return true;
-    }
-    return false;
-  }
-
   async setupPage({page, cdp, workerid}) {
     await this.browser.setupPage({page, cdp});
 
@@ -949,7 +941,7 @@ export class Crawler {
 
     const logDetails = data.logDetails;
 
-    const failCrawlOnError = (this.isSeedUrl(url) && this.params.failOnFailedSeed);
+    const failCrawlOnError = ((depth === 0) && this.params.failOnFailedSeed);
 
     let isHTMLPage = await timedRun(
       this.isHTML(url),
