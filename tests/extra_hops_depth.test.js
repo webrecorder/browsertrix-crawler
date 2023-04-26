@@ -16,7 +16,8 @@ test("check that URLs are crawled 2 extra hops beyond depth", async () => {
     console.log(error);
   }
 
-  const crawled_pages = fs.readFileSync("test-crawls/collections/extra-hops-beyond/pages/pages.jsonl", "utf8");
+  const crawledPages = fs.readFileSync("test-crawls/collections/extra-hops-beyond/pages/pages.jsonl", "utf8");
+  const crawledPagesArray = crawledPages.trim().split("\n");
 
   const expectedPages = [
     "https://webrecorder.net/",
@@ -28,7 +29,9 @@ test("check that URLs are crawled 2 extra hops beyond depth", async () => {
     "https://webrecorder.net/faq",
   ];
 
-  for (const page of crawled_pages.trim().split("\n")) {
+  expect(expectedPages.length).toEqual(crawledPagesArray.length);
+
+  for (const page of crawledPagesArray) {
     const url = JSON.parse(page).url;
     if (!url) {
       continue;
