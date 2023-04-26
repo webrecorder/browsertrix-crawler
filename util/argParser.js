@@ -373,6 +373,12 @@ class ArgParser {
         type: "boolean",
         default: false,
       },
+
+      "failOnFailedSeed": {
+        describe: "If set, crawler will fail with exit code 1 if any seed fails",
+        type: "boolean",
+        default: false
+      }
     };
   }
 

@@ -966,6 +966,8 @@ export class Crawler {
 
     const logDetails = data.logDetails;
 
+    const failCrawlOnError = ((depth === 0) && this.params.failOnFailedSeed);
+
     let isHTMLPage = await timedRun(
       this.isHTML(url),
       FETCH_TIMEOUT_SECS,
@@ -1011,6 +1013,17 @@ export class Crawler {
     try {
       const resp = await page.goto(url, gotoOpts);
 
+      // Handle 4xx or 5xx response as a page load error
+      const statusCode = resp.status();
+      if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
+        if (failCrawlOnError) {
+          logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails});
+        } else {
+          logger.error("Page Load Error, skipping page", {statusCode, ...logDetails});
+          throw new Error(`Page ${url} returned status code ${statusCode}`);
+        }
+      }
+
       const contentType = await this.browser.responseHeader(resp, "content-type");
 
       isHTMLPage = this.isHTMLContentType(contentType);
@@ -1020,15 +1033,23 @@ export class Crawler {
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         if (e.name === "TimeoutError") {
           if (data.loadState !== LoadState.CONTENT_LOADED) {
-            logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
-            throw e;
+            if (failCrawlOnError) {
+              logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
+            } else {
+              logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
+              throw e;
+            }
           } else {
             logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
             data.skipBehaviors = true;
           }
         } else {
-          logger.error("Page Load Error, skipping page", {msg, ...logDetails});
-          throw e;
+          if (failCrawlOnError) {
+            logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
+          } else {
+            logger.error("Page Load Error, skipping page", {msg, ...logDetails});
+            throw e;
+          }
         }
       }
     }
