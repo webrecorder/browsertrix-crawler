@@ -411,7 +411,7 @@ class ArgParser {
       logger.fatal(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
 
-        // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
+    // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
     // can be multiple separate by comma
     // (see: https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options)
     if (typeof argv.waitUntil != "object"){
