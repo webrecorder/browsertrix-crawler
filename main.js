@@ -1,7 +1,9 @@
 #!/usr/bin/env -S node --experimental-global-webcrypto
 
 import { logger } from "./util/logger.js";
+import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
+
 
 var crawler = null;
 
@@ -20,6 +22,8 @@ async function handleTerminate(signame) {
     logger.info("success: crawler done, exiting");
     process.exit(0);
   }
+
+  setExitOnRedisError(true);
 
   try {
     if (!crawler.interrupted) {

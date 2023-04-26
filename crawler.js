@@ -28,6 +28,7 @@ import { Browser } from "./util/browser.js";
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
+import { OriginOverride } from "./util/originoverride.js";
 
 // to ignore HTTPS error for HEAD check
 import { Agent as HTTPAgent } from "http";
@@ -332,17 +333,17 @@ export class Crawler {
     }
 
     switch (type) {
-    case "info":
-      behaviorLine = JSON.stringify(data);
-      if (behaviorLine != this._behaviorLastLine) {
-        logger.info(message, details, "behaviorScript");
-        this._behaviorLastLine = behaviorLine;
-      }
-      break;
+      case "info":
+        behaviorLine = JSON.stringify(data);
+        if (behaviorLine != this._behaviorLastLine) {
+          logger.info(message, details, "behaviorScript");
+          this._behaviorLastLine = behaviorLine;
+        }
+        break;
 
-    case "debug":
-    default:
-      logger.debug(message, details, "behaviorScript");
+      case "debug":
+      default:
+        logger.debug(message, details, "behaviorScript");
     }
   }
 
@@ -353,7 +354,7 @@ export class Crawler {
   }
 
   async setupPage({ page, cdp, workerid }) {
-    await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+    await this.browser.setupPage({ page, cdp });
 
     if (this.params.logging.includes("jserrors")) {
       page.on("console", (msg) => {
@@ -576,12 +577,10 @@ export class Crawler {
   async checkLimits() {
     let interrupt = false;
 
-    let dir;
-    let size;
-    if (this.params.sizeLimit || this.params.diskUtilization) {
-      dir = path.join(this.collDir, "archive");
-      size = await getDirSize(dir);
-    }
+    const dir = path.join(this.collDir, "archive");
+    const size = await getDirSize(dir);
+
+    await this.crawlState.setArchiveSize(size);
 
     if (this.params.sizeLimit) {
       if (size >= this.params.sizeLimit) {
@@ -656,8 +655,6 @@ export class Crawler {
   }
 
   async crawl() {
-    this.profileDir = await this.browser.loadProfile(this.params.profile);
-
     if (this.params.healthCheckPort) {
       this.healthChecker = new HealthChecker(this.params.healthCheckPort, this.params.workers);
     }
@@ -721,6 +718,10 @@ export class Crawler {
 
     this.screencaster = this.initScreenCaster();
 
+    if (this.params.originOverride) {
+      this.originOverride = new OriginOverride(this.params.originOverride);
+    }
+
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
       if (!await this.queueUrl(i, seed.url, 0, 0)) {
@@ -735,7 +736,7 @@ export class Crawler {
     }
 
     await this.browser.launch({
-      dataDir: this.profileDir,
+      profileUrl: this.params.profile,
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
       chromeOptions: {
@@ -919,12 +920,14 @@ export class Crawler {
     const realSize = await this.crawlState.queueSize();
     const pendingList = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
+    const failed = await this.crawlState.numFailed();
     const total = realSize + pendingList.length + done;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       "crawled": done,
       "total": total,
       "pending": pendingList.length,
+      "failed": failed,
       "limit": limit,
       "pendingPages": pendingList.map(x => JSON.stringify(x))
     };
@@ -975,6 +978,10 @@ export class Crawler {
 
     if (this.blockRules) {
       await this.blockRules.initPage(page);
+    }
+
+    if (this.originOverride) {
+      await this.originOverride.initPage(page);
     }
 
     let ignoreAbort = false;
@@ -1411,21 +1418,21 @@ export class Crawler {
 
   async serializeConfig(done = false) {
     switch (this.params.saveState) {
-    case "never":
-      return;
-
-    case "partial":
-      if (!done) {
+      case "never":
         return;
-      }
-      if (await this.crawlState.isFinished()) {
-        return;
-      }
-      break;
 
-    case "always":
-    default:
-      break;
+      case "partial":
+        if (!done) {
+          return;
+        }
+        if (await this.crawlState.isFinished()) {
+          return;
+        }
+        break;
+
+      case "always":
+      default:
+        break;
     }
 
     const now = new Date();
