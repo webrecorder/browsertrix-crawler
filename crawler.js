@@ -1080,7 +1080,7 @@ export class Crawler {
     await sleep(0.5);
 
     try {
-      await page.waitForLoadState("networkidle", {timeout: this.params.netIdleWait * 1000});
+      await page.waitForNetworkIdle({timeout: this.params.netIdleWait * 1000});
     } catch (e) {
       logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
@@ -1107,7 +1107,7 @@ export class Crawler {
     try {
       const linkResults = await Promise.allSettled(
         frames.map(frame => timedRun(
-          frame.evaluate(loadFunc, {selector: selector, extract: extract}),
+          frame.evaluate(loadFunc, selector, extract),
           PAGE_OP_TIMEOUT_SECS,
           "Link extraction timed out",
           logDetails,
@@ -1164,9 +1164,10 @@ export class Crawler {
     try {
       logger.debug("Check CF Blocking", logDetails);
 
-      const cloudflare = page.locator("div.cf-browser-verification.cf-im-under-attack");
-
-      while (await cloudflare.waitFor({timeout: PAGE_OP_TIMEOUT_SECS})) {
+      while (await timedRun(
+        page.$("div.cf-browser-verification.cf-im-under-attack"),
+        PAGE_OP_TIMEOUT_SECS
+      )) {
         logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
         await sleep(5.5);
       }

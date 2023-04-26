@@ -76,7 +76,7 @@ export class BlockRules
     page.on("request", async (request) => {
       const logDetails = {page: page.url()};
       try {
-        this.handleRequest(request, logDetails);
+        await this.handleRequest(request, logDetails);
       } catch (e) {
         logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }
@@ -233,7 +233,7 @@ export class AdBlockRules extends BlockRules
     page.on("request", async (request) => {
       const logDetails = {page: page.url()};
       try {
-        this.handleRequest(request, logDetails);
+        await this.handleRequest(request, logDetails);
       } catch (e) {
         logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }

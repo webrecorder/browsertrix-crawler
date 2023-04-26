@@ -53,7 +53,7 @@ class ArgParser {
       },
 
       "waitUntil": {
-        describe: "Playwright page.goto() condition to wait for before continuing",
+        describe: "Puppeteer page.goto() condition to wait for before continuing, can be multiple separated by ','",
         default: "load",
       },
 
@@ -209,7 +209,7 @@ class ArgParser {
       },
 
       "mobileDevice": {
-        describe: "Emulate mobile device by name from: https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/deviceDescriptorsSource.json",
+        describe: "Emulate mobile device by name from: https://github.com/puppeteer/puppeteer/blob/main/src/common/DeviceDescriptors.ts",
         type: "string",
       },
 
@@ -411,10 +411,17 @@ class ArgParser {
       logger.fatal(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
 
-    // waitUntil condition must be one of WAIT_UNTIL_OPTS: load, domcontentloaded, networkidle
-    // (see: https://playwright.dev/docs/api/class-page#page-goto-option-wait-until)
-    if (!WAIT_UNTIL_OPTS.includes(argv.waitUntil)) {
-      logger.fatal("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
+        // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
+    // can be multiple separate by comma
+    // (see: https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options)
+    if (typeof argv.waitUntil != "object"){
+      argv.waitUntil = argv.waitUntil.split(",");
+    }
+
+    for (const opt of argv.waitUntil) {
+      if (!WAIT_UNTIL_OPTS.includes(opt)) {
+        logger.fatal("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
+      }
     }
 
     // validate screenshot options
@@ -455,7 +462,7 @@ class ArgParser {
         logger.fatal("Unknown device: " + argv.mobileDevice);
       }
     } else {
-      argv.emulateDevice = {};
+      argv.emulateDevice = {viewport: null};
     }
 
     if (argv.seedFile) {
