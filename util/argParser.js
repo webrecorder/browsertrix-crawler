@@ -3,7 +3,8 @@ import fs from "fs";
 import os from "os";
 
 import yaml from "js-yaml";
-import { devices } from "playwright-core";
+//import { devices } from "playwright-core";
+import { KnownDevices as devices } from "puppeteer-core";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -373,12 +374,6 @@ class ArgParser {
         type: "boolean",
         default: false,
       },
-
-      "browserdriver": {
-        describe: "playwright, playwright-new-context, puppeteer",
-        type: "string",
-        default: "playwright"
-      },
     };
   }
 
@@ -459,11 +454,8 @@ class ArgParser {
       if (!argv.emulateDevice) {
         logger.fatal("Unknown device: " + argv.mobileDevice);
       }
-      if (argv.emulateDevice.defaultBrowserType !== "chromium") {
-        logger.fatal(`Device Browser: ${argv.emulateDevice.defaultBrowserType}\r\nSorry, only Chromium-based devices are supported at this time`);
-      }
     } else {
-      argv.emulateDevice = {viewport: null};
+      argv.emulateDevice = {};
     }
 
     if (argv.seedFile) {

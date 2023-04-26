@@ -12,16 +12,18 @@ export class OriginOverride
     });
   }
 
-  initPage(page) {
+  async initPage(page) {
     for (const {orig, dest} of this.originOverride) {
       const logDetails = {page: page.url(), orig, dest};
 
       logger.debug(`Adding override ${orig} => ${dest}`);
 
-      page.route(orig + "/**", async (route) => {
+      page.on("request", async (request) => {
         try {
-          const request = route.request();
           const url = request.url();
+          if (!url.startsWith(orig)) {
+            request.continue({}, -1);
+          }
 
           const newUrl = dest + url.slice(orig.length);
           const resp = await fetch(newUrl, {headers: request.headers()});
@@ -32,7 +34,7 @@ export class OriginOverride
 
           logger.debug("Origin overridden", {orig: url, dest: newUrl, status, body: body.length}, "originoverride");
 
-          route.fulfill({body, headers, status});
+          request.respond({body, headers, status}, -1);
 
         } catch (e) {
           logger.warn("Error overriding origin", {...errJSON(e), ...logDetails}, "originoverride");

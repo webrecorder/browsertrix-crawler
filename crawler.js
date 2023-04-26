@@ -22,7 +22,7 @@ import { logger, errJSON } from "./util/logger.js";
 import { runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 
-import { PersistentContextBrowser, PuppeteerPersistentContextBrowser, NewContextBrowser } from "./util/browser.js";
+import { Browser } from "./util/browser.js";
 
 import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
@@ -96,10 +96,6 @@ export class Crawler {
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
     this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
 
-    //if (this.params.browserdriver === "puppeteer" && this.params.waitUntil === "load") {
-    //this.params.waitUntil = ["load", "networkidle0"];
-    //}
-
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
       timeout: this.params.pageLoadTimeout * 1000
@@ -124,21 +120,7 @@ export class Crawler {
 
     this.behaviorLastLine = null;
 
-    switch (this.params.browserdriver) {
-    case "playwright-new-context":
-      this.browser = new NewContextBrowser();
-      break;
-
-    case "puppeteer":
-      this.browser = new PuppeteerPersistentContextBrowser();
-      break;
-
-    case "playwright":
-    default:
-      this.browser = new PersistentContextBrowser();
-    }
-
-    logger.info("Browser Driver: " + this.browser.constructor.name);
+    this.browser = new Browser();
   }
 
   configureUA() {
@@ -373,16 +355,21 @@ export class Crawler {
   async setupPage({page, cdp, workerid}) {
     await this.browser.setupPage({page, cdp});
 
-    if (this.adBlockRules && this.params.blockAds) {
-      await this.adBlockRules.initPage(page, cdp, this.browser);
-    }
+    if ((this.adBlockRules && this.params.blockAds) ||
+        this.blockRules || this.originOverride) {
+      await page.setRequestInterception(true);
 
-    if (this.blockRules) {
-      await this.blockRules.initPage(page, cdp, this.browser);
-    }
+      if (this.adBlockRules && this.params.blockAds) {
+        await this.adBlockRules.initPage(page);
+      }
 
-    if (this.originOverride) {
-      await this.originOverride.initPage(page);
+      if (this.blockRules) {
+        await this.blockRules.initPage(page);
+      }
+
+      if (this.originOverride) {
+        await this.originOverride.initPage(page);
+      }
     }
 
     if (this.params.logging.includes("jserrors")) {

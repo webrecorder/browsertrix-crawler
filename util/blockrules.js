@@ -68,30 +68,22 @@ export class BlockRules
     }
   }
 
-  async initPage(page, cdp, browser) {
+  async initPage(page) {
     if (!this.rules.length) {
       return;
     }
 
-    if (page._btrix_interceptionAdded) {
-      return true;
-    }
-
-    page._btrix_interceptionAdded = true;
-
-    //await page.route("**/*", (route) => {
-    await browser.addIntercept(cdp, (route) => {
+    page.on("request", async (request) => {
       const logDetails = {page: page.url()};
       try {
-        this.handleRequest(route, logDetails);
+        this.handleRequest(request, logDetails);
       } catch (e) {
         logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }
     });
   }
 
-  async handleRequest(route, logDetails) {
-    const request = route.request();
+  async handleRequest(request, logDetails) {
     const url = request.url();
 
     let blockState;
@@ -100,9 +92,9 @@ export class BlockRules
       blockState = await this.shouldBlock(request, url, logDetails);
 
       if (blockState === BlockState.ALLOW) {
-        await route.continue();
+        await request.continue({}, 1);
       } else {
-        await route.abort("BlockedByClient");
+        await request.abort("blockedbyclient", 1);
       }
 
     } catch (e) {
@@ -117,29 +109,29 @@ export class BlockRules
 
     const isNavReq = request.isNavigationRequest();
 
-    //const frame = request.frame();
+    const frame = request.frame();
 
     let frameUrl = "";
     let blockState;
 
     if (isNavReq) {
-      //const parentFrame = frame.parentFrame();
-      //if (parentFrame) {
-      //frameUrl = parentFrame.url();
-      //blockState = BlockState.BLOCK_IFRAME_NAV;
-      //} else {
-      //frameUrl = frame.url();
-      blockState = BlockState.BLOCK_PAGE_NAV;
-      //}
+      const parentFrame = frame.parentFrame();
+      if (parentFrame) {
+        frameUrl = parentFrame.url();
+        blockState = BlockState.BLOCK_IFRAME_NAV;
+      } else {
+        frameUrl = frame.url();
+        blockState = BlockState.BLOCK_PAGE_NAV;
+      }
     } else {
-      //frameUrl = frame ? frame.url() : "";
+      frameUrl = frame ? frame.url() : "";
       blockState = BlockState.BLOCK_OTHER;
     }
 
     // ignore initial page
-    // if (frameUrl === "about:blank") {
-    //   return BlockState.ALLOW;
-    // }
+    if (frameUrl === "about:blank") {
+      return BlockState.ALLOW;
+    }
 
     // always allow special pywb proxy script
     for (const allowUrl of ALWAYS_ALLOW) {
@@ -149,14 +141,14 @@ export class BlockRules
     }
 
     for (const rule of this.rules) {
-      const {done, block} = await this.ruleCheck(rule, request, url, isNavReq, logDetails);
+      const {done, block} = await this.ruleCheck(rule, request, url, frameUrl, isNavReq, logDetails);
 
       if (block) {
         if (blockState === BlockState.BLOCK_PAGE_NAV) {
           logger.warn("Block rule match for page request ignored, set --exclude to block full pages", {url, ...logDetails}, "blocking");
           return BlockState.ALLOW;
         }
-        logger.debug("URL Blocked in iframe", {url, ...logDetails}, "blocking");
+        logger.debug("URL Blocked in iframe", {url, frameUrl, ...logDetails}, "blocking");
         await this.recordBlockMsg(url);
         return blockState;
       }
@@ -168,17 +160,15 @@ export class BlockRules
     return BlockState.ALLOW;
   }
 
-  async ruleCheck(rule, request, reqUrl, isNavReq, logDetails) {
+  async ruleCheck(rule, request, reqUrl, frameUrl, isNavReq, logDetails) {
     const {url, inFrameUrl, frameTextMatch} = rule;
-    let frameUrl = "";
 
     const type = rule.type || "block";
     const allowOnly = (type === "allowOnly");
 
     // not a frame match, skip rule
-    if (inFrameUrl) {
-      //!frameUrl.match(inFrameUrl)
-      //return {block: false, done: false};
+    if (inFrameUrl && !frameUrl.match(inFrameUrl)) {
+      return {block: false, done: false};
     }
 
     const urlMatched = (url && reqUrl.match(url));
@@ -239,18 +229,11 @@ export class AdBlockRules extends BlockRules
     this.adhosts = JSON.parse(fs.readFileSync(new URL(adhostsFilePath, import.meta.url)));
   }
 
-  async initPage(page, cdp, browser) {
-    if (page._btrix_adInterceptionAdded) {
-      return true;
-    }
-
-    page._btrix_adInterceptionAdded = true;
-
-    //await page.route("**/*", (route) => {
-    await browser.addIntercept(cdp, (route) => {
+  async initPage(page) {
+    page.on("request", async (request) => {
       const logDetails = {page: page.url()};
       try {
-        this.handleRequest(route, logDetails);
+        this.handleRequest(request, logDetails);
       } catch (e) {
         logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }

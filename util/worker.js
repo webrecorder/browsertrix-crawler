@@ -88,12 +88,6 @@ export class PageWorker
       logger.debug("Reusing page", {reuseCount: this.reuseCount}, "worker");
       return this.opts;
     } else if (this.page) {
-      try {
-        this.storageState = await this.page.context().storageState();
-      } catch (e) {
-        this.storageState = null;
-      }
-
       await this.closePage();
     }
     
@@ -104,7 +98,7 @@ export class PageWorker
       try {
         logger.debug("Getting page in new window", {workerid}, "worker");
         const { page, cdp } = await timedRun(
-          this.crawler.browser.newWindowPageWithCDP(this.storageState),
+          this.crawler.browser.newWindowPageWithCDP(),
           NEW_WINDOW_TIMEOUT,
           "New Window Timed Out",
           {workerid},

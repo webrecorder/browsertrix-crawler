@@ -9,19 +9,19 @@ import path from "path";
 import { logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
-import { chromium } from "playwright-core";
 import puppeteer from "puppeteer-core";
 
 
 // ==================================================================
-export class Browser
+export class BaseBrowser
 {
   constructor() {
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
     this.customProfile = false;
+    this.emulateDevice = null;
   }
 
-  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {viewport: null}} = {}) {
+  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}} = {}) {
     if (this.isLaunched()) {
       return;
     }
@@ -30,10 +30,11 @@ export class Browser
       this.customProfile = await this.loadProfile(profileUrl);
     }
 
+    this.emulateDevice = emulateDevice;
+
     const args = this.chromeArgs(chromeOptions);
 
     const launchOpts = {
-      ...emulateDevice,
       args,
       headless,
       executablePath: this.getBrowserExe(),
@@ -42,7 +43,10 @@ export class Browser
       handleSIGHUP: signals,
       handleSIGINT: signals,
       handleSIGTERM: signals,
-      serviceWorkers: "allow"
+
+      defaultViewport: null,
+      waitForInitialPage: false,
+      userDataDir: this.profileDir
     };
 
     await this._init(launchOpts);
@@ -178,274 +182,22 @@ export class Browser
 
     return result.value;
   }
-
-  async addIntercept(cdp, handler) {
-    await cdp.send("Fetch.enable", {"patterns": [{"requestStage": "Request", "urlPattern": "*"}]});
-
-    await cdp.on("Fetch.requestPaused", (resp) => {
-      const route = new Route(cdp, resp);
-      // console.log("*** intercepted: " + resp.request.url);
-      handler(route);
-    });
-  }
 }
 
 
 // ==================================================================
-class Route
-{
-  constructor(cdp, resp) {
-    this.cdp = cdp;
-    this.resp = resp;
-    this.requestId = resp.requestId;
-  }
-
-  abort(reason) {
-    //console.log("abort: " + this.resp.request.url);
-    return this.cdp.send("Fetch.failRequest", {requestId: this.requestId, errorReason: reason});
-  }
-
-  continue() {
-    //console.log("continued: " + this.resp.request.url);
-    return this.cdp.send("Fetch.continueResponse", {requestId: this.requestId});
-  }
-
-  request() {
-    return new Request(this.resp.request.url, this.resp.resourceType === "Document");
-  }
-}
-
-
-// ==================================================================
-class Request
-{
-  constructor(url, isNav) {
-    this._url = url;
-    this._isNav = isNav;
-  }
-
-  url() {
-    return this._url;
-  }
-
-  isNavigationRequest() {
-    return this._isNav;
-  }
-
-  frame() {
-    return null;
-  }
-}
-
-
-// ==================================================================
-export class PlaywrightBrowser extends Browser
-{
-  addInitScript(page, script) {
-    return page.addInitScript(script);
-  }
-
-  async responseHeader(resp, header) {
-    return await resp.headerValue(header);
-  }
-
-  async evaluateWithCLI(page, frame, cdp, funcString, logData, contextName) {
-
-    if (frame !== page.mainFrame()) {
-      const context = page.context();
-      cdp = await context.newCDPSession(frame);
-    }
-
-    console.log("is top", frame === page.mainFrame());
-    
-    const res = await this.evaluateWithCLI_(cdp, frame, undefined, funcString, logData, contextName);
-
-    if (frame !== page.mainFrame()) {
-      try {
-        await cdp.detach();
-      } catch (e) {
-        logger.warn("Detach failed", logData, contextName);
-      }
-    }
-
-    return res;
-  }
-}
-
-
-// ==================================================================
-export class NewContextBrowser extends PlaywrightBrowser
-{
-  constructor() {
-    super();
-    this.browser = null;
-    this.contexts = new Map();
-
-    this.launchOpts = null;
-  }
-
-  isLaunched() {
-    if (this.browser) {
-      logger.warn("Browser already inited", {}, "browser");
-      return true;
-    }
-
-    return false;
-  }
-
-  async close() {
-    for (const context of this.contexts.values()) {
-      await context.close();
-    }
-    this.contexts.clear();
-
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-    }
-  }
-
-  async closePage(page) {
-    try {
-      await page.close();
-    } catch (e) {
-      // ignore
-    }
-
-    const context = this.contexts.get(page);
-    if (context) {
-      await context.close();
-      this.contexts.delete(page);
-    }
-  }
-
-  async _init(launchOpts) {
-    if (this.customProfile) {
-      throw new Error("not supported yet");
-    }
-    
-    this.browser = await chromium.launch(launchOpts);
-    this.launchOpts = launchOpts;
-  }
-
-  numPages() {
-    return this.contexts.length;
-  }
-
-  async newWindowPageWithCDP(storageState) {
-    const context = await this.browser.newContext({...this.launchOpts, storageState});
-
-    const page = await context.newPage();
-
-    const cdp = await context.newCDPSession(page);
-
-    this.contexts.set(page, context);
-
-    return {page, cdp};
-  }
-}
-
-
-// ==================================================================
-export class PersistentContextBrowser extends PlaywrightBrowser
-{
-  constructor() {
-    super();
-    this.context = null;
-
-    this.firstPage = null;
-    this.firstCDP = null;
-  }
-
-  async getFirstPageWithCDP() {
-    return {page: this.firstPage, cdp: this.firstCDP};
-  }
-
-  isLaunched() {
-    if (this.context) {
-      logger.warn("Context already inited", {}, "context");
-      return true;
-    }
-
-    return false;
-  }
-
-  async close() {
-    if (this.context) {
-      await this.context.close();
-      this.context = null;
-    }
-  }
-
-  async closePage(page) {
-    await page.close();
-  }
-
-  async _init(launchOpts) {
-    this.context = await chromium.launchPersistentContext(this.profileDir, launchOpts);
-
-    await this._initFirst();
-  }
-
-  async _initFirst() {
-    if (this.context.pages().length) {
-      this.firstPage = this.context.pages()[0];
-    } else {
-      this.firstPage = await this.context.newPage();
-    }
-    this.firstCDP = await this.context.newCDPSession(this.firstPage);
-  }
-
-  numPages() {
-    return this.context ? this.context.pages().length : 0;
-  }
-
-  async newWindowPageWithCDP() {
-    // unique url to detect new pages
-    const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
-
-    const p = new Promise((resolve) => {
-      const listener = (page) => {
-        if (page.url() === startPage) {
-          resolve(page);
-          this.context.removeListener("page", listener);
-        }
-      };
-
-      this.context.on("page", listener);
-    });
-
-    try {
-      await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
-    } catch (e) {
-      await this._initFirst();
-
-      await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
-    }
-
-    const page = await p;
-
-    const cdp = await this.context.newCDPSession(page);
-
-    return {page, cdp};
-  }
-}
-
-
-// ==================================================================
-export class PuppeteerPersistentContextBrowser extends Browser
+export class Browser extends BaseBrowser
 {
   constructor() {
     super();
     this.browser = null;
 
     this.firstCDP = null;
-    this.firstPage = null;
   }
 
-  async getFirstPageWithCDP() {
-    return {page: this.firstPage, cdp: this.firstCDP};
-  }
+  //async getFirstPageWithCDP() {
+  //  return {page: this.firstPage, cdp: this.firstCDP};
+  //}
 
   isLaunched() {
     if (this.browser) {
@@ -472,18 +224,11 @@ export class PuppeteerPersistentContextBrowser extends Browser
   }
 
   async _init(launchOpts) {
-    launchOpts = {...launchOpts,
-      defaultViewport: null,
-      waitForInitialPage: false,
-      userDataDir: this.profileDir
-    };
-
     this.browser = await puppeteer.launch(launchOpts);
 
     const target = this.browser.target();
 
     this.firstCDP = await target.createCDPSession();
-    this.firstPage = await target.page();
   }
 
   numPages() {
@@ -519,6 +264,16 @@ export class PuppeteerPersistentContextBrowser extends Browser
 
     const page = await target.page();
 
+    const device = this.emulateDevice;
+
+    if (device) {
+      if (device.viewport && device.userAgent) {
+        await page.emulate(device);
+      } else if (device.userAgent) {
+        await page.setUserAgent(device.userAgent);
+      }
+    }
+
     const cdp = await target.createCDPSession();
 
     return {page, cdp};
@@ -532,12 +287,20 @@ export class PuppeteerPersistentContextBrowser extends Browser
     const context = await frame.executionContext();
     cdp = context._client;
     const cdpContextId = context._contextId;
-    //const target = page.target();
-    //const cdp = await target.createCDPSession();
     return await this.evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName);
+  }
+
+  async getCookies(page) {
+    return await page.cookies();
+  }
+
+  async setCookies(page, cookies) {
+    return await page.setCookie(...cookies);
   }
 }
 
+
+// ==================================================================
 export const defaultArgs = [
   "--disable-field-trial-config", // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
   "--disable-background-networking",
