@@ -158,10 +158,8 @@ async function main() {
 
   const browser = new Browser();
 
-  const profileDir = await browser.loadProfile(params.profile);
-
   await browser.launch({
-    dataDir: profileDir,
+    profileUrl: params.profile,
     headless: params.headless,
     signals: true,
     chromeOptions: {
@@ -191,18 +189,17 @@ async function main() {
     params.password = await promptInput("Enter password: ", true);
   }
 
-  const { page, cdp } = await browser.getFirstPageWithCDP();
+  const { page, cdp } = await browser.newWindowPageWithCDP();
 
-  const waitUntil =  "load";
+  const waitUntil = "load";
 
-  //await page.setCacheEnabled(false);
-  await cdp.send("Network.setCacheDisabled", {cacheDisabled: true});
+  await page.setCacheEnabled(false);
 
   if (!params.automated) {
     await browser.setupPage({page, cdp});
 
     // for testing, inject browsertrix-behaviors
-    await page.addInitScript(behaviors + ";\nself.__bx_behaviors.init();");
+    await browser.addInitScript(page, behaviors + ";\nself.__bx_behaviors.init();");
   }
 
   logger.info(`Loading page: ${params.url}`);
@@ -384,7 +381,7 @@ class InteractiveBrowser {
         return;
       }
 
-      const cookies = await this.browser.context.cookies(url);
+      const cookies = await this.browser.getCookies(this.page, url);
       for (const cookie of cookies) {
         cookie.expires = (new Date().getTime() / 1000) + this.params.cookieDays * 86400;
         delete cookie.size;
@@ -396,7 +393,7 @@ class InteractiveBrowser {
           cookie.url = url;
         }
       }
-      await this.browser.context.addCookies(cookies);
+      await this.browser.setCookies(this.page, cookies);
     } catch (e) {
       logger.error("Save Cookie Error: ", e);
     }

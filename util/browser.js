@@ -9,36 +9,32 @@ import path from "path";
 import { logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
-import { chromium } from "playwright-core";
+import puppeteer from "puppeteer-core";
 
 
 // ==================================================================
-export class Browser
+export class BaseBrowser
 {
   constructor() {
-    this.context = null;
-
-    this.firstPage = null;
-    this.firstCDP = null;
-
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
     this.customProfile = false;
+    this.emulateDevice = null;
   }
 
-  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {viewport: null}} = {}) {
-    if (this.context) {
-      logger.warn("Context already inited", {}, "context");
-      return this.context;
+  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}} = {}) {
+    if (this.isLaunched()) {
+      return;
     }
 
     if (profileUrl) {
       this.customProfile = await this.loadProfile(profileUrl);
     }
 
+    this.emulateDevice = emulateDevice;
+
     const args = this.chromeArgs(chromeOptions);
 
     const launchOpts = {
-      ...emulateDevice,
       args,
       headless,
       executablePath: this.getBrowserExe(),
@@ -47,68 +43,23 @@ export class Browser
       handleSIGHUP: signals,
       handleSIGINT: signals,
       handleSIGTERM: signals,
-      serviceWorkers: "allow"
+
+      defaultViewport: null,
+      waitForInitialPage: false,
+      userDataDir: this.profileDir
     };
 
-    this.context = await chromium.launchPersistentContext(this.profileDir, launchOpts);
-
-    if (this.context.pages()) {
-      this.firstPage = this.context.pages()[0];
-    } else {
-      this.firstPage = await this.context.newPage();
-    }
-    this.firstCDP = await this.context.newCDPSession(this.firstPage);
-
-    return this.context;
-  }
-
-  async close() {
-    if (this.context) {
-      await this.context.close();
-      this.context = null;
-    }
+    await this._init(launchOpts);
   }
 
   async setupPage({page, cdp}) {
-    await page.addInitScript("Object.defineProperty(navigator, \"webdriver\", {value: false});");
+    await this.addInitScript(page, "Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
     if (this.customProfile) {
       logger.info("Disabling Service Workers for profile", {}, "browser");
 
       await cdp.send("Network.setBypassServiceWorker", {bypass: true});
     }
-  }
-
-  async getFirstPageWithCDP() {
-    return {page: this.firstPage, cdp: this.firstCDP};
-  }
-
-  numPages() {
-    return this.context ? this.context.pages().length : 0;
-  }
-
-  async newWindowPageWithCDP() {
-    // unique url to detect new pages
-    const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
-
-    const p = new Promise((resolve) => {
-      const listener = (page) => {
-        if (page.url() === startPage) {
-          resolve(page);
-          this.context.removeListener("page", listener);
-        }
-      };
-
-      this.context.on("page", listener);
-    });
-
-    await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
-
-    const page = await p;
-
-    const cdp = await this.context.newCDPSession(page);
-
-    return {page, cdp};
   }
 
   async loadProfile(profileFilename) {
@@ -157,6 +108,7 @@ export class Browser
   chromeArgs({proxy=true, userAgent=null, extraArgs=[]} = {}) {
     // Chrome Flags, including proxy server
     const args = [
+      ...defaultArgs,
       ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
       //"--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
       "--no-sandbox",
@@ -200,21 +152,19 @@ export class Browser
     return null;
   }
 
-  async evaluateWithCLI(context, frame, funcString, logData, contextName) {
+  async evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName) {
     let details = {frameUrl: frame.url(), ...logData};
 
     logger.info("Run Script Started", details, contextName);
 
-    const cdp = await context.newCDPSession(frame);
-
     // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
     //const contextId = context._contextId;
-    const expression = funcString + "\n//# sourceURL=__playwright_evaluation_script__";
+    const expression = funcString + "\n//# sourceURL=__evaluation_script__";
 
     const { exceptionDetails, result } = await cdp
       .send("Runtime.evaluate", {
         expression,
-        //contextId,
+        contextId: cdpContextId,
         returnByValue: true,
         awaitPromise: true,
         userGesture: true,
@@ -230,13 +180,164 @@ export class Browser
       logger.info("Run Script Finished", details, contextName);
     }
 
-    try {
-      await cdp.detach();
-    } catch (e) {
-      logger.warn("Detach failed", details, contextName);
-    }
-
     return result.value;
   }
 }
 
+
+// ==================================================================
+export class Browser extends BaseBrowser
+{
+  constructor() {
+    super();
+    this.browser = null;
+
+    this.firstCDP = null;
+  }
+
+  isLaunched() {
+    if (this.browser) {
+      logger.warn("Context already inited", {}, "browser");
+      return true;
+    }
+
+    return false;
+  }
+
+  async close() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
+  }
+
+  addInitScript(page, script) {
+    return page.evaluateOnNewDocument(script);
+  }
+
+  async _init(launchOpts) {
+    this.browser = await puppeteer.launch(launchOpts);
+
+    const target = this.browser.target();
+
+    this.firstCDP = await target.createCDPSession();
+  }
+
+  numPages() {
+    return this.browser ? this.browser.pages().length : 0;
+  }
+
+  async newWindowPageWithCDP() {
+    // unique url to detect new pages
+    const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
+
+    const p = new Promise((resolve) => {
+      const listener = (target) => {
+        if (target.url() === startPage) {
+          resolve(target);
+          this.browser.removeListener("targetcreated", listener);
+        }
+      };
+
+      this.browser.on("targetcreated", listener);
+    });
+
+    try {
+      await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+    } catch (e) {
+      const target = this.browser.target();
+
+      this.firstCDP = await target.createCDPSession();
+
+      await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
+    }
+
+    const target = await p;
+
+    const page = await target.page();
+
+    const device = this.emulateDevice;
+
+    if (device) {
+      if (device.viewport && device.userAgent) {
+        await page.emulate(device);
+      } else if (device.userAgent) {
+        await page.setUserAgent(device.userAgent);
+      }
+    }
+
+    const cdp = await target.createCDPSession();
+
+    return {page, cdp};
+  }
+
+  async responseHeader(resp, header) {
+    return await resp.headers()[header];
+  }
+
+  async evaluateWithCLI(_, frame, cdp, funcString, logData, contextName) {
+    const context = await frame.executionContext();
+    cdp = context._client;
+    const cdpContextId = context._contextId;
+    return await this.evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName);
+  }
+
+  interceptRequest(page, callback) {
+    page.on("request", callback);
+  }
+
+  async waitForNetworkIdle(page, params) {
+    return await page.waitForNetworkIdle(params);
+  }
+
+  async setViewport(page, params) {
+    await page.setViewport(params);
+  }
+
+  async getCookies(page) {
+    return await page.cookies();
+  }
+
+  async setCookies(page, cookies) {
+    return await page.setCookie(...cookies);
+  }
+}
+
+
+// ==================================================================
+// Default Chromium args from playwright
+export const defaultArgs = [
+  "--disable-field-trial-config", // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
+  "--disable-background-networking",
+  "--enable-features=NetworkService,NetworkServiceInProcess",
+  "--disable-background-timer-throttling",
+  "--disable-backgrounding-occluded-windows",
+  "--disable-back-forward-cache", // Avoids surprises like main request not being intercepted during page.goBack().
+  "--disable-breakpad",
+  "--disable-client-side-phishing-detection",
+  "--disable-component-extensions-with-background-pages",
+  "--disable-component-update", // Avoids unneeded network activity after startup.
+  "--no-default-browser-check",
+  "--disable-default-apps",
+  "--disable-dev-shm-usage",
+  "--disable-extensions",
+  // AvoidUnnecessaryBeforeUnloadCheckSync - https://github.com/microsoft/playwright/issues/14047
+  // Translate - https://github.com/microsoft/playwright/issues/16126
+  "--disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate",
+  "--allow-pre-commit-input",
+  "--disable-hang-monitor",
+  "--disable-ipc-flooding-protection",
+  "--disable-popup-blocking",
+  "--disable-prompt-on-repost",
+  "--disable-renderer-backgrounding",
+  "--disable-sync",
+  "--force-color-profile=srgb",
+  "--metrics-recording-only",
+  "--no-first-run",
+  "--enable-automation",
+  "--password-store=basic",
+  "--use-mock-keychain",
+  // See https://chromium-review.googlesource.com/c/chromium/src/+/2436773
+  "--no-service-autorun",
+  "--export-tagged-pdf"
+];
