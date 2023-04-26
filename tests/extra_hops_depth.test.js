@@ -29,7 +29,8 @@ test("check that URLs are crawled 2 extra hops beyond depth", async () => {
     "https://webrecorder.net/faq",
   ];
 
-  expect(expectedPages.length).toEqual(crawledPagesArray.length);
+  // first line is the header, not page, so adding -1
+  expect(expectedPages.length).toEqual(crawledPagesArray.length - 1);
 
   for (const page of crawledPagesArray) {
     const url = JSON.parse(page).url;

@@ -4,7 +4,7 @@ import fs from "fs";
 
 test("ensure custom driver with custom selector crawls JS files as pages", async () => {
   try {
-    child_process.execSync("docker run -v $PWD/tests/fixtures:/tests/fixtures -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://replayweb.page/ --collection custom-driver-1 --driver /tests/fixtures/driver-1.mjs");
+    child_process.execSync("docker run -v $PWD/tests/fixtures:/tests/fixtures -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --collection custom-driver-1 --driver /tests/fixtures/driver-1.mjs");
   }
   catch (error) {
     console.log(error);
@@ -24,8 +24,9 @@ test("ensure custom driver with custom selector crawls JS files as pages", async
   console.log(pages);
 
   const expectedPages = new Set([
-    "https://replayweb.page/",
-    "https://replayweb.page/ui.js"
+    "https://www.iana.org/",
+    "https://www.iana.org/_js/jquery.js",
+    "https://www.iana.org/_js/iana.js"
   ]);
 
   expect(pages).toEqual(expectedPages);
