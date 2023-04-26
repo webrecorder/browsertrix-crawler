@@ -1108,7 +1108,7 @@ export class Crawler {
     try {
       const linkResults = await Promise.allSettled(
         frames.map(frame => timedRun(
-          frame.evaluate(loadFunc, selector, extract),
+          frame.evaluate(loadFunc, {selector, extract}),
           PAGE_OP_TIMEOUT_SECS,
           "Link extraction timed out",
           logDetails,
