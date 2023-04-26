@@ -68,7 +68,7 @@ export class PageWorker
       }
 
       try {
-        await this.crawler.browser.closePage(this.page);
+        await this.page.close();
       } catch (e) {
         // ignore
       }

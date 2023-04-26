@@ -219,10 +219,6 @@ export class Browser extends BaseBrowser
     return page.evaluateOnNewDocument(script);
   }
 
-  async closePage(page) {
-    await page.close();
-  }
-
   async _init(launchOpts) {
     this.browser = await puppeteer.launch(launchOpts);
 

@@ -69,10 +69,6 @@ export class BlockRules
   }
 
   async initPage(page) {
-    if (!this.rules.length) {
-      return;
-    }
-
     page.on("request", async (request) => {
       const logDetails = {page: page.url()};
       try {
