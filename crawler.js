@@ -1108,7 +1108,7 @@ export class Crawler {
     try {
       const linkResults = await Promise.allSettled(
         frames.map(frame => timedRun(
-          this.browser.evaluateFrame(frame, loadFunc, selector, extract),
+          frame.evaluate(loadFunc, selector, extract),
           PAGE_OP_TIMEOUT_SECS,
           "Link extraction timed out",
           logDetails,
@@ -1166,7 +1166,7 @@ export class Crawler {
       logger.debug("Check CF Blocking", logDetails);
 
       while (await timedRun(
-        this.browser.lookForCloudflareCheck(page),
+        page.$("div.cf-browser-verification.cf-im-under-attack"),
         PAGE_OP_TIMEOUT_SECS
       )) {
         logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);

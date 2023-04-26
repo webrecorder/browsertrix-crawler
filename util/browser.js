@@ -294,14 +294,6 @@ export class Browser extends BaseBrowser
     return await page.waitForNetworkIdle(params);
   }
 
-  evaluateFrame(frame, loadFunc, selector, extract) {
-    return frame.evaluate(loadFunc, selector, extract);
-  }
-
-  lookForCloudflareCheck(page) {
-    return page.$("div.cf-browser-verification.cf-im-under-attack");
-  }
-
   async setViewport(page, params) {
     await page.setViewport(params);
   }
