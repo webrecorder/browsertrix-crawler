@@ -26,27 +26,27 @@ function doesCDXContain(coll, value) {
 
 test("test crawl without block for specific URL", () => {
   const config = {
-    "url": "https://www.iana.org/",
+    "url": "https://www.webrecorder.net/",
   };
 
   runCrawl("block-1-no-block", config);
 
   // without blocks, URL with add sense is included
-  expect(doesCDXContain("block-1-no-block", "https://cse.google.com/adsense/search/async-ads.js")).toBe(true);
+  expect(doesCDXContain("block-1-no-block", "https://webrecorder.net/assets/main.css")).toBe(true);
 });
 
 
 test("test block rule on specific URL", () => {
   const config = {
-    "url": "https://www.iana.org/",
+    "url": "https://www.webrecorder.net/",
     "blockRules": [
-      {"url": "adsense"}
+      {"url": "main.css"}
     ]
   };
 
   runCrawl("block-1", config);
 
-  expect(doesCDXContain("block-1", "https://cse.google.com/adsense/search/async-ads.js")).toBe(false);
+  expect(doesCDXContain("block-1", "https://webrecorder.net/assets/main.css")).toBe(false);
 });
 
 test("test block rule based on iframe text, content included due to match", () => {

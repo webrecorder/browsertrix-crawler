@@ -361,15 +361,15 @@ export class Crawler {
       await page.setRequestInterception(true);
 
       if (this.adBlockRules && this.params.blockAds) {
-        await this.adBlockRules.initPage(page);
+        await this.adBlockRules.initPage(this.browser, page);
       }
 
       if (this.blockRules) {
-        await this.blockRules.initPage(page);
+        await this.blockRules.initPage(this.browser, page);
       }
 
       if (this.originOverride) {
-        await this.originOverride.initPage(page);
+        await this.originOverride.initPage(this.browser, page);
       }
     }
 
@@ -422,7 +422,7 @@ export class Crawler {
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
       const archiveDir = path.join(this.collDir, "archive");
-      const screenshots = new Screenshots({page, url, directory: archiveDir});
+      const screenshots = new Screenshots({browser: this.browser, page, url, directory: archiveDir});
       if (this.params.screenshot.includes("view")) {
         await screenshots.take();
       }
@@ -1081,7 +1081,7 @@ export class Crawler {
     await sleep(0.5);
 
     try {
-      await page.waitForNetworkIdle({timeout: this.params.netIdleWait * 1000});
+      await this.browser.waitForNetworkIdle(page, {timeout: this.params.netIdleWait * 1000});
     } catch (e) {
       logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
@@ -1108,7 +1108,7 @@ export class Crawler {
     try {
       const linkResults = await Promise.allSettled(
         frames.map(frame => timedRun(
-          frame.evaluate(loadFunc, selector, extract),
+          this.browser.evaluateFrame(frame, loadFunc, selector, extract),
           PAGE_OP_TIMEOUT_SECS,
           "Link extraction timed out",
           logDetails,
@@ -1166,7 +1166,7 @@ export class Crawler {
       logger.debug("Check CF Blocking", logDetails);
 
       while (await timedRun(
-        page.$("div.cf-browser-verification.cf-im-under-attack"),
+        this.browser.lookForCloudflareCheck(page),
         PAGE_OP_TIMEOUT_SECS
       )) {
         logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);

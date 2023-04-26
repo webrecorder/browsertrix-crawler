@@ -12,8 +12,8 @@ export class OriginOverride
     });
   }
 
-  async initPage(page) {
-    page.on("request", async (request) => {
+  async initPage(browser, page) {
+    const onRequest = async (request) => {
       try {
         const url = request.url();
 
@@ -45,6 +45,7 @@ export class OriginOverride
         logger.warn("Error overriding origin", {...errJSON(e), url: page.url()}, "originoverride");
         request.continue({}, -1);
       }
-    });
+    };
+    await browser.interceptRequest(page, onRequest);
   }
 }

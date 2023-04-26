@@ -68,15 +68,16 @@ export class BlockRules
     }
   }
 
-  async initPage(page) {
-    page.on("request", async (request) => {
+  async initPage(browser, page) {
+    const onRequest = async (request) => {
       const logDetails = {page: page.url()};
       try {
         await this.handleRequest(request, logDetails);
       } catch (e) {
         logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
       }
-    });
+    };
+    await browser.interceptRequest(page, onRequest);
   }
 
   async handleRequest(request, logDetails) {
@@ -223,17 +224,6 @@ export class AdBlockRules extends BlockRules
   constructor(blockPutUrl, blockErrMsg, adhostsFilePath = "../ad-hosts.json") {
     super([], blockPutUrl, blockErrMsg);
     this.adhosts = JSON.parse(fs.readFileSync(new URL(adhostsFilePath, import.meta.url)));
-  }
-
-  async initPage(page) {
-    page.on("request", async (request) => {
-      const logDetails = {page: page.url()};
-      try {
-        await this.handleRequest(request, logDetails);
-      } catch (e) {
-        logger.warn("Error handling request", {...errJSON(e), ...logDetails}, "blocking");
-      }
-    });
   }
 
   isAdUrl(url) {

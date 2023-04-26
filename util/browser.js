@@ -286,6 +286,26 @@ export class Browser extends BaseBrowser
     return await this.evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName);
   }
 
+  async interceptRequest(page, callback) {
+    page.on("request", callback);
+  }
+
+  async waitForNetworkIdle(page, params) {
+    return await page.waitForNetworkIdle(params);
+  }
+
+  async evaluateFrame(frame, loadFunc, selector, extract) {
+    return frame.evaluate(loadFunc, selector, extract);
+  }
+
+  async lookForCloudflareCheck(page) {
+    return page.$("div.cf-browser-verification.cf-im-under-attack");
+  }
+
+  async setViewport(page, params) {
+    await page.setViewport(params);
+  }
+
   async getCookies(page) {
     return await page.cookies();
   }
