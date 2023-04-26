@@ -54,7 +54,7 @@ class ArgParser {
 
       "waitUntil": {
         describe: "Puppeteer page.goto() condition to wait for before continuing, can be multiple separated by ','",
-        default: "load",
+        default: "load,networkidle2",
       },
 
       "depth": {
