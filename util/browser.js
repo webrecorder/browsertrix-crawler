@@ -286,7 +286,7 @@ export class Browser extends BaseBrowser
     return await this.evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName);
   }
 
-  async interceptRequest(page, callback) {
+  interceptRequest(page, callback) {
     page.on("request", callback);
   }
 
@@ -294,11 +294,11 @@ export class Browser extends BaseBrowser
     return await page.waitForNetworkIdle(params);
   }
 
-  async evaluateFrame(frame, loadFunc, selector, extract) {
+  evaluateFrame(frame, loadFunc, selector, extract) {
     return frame.evaluate(loadFunc, selector, extract);
   }
 
-  async lookForCloudflareCheck(page) {
+  lookForCloudflareCheck(page) {
     return page.$("div.cf-browser-verification.cf-im-under-attack");
   }
 
