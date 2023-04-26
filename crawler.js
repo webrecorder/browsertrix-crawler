@@ -926,7 +926,7 @@ export class Crawler {
     const { heapUsed, heapTotal } = memUsage;
     this.maxHeapUsed = Math.max(this.maxHeapUsed || 0, heapUsed);
     this.maxHeapTotal = Math.max(this.maxHeapTotal || 0, heapTotal);
-    logger.info("Memory", {maxHeapUsed: this.maxHeapUsed, maxHeapTotal: this.maxHeapTotal, ...memUsage}, "memory");
+    logger.debug("Memory", {maxHeapUsed: this.maxHeapUsed, maxHeapTotal: this.maxHeapTotal, ...memUsage}, "memory");
   }
 
   async writeStats(toFile=false) {
