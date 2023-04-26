@@ -195,10 +195,6 @@ export class Browser extends BaseBrowser
     this.firstCDP = null;
   }
 
-  //async getFirstPageWithCDP() {
-  //  return {page: this.firstPage, cdp: this.firstCDP};
-  //}
-
   isLaunched() {
     if (this.browser) {
       logger.warn("Context already inited", {}, "browser");
@@ -309,6 +305,7 @@ export class Browser extends BaseBrowser
 
 
 // ==================================================================
+// Default Chromium args from playwright
 export const defaultArgs = [
   "--disable-field-trial-config", // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
   "--disable-background-networking",

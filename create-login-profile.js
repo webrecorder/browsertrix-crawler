@@ -194,7 +194,6 @@ async function main() {
   const waitUntil = "load";
 
   await page.setCacheEnabled(false);
-  //await cdp.send("Network.setCacheDisabled", {cacheDisabled: true});
 
   if (!params.automated) {
     await browser.setupPage({page, cdp});

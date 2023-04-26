@@ -3,7 +3,6 @@ import fs from "fs";
 import os from "os";
 
 import yaml from "js-yaml";
-//import { devices } from "playwright-core";
 import { KnownDevices as devices } from "puppeteer-core";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
