@@ -3,7 +3,7 @@ import fs from "fs";
 import os from "os";
 
 import yaml from "js-yaml";
-import { devices } from "playwright-core";
+import { KnownDevices as devices } from "puppeteer-core";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -52,8 +52,8 @@ class ArgParser {
       },
 
       "waitUntil": {
-        describe: "Playwright page.goto() condition to wait for before continuing",
-        default: "load",
+        describe: "Puppeteer page.goto() condition to wait for before continuing, can be multiple separated by ','",
+        default: "load,networkidle2",
       },
 
       "depth": {
@@ -208,7 +208,7 @@ class ArgParser {
       },
 
       "mobileDevice": {
-        describe: "Emulate mobile device by name from: https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/deviceDescriptorsSource.json",
+        describe: "Emulate mobile device by name from: https://github.com/puppeteer/puppeteer/blob/main/src/common/DeviceDescriptors.ts",
         type: "string",
       },
 
@@ -369,7 +369,7 @@ class ArgParser {
       },
 
       "logErrorsToRedis": {
-        descripe: "If set, write error messages to redis",
+        describe: "If set, write error messages to redis",
         type: "boolean",
         default: false,
       },
@@ -416,10 +416,17 @@ class ArgParser {
       logger.fatal(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
 
-    // waitUntil condition must be one of WAIT_UNTIL_OPTS: load, domcontentloaded, networkidle
-    // (see: https://playwright.dev/docs/api/class-page#page-goto-option-wait-until)
-    if (!WAIT_UNTIL_OPTS.includes(argv.waitUntil)) {
-      logger.fatal("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
+    // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
+    // can be multiple separate by comma
+    // (see: https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options)
+    if (typeof argv.waitUntil != "object"){
+      argv.waitUntil = argv.waitUntil.split(",");
+    }
+
+    for (const opt of argv.waitUntil) {
+      if (!WAIT_UNTIL_OPTS.includes(opt)) {
+        logger.fatal("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
+      }
     }
 
     // validate screenshot options
@@ -458,9 +465,6 @@ class ArgParser {
       argv.emulateDevice = devices[argv.mobileDevice.replace("-", " ")];
       if (!argv.emulateDevice) {
         logger.fatal("Unknown device: " + argv.mobileDevice);
-      }
-      if (argv.emulateDevice.defaultBrowserType !== "chromium") {
-        logger.fatal(`Device Browser: ${argv.emulateDevice.defaultBrowserType}\r\nSorry, only Chromium-based devices are supported at this time`);
       }
     } else {
       argv.emulateDevice = {viewport: null};
