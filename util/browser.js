@@ -227,7 +227,7 @@ export class Browser extends BaseBrowser
     return this.browser ? this.browser.pages().length : 0;
   }
 
-  async newWindowPageWithCDP() {
+  async newWindowPageWithCDP(recorder) {
     // unique url to detect new pages
     const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
 
@@ -241,6 +241,11 @@ export class Browser extends BaseBrowser
 
       this.browser.on("targetcreated", listener);
     });
+
+    if (!this.firstUse) {
+      await recorder.onCreatePage({cdp: this.firstCDP, noNetwork: true});
+      this.firstUse = true;
+    }
 
     try {
       await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});

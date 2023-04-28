@@ -107,7 +107,7 @@ export class PageWorker
       try {
         logger.debug("Getting page in new window", {workerid}, "worker");
         const { page, cdp } = await timedRun(
-          this.crawler.browser.newWindowPageWithCDP(),
+          this.crawler.browser.newWindowPageWithCDP(this.recorder),
           NEW_WINDOW_TIMEOUT,
           "New Window Timed Out",
           {workerid},

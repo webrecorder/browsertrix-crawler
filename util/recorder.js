@@ -73,7 +73,7 @@ export class Recorder
     });
   }
 
-  async onCreatePage({cdp}) {
+  async onCreatePage({cdp, noNetwork=false}) {
     // Fetch
 
     cdp.on("Fetch.requestPaused", (params) => {
@@ -129,7 +129,10 @@ export class Recorder
     });
 
     await cdp.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
-    await cdp.send("Network.enable");
+
+    if (!noNetwork) {
+      await cdp.send("Network.enable");
+    }
   }
 
   handleResponseReceived(params) {
@@ -233,7 +236,7 @@ export class Recorder
       try {
         await cdp.send("Fetch.continueResponse", {requestId});
       } catch (e) {
-        //logger.warn("continueResponse failed", {url, ...errJSON(e), ...this.logDetails}, "recorder");
+        logger.warn("continueResponse failed", {url, ...errJSON(e), ...this.logDetails}, "recorder");
       }
     }
   }
@@ -241,7 +244,9 @@ export class Recorder
   async handleFetchResponse(params, cdp) {
     const { request } = params;
     const { url } = request;
-    const {networkId, requestId, responseErrorReason, responseStatusCode, responseHeaders} = params;
+    const {requestId, responseErrorReason, responseStatusCode, responseHeaders} = params;
+
+    const networkId = params.networkId || requestId;
 
     if (responseErrorReason) {
       logger.warn("Skipping failed response", {url, reason: responseErrorReason, ...this.logDetails}, "recorder");
