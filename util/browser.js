@@ -108,6 +108,7 @@ export class BaseBrowser
   chromeArgs({proxy=true, userAgent=null, extraArgs=[]} = {}) {
     // Chrome Flags, including proxy server
     const args = [
+      // eslint-disable-next-line no-use-before-define
       ...defaultArgs,
       ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
       //"--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)

@@ -331,7 +331,12 @@ export class Recorder
         body
       });
     } catch (e) {
-      logger.warn("Fulfill Failed", {url, ...this.logDetails, ...errJSON(e)}, "recorder");
+      const type = reqresp.type;
+      if (type === "Document") {
+        logger.debug("document not loaded in browser, possibly other URLs missing", {url, type: reqresp.resourceType}, "recorder");
+      } else {
+        logger.debug("URL not loaded in browser", {url, type: reqresp.resourceType}, "recorder");
+      }
     }
 
     return true;
