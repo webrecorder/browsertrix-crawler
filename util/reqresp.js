@@ -74,6 +74,8 @@ export class RequestResponseInfo
 
     this.fetch = true;
     this.resourceType = params.resourceType;
+
+    this.frameId = params.frameId;
   }
 
   fillResponse(response) {

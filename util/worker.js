@@ -61,6 +61,8 @@ export class PageWorker
     this.crashBreak = null;
 
     this.recorder = new Recorder({workerid: id, collDir, crawler: this.crawler});
+
+    this.crawler.browser.recorders.push(this.recorder);
   }
 
   async closePage() {
@@ -107,7 +109,7 @@ export class PageWorker
       try {
         logger.debug("Getting page in new window", {workerid}, "worker");
         const { page, cdp } = await timedRun(
-          this.crawler.browser.newWindowPageWithCDP(this.recorder),
+          this.crawler.browser.newWindowPageWithCDP(),
           NEW_WINDOW_TIMEOUT,
           "New Window Timed Out",
           {workerid},

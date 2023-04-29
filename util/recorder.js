@@ -45,6 +45,9 @@ export class Recorder
     this.pendingRequests = null;
     this.skipIds = null;
 
+    this.swFrameIds = null;
+    this.swUrls = null;
+
     this.logDetails = {};
     this.skipping = false;
 
@@ -73,13 +76,15 @@ export class Recorder
     });
   }
 
-  async onCreatePage({cdp, noNetwork=false}) {
+  async onCreatePage({cdp}) {
     // Fetch
 
-    cdp.on("Fetch.requestPaused", (params) => {
+    cdp.on("Fetch.requestPaused", async (params) => {
       logNetwork("Fetch.requestPaused", {requestId: params.requestId, ...this.logDetails});
       this.handleRequestPaused(params, cdp);
     });
+
+    await cdp.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
 
     // Response
     cdp.on("Network.responseReceived", (params) => {
@@ -128,11 +133,18 @@ export class Recorder
       this.handleLoadingFailed(params);
     });
 
-    await cdp.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
+    await cdp.send("Network.enable");
 
-    if (!noNetwork) {
-      await cdp.send("Network.enable");
-    }
+    // Target
+
+    cdp.on("Target.attachedToTarget", async (params) => {
+      const { url, type } = params.targetInfo;
+      if (type === "service_worker") {
+        this.swUrls.add(url);
+      }
+    });
+
+    await cdp.send("Target.setAutoAttach", {autoAttach: true, waitForDebuggerOnStart: false, flatten: true});
   }
 
   handleResponseReceived(params) {
@@ -218,15 +230,15 @@ export class Recorder
     this.serializeToWARC(reqresp);
   }
 
-  async handleRequestPaused(params, cdp) {
-    const { requestId, request, responseStatusCode, responseErrorReason, resourceType } = params;
+  async handleRequestPaused(params, cdp, isSWorker = false) {
+    const { requestId, request, responseStatusCode, responseErrorReason, resourceType, networkId } = params;
     const { method, headers, url } = request;
 
     let continued = false;
 
     try {
-      if (responseStatusCode && !responseErrorReason && !this.shouldSkip(method, headers, resourceType)) {
-        continued = await this.handleFetchResponse(params, cdp);
+      if (responseStatusCode && !responseErrorReason && !this.shouldSkip(method, headers, resourceType) && !(isSWorker && networkId)) {
+        continued = await this.handleFetchResponse(params, cdp, isSWorker);
       }
     } catch (e) {
       logger.error("Error handling response, probably skipping URL", {url, ...errJSON(e), ...this.logDetails}, "recorder");
@@ -236,12 +248,12 @@ export class Recorder
       try {
         await cdp.send("Fetch.continueResponse", {requestId});
       } catch (e) {
-        logger.warn("continueResponse failed", {url, ...errJSON(e), ...this.logDetails}, "recorder");
+        logger.debug("continueResponse failed", {url, ...errJSON(e), ...this.logDetails}, "recorder");
       }
     }
   }
 
-  async handleFetchResponse(params, cdp) {
+  async handleFetchResponse(params, cdp, isSWorker) {
     const { request } = params;
     const { url } = request;
     const {requestId, responseErrorReason, responseStatusCode, responseHeaders} = params;
@@ -281,7 +293,7 @@ export class Recorder
     let streamingConsume = false;
 
     if (contentLen < 0 || contentLen > MAX_BROWSER_FETCH_SIZE) {
-      const opts = {tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId};
+      const opts = {tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId, cdp};
 
       // fetching using response stream, await here and then either call fulFill, or if not started, return false
       if (contentLen < 0) {
@@ -292,8 +304,15 @@ export class Recorder
         }
         streamingConsume = true;
       } else {
-        const fetcher = new AsyncFetcher(opts);
-        this.fetcherQ.add(() => fetcher.load());
+        let fetcher = null;
+
+        if (!isSWorker || reqresp.method !== "GET") {
+          fetcher = new AsyncFetcher(opts);
+          this.fetcherQ.add(() => fetcher.load());
+        } else {
+          fetcher = new NetworkLoadStreamSyncFetcher(opts);
+          await fetcher.load();
+        }
         return false;
       }
 
@@ -348,6 +367,8 @@ export class Recorder
     // if (this.pendingRequests && this.pendingRequests.size) {
     //   logger.warn("Interrupting timed out requests, moving to next page", this.logDetails, "recorder");
     // }
+    this.swFrameIds = new Set();
+    this.swUrls = new Set();
     this.pendingRequests = new Map();
     this.skipIds = new Set();
     this.skipping = false;
@@ -638,7 +659,7 @@ class AsyncFetcher extends StreamingBufferIO
   }
 
   async _doFetch() {
-    const { reqresp, crawlState } = this;
+    const { reqresp } = this;
     const { method, url } = reqresp;
     logger.debug("Async started: fetch", {url}, "recorder");
 
@@ -656,13 +677,47 @@ class AsyncFetcher extends StreamingBufferIO
 
     } else if (!resp.body) {
       logger.error("Empty body, stopping fetch", {url}, "recorder");
-      await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
+      await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
       return;
     }
 
     reqresp.fillFetchResponse(resp);
 
     return AsyncIterReader.fromReadable(resp.body.getReader());
+  }
+
+  async* takeStreamIter(cdp, stream, reqresp) {
+    //let responded = false;
+    const buffs = [];
+    let buffLength = 0;
+    let sizeExceeded = false;
+
+    const logDetails = this.logDetails;
+
+    try {
+      while (true) {
+        const {data, base64Encoded, eof} = await cdp.send("IO.read", {handle: stream});
+        const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
+        if (buffLength + buff.length < MAX_BROWSER_FETCH_SIZE) {
+          buffs.push(buff);
+          buffLength += buff.length;
+        } else {
+          sizeExceeded = true;
+        }
+
+        yield buff;
+
+        if (eof) {
+          break;
+        }
+      }
+
+      if (!sizeExceeded) {
+        reqresp.payload = concatChunks(buffs, buffLength);
+      }
+    } catch (e) {
+      logger.error("Error in takeStream", {...errJSON(e), url: reqresp.url, ...logDetails}, "recorder");
+    }
   }
 
   write(chunk) {
@@ -726,41 +781,55 @@ class ResponseStreamAsyncFetcher extends AsyncFetcher
 
     const { stream } = await cdp.send("Fetch.takeResponseBodyAsStream", {requestId});
 
-    const logDetails = this.logDetails;
+    return this.takeStreamIter(cdp, stream, reqresp);
+  }
+}
 
-    const buffs = [];
-    let buffLength = 0;
-    let sizeExceeded = false;
+// =================================================================
+class NetworkLoadStreamSyncFetcher extends AsyncFetcher
+{
+  constructor(opts) {
+    super(opts);
+    this.cdp = opts.cdp;
+  }
 
-    async function* takeStreamIter() {
-      //let responded = false;
-      try {
-        while (true) {
-          const {data, base64Encoded, eof} = await cdp.send("IO.read", {handle: stream});
-          const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
-          if (buffLength + buff.length < MAX_BROWSER_FETCH_SIZE) {
-            buffs.push(buff);
-            buffLength += buff.length;
-          } else {
-            sizeExceeded = true;
-          }
+  async _doFetch() {
+    const { reqresp, cdp } = this;
+    const { url } = reqresp;
+    logger.debug("Async started: loadNetworkResource", {url}, "recorder");
 
-          yield buff;
+    const options = {disableCache: false, includeCredentials: true};
 
-          if (eof) {
-            break;
-          }
-        }
+    let result = null;
 
-        if (!sizeExceeded) {
-          reqresp.payload = concatChunks(buffs, buffLength);
-        }
-      } catch (e) {
-        logger.error("Error in takeStream", {...errJSON(e), url, ...logDetails}, "recorder");
-      }
+    try {
+      result = await cdp.send("Network.loadNetworkResource", {frameId: reqresp.frameId, url, options});
+    } catch (e) {
+      logger.debug("Network.loadNetworkResource failed, attempting node fetch", {url}, "recorder");
+      return await super._doFetch();
     }
 
-    return takeStreamIter();
+    const { stream, headers, httpStatusCode } = result.resource;
+
+    if (reqresp.expectedSize < 0 && headers.get("content-length")) {
+      reqresp.expectedSize = Number(headers.get("content-length") || -1);
+    }
+
+    if (reqresp.expectedSize === 0) {
+      reqresp.payload = new Uint8Array();
+      return;
+
+    } else if (!stream) {
+      //logger.error("Empty body, stopping fetch", {url}, "recorder");
+      //await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
+      logger.debug("Network.loadNetworkResource failed, attempting node fetch", {url}, "recorder");
+      return await super._doFetch();
+    }
+
+    reqresp.status = httpStatusCode;
+    reqresp.responseHeaders = headers;
+
+    return this.takeStreamIter(cdp, stream, reqresp);
   }
 }
 

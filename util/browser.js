@@ -19,6 +19,8 @@ export class BaseBrowser
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
     this.customProfile = false;
     this.emulateDevice = null;
+
+    this.recorders = [];
   }
 
   async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}} = {}) {
@@ -222,13 +224,15 @@ export class Browser extends BaseBrowser
     const target = this.browser.target();
 
     this.firstCDP = await target.createCDPSession();
+
+    await this.serviceWorkerFetch();
   }
 
   numPages() {
     return this.browser ? this.browser.pages().length : 0;
   }
 
-  async newWindowPageWithCDP(recorder) {
+  async newWindowPageWithCDP() {
     // unique url to detect new pages
     const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
 
@@ -242,11 +246,6 @@ export class Browser extends BaseBrowser
 
       this.browser.on("targetcreated", listener);
     });
-
-    if (!this.firstUse) {
-      await recorder.onCreatePage({cdp: this.firstCDP, noNetwork: true});
-      this.firstUse = true;
-    }
 
     try {
       await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
@@ -275,6 +274,44 @@ export class Browser extends BaseBrowser
     const cdp = await target.createCDPSession();
 
     return {page, cdp};
+  }
+
+  async serviceWorkerFetch() {
+    this.firstCDP.on("Fetch.requestPaused", async (params) => {
+      const { frameId, requestId, networkId, request } = params;
+
+      if (networkId) {
+        try {
+          await this.firstCDP.send("Fetch.continueResponse", {requestId});
+        } catch (e) {
+          logger.warn("continueResponse failed", {url: request.url}, "recorder");
+        }
+        return;
+      }
+
+      let foundRecorder = null;
+
+      for (const recorder of this.recorders) {
+        if (recorder.swUrls && recorder.swFrameIds && recorder.swUrls.has(request.url)) {
+          //console.log(`*** found sw ${request.url} in recorder for worker ${recorder.workerid}`);
+          recorder.swFrameIds.add(frameId);
+        }
+
+        if (recorder.swFrameIds && recorder.swFrameIds.has(frameId)) {
+          foundRecorder = recorder;
+          break;
+        }
+      }
+
+      if (!foundRecorder) {
+        logger.warn("frame for SW not found, using first recorder", {url: request.url}, "recorder");
+        foundRecorder = this.recorders[0];
+      }
+
+      await foundRecorder.handleRequestPaused(params, this.firstCDP, true);
+    });
+
+    await this.firstCDP.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
   }
 
   async responseHeader(resp, header) {
