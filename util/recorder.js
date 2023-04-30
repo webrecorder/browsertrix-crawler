@@ -306,7 +306,7 @@ export class Recorder
       } else {
         let fetcher = null;
 
-        if (!isSWorker || reqresp.method !== "GET") {
+        if (isSWorker || reqresp.method !== "GET") {
           fetcher = new AsyncFetcher(opts);
           this.fetcherQ.add(() => fetcher.load());
         } else {
@@ -637,9 +637,9 @@ class AsyncFetcher extends StreamingBufferIO
         logger.debug("Async fetch: streaming done", {size: reqresp.readSize, expected: reqresp.expectedSize, networkId, url, ...this.logDetails}, "recorder");
         
       } else {
-        logger.warn("Async fetch: response size mismatch, skipping", {size: reqresp.readSize, expected: reqresp.expectedSize, url, ...this.logDetails}, "recorder");
-        await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
-        return fetched;
+        logger.warn("Async fetch: possible response size mismatch", {size: reqresp.readSize, expected: reqresp.expectedSize, url, ...this.logDetails}, "recorder");
+        //await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
+        //return fetched;
       }
 
       if (Object.keys(reqresp.extraOpts).length) {
@@ -667,7 +667,7 @@ class AsyncFetcher extends StreamingBufferIO
 
     const resp = await fetch(url, {method, headers, body: reqresp.postData || undefined});
 
-    if (reqresp.expectedSize < 0 && resp.headers.get("content-length")) {
+    if (reqresp.expectedSize < 0 && resp.headers.get("content-length") && !resp.headers.get("content-encoding")) {
       reqresp.expectedSize = Number(resp.headers.get("content-length") || -1);
     }
 
@@ -811,7 +811,7 @@ class NetworkLoadStreamSyncFetcher extends AsyncFetcher
 
     const { stream, headers, httpStatusCode } = result.resource;
 
-    if (reqresp.expectedSize < 0 && headers.get("content-length")) {
+    if (reqresp.expectedSize < 0 && headers.get("content-length") && !headers.get("content-encoding")) {
       reqresp.expectedSize = Number(headers.get("content-length") || -1);
     }
 
