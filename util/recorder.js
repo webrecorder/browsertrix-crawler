@@ -663,7 +663,7 @@ class AsyncFetcher extends StreamingBufferIO
     const { method, url } = reqresp;
     logger.debug("Async started: fetch", {url}, "recorder");
 
-    const { headers } = reqresp.getRequestHeadersDict();
+    const headers = reqresp.getRequestHeadersDict();
 
     const resp = await fetch(url, {method, headers, body: reqresp.postData || undefined});
 
@@ -841,8 +841,7 @@ function createResponse(reqresp, pageid, payload) {
   const statusline = `HTTP/1.1 ${reqresp.status} ${reqresp.statusText}`;
   const date = new Date().toISOString();
 
-  const { headersDict } = reqresp.getResponseHeadersDict(reqresp.payload ? reqresp.payload.length : null);
-  const httpHeaders = headersDict;
+  const httpHeaders = reqresp.getResponseHeadersDict(reqresp.payload ? reqresp.payload.length : null);
 
   const warcHeaders = {
     "WARC-Page-ID": pageid,
@@ -872,8 +871,7 @@ function createRequest(reqresp, responseRecord, pageid) {
 
   const requestBody = reqresp.postData ? [encoder.encode(reqresp.postData)] : [];
 
-  const { headersDict } = reqresp.getRequestHeadersDict();
-  const httpHeaders = headersDict;
+  const httpHeaders = reqresp.getRequestHeadersDict();
 
   const warcHeaders = {
     "WARC-Concurrent-To": responseRecord.warcHeader("WARC-Record-ID"),

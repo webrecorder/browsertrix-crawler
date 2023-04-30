@@ -159,8 +159,9 @@ export class RequestResponseInfo
       headersDict = {};
 
       for (const header of headersList) {
-        const headerName = header.name.toLowerCase();
+        let headerName = header.name.toLowerCase();
         if (EXCLUDE_HEADERS.includes(headerName)) {
+          headerName = "x-orig-" + headerName;
           continue;
         }
         if (actualContentLength && headerName === CONTENT_LENGTH) {
@@ -171,39 +172,29 @@ export class RequestResponseInfo
       }
     }
 
-    let headers = null;
-
     if (!headersDict) {
-      return {headers: new Headers(), headersDict: {}};
+      return {};
     }
 
-    try {
-      headers = new Headers(headersDict);
-    } catch (e) {
-      for (const key of Object.keys(headersDict)) {
-        if (key[0] === ":") {
-          delete headersDict[key];
-          continue;
-        }
-        const keyLower = key.toLowerCase();
-        if (EXCLUDE_HEADERS.includes(keyLower)) {
-          continue;
-        }
-        if (actualContentLength && keyLower === CONTENT_LENGTH) {
-          headersDict[key] = "" + actualContentLength;
-          continue;
-        }
-        headersDict[key] = headersDict[key].replace(/\n/g, ", ");
+    for (const key of Object.keys(headersDict)) {
+      if (key[0] === ":") {
+        delete headersDict[key];
+        continue;
       }
-      try {
-        headers = new Headers(headersDict);
-      } catch (e) {
-        console.warn(e);
-        headers = new Headers();
+      const keyLower = key.toLowerCase();
+      if (EXCLUDE_HEADERS.includes(keyLower)) {
+        headersDict["x-orig-" + key] = headersDict[key];
+        delete headersDict[key];
+        continue;
       }
+      if (actualContentLength && keyLower === CONTENT_LENGTH) {
+        headersDict[key] = "" + actualContentLength;
+        continue;
+      }
+      headersDict[key] = headersDict[key].replace(/\n/g, ", ");
     }
 
-    return {headers, headersDict};
+    return headersDict;
   }
 
   isValidBinary() {
@@ -213,7 +204,7 @@ export class RequestResponseInfo
 
     const length = this.payload.length;
 
-    const { headers } = this.getResponseHeadersDict();
+    const headers = new Headers(this.getResponseHeadersDict());
     const contentType = headers.get(CONTENT_TYPE);
     const contentLength = headers.get(CONTENT_LENGTH);
 
