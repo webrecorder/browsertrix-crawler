@@ -208,6 +208,14 @@ return 0;
     return await this.redis.hset(this.crawlSizeKey, this.uid, size);
   }
 
+  async isCrawlStopped() {
+    return await this.redis.get("crawl-stop") === "1";
+  }
+
+  async stopCrawl() {
+    await this.redis.set("crawl-stop", "1");
+  }
+
   async incFailCount() {
     const key = `${this.key}:status:failcount:${this.uid}`;
     const res = await this.redis.incr(key);
