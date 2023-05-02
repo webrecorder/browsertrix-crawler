@@ -212,6 +212,8 @@ return 0;
     return await this.redis.get("crawl-stop") === "1";
   }
 
+  // note: not currently called in crawler, but could be
+  // crawl may be stopped by setting this elsewhere in shared redis
   async stopCrawl() {
     await this.redis.set("crawl-stop", "1");
   }
