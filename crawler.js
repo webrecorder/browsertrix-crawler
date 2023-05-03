@@ -784,7 +784,12 @@ export class Crawler {
 
     if (this.params.generateCDX) {
       logger.info("Generating CDX");
-      await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+      const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+      if (indexResult === 0) {
+        logger.debug("Indexing complete, CDX successfully created");
+      } else {
+        logger.error("Error indexing and generating CDX", {"status code": indexResult});
+      }
     }
 
     await this.closeLog();
@@ -925,7 +930,7 @@ export class Crawler {
         if (stdout) {
           logger.debug(stdout.join("\n"));
         }
-        if (stderr) {
+        if (stderr && this.params.logging.includes("debug")) {
           logger.error(stderr.join("\n"));
         }
         resolve(code);
