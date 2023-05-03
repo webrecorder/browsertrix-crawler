@@ -909,15 +909,27 @@ export class Crawler {
   }
 
   awaitProcess(proc) {
+    let stdout = [];
+    let stderr = [];
+
     proc.stdout.on("data", (data) => {
-      logger.debug(data.toString());
+      stdout.push(data.toString());
     });
 
     proc.stderr.on("data", (data) => {
-      logger.error(data.toString());
+      stderr.push(data.toString());
     });
+
     return new Promise((resolve) => {
-      proc.on("close", (code) => resolve(code));
+      proc.on("close", (code) => {
+        if (stdout) {
+          logger.debug(stdout.join("\n"));
+        }
+        if (stderr) {
+          logger.error(stderr.join("\n"));
+        }
+        resolve(code);
+      });
     });
   }
 
