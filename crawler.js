@@ -927,7 +927,7 @@ export class Crawler {
 
     return new Promise((resolve) => {
       proc.on("close", (code) => {
-        if (stdout) {
+        if (stdout.length) {
           logger.debug(stdout.join("\n"));
         }
         if (stderr && this.params.logging.includes("debug")) {
