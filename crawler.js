@@ -44,6 +44,8 @@ const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/
 const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
 
+const POST_CRAWL_STATES = ["generate-wacz", "uploading-wacz", "generate-cdx", "generate-warc"];
+
 
 // ============================================================================
 export class Crawler {
@@ -706,7 +708,12 @@ export class Crawler {
       this.storage = initStorage();
     }
 
-    if (initState === "finalize") {
+    if (POST_CRAWL_STATES.includes(initState)) {
+      logger.info("crawl already finished, running post-crawl tasks", {state: initState});
+      await this.postCrawl();
+      return;
+    } else if (await this.crawlState.isCrawlStopped()) {
+      logger.info("crawl stopped, running post-crawl tasks");
       await this.postCrawl();
       return;
     }
@@ -784,6 +791,7 @@ export class Crawler {
 
     if (this.params.generateCDX) {
       logger.info("Generating CDX");
+      await this.crawlState.setStatus("generate-cdx");
       const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
       if (indexResult === 0) {
         logger.debug("Indexing complete, CDX successfully created");
@@ -829,6 +837,7 @@ export class Crawler {
 
   async generateWACZ() {
     logger.info("Generating WACZ");
+    await this.crawlState.setStatus("generate-wacz");
 
     const archiveDir = path.join(this.collDir, "archive");
 
@@ -906,6 +915,7 @@ export class Crawler {
     }
 */
     if (this.storage) {
+      await this.crawlState.setStatus("uploading-wacz");
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
       const targetFilename = interpolateFilename(filename, this.crawlId);
 
@@ -1335,6 +1345,7 @@ export class Crawler {
 
   async awaitPendingClear() {
     logger.info("Waiting to ensure pending data is written to WARCs...");
+    await this.crawlState.setStatus("pending-wait");
 
     const redis = await initRedis("redis://localhost/0");
 
@@ -1370,6 +1381,7 @@ export class Crawler {
 
   async combineWARC() {
     logger.info("Generating Combined WARCs");
+    await this.crawlState.setStatus("generate-warc");
 
     // Get the list of created Warcs
     const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));
