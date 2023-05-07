@@ -1,4 +1,5 @@
-pywb>=2.7.3
+#pywb>=2.7.3
+git+https://github.com/webrecorder/pywb.git@record-unbound-range-only
 uwsgi
 wacz>=0.4.8
 requests[socks]
