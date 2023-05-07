@@ -792,7 +792,12 @@ export class Crawler {
     if (this.params.generateCDX) {
       logger.info("Generating CDX");
       await this.crawlState.setStatus("generate-cdx");
-      await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+      const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+      if (indexResult === 0) {
+        logger.debug("Indexing complete, CDX successfully created");
+      } else {
+        logger.error("Error indexing and generating CDX", {"status code": indexResult});
+      }
     }
 
     await this.closeLog();
@@ -919,15 +924,27 @@ export class Crawler {
   }
 
   awaitProcess(proc) {
+    let stdout = [];
+    let stderr = [];
+
     proc.stdout.on("data", (data) => {
-      logger.debug(data.toString());
+      stdout.push(data.toString());
     });
 
     proc.stderr.on("data", (data) => {
-      logger.error(data.toString());
+      stderr.push(data.toString());
     });
+
     return new Promise((resolve) => {
-      proc.on("close", (code) => resolve(code));
+      proc.on("close", (code) => {
+        if (stdout.length) {
+          logger.debug(stdout.join("\n"));
+        }
+        if (stderr.length && this.params.logging.includes("debug")) {
+          logger.error(stderr.join("\n"));
+        }
+        resolve(code);
+      });
     });
   }
 
