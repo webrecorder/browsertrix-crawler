@@ -930,7 +930,7 @@ export class Crawler {
         if (stdout.length) {
           logger.debug(stdout.join("\n"));
         }
-        if (stderr && this.params.logging.includes("debug")) {
+        if (stderr.length && this.params.logging.includes("debug")) {
           logger.error(stderr.join("\n"));
         }
         resolve(code);
