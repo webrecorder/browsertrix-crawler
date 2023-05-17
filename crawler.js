@@ -45,6 +45,8 @@ const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/
 const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
 
+const POST_CRAWL_STATES = ["generate-wacz", "uploading-wacz", "generate-cdx", "generate-warc"];
+
 
 // ============================================================================
 export class Crawler {
@@ -356,6 +358,24 @@ export class Crawler {
   async setupPage({ page, cdp, workerid }) {
     await this.browser.setupPage({ page, cdp });
 
+    if ((this.adBlockRules && this.params.blockAds) ||
+      this.blockRules || this.originOverride) {
+
+      await page.setRequestInterception(true);
+
+      if (this.adBlockRules && this.params.blockAds) {
+        await this.adBlockRules.initPage(this.browser, page);
+      }
+
+      if (this.blockRules) {
+        await this.blockRules.initPage(this.browser, page);
+      }
+
+      if (this.originOverride) {
+        await this.originOverride.initPage(this.browser, page);
+      }
+    }
+
     if (this.params.logging.includes("jserrors")) {
       page.on("console", (msg) => {
         if (msg.type() === "error") {
@@ -375,13 +395,13 @@ export class Crawler {
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
-      await page.addInitScript(behaviors + ";");
+      await this.browser.addInitScript(page, behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
       if (this.params.customBehaviors) {
         for (const source of collectAllFileSources(this.params.customBehaviors, ".js")) {
           await page.addInitScript(`self.__bx_behaviors.load(${source});`);
         }
       }
-      await page.addInitScript(`self.__bx_behaviors.init(${this.params.behaviorOpts});`);
+      await this.browser.addInitScript(`self.__bx_behaviors.init(${this.params.behaviorOpts});`);
     }
   }
 
@@ -411,7 +431,7 @@ export class Crawler {
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
       const archiveDir = path.join(this.collDir, "archive");
-      const screenshots = new Screenshots({ page, url, directory: archiveDir });
+      const screenshots = new Screenshots({ browser: this.browser, page, url, directory: archiveDir });
       if (this.params.screenshot.includes("view")) {
         await screenshots.take();
       }
@@ -437,7 +457,7 @@ export class Crawler {
         logger.info("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
         const res = await timedRun(
-          this.runBehaviors(page, data.filteredFrames, logDetails),
+          this.runBehaviors(page, cdp, data.filteredFrames, logDetails),
           this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
@@ -502,16 +522,14 @@ export class Crawler {
     }
   }
 
-  async runBehaviors(page, frames, logDetails) {
+  async runBehaviors(page, cdp, frames, logDetails) {
     try {
       frames = frames || page.frames();
-
-      const context = page.context();
 
       logger.info("Running behaviors", { frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails }, "behavior");
 
       return await Promise.allSettled(
-        frames.map(frame => this.browser.evaluateWithCLI(context, frame, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => this.browser.evaluateWithCLI(page, frame, cdp, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
     } catch (e) {
@@ -697,7 +715,12 @@ export class Crawler {
       this.storage = initStorage();
     }
 
-    if (initState === "finalize") {
+    if (POST_CRAWL_STATES.includes(initState)) {
+      logger.info("crawl already finished, running post-crawl tasks", { state: initState });
+      await this.postCrawl();
+      return;
+    } else if (await this.crawlState.isCrawlStopped()) {
+      logger.info("crawl stopped, running post-crawl tasks");
       await this.postCrawl();
       return;
     }
@@ -718,7 +741,7 @@ export class Crawler {
 
     this.screencaster = this.initScreenCaster();
 
-    if (this.params.originOverride) {
+    if (this.params.originOverride.length) {
       this.originOverride = new OriginOverride(this.params.originOverride);
     }
 
@@ -775,7 +798,13 @@ export class Crawler {
 
     if (this.params.generateCDX) {
       logger.info("Generating CDX");
-      await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], { cwd: this.params.cwd }));
+      await this.crawlState.setStatus("generate-cdx");
+      const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], { cwd: this.params.cwd }));
+      if (indexResult === 0) {
+        logger.debug("Indexing complete, CDX successfully created");
+      } else {
+        logger.error("Error indexing and generating CDX", { "status code": indexResult });
+      }
     }
 
     await this.closeLog();
@@ -815,6 +844,7 @@ export class Crawler {
 
   async generateWACZ() {
     logger.info("Generating WACZ");
+    await this.crawlState.setStatus("generate-wacz");
 
     const archiveDir = path.join(this.collDir, "archive");
 
@@ -892,6 +922,7 @@ export class Crawler {
     }
 */
     if (this.storage) {
+      await this.crawlState.setStatus("uploading-wacz");
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
       const targetFilename = interpolateFilename(filename, this.crawlId);
 
@@ -900,16 +931,36 @@ export class Crawler {
   }
 
   awaitProcess(proc) {
+    let stdout = [];
+    let stderr = [];
+
     proc.stdout.on("data", (data) => {
-      logger.debug(data.toString());
+      stdout.push(data.toString());
     });
 
     proc.stderr.on("data", (data) => {
-      logger.error(data.toString());
+      stderr.push(data.toString());
     });
+
     return new Promise((resolve) => {
-      proc.on("close", (code) => resolve(code));
+      proc.on("close", (code) => {
+        if (stdout.length) {
+          logger.debug(stdout.join("\n"));
+        }
+        if (stderr.length && this.params.logging.includes("debug")) {
+          logger.error(stderr.join("\n"));
+        }
+        resolve(code);
+      });
     });
+  }
+
+  logMemory() {
+    const memUsage = process.memoryUsage();
+    const { heapUsed, heapTotal } = memUsage;
+    this.maxHeapUsed = Math.max(this.maxHeapUsed || 0, heapUsed);
+    this.maxHeapTotal = Math.max(this.maxHeapTotal || 0, heapTotal);
+    logger.debug("Memory", { maxHeapUsed: this.maxHeapUsed, maxHeapTotal: this.maxHeapTotal, ...memUsage }, "memory");
   }
 
   async writeStats(toFile = false) {
@@ -933,6 +984,7 @@ export class Crawler {
     };
 
     logger.info("Crawl statistics", stats, "crawlStatus");
+    this.logMemory();
 
     if (toFile && this.params.statsFilename) {
       try {
@@ -947,6 +999,8 @@ export class Crawler {
     const { url, seedId, depth, extraHops = 0 } = data;
 
     const logDetails = data.logDetails;
+
+    const failCrawlOnError = ((depth === 0) && this.params.failOnFailedSeed);
 
     let isHTMLPage = await timedRun(
       this.isHTML(url),
@@ -972,18 +1026,6 @@ export class Crawler {
       }
     }
 
-    if (this.adBlockRules && this.params.blockAds) {
-      await this.adBlockRules.initPage(page);
-    }
-
-    if (this.blockRules) {
-      await this.blockRules.initPage(page);
-    }
-
-    if (this.originOverride) {
-      await this.originOverride.initPage(page);
-    }
-
     let ignoreAbort = false;
 
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
@@ -1005,7 +1047,18 @@ export class Crawler {
     try {
       const resp = await page.goto(url, gotoOpts);
 
-      const contentType = await resp.headerValue("content-type");
+      // Handle 4xx or 5xx response as a page load error
+      const statusCode = resp.status();
+      if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
+        if (failCrawlOnError) {
+          logger.fatal("Seed Page Load Error, failing crawl", { statusCode, ...logDetails });
+        } else {
+          logger.error("Page Load Error, skipping page", { statusCode, ...logDetails });
+          throw new Error(`Page ${url} returned status code ${statusCode}`);
+        }
+      }
+
+      const contentType = await this.browser.responseHeader(resp, "content-type");
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
@@ -1014,15 +1067,23 @@ export class Crawler {
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         if (e.name === "TimeoutError") {
           if (data.loadState !== LoadState.CONTENT_LOADED) {
-            logger.error("Page Load Timeout, skipping page", { msg, ...logDetails });
-            throw e;
+            if (failCrawlOnError) {
+              logger.fatal("Seed Page Load Timeout, failing crawl", { msg, ...logDetails });
+            } else {
+              logger.error("Page Load Timeout, skipping page", { msg, ...logDetails });
+              throw e;
+            }
           } else {
             logger.warn("Page Loading Slowly, skipping behaviors", { msg, ...logDetails });
             data.skipBehaviors = true;
           }
         } else {
-          logger.error("Page Load Error, skipping page", { msg, ...logDetails });
-          throw e;
+          if (failCrawlOnError) {
+            logger.fatal("Seed Page Load Timeout, failing crawl", { msg, ...logDetails });
+          } else {
+            logger.error("Page Load Error, skipping page", { msg, ...logDetails });
+            throw e;
+          }
         }
       }
     }
@@ -1075,7 +1136,7 @@ export class Crawler {
     await sleep(0.5);
 
     try {
-      await page.waitForLoadState("networkidle", { timeout: this.params.netIdleWait * 1000 });
+      await this.browser.waitForNetworkIdle(page, { timeout: this.params.netIdleWait * 1000 });
     } catch (e) {
       logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
@@ -1102,7 +1163,7 @@ export class Crawler {
     try {
       const linkResults = await Promise.allSettled(
         frames.map(frame => timedRun(
-          frame.evaluate(loadFunc, { selector: selector, extract: extract }),
+          frame.evaluate(loadFunc, { selector, extract }),
           PAGE_OP_TIMEOUT_SECS,
           "Link extraction timed out",
           logDetails,
@@ -1159,9 +1220,10 @@ export class Crawler {
     try {
       logger.debug("Check CF Blocking", logDetails);
 
-      const cloudflare = page.locator("div.cf-browser-verification.cf-im-under-attack");
-
-      while (await cloudflare.waitFor({ timeout: PAGE_OP_TIMEOUT_SECS })) {
+      while (await timedRun(
+        page.$("div.cf-browser-verification.cf-im-under-attack"),
+        PAGE_OP_TIMEOUT_SECS
+      )) {
         logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
         await sleep(5.5);
       }
@@ -1290,6 +1352,7 @@ export class Crawler {
 
   async awaitPendingClear() {
     logger.info("Waiting to ensure pending data is written to WARCs...");
+    await this.crawlState.setStatus("pending-wait");
 
     const redis = await initRedis("redis://localhost/0");
 
@@ -1325,6 +1388,7 @@ export class Crawler {
 
   async combineWARC() {
     logger.info("Generating Combined WARCs");
+    await this.crawlState.setStatus("generate-warc");
 
     // Get the list of created Warcs
     const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));

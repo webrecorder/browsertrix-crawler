@@ -77,7 +77,8 @@ class Logger
       this.logStream.write(string + "\n");
     }
 
-    if (this.logErrorsToRedis && logLevel === "error") {
+    const toLogToRedis = ["error", "fatal"];
+    if (this.logErrorsToRedis && toLogToRedis.includes(logLevel)) {
       this.crawlState.logError(string);
     }
   }

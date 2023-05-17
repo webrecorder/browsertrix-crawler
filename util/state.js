@@ -60,8 +60,6 @@ export class RedisCrawlState
     // crawler errors
     this.ekey = this.key + ":e";
 
-    this.crawlSizeKey = "crawl-size";
-
     this._initLuaCommands(this.redis);
   }
 
@@ -205,7 +203,17 @@ return 0;
   }
 
   async setArchiveSize(size) {
-    return await this.redis.hset(this.crawlSizeKey, this.uid, size);
+    return await this.redis.hset(`${this.key}:size`, this.uid, size);
+  }
+
+  async isCrawlStopped() {
+    return await this.redis.get(`${this.key}:stopping`) === "1";
+  }
+
+  // note: not currently called in crawler, but could be
+  // crawl may be stopped by setting this elsewhere in shared redis
+  async stopCrawl() {
+    await this.redis.set(`${this.key}:stopping`, "1");
   }
 
   async incFailCount() {
