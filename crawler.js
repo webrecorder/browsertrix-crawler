@@ -853,6 +853,10 @@ export class Crawler {
       if (isFinished) {
         return;
       }
+      // if stopped, won't get anymore data, so consider failed
+      if (await this.crawlState.isCrawlStopped()) {
+        await this.crawlState.setStatus("failed");
+      }
       logger.fatal("No WARC Files, assuming crawl failed");
     }
 
