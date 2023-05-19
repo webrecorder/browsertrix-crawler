@@ -61,7 +61,7 @@ export class Screenshots {
       await this.browser.setViewport(this.page, {width: 1920, height: 1080});
       const options = screenshotTypes[screenshotType];
       const screenshotBuffer = await this.page.screenshot(options);
-      const thumbnailBuffer = sharp(screenshotBuffer)
+      const thumbnailBuffer = await sharp(screenshotBuffer)
         // 16:9 thumbnail
         .resize(640, 360)
         .toBuffer();
