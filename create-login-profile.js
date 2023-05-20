@@ -315,7 +315,7 @@ function promptInput(msg, hidden = false) {
 class InteractiveBrowser {
   constructor(params, browser, page, cdp, targetId) {
     logger.info("Creating Profile Interactively...");
-    child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
+    child_process.spawn("socat", ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"]);
 
     this.params = params;
     this.browser = browser;
@@ -331,12 +331,16 @@ class InteractiveBrowser {
 
     page.on("load", () => this.handlePageLoad());
 
-    page.on("popup", async () => {
-      await cdp.send("Target.activateTarget", {targetId: this.targetId});
-    });
+    //page.on("popup", async () => {
+      //console.log("activate?");
+      //await cdp.send("Target.activateTarget", {targetId: this.targetId});
+    //});
+    cdp.send("Page.enable").then(() => console.log("Page enabled"));
 
     cdp.on("Page.windowOpen", async (resp) => {
+      console.log("windowOpen?", resp);
       if (resp.url) {
+        await cdp.send("Target.activateTarget", {targetId: this.targetId});
         await page.goto(resp.url);
       }
     });
