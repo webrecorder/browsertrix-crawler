@@ -322,7 +322,6 @@ class InteractiveBrowser {
     this.page = page;
     this.cdp = cdp;
 
-    //const target = page.target();
     this.targetId = targetId;
 
     this.originSet = new Set();
@@ -331,19 +330,17 @@ class InteractiveBrowser {
 
     page.on("load", () => this.handlePageLoad());
 
-    //page.on("popup", async () => {
-      //console.log("activate?");
-      //await cdp.send("Target.activateTarget", {targetId: this.targetId});
-    //});
-    cdp.send("Page.enable").then(() => console.log("Page enabled"));
+    // attempt to keep everything to initial tab if headless
+    if (this.params.headless) {
+      cdp.send("Page.enable");
 
-    cdp.on("Page.windowOpen", async (resp) => {
-      console.log("windowOpen?", resp);
-      if (resp.url) {
-        await cdp.send("Target.activateTarget", {targetId: this.targetId});
-        await page.goto(resp.url);
-      }
-    });
+      cdp.on("Page.windowOpen", async (resp) => {
+        if (resp.url) {
+          await cdp.send("Target.activateTarget", {targetId: this.targetId});
+          await page.goto(resp.url);
+        }
+      });
+    }
 
     this.shutdownWait = params.shutdownWait * 1000;
     
