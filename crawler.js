@@ -265,7 +265,7 @@ export class Crawler {
       }
     });
 
-    child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
+    child_process.spawn("socat", ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"]);
 
     if (!this.params.headless && !process.env.NO_XVFB) {
       child_process.spawn("Xvfb", [
