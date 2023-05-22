@@ -34,9 +34,13 @@ export class BaseBrowser
 
     const args = this.chromeArgs(chromeOptions);
 
-    const geom = process.env.GEOMETRY.split("x");
+    let defaultViewport = null;
 
-    const defaultViewport = {width: Number(geom[0]), height: Number(geom[1])};
+    if (process.env.GEOMETRY) {
+      const geom = process.env.GEOMETRY.split("x");
+
+      defaultViewport = {width: Number(geom[0]), height: Number(geom[1])};
+    }
 
     const launchOpts = {
       args,
