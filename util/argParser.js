@@ -494,14 +494,6 @@ class ArgParser {
       //logger.debug(`Set netIdleWait to ${argv.netIdleWait} seconds`);
     }
 
-    // prefer argv.include only if string or a non-empty array
-    if (argv.include && (typeof(argv.include) === "string" || argv.include.length)) {
-      if (argv.scopeType && argv.scopeType !== "custom") {
-        logger.info("You've specified a --scopeType and a --scopeIncludeRx / --include regex. The custom scope regex will take precedence, overriding the scopeType");
-        argv.scopeType = "custom";
-      }
-    }
-
     const scopeOpts = {
       scopeType: argv.scopeType,
       sitemap: argv.sitemap,
