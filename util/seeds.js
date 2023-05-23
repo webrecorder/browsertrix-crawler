@@ -19,7 +19,8 @@ export class ScopedSeed
     }
 
     if (this.scopeType !== "custom") {
-      [this.include, allowHash] = this.scopeFromType(this.scopeType, parsedUrl);
+      [include, allowHash] = this.scopeFromType(this.scopeType, parsedUrl);
+      this.include = [...include, ...this.include];
     }
 
     this.sitemap = this.resolveSiteMap(sitemap);
@@ -138,7 +139,7 @@ export class ScopedSeed
 
     // check scopes
     for (const s of this.include) {
-      if (s.exec(url)) {
+      if (s.test(url)) {
         inScope = true;
         break;
       }
@@ -157,7 +158,7 @@ export class ScopedSeed
 
     // check exclusions
     for (const e of this.exclude) {
-      if (e.exec(url)) {
+      if (e.test(url)) {
         //console.log(`Skipping ${url} excluded by ${e}`);
         return false;
       }
