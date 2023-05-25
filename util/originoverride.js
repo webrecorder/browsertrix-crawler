@@ -18,12 +18,12 @@ export class OriginOverride
         const url = request.url();
 
         let newUrl = null;
-        let dest = null;
+        let orig = null;
 
         for (const {origUrl, destUrl} of this.originOverride) {
           if (url.startsWith(origUrl.origin)) {
             newUrl = destUrl.origin + url.slice(origUrl.origin.length);
-            dest = destUrl;
+            orig = origUrl;
             break;
           }
         }
@@ -34,11 +34,9 @@ export class OriginOverride
         }
 
         const headers = new Headers(request.headers());
-        if (headers.get("host")) {
-          headers.set("host", dest.host);
-        }
+        headers.set("host", orig.host);
         if (headers.get("origin")) {
-          headers.set("origin", dest.origin);
+          headers.set("origin", orig.origin);
         }
 
         const resp = await fetch(newUrl, {headers});
