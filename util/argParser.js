@@ -386,7 +386,7 @@ class ArgParser {
     argv = argv || process.argv;
 
     if (process.env.CRAWL_ARGS) {
-      argv = argv.concat(process.env.CRAWL_ARGS.split(" "));
+      argv = yargs(process.env.CRAWL_ARGS).parse();
     }
 
     let origConfig = {};
