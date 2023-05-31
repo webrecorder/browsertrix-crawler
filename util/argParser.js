@@ -386,7 +386,7 @@ class ArgParser {
     argv = argv || process.argv;
 
     if (process.env.CRAWL_ARGS) {
-      argv = argv.concat(process.env.CRAWL_ARGS.split(" "));
+      argv = argv.concat(this.splitCrawlArgsQuoteSafe(process.env.CRAWL_ARGS));
     }
 
     let origConfig = {};
@@ -407,6 +407,11 @@ class ArgParser {
     return {parsed, origConfig};
   }
 
+  splitCrawlArgsQuoteSafe(crawlArgs) {
+    // Split process.env.CRAWL_ARGS on spaces but retaining spaces within double quotes
+    const regex = /"[^"]+"|[^\s]+/g;
+    return crawlArgs.match(regex).map(e => e.replace(/"(.+)"/, "$1"));
+  }
 
   validateArgs(argv) {
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
