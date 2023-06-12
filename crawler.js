@@ -32,6 +32,8 @@ import { OriginOverride } from "./util/originoverride.js";
 // to ignore HTTPS error for HEAD check
 import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
+import {RedisHelper} from "./util/redisHelper.js";
+import {parseUrl} from "./util/seedHelper.js";
 
 const HTTPS_AGENT = HTTPSAgent({
   rejectUnauthorized: false,
@@ -96,6 +98,7 @@ export class Crawler {
     this.emulateDevice = this.params.emulateDevice || {};
 
     this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
+    console.log(this.captureBasePrefix);
     this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
 
     this.gotoOpts = {
@@ -146,7 +149,7 @@ export class Crawler {
   }
 
   async initCrawlState() {
-    const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
+    const redisUrl = "redis://localhost:6379/0";
 
     if (!redisUrl.startsWith("redis://")) {
       logger.fatal("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
@@ -164,6 +167,8 @@ export class Crawler {
         await sleep(3);
       }
     }
+
+    this.redisHelper = new RedisHelper(redis);
 
     logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
 
@@ -404,6 +409,7 @@ export class Crawler {
     const {page, cdp, data, workerid} = opts;
 
     const {url} = data;
+    await this.writeStats(false, {url: url, data: data});
 
     const logDetails = {page: url, workerid};
     data.logDetails = logDetails;
@@ -413,6 +419,7 @@ export class Crawler {
       logger.info("Page no longer in scope", data);
       return true;
     }
+    logger.info("OUT OF BASE SCOPE");
 
     // run custom driver here
     await this.driver({page, data, crawler: this});
@@ -424,6 +431,7 @@ export class Crawler {
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
       const archiveDir = path.join(this.collDir, "archive");
+      logger.info("archiveDir " + archiveDir);
       const screenshots = new Screenshots({browser: this.browser, page, url, directory: archiveDir});
       if (this.params.screenshot.includes("view")) {
         await screenshots.take();
@@ -956,10 +964,12 @@ export class Crawler {
     logger.debug("Memory", {maxHeapUsed: this.maxHeapUsed, maxHeapTotal: this.maxHeapTotal, ...memUsage}, "memory");
   }
 
-  async writeStats(toFile=false) {
+  async writeStats(toFile=false, data = {}) {
     if (!this.params.logging.includes("stats")) {
       return;
     }
+
+    logger.info("TEST LOG",data);
 
     const realSize = await this.crawlState.queueSize();
     const pendingList = await this.crawlState.getPendingList();
@@ -1037,6 +1047,7 @@ export class Crawler {
 
     logger.info("Awaiting page load", logDetails);
 
+    logger.info("failed on seed",{failCrawlOnError: failCrawlOnError});
     try {
       const resp = await page.goto(url, gotoOpts);
 
@@ -1044,7 +1055,7 @@ export class Crawler {
       const statusCode = resp.status();
       if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
         if (failCrawlOnError) {
-          logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails});
+          logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails}, "general", statusCode);
         } else {
           logger.error("Page Load Error, skipping page", {statusCode, ...logDetails});
           throw new Error(`Page ${url} returned status code ${statusCode}`);
@@ -1116,7 +1127,16 @@ export class Crawler {
 
     for (const opts of selectorOptsList) {
       const links = await this.extractLinks(page, data.filteredFrames, opts, logDetails);
-      await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
+      const parsedLinks = [];
+      for(const link of links) {
+        let parsedLink = parseUrl(link);
+        if (parsedLink !== null) {
+          await this.redisHelper.pushEventToQueue("extractedUrls",JSON.stringify({link: parsedLink, event: "ADD_URL", domain: this.params.domain, level: this.params.level}));
+          parsedLinks.push(parsedLink);
+        }
+      }
+
+      await this.queueInScopeUrls(seedId, parsedLinks, depth, extraHops, logDetails);
     }
   }
 
@@ -1193,7 +1213,6 @@ export class Crawler {
 
       for (const possibleUrl of urls) {
         const res = this.isInScope({url: possibleUrl, extraHops: newExtraHops, depth, seedId}, logDetails);
-
         if (!res) {
           continue;
         }
@@ -1440,6 +1459,8 @@ export class Crawler {
 
         // write combined warcs to root collection dir as they're output of a collection (like wacz)
         combinedWarcFullPath = path.join(this.collDir, combinedWarcName);
+
+        logger.info("full path " + combinedWarcFullPath);
 
         if (fh) {
           fh.end();

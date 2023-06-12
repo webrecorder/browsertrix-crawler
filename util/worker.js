@@ -105,6 +105,8 @@ export class PageWorker
           "worker"
         );
 
+        logger.info("PAGE >>>>>" + page + " <<<<  " + cdp)
+
         this.page = page;
         this.cdp = cdp;
         this.opts = {page: this.page, cdp: this.cdp, workerid};
