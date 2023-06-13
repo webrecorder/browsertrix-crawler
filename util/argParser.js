@@ -373,11 +373,13 @@ class ArgParser {
         type: "boolean",
         default: false,
       },
+
       "failOnFailedSeed": {
         describe: "If set, crawler will fail with exit code 1 if any seed fails",
         type: "boolean",
         default: false
       },
+
       "customBehaviors": {
         describe: "injects a custom behavior file or set of behavior files in a directory",
         type: ["string"]
@@ -389,7 +391,7 @@ class ArgParser {
     argv = argv || process.argv;
 
     if (process.env.CRAWL_ARGS) {
-      argv = argv.concat(process.env.CRAWL_ARGS.split(" "));
+      argv = argv.concat(this.splitCrawlArgsQuoteSafe(process.env.CRAWL_ARGS));
     }
 
     let origConfig = {};
@@ -407,22 +409,27 @@ class ArgParser {
       .check((argv) => this.validateArgs(argv))
       .argv;
 
-    return { parsed, origConfig };
+    return {parsed, origConfig};
   }
 
+  splitCrawlArgsQuoteSafe(crawlArgs) {
+    // Split process.env.CRAWL_ARGS on spaces but retaining spaces within double quotes
+    const regex = /"[^"]+"|[^\s]+/g;
+    return crawlArgs.match(regex).map(e => e.replace(/"(.+)"/, "$1"));
+  }
 
   validateArgs(argv) {
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
 
     // Check that the collection name is valid.
-    if (argv.collection.search(/^[\w][\w-]*$/) === -1) {
+    if (argv.collection.search(/^[\w][\w-]*$/) === -1){
       logger.fatal(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
 
     // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
     // can be multiple separate by comma
     // (see: https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options)
-    if (typeof argv.waitUntil != "object") {
+    if (typeof argv.waitUntil != "object"){
       argv.waitUntil = argv.waitUntil.split(",");
     }
 
@@ -452,7 +459,7 @@ class ArgParser {
 
     // background behaviors to apply
     const behaviorOpts = {};
-    if (typeof argv.behaviors != "object") {
+    if (typeof argv.behaviors != "object"){
       argv.behaviors = argv.behaviors.split(",");
     }
     argv.behaviors.forEach((x) => behaviorOpts[x] = true);
@@ -470,14 +477,14 @@ class ArgParser {
         logger.fatal("Unknown device: " + argv.mobileDevice);
       }
     } else {
-      argv.emulateDevice = { viewport: null };
+      argv.emulateDevice = {viewport: null};
     }
 
     if (argv.seedFile) {
       const urlSeedFile = fs.readFileSync(argv.seedFile, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
 
-      if (typeof (argv.seeds) === "string") {
+      if (typeof(argv.seeds) === "string") {
         argv.seeds = [argv.seeds];
       }
 
@@ -497,14 +504,6 @@ class ArgParser {
       //logger.debug(`Set netIdleWait to ${argv.netIdleWait} seconds`);
     }
 
-    // prefer argv.include only if string or a non-empty array
-    if (argv.include && (typeof (argv.include) === "string" || argv.include.length)) {
-      if (argv.scopeType && argv.scopeType !== "custom") {
-        logger.info("You've specified a --scopeType and a --scopeIncludeRx / --include regex. The custom scope regex will take precedence, overriding the scopeType");
-        argv.scopeType = "custom";
-      }
-    }
-
     const scopeOpts = {
       scopeType: argv.scopeType,
       sitemap: argv.sitemap,
@@ -517,10 +516,10 @@ class ArgParser {
     argv.scopedSeeds = [];
 
     for (let seed of argv.seeds) {
-      if (typeof (seed) === "string") {
-        seed = { url: seed };
+      if (typeof(seed) === "string") {
+        seed = {url: seed};
       }
-      argv.scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...seed }));
+      argv.scopedSeeds.push(new ScopedSeed({...scopeOpts, ...seed}));
     }
 
     // Resolve statsFilename
