@@ -419,7 +419,6 @@ export class Crawler {
       logger.info("Page no longer in scope", data);
       return true;
     }
-    logger.info("OUT OF BASE SCOPE");
 
     // run custom driver here
     await this.driver({page, data, crawler: this});
@@ -1055,6 +1054,7 @@ export class Crawler {
       const statusCode = resp.status();
       if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
         if (failCrawlOnError) {
+          await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error, status code: ${statusCode}`}));
           logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails}, "general", statusCode);
         } else {
           logger.error("Page Load Error, skipping page", {statusCode, ...logDetails});
@@ -1072,6 +1072,7 @@ export class Crawler {
         if (e.name === "TimeoutError") {
           if (data.loadState !== LoadState.CONTENT_LOADED) {
             if (failCrawlOnError) {
+              await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Timeout: ${msg}`}));
               logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
             } else {
               logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
@@ -1083,6 +1084,7 @@ export class Crawler {
           }
         } else {
           if (failCrawlOnError) {
+            await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error: ${msg}`})
             logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
           } else {
             logger.error("Page Load Error, skipping page", {msg, ...logDetails});
