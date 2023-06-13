@@ -186,10 +186,12 @@ seeds:
    - url: https://example.com/subpath/file.html
      scopeType: prefix
 
+   - url: https://example.com/subpath/file.html
+
 include: https://example.com/onlythispath
 `);
 
-  expect(seeds.length).toEqual(3);
+  expect(seeds.length).toEqual(4);
 
   expect(seeds[0].scopeType).toEqual("custom");
   expect(seeds[0].url).toEqual("https://example.com/1");
@@ -203,9 +205,13 @@ include: https://example.com/onlythispath
 
   expect(seeds[2].scopeType).toEqual("prefix");
   expect(seeds[2].url).toEqual("https://example.com/subpath/file.html");
-  expect(seeds[2].include).toEqual([/^https?:\/\/example\.com\/subpath\//]);
+  expect(seeds[2].include).toEqual([/^https?:\/\/example\.com\/subpath\//, /https:\/\/example.com\/onlythispath/]);
   expect(seeds[2].exclude).toEqual([]);
 
+  expect(seeds[3].scopeType).toEqual("custom");
+  expect(seeds[3].url).toEqual("https://example.com/subpath/file.html");
+  expect(seeds[3].include).toEqual([/https:\/\/example.com\/onlythispath/]);
+  expect(seeds[3].exclude).toEqual([]);
 });
 
 

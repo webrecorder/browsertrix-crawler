@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import * as warcio from "warcio";
+import sharp from "sharp";
 
 import { logger } from "./logger.js";
 
@@ -15,8 +16,7 @@ export const screenshotTypes = {
   "thumbnail": {
     type: "jpeg",
     omitBackground: true,
-    fullPage: false,
-    quality: 75
+    fullPage: false
   },
   "fullPage": {
     type: "png",
@@ -44,9 +44,7 @@ export class Screenshots {
       }
       const options = screenshotTypes[screenshotType];
       const screenshotBuffer = await this.page.screenshot(options);
-      const warcRecord = await this.wrap(screenshotBuffer, screenshotType, options.type);
-      const warcRecordBuffer = await warcio.WARCSerializer.serialize(warcRecord, {gzip: true});
-      fs.appendFileSync(this.warcName, warcRecordBuffer);
+      await this.writeBufferToWARC(screenshotBuffer, screenshotType, options.type);
       logger.info(`Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.warcName}`);
     } catch (e) {
       logger.error(`Taking screenshot (type: ${screenshotType}) failed for ${this.url}`, e.message);
@@ -58,7 +56,26 @@ export class Screenshots {
   }
 
   async takeThumbnail() {
-    await this.take("thumbnail");
+    try {
+      const screenshotType = "thumbnail";
+      await this.browser.setViewport(this.page, {width: 1920, height: 1080});
+      const options = screenshotTypes[screenshotType];
+      const screenshotBuffer = await this.page.screenshot(options);
+      const thumbnailBuffer = await sharp(screenshotBuffer)
+        // 16:9 thumbnail
+        .resize(640, 360)
+        .toBuffer();
+      await this.writeBufferToWARC(thumbnailBuffer, screenshotType, options.type);
+      logger.info(`Screenshot (type: thumbnail) for ${this.url} written to ${this.warcName}`);
+    } catch (e) {
+      logger.error(`Taking screenshot (type: thumbnail) failed for ${this.url}`, e.message);
+    }
+  }
+
+  async writeBufferToWARC(screenshotBuffer, screenshotType, imageType) {
+    const warcRecord = await this.wrap(screenshotBuffer, screenshotType, imageType);
+    const warcRecordBuffer = await warcio.WARCSerializer.serialize(warcRecord, {gzip: true});
+    fs.appendFileSync(this.warcName, warcRecordBuffer);
   }
 
   async wrap(buffer, screenshotType="screenshot", imageType="png") {

@@ -5,10 +5,10 @@ export class OriginOverride
   constructor(originOverride) {
     this.originOverride = originOverride.map((override) => {
       let [orig, dest] = override.split("=");
-      orig = new URL(orig).origin;
-      dest = new URL(dest).origin;
+      const origUrl = new URL(orig);
+      const destUrl = new URL(dest);
 
-      return {orig, dest};
+      return {origUrl, destUrl};
     });
   }
 
@@ -18,10 +18,12 @@ export class OriginOverride
         const url = request.url();
 
         let newUrl = null;
+        let orig = null;
 
-        for (const {orig, dest} of this.originOverride) {
-          if (url.startsWith(orig)) {
-            newUrl = dest + url.slice(orig.length);
+        for (const {origUrl, destUrl} of this.originOverride) {
+          if (url.startsWith(origUrl.origin)) {
+            newUrl = destUrl.origin + url.slice(origUrl.origin.length);
+            orig = origUrl;
             break;
           }
         }
@@ -31,15 +33,21 @@ export class OriginOverride
           return;
         }
 
-        const resp = await fetch(newUrl, {headers: request.headers()});
+        const headers = new Headers(request.headers());
+        headers.set("host", orig.host);
+        if (headers.get("origin")) {
+          headers.set("origin", orig.origin);
+        }
+
+        const resp = await fetch(newUrl, {headers});
 
         const body = Buffer.from(await resp.arrayBuffer());
-        const headers = Object.fromEntries(resp.headers);
+        const respHeaders = Object.fromEntries(resp.headers);
         const status = resp.status;
 
         logger.debug("Origin overridden", {orig: url, dest: newUrl, status, body: body.length}, "originoverride");
 
-        request.respond({body, headers, status}, -1);
+        request.respond({body, headers: respHeaders, status}, -1);
 
       } catch (e) {
         logger.warn("Error overriding origin", {...errJSON(e), url: page.url()}, "originoverride");
