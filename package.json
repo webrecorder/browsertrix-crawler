@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
+    "body-parser": "^1.20.2",
     "browsertrix-behaviors": "^0.5.0-beta.0",
+    "express": "^4.18.2",
     "get-folder-size": "^4.0.0",
     "ioredis": "^4.27.1",
     "js-yaml": "^4.1.0",
@@ -23,8 +25,7 @@
     "uuid": "8.3.2",
     "warcio": "^1.6.0",
     "ws": "^7.4.4",
-    "yargs": "^16.0.3",
-    "express": "^4.18.2"
+    "yargs": "^16.0.3"
   },
   "devDependencies": {
     "eslint": "^7.20.0",
