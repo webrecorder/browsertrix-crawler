@@ -23,7 +23,8 @@
     "uuid": "8.3.2",
     "warcio": "^1.6.0",
     "ws": "^7.4.4",
-    "yargs": "^16.0.3"
+    "yargs": "^16.0.3",
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "eslint": "^7.20.0",

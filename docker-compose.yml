@@ -1,5 +1,5 @@
 version: '3.5'
-  
+
 services:
     crawler:
         image: ${REGISTRY}webrecorder/browsertrix-crawler:latest
@@ -14,4 +14,7 @@ services:
           - SYS_ADMIN
 
         shm_size: 1gb
+
+        ports:
+          - "3000:3000"
 

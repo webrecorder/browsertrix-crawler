@@ -3,6 +3,7 @@
 import { logger } from "./util/logger.js";
 import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
+import express from "express";
 
 
 var crawler = null;
@@ -62,6 +63,20 @@ process.on("SIGUSR2", () => {
 });
 
 crawler = new Crawler();
-crawler.run();
 
+const app = express();
+const port = 3000;
+console.log("crawler created");
+app.get("/", (req, res) => {
+  if (crawler) {
+    res.send("Crawl initiated!");
+    crawler.run();
+  } else {
+    res.send("No crawler running");
+  }
+});
 
+// Start the server
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+});
