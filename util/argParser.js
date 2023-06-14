@@ -384,6 +384,7 @@ class ArgParser {
 
   parseArgs(argv) {
     argv = argv || process.argv;
+
     if (process.env.CRAWL_ARGS) {
       argv = argv.concat(this.splitCrawlArgsQuoteSafe(process.env.CRAWL_ARGS));
     }
@@ -402,7 +403,6 @@ class ArgParser {
       })
       .check((argv) => this.validateArgs(argv))
       .argv;
-    console.log(parsed);
 
     return {parsed, origConfig};
   }
