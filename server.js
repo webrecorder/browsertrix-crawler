@@ -17,7 +17,6 @@ app.post("/crawl", (req, res) => {
   const requiredKeys = ["url", "collection", "id"];
   const missingKeys = requiredKeys.filter((key) => !(key in reqDict));
   if (missingKeys.length === 0) {
-    res.status(200).json({info: `${reqDict.url} enqueued to crawl`});
     const args = [
       "--url", reqDict.url,
       "--collection", String(reqDict.collection),
@@ -25,7 +24,8 @@ app.post("/crawl", (req, res) => {
     ];
     args.push(...fixedArgs);
 
-    crawlProcess = child_process.spawn("crawl", args, {stdio: "inherit"});
+    crawlProcess = child_process.spawnSync("crawl", args, {stdio: "inherit"});
+    res.status(200).json({info: `${reqDict.url} crawl finished`});
   } else {
     res.status(404).json({error: "Ensure that url, collection and id is present as keys in json"});
   }
