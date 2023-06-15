@@ -3,8 +3,6 @@
 import { logger } from "./util/logger.js";
 import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
-import express from "express";
-import bodyParser from "body-parser";
 
 var crawler = null;
 
@@ -62,26 +60,5 @@ process.on("SIGUSR2", () => {
   }
 });
 
-const app = express();
-const port = 3000;
-
-app.use(bodyParser.json());
-
-app.post("/crawl", (req, res) => {
-  const reqDict = { ...req.body };
-  const requiredKeys = ["url", "collection", "id"];
-  const missingKeys = requiredKeys.filter((key) => !(key in reqDict));
-  if (missingKeys.length === 0) {
-    process.argv.push("--url", reqDict.url, "--collection", reqDict.collection, "--id", String(reqDict.id));
-    res.status(200).send(`${reqDict.url} enqueued to crawl`);
-    crawler = new Crawler();
-    crawler.run();
-  } else {
-    res.status(404).send("Ensure that url, collection and id is present as keys in json");
-  }
-});
-
-// Start the server
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
+crawler = new Crawler();
+crawler.run();

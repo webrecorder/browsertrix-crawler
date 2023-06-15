@@ -50,5 +50,4 @@ WORKDIR /crawls
 ADD docker-entrypoint.sh /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
-CMD ["crawl"]
-
+CMD ["node", "/app/server.js"]
