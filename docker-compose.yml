@@ -1,17 +1,15 @@
 version: '3.5'
-  
 services:
     crawler:
         image: ${REGISTRY}webrecorder/browsertrix-crawler:latest
         build:
           context: ./
-
         volumes:
           - ./crawls:/crawls
 
         cap_add:
           - NET_ADMIN
           - SYS_ADMIN
-
+        ports:
+          - "3000:3000"
         shm_size: 1gb
-
