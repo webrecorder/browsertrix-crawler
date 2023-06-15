@@ -4,6 +4,7 @@ import { logger } from "./util/logger.js";
 import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
 
+
 var crawler = null;
 
 var lastSigInt = 0;
@@ -62,3 +63,4 @@ process.on("SIGUSR2", () => {
 
 crawler = new Crawler();
 crawler.run();
+
