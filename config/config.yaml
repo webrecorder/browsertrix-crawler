@@ -16,3 +16,12 @@ recorder:
 
 collections:
   live: $live
+
+server:
+  generateWARC: true
+  combineWARC: true
+  workers: 3
+  scopeType: page
+  waitUntil: networkidle0
+  timeout: 30
+  behaviorTimeout: 30

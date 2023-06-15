@@ -1,12 +1,16 @@
 import express from "express";
 import bodyParser from "body-parser";
 import child_process from "child_process";
+import yaml from "js-yaml";
+import fs from "fs";
 
-console.log("In server");
 const app = express();
 const port = 3000;
 
 app.use(bodyParser.json());
+
+let crawlProcess = null;
+let fixedArgs = createArgsFromYAML();
 
 app.post("/crawl", (req, res) => {
   const reqDict = { ...req.body };
@@ -17,23 +21,37 @@ app.post("/crawl", (req, res) => {
     const args = [
       "--url", reqDict.url,
       "--collection", String(reqDict.collection),
-      "--id", String(reqDict.url),
-      "--generateWARC",
-      "--combineWARC", "true",
-      "--w", "3",
-      "--scopeType", "page-spa",
-      "--waitUntil", "networkidle0",
-      "--timeout", "30",
-      "--behaviorTimeout", "30"
+      "--id", String(reqDict.url)
     ];
-    child_process.spawn("crawl", args, {stdio: "inherit"});
+    args.push(...fixedArgs);
+
+    crawlProcess = child_process.spawn("crawl", args, {stdio: "inherit"});
   } else {
     res.status(404).json({error: "Ensure that url, collection and id is present as keys in json"});
   }
 });
 
 
-// Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
+
+
+// Handle SIGTSTP signal (Ctrl+Z)
+process.on("SIGTSTP", () => {
+  if (crawlProcess) {
+    crawlProcess.kill();
+  }
+  process.exit(0);
+});
+
+function createArgsFromYAML(){
+  // Parse the YAML content
+  const data = yaml.load(fs.readFileSync("/app/config.yaml", "utf8"));
+  let args = [];
+  // Iterate through each key-value pair
+  Object.entries(data.server).forEach(([key, value]) => {
+    args.push(`--${key}`, value);
+  });
+  return args;
+}

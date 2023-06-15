@@ -2,4 +2,3 @@ output/
 node_modules/
 crawls/
 test-crawls/
-package-lock.json
