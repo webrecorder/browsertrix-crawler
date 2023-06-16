@@ -1,8 +1,6 @@
 import {logger} from "./logger.js";
 
 export function is_valid_link(page_url, linked_url, logDetails = {}) {
-  console.log("page_url: " + page_url + " " + base_domain(page_url));
-  console.log("linked_url : " + linked_url + " " + base_domain(linked_url));
   let parsedUrl = null;
   try {
     parsedUrl = new URL(linked_url.trim());

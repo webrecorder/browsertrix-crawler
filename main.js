@@ -3,7 +3,6 @@
 import { logger } from "./util/logger.js";
 import {setExitOnRedisError} from "./util/redis.js";
 import { Crawler } from "./crawler.js";
-import Redis from "ioredis";
 
 
 var crawler = null;
