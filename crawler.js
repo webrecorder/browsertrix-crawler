@@ -34,6 +34,7 @@ import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
 import {RedisHelper} from "./util/redisHelper.js";
 import {parseUrl} from "./util/seedHelper.js";
+import {initBroadCrawlRedis} from "./util/broadCrawlRedis.js";
 
 const HTTPS_AGENT = HTTPSAgent({
   rejectUnauthorized: false,
@@ -54,6 +55,7 @@ export class Crawler {
   constructor() {
     const res = parseArgs();
     this.params = res.parsed;
+    logger.info("params",this.params);
     this.origConfig = res.origConfig;
 
     // root collections dir
@@ -168,7 +170,18 @@ export class Crawler {
       }
     }
 
-    this.redisHelper = new RedisHelper(redis);
+    let broadCrawlRedis;
+    while (true) {
+      try {
+        broadCrawlRedis = await initBroadCrawlRedis();
+        break;
+      } catch (e) {
+        //logger.fatal("Unable to connect to state store Redis: " + redisUrl);
+        logger.warn("Waiting for redis at broadcrawl", {}, "state");
+        await sleep(3);
+      }
+    }
+    this.redisHelper = new RedisHelper(broadCrawlRedis);
 
     logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
 
@@ -304,6 +317,15 @@ export class Crawler {
     try {
       await this.crawl();
       status = (!this.interrupted ? "done" : "interrupted");
+      if(!this.interrupted){
+        await this.redisHelper.pushEventToQueue("crawlStatus", JSON.stringify({
+          url: this.params.url,
+          event: "CRAWL_SUCCESS",
+          domain: this.params.domain,
+          level: this.params.level,
+          s3Path: this.warcFilePath
+        }));
+      }
     } catch(e) {
       logger.error("Crawl failed", e);
       exitCode = 9;
@@ -409,7 +431,6 @@ export class Crawler {
     const {page, cdp, data, workerid} = opts;
 
     const {url} = data;
-    await this.writeStats(false, {url: url, data: data});
 
     const logDetails = {page: url, workerid};
     data.logDetails = logDetails;
@@ -496,13 +517,13 @@ export class Crawler {
       }
     } else {
       logger.warn("Page Load Failed", {loadState, ...logDetails}, "pageStatus");
-
       await this.crawlState.markFailed(data.url);
 
       if (this.healthChecker) {
         this.healthChecker.incError();
       }
     }
+    logger.info("crawl complete");
 
     await this.serializeConfig();
 
@@ -644,11 +665,11 @@ export class Crawler {
     }
 
     if (interrupt) {
-      this.gracefulFinish();
+      await this.gracefulFinish();
     }
   }
 
-  gracefulFinish() {
+  async gracefulFinish() {
     this.interrupted = true;
     logger.info("Crawler interrupted, gracefully finishing current pages");
     if (!this.params.waitOnDone) {
@@ -793,7 +814,10 @@ export class Crawler {
 
   async postCrawl() {
     if (this.params.combineWARC) {
-      await this.combineWARC();
+      this.warcFilePath = await this.combineWARC();
+      this.storage = initStorage();
+      await this.storage.uploadFile(this.warcFilePath, "targetFilename");
+      logger.info("this storage",this.storage);
     }
 
     if (this.params.generateCDX) {
@@ -963,12 +987,10 @@ export class Crawler {
     logger.debug("Memory", {maxHeapUsed: this.maxHeapUsed, maxHeapTotal: this.maxHeapTotal, ...memUsage}, "memory");
   }
 
-  async writeStats(toFile=false, data = {}) {
+  async writeStats(toFile=false) {
     if (!this.params.logging.includes("stats")) {
       return;
     }
-
-    logger.info("TEST LOG",data);
 
     const realSize = await this.crawlState.queueSize();
     const pendingList = await this.crawlState.getPendingList();
@@ -990,6 +1012,7 @@ export class Crawler {
 
     if (toFile && this.params.statsFilename) {
       try {
+
         await fsp.writeFile(this.params.statsFilename, JSON.stringify(stats, null, 2));
       } catch (err) {
         logger.warn("Stats output failed", err);
@@ -1084,7 +1107,7 @@ export class Crawler {
           }
         } else {
           if (failCrawlOnError) {
-            await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error: ${msg}`})
+            await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error: ${msg}`}));
             logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
           } else {
             logger.error("Page Load Error, skipping page", {msg, ...logDetails});
@@ -1133,7 +1156,7 @@ export class Crawler {
       for(const link of links) {
         let parsedLink = parseUrl(link);
         if (parsedLink !== null) {
-          await this.redisHelper.pushEventToQueue("extractedUrls",JSON.stringify({link: parsedLink, event: "ADD_URL", domain: this.params.domain, level: this.params.level}));
+          await this.redisHelper.pushEventToQueue("extractedUrls",JSON.stringify({link: parsedLink, event: "ADD_URL", domain: this.params.domain, level: this.params.level + 1}));
           parsedLinks.push(parsedLink);
         }
       }
@@ -1494,9 +1517,13 @@ export class Crawler {
     }
 
     logger.debug(`Combined WARCs saved as: ${generatedCombinedWarcs}`);
+    return combinedWarcFullPath;
   }
 
   async serializeConfig(done = false) {
+    logger.info("this.params.saveState",this.params.saveState);
+    logger.info("done",done);
+    logger.info("crawlstate",await this.crawlState.isFinished());
     switch (this.params.saveState) {
     case "never":
       return;
@@ -1523,6 +1550,7 @@ export class Crawler {
         return;
       }
     }
+    logger.info("STORAGE2",this.storage);
 
     this.lastSaveTime = now.getTime();
 
@@ -1562,6 +1590,7 @@ export class Crawler {
       }
     }
 
+    logger.info("STORAGE",this.storage);
     if (this.storage && done && this.params.saveState === "always") {
       const targetFilename = interpolateFilename(filenameOnly, this.crawlId);
 

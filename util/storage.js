@@ -22,6 +22,8 @@ export class S3StorageSync
     let accessKey;
     let secretKey;
 
+    logger.info("url",urlOrData);
+    logger.info("url",typeof(urlOrData));
     if (typeof(urlOrData) === "string") {
       url = new URL(urlOrData);
       accessKey = url.username;
