@@ -175,7 +175,3 @@ export function rxEscape(string) {
 export function urlRxEscape(url, parsedUrl) {
   return rxEscape(url).replace(parsedUrl.protocol, "https?:");
 }
-
-
-
-

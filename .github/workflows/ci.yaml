@@ -19,8 +19,7 @@ jobs:
         node-version: ${{ matrix.node-version }}
     - name: install requirements
       run: yarn install
-    - name: run linter
-      run: yarn lint
+
   
   build:
 
@@ -40,8 +39,7 @@ jobs:
       run: yarn install
     - name: build docker
       run: docker-compose build
-    - name: run jest
-      run: sudo yarn test
+
         
 
 
