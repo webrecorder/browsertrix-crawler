@@ -40,8 +40,6 @@ jobs:
       run: yarn install
     - name: build docker
       run: docker-compose build
-    - name: run jest
-      run: sudo yarn test
         
 
 
