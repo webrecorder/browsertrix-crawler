@@ -33,7 +33,7 @@ import { OriginOverride } from "./util/originoverride.js";
 import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
 import {RedisHelper} from "./util/redisHelper.js";
-import {parseUrl} from "./util/seedHelper.js";
+import {is_valid_link} from "./util/seedHelper.js";
 import {initBroadCrawlRedis} from "./util/broadCrawlRedis.js";
 
 const HTTPS_AGENT = HTTPSAgent({
@@ -814,10 +814,11 @@ export class Crawler {
 
   async postCrawl() {
     if (this.params.combineWARC) {
-      this.warcFilePath = await this.combineWARC();
-      this.storage = initStorage();
-      await this.storage.uploadFile(this.warcFilePath, "targetFilename");
-      logger.info("this storage",this.storage);
+      await this.combineWARC();
+      // this.warcFilePath = await this.combineWARC();
+      // this.storage = initStorage();
+      // await this.storage.uploadFile(this.warcFilePath, "targetFilename");
+      // logger.info("this storage",this.storage);
     }
 
     if (this.params.generateCDX) {
@@ -1149,18 +1150,17 @@ export class Crawler {
     }
 
     logger.debug("Extracting links");
-
     for (const opts of selectorOptsList) {
       const links = await this.extractLinks(page, data.filteredFrames, opts, logDetails);
       const parsedLinks = [];
       for(const link of links) {
-        let parsedLink = parseUrl(link);
+        if(is_valid_link(page.url(), link) === false) continue;
+        const parsedLink = new URL(link.trim());
         if (parsedLink !== null) {
           await this.redisHelper.pushEventToQueue("extractedUrls",JSON.stringify({link: parsedLink, event: "ADD_URL", domain: this.params.domain, level: this.params.level + 1}));
           parsedLinks.push(parsedLink);
         }
       }
-
       await this.queueInScopeUrls(seedId, parsedLinks, depth, extraHops, logDetails);
     }
   }

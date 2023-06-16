@@ -1,12 +1,11 @@
 import { logger } from "./logger.js";
 import { MAX_DEPTH } from "./constants.js";
-import {parseUrl} from "./seedHelper.js";
 
 
 export class ScopedSeed
 {
   constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} = {}) {
-    const parsedUrl = parseUrl(url);
+    const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       logger.fatal(`Invalid Seed "${url}" - not a valid URL`);
     }
@@ -20,7 +19,8 @@ export class ScopedSeed
     }
 
     if (this.scopeType !== "custom") {
-      [this.include, allowHash] = this.scopeFromType(this.scopeType, parsedUrl);
+      [include, allowHash] = this.scopeFromType(this.scopeType, parsedUrl);
+      this.include = [...include, ...this.include];
     }
 
     this.sitemap = this.resolveSiteMap(sitemap);
@@ -39,21 +39,21 @@ export class ScopedSeed
     }
   }
 
-  // parseUrl(url, logDetails = {}) {
-  //   let parsedUrl = null;
-  //   try {
-  //     parsedUrl = new URL(url.trim());
-  //   } catch (e) {
-  //     logger.warn("Invalid Seed - not a valid URL", {url, ...logDetails});
-  //   }
-  //
-  //   if (parsedUrl.protocol !== "http:" && parsedUrl.protocol != "https:") {
-  //     logger.warn("Invalid Seed - URL must start with http:// or https://", {url, ...logDetails});
-  //     parsedUrl = null;
-  //   }
-  //
-  //   return parsedUrl;
-  // }
+  parseUrl(url, logDetails = {}) {
+    let parsedUrl = null;
+    try {
+      parsedUrl = new URL(url.trim());
+    } catch (e) {
+      logger.warn("Invalid Seed - not a valid URL", {url, ...logDetails});
+    }
+
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol != "https:") {
+      logger.warn("Invalid Seed - URL must start with http:// or https://", {url, ...logDetails});
+      parsedUrl = null;
+    }
+
+    return parsedUrl;
+  }
 
   resolveSiteMap(sitemap) {
     if (sitemap === true) {
@@ -114,9 +114,8 @@ export class ScopedSeed
     if (depth > this.maxDepth) {
       return false;
     }
-    logger.info("URL >>>> " + url);
 
-    url = parseUrl(url, logDetails);
+    url = this.parseUrl(url, logDetails);
     if (!url) {
       return false;
     }
@@ -140,7 +139,7 @@ export class ScopedSeed
 
     // check scopes
     for (const s of this.include) {
-      if (s.exec(url)) {
+      if (s.test(url)) {
         inScope = true;
         break;
       }
@@ -159,7 +158,7 @@ export class ScopedSeed
 
     // check exclusions
     for (const e of this.exclude) {
-      if (e.exec(url)) {
+      if (e.test(url)) {
         //console.log(`Skipping ${url} excluded by ${e}`);
         return false;
       }
@@ -176,7 +175,3 @@ export function rxEscape(string) {
 export function urlRxEscape(url, parsedUrl) {
   return rxEscape(url).replace(parsedUrl.protocol, "https?:");
 }
-
-
-
-
