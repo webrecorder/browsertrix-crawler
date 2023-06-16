@@ -20,7 +20,6 @@ ENV PROXY_HOST=localhost \
     STORE_PATH=/staging/test \
     STORE_FILENAME=filename
 
-COPY .env ./
 
 WORKDIR /app
 

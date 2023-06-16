@@ -1,7 +1,7 @@
 #!/usr/bin/env -S node --experimental-global-webcrypto
 
 import { logger } from "./util/logger.js";
-import {setExitOnRedisError} from "./util/redis.js";
+import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
 
 
