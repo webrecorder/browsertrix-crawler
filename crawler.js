@@ -343,6 +343,10 @@ export class Crawler {
       }
       break;
 
+    case "error":
+      logger.error(message, details, "behaviorScript");
+      break;
+
     case "debug":
     default:
       logger.debug(message, details, "behaviorScript");
@@ -395,14 +399,24 @@ export class Crawler {
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
-      await this.browser.addInitScript(page, behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
+      await this.browser.addInitScript(page, behaviors);
+      let customBehaviors = "null";
+
       if (this.params.customBehaviors) {
-        for (const source of collectAllFileSources(this.params.customBehaviors, ".js")) {
-          await page.addInitScript(`self.__bx_behaviors.load(${source});`);
-        }
+        customBehaviors = this.loadCustomBehaviors(this.params.customBehaviors);
       }
-      await this.browser.addInitScript(`self.__bx_behaviors.init(${this.params.behaviorOpts});`);
+      await this.browser.addInitScript(page, `self.__bx_behaviors.init(${this.params.behaviorOpts}, false, ${customBehaviors});`);
     }
+  }
+
+  loadCustomBehaviors(filename) {
+    let funcs = [];
+
+    for (const source of collectAllFileSources(filename, ".js")) {
+      funcs.push(source);
+    }
+
+    return "[" + funcs.join(",") + "]";
   }
 
   async crawlPage(opts) {
