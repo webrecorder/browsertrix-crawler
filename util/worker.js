@@ -215,7 +215,7 @@ export class PageWorker
   async runLoop() {
     const crawlState = this.crawler.crawlState;
 
-    while (!this.crawler.interrupted) {
+    while (!this.crawler.interrupted && !await crawlState.isCrawlStopped()) {
       const data = await crawlState.nextFromQueue();
 
       // see if any work data in the queue

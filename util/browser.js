@@ -36,17 +36,25 @@ export class BaseBrowser
 
     const args = this.chromeArgs(chromeOptions);
 
+    let defaultViewport = null;
+
+    if (process.env.GEOMETRY) {
+      const geom = process.env.GEOMETRY.split("x");
+
+      defaultViewport = {width: Number(geom[0]), height: Number(geom[1])};
+    }
+
     const launchOpts = {
       args,
-      headless,
+      headless: headless ? "new" : false,
       executablePath: this.getBrowserExe(),
-      ignoreDefaultArgs: ["--enable-automation"],
+      ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
       ignoreHTTPSErrors: true,
       handleSIGHUP: signals,
       handleSIGINT: signals,
       handleSIGTERM: signals,
 
-      defaultViewport: null,
+      defaultViewport,
       waitForInitialPage: false,
       userDataDir: this.profileDir
     };
@@ -117,6 +125,7 @@ export class BaseBrowser
       "--no-sandbox",
       "--disable-background-media-suspend",
       "--remote-debugging-port=9221",
+      "--remote-allow-origins=*",
       "--autoplay-policy=no-user-gesture-required",
       "--disable-site-isolation-trials",
       `--user-agent=${userAgent || this.getDefaultUA()}`,
@@ -366,7 +375,8 @@ export const defaultArgs = [
   "--disable-extensions",
   // AvoidUnnecessaryBeforeUnloadCheckSync - https://github.com/microsoft/playwright/issues/14047
   // Translate - https://github.com/microsoft/playwright/issues/16126
-  "--disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate",
+  // Optimization* - https://bugs.chromium.org/p/chromium/issues/detail?id=1311753
+  "--disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,OptimizationGuideModelDownloading,OptimizationHintsFetching,OptimizationTargetPrediction,OptimizationHints",
   "--allow-pre-commit-input",
   "--disable-hang-monitor",
   "--disable-ipc-flooding-protection",

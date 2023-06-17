@@ -315,14 +315,13 @@ function promptInput(msg, hidden = false) {
 class InteractiveBrowser {
   constructor(params, browser, page, cdp, targetId) {
     logger.info("Creating Profile Interactively...");
-    child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
+    child_process.spawn("socat", ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"]);
 
     this.params = params;
     this.browser = browser;
     this.page = page;
     this.cdp = cdp;
 
-    //const target = page.target();
     this.targetId = targetId;
 
     this.originSet = new Set();
@@ -331,15 +330,17 @@ class InteractiveBrowser {
 
     page.on("load", () => this.handlePageLoad());
 
-    page.on("popup", async () => {
-      await cdp.send("Target.activateTarget", {targetId: this.targetId});
-    });
+    // attempt to keep everything to initial tab if headless
+    if (this.params.headless) {
+      cdp.send("Page.enable");
 
-    cdp.on("Page.windowOpen", async (resp) => {
-      if (resp.url) {
-        await page.goto(resp.url);
-      }
-    });
+      cdp.on("Page.windowOpen", async (resp) => {
+        if (resp.url) {
+          await cdp.send("Target.activateTarget", {targetId: this.targetId});
+          await page.goto(resp.url);
+        }
+      });
+    }
 
     this.shutdownWait = params.shutdownWait * 1000;
     

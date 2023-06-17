@@ -373,6 +373,12 @@ class ArgParser {
         type: "boolean",
         default: false,
       },
+
+      "failOnFailedSeed": {
+        describe: "If set, crawler will fail with exit code 1 if any seed fails",
+        type: "boolean",
+        default: false
+      }
     };
   }
 
@@ -380,7 +386,7 @@ class ArgParser {
     argv = argv || process.argv;
 
     if (process.env.CRAWL_ARGS) {
-      argv = argv.concat(process.env.CRAWL_ARGS.split(" "));
+      argv = argv.concat(this.splitCrawlArgsQuoteSafe(process.env.CRAWL_ARGS));
     }
 
     let origConfig = {};
@@ -401,6 +407,11 @@ class ArgParser {
     return {parsed, origConfig};
   }
 
+  splitCrawlArgsQuoteSafe(crawlArgs) {
+    // Split process.env.CRAWL_ARGS on spaces but retaining spaces within double quotes
+    const regex = /"[^"]+"|[^\s]+/g;
+    return crawlArgs.match(regex).map(e => e.replace(/"(.+)"/, "$1"));
+  }
 
   validateArgs(argv) {
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
@@ -486,14 +497,6 @@ class ArgParser {
         argv.netIdleWait = 2;
       }
       //logger.debug(`Set netIdleWait to ${argv.netIdleWait} seconds`);
-    }
-
-    // prefer argv.include only if string or a non-empty array
-    if (argv.include && (typeof(argv.include) === "string" || argv.include.length)) {
-      if (argv.scopeType && argv.scopeType !== "custom") {
-        logger.info("You've specified a --scopeType and a --scopeIncludeRx / --include regex. The custom scope regex will take precedence, overriding the scopeType");
-        argv.scopeType = "custom";
-      }
     }
 
     const scopeOpts = {

@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=109
+ARG BROWSER_VERSION=112
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:chrome-${BROWSER_VERSION}
 #ARG BROWSER_VERSION=1.47.186
 #ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}

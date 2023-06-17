@@ -43,6 +43,8 @@ const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/
 const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
 
+const POST_CRAWL_STATES = ["generate-wacz", "uploading-wacz", "generate-cdx", "generate-warc"];
+
 
 // ============================================================================
 export class Crawler {
@@ -257,7 +259,7 @@ export class Crawler {
       }
     });
 
-    child_process.spawn("socat", ["tcp-listen:9222,fork", "tcp:localhost:9221"]);
+    child_process.spawn("socat", ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"]);
 
     if (!this.params.headless && !process.env.NO_XVFB) {
       child_process.spawn("Xvfb", [
@@ -700,7 +702,12 @@ export class Crawler {
       this.storage = initStorage();
     }
 
-    if (initState === "finalize") {
+    if (POST_CRAWL_STATES.includes(initState)) {
+      logger.info("crawl already finished, running post-crawl tasks", {state: initState});
+      await this.postCrawl();
+      return;
+    } else if (await this.crawlState.isCrawlStopped()) {
+      logger.info("crawl stopped, running post-crawl tasks");
       await this.postCrawl();
       return;
     }
@@ -782,7 +789,13 @@ export class Crawler {
     if (this.params.generateCDX) {
       logger.info("Generating CDX");
       await fsp.mkdir(path.join(this.collDir, "indexes"), {recursive: true});
-      await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+      await this.crawlState.setStatus("generate-cdx");
+      const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+      if (indexResult === 0) {
+        logger.debug("Indexing complete, CDX successfully created");
+      } else {
+        logger.error("Error indexing and generating CDX", {"status code": indexResult});
+      }
     }
 
     await this.closeLog();
@@ -822,6 +835,7 @@ export class Crawler {
 
   async generateWACZ() {
     logger.info("Generating WACZ");
+    await this.crawlState.setStatus("generate-wacz");
 
     const archiveDir = path.join(this.collDir, "archive");
 
@@ -836,6 +850,10 @@ export class Crawler {
       // if finished, just return
       if (isFinished) {
         return;
+      }
+      // if stopped, won't get anymore data, so consider failed
+      if (await this.crawlState.isCrawlStopped()) {
+        await this.crawlState.setStatus("failed");
       }
       logger.fatal("No WARC Files, assuming crawl failed");
     }
@@ -899,6 +917,7 @@ export class Crawler {
     }
 */
     if (this.storage) {
+      await this.crawlState.setStatus("uploading-wacz");
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
       const targetFilename = interpolateFilename(filename, this.crawlId);
 
@@ -907,15 +926,27 @@ export class Crawler {
   }
 
   awaitProcess(proc) {
+    let stdout = [];
+    let stderr = [];
+
     proc.stdout.on("data", (data) => {
-      logger.debug(data.toString());
+      stdout.push(data.toString());
     });
 
     proc.stderr.on("data", (data) => {
-      logger.error(data.toString());
+      stderr.push(data.toString());
     });
+
     return new Promise((resolve) => {
-      proc.on("close", (code) => resolve(code));
+      proc.on("close", (code) => {
+        if (stdout.length) {
+          logger.debug(stdout.join("\n"));
+        }
+        if (stderr.length && this.params.logging.includes("debug")) {
+          logger.error(stderr.join("\n"));
+        }
+        resolve(code);
+      });
     });
   }
 
@@ -964,6 +995,8 @@ export class Crawler {
 
     const logDetails = data.logDetails;
 
+    const failCrawlOnError = ((depth === 0) && this.params.failOnFailedSeed);
+
     let isHTMLPage = await timedRun(
       this.isHTML(url),
       FETCH_TIMEOUT_SECS,
@@ -1010,6 +1043,17 @@ export class Crawler {
     try {
       const resp = await page.goto(url, gotoOpts);
 
+      // Handle 4xx or 5xx response as a page load error
+      const statusCode = resp.status();
+      if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
+        if (failCrawlOnError) {
+          logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails});
+        } else {
+          logger.error("Page Load Error, skipping page", {statusCode, ...logDetails});
+          throw new Error(`Page ${url} returned status code ${statusCode}`);
+        }
+      }
+
       const contentType = await this.browser.responseHeader(resp, "content-type");
 
       isHTMLPage = this.isHTMLContentType(contentType);
@@ -1019,15 +1063,23 @@ export class Crawler {
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         if (e.name === "TimeoutError") {
           if (data.loadState !== LoadState.CONTENT_LOADED) {
-            logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
-            throw e;
+            if (failCrawlOnError) {
+              logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
+            } else {
+              logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
+              throw e;
+            }
           } else {
             logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
             data.skipBehaviors = true;
           }
         } else {
-          logger.error("Page Load Error, skipping page", {msg, ...logDetails});
-          throw e;
+          if (failCrawlOnError) {
+            logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
+          } else {
+            logger.error("Page Load Error, skipping page", {msg, ...logDetails});
+            throw e;
+          }
         }
       }
     }
@@ -1295,6 +1347,7 @@ export class Crawler {
 
   // async awaitPendingClear() {
   //   logger.info("Waiting to ensure pending data is written to WARCs...");
+  //   await this.crawlState.setStatus("pending-wait");
 
   //   const redis = await initRedis("redis://localhost/0");
 
@@ -1330,6 +1383,7 @@ export class Crawler {
 
   async combineWARC() {
     logger.info("Generating Combined WARCs");
+    await this.crawlState.setStatus("generate-warc");
 
     // Get the list of created Warcs
     const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));
