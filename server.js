@@ -13,22 +13,27 @@ let crawlProcess = null;
 let fixedArgs = createArgsFromYAML();
 
 app.post("/crawl", (req, res) => {
-  const reqDict = { ...req.body };
-  const requiredKeys = ["url", "collection", "id"];
-  const missingKeys = requiredKeys.filter((key) => !(key in reqDict));
-  if (missingKeys.length === 0) {
-    const args = [
-      "--url", reqDict.url,
-      "--collection", String(reqDict.collection),
-      "--id", String(reqDict.url)
-    ];
-    args.push(...fixedArgs);
+  try {
+    const reqDict = {...req.body};
+    const requiredKeys = ["url", "collection", "id"];
+    const missingKeys = requiredKeys.filter((key) => !(key in reqDict));
+    if (missingKeys.length === 0) {
+      const args = [
+        "--url", reqDict.url,
+        "--collection", String(reqDict.collection),
+        "--id", String(reqDict.url)
+      ];
+      args.push(...fixedArgs);
 
-    crawlProcess = child_process.spawnSync("crawl", args, {stdio: "inherit"});
-    res.status(200).json({info: `${reqDict.url} crawl finished`});
-  } else {
-    res.status(404).json({error: "Ensure that url, collection and id is present as keys in json"});
+      crawlProcess = child_process.spawnSync("crawl", args, {stdio: "inherit"});
+      res.status(200).json({info: `${reqDict.url} crawl finished`});
+    } else {
+      res.status(404).json({error: "Ensure that url, collection and id is present as keys in json"});
+    }
+  } catch (e) {
+    res.status(500).json({error: e.message});
   }
+
 });
 
 
