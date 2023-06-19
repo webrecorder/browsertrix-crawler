@@ -23,7 +23,7 @@ app.post("/crawl", (req, res) => {
         "--domain", reqDict.domain,
         "--level", String(reqDict.level),
         "--collection", String(reqDict.collection),
-        "--id", String(reqDict.url)
+        "--id", String(reqDict.id)
       ];
       args.push(...fixedArgs);
 

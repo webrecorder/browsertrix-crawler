@@ -1,7 +1,7 @@
 version: '3.5'
 services:
     crawler:
-        image: ${REGISTRY}synpatic/browsertrix-crawler:latest
+        image: synpatic/browsertrix-crawler:latest
         build:
           context: ./
         volumes:
