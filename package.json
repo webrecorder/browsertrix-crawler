@@ -12,10 +12,11 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
+    "aws-sdk": "^2.1399.0",
     "body-parser": "^1.20.2",
     "browsertrix-behaviors": "^0.5.0-beta.0",
-    "express": "^4.18.2",
     "dotenv": "^16.1.4",
+    "express": "^4.18.2",
     "get-folder-size": "^4.0.0",
     "ioredis": "^4.27.1",
     "js-yaml": "^4.1.0",

@@ -36,6 +36,9 @@ import {RedisHelper} from "./util/redisHelper.js";
 import {is_valid_link} from "./util/seedHelper.js";
 import {initBroadCrawlRedis} from "./util/broadCrawlRedis.js";
 
+import AWS from "aws-sdk";
+
+
 const HTTPS_AGENT = HTTPSAgent({
   rejectUnauthorized: false,
 });
@@ -316,6 +319,7 @@ export class Crawler {
 
     try {
       await this.crawl();
+      logger.info("status",this.interrupted);
       status = (!this.interrupted ? "done" : "interrupted");
       if(!this.interrupted){
         await this.redisHelper.pushEventToQueue("crawlStatus", JSON.stringify({
@@ -324,6 +328,14 @@ export class Crawler {
           domain: this.params.domain,
           level: this.params.level,
           s3Path: this.warcFilePath
+        }));
+      }else{
+        await this.redisHelper.pushEventToQueue("crawlStatus", JSON.stringify({
+          url: this.params.url,
+          event: "CRAWL_FAIL",
+          domain: this.params.domain,
+          level: this.params.level,
+          message: "Crawl interrupted. Please check logs for a detailed reason."
         }));
       }
     } catch(e) {
@@ -812,13 +824,42 @@ export class Crawler {
     await this.postCrawl();
   }
 
+  async uploadToS3(filePath) {
+    // Configure AWS credentials
+    const credentials  = {
+      accessKeyId: process.env.STORE_ACCESS_KEY,
+      secretAccessKey: process.env.STORE_SECRET_KEY,
+      sessionToken: process.env.SESSION_TOKEN
+    };
+
+    // Create an S3 client
+    AWS.config.update({ credentials });
+    const s3 = new AWS.S3();
+    // Define the bucket name and file path
+    const bucketName = "crawler-test-1";
+
+    // Set the parameters for the S3 upload
+    const params = {
+      Bucket: bucketName,
+      Key: "test.warc.gz", // Specify the desired destination file name in the bucket
+      Body: fs.createReadStream(filePath),
+    };
+
+    try {
+      // Upload the file to S3
+      const result = await s3.upload(params).promise();
+      console.log("File uploaded successfully:", result.Location);
+    } catch (e){
+      logger.error("error",e);
+    }
+
+  }
+
   async postCrawl() {
     if (this.params.combineWARC) {
-      await this.combineWARC();
-      // this.warcFilePath = await this.combineWARC();
-      // this.storage = initStorage();
-      // await this.storage.uploadFile(this.warcFilePath, "targetFilename");
-      // logger.info("this storage",this.storage);
+      // await this.combineWARC();
+      this.warcFilePath = await this.combineWARC();
+      await this.uploadToS3(this.warcFilePath);
     }
 
     if (this.params.generateCDX) {
