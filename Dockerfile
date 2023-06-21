@@ -51,7 +51,5 @@ RUN ln -s /app/main.js /usr/bin/crawl; ln -s /app/create-login-profile.js /usr/b
 
 WORKDIR /crawls
 
-ADD docker-entrypoint.sh /docker-entrypoint.sh
-ENTRYPOINT ["/docker-entrypoint.sh"]
-
-CMD ["node", "/app/server.js"]
+ADD docker-entrypoint-1.sh /docker-entrypoint-1.sh
+ENTRYPOINT ["/docker-entrypoint-1.sh"]
