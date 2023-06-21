@@ -4,6 +4,7 @@ services:
         image: browsertrix:latest
         build:
           context: ./
+        platform: linux/amd64
         volumes:
           - ./crawls:/crawls
 
