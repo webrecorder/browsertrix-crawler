@@ -1,12 +1,12 @@
 version: '3.5'
 services:
     crawler:
-        image: browsertrix:latest
+        image: adityaraj28/browsertrix-crawler:latest
         build:
           context: ./
         platform: linux/amd64
         volumes:
-          - ./crawls:/crawls
+          - /crawls:/crawls
 
         cap_add:
           - NET_ADMIN
