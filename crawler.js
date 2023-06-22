@@ -814,11 +814,6 @@ export class Crawler {
 
   async postCrawl() {
     if (this.params.combineWARC) {
-      await this.combineWARC();
-      // this.warcFilePath = await this.combineWARC();
-      // this.storage = initStorage();
-      // await this.storage.uploadFile(this.warcFilePath, "targetFilename");
-      // logger.info("this storage",this.storage);
     }
 
     if (this.params.generateCDX) {
