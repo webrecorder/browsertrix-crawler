@@ -6,22 +6,20 @@ FROM ${BROWSER_IMAGE_BASE}
 # needed to add args to main build stage
 ARG BROWSER_VERSION
 
-ENV PROXY_HOST=localhost \
-    PROXY_PORT=8080 \
-    PROXY_CA_URL=http://wsgiprox/download/pem \
-    PROXY_CA_FILE=/tmp/proxy-ca.pem \
-    DISPLAY=:99 \
-    GEOMETRY=1360x1020x16 \
-    BROWSER_VERSION=${BROWSER_VERSION} \
-    BROWSER_BIN=google-chrome \
-    OPENSSL_CONF=/app/openssl.conf \
-    VNC_PASS=vncpassw0rd! \
-    STORE_ENDPOINT_URL='{ENDPOINT}' \
-    STORE_PATH=/crawler-test-1/ \
-    STORE_ACCESS_KEY="{ACCESS_KEY}" \
-    STORE_SECRET_KEY="{SECRET_KEY}" \
-    SESSION_TOKEN="{SESSION_TOKEN}"
-
+#ENV PROXY_HOST=localhost \
+#    PROXY_PORT=8080 \
+#    PROXY_CA_URL=http://wsgiprox/download/pem \
+#    PROXY_CA_FILE=/tmp/proxy-ca.pem \
+#    DISPLAY=:99 \
+#    GEOMETRY=1360x1020x16 \
+#    BROWSER_VERSION=${BROWSER_VERSION} \
+#    BROWSER_BIN=google-chrome \
+#    OPENSSL_CONF=/app/openssl.conf \
+#    STORE_ENDPOINT_URL="http://crawler-test-1.s3-website-us-east-1.amazonaws.com" \
+#    STORE_PATH=/crawler-test-1/ \
+#    STORE_ACCESS_KEY=$AWS_ACCESS_KEY_ID \
+#    STORE_SECRET_KEY=$AWS_SECRET_ACCESS_KEY \
+#    SESSION_TOKEN=$AWS_SESSION_TOKEN
 
 WORKDIR /app
 

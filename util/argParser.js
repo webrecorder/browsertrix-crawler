@@ -84,7 +84,7 @@ class ArgParser {
       "pageLoadTimeout": {
         alias: "timeout",
         describe: "Timeout for each page to load (in seconds)",
-        default: 90,
+        default: 1000,
         type: "number",
       },
 
@@ -239,7 +239,7 @@ class ArgParser {
 
       "behaviorTimeout": {
         describe: "If >0, timeout (in seconds) for in-page behavior will run on each page. If 0, a behavior can run until finish.",
-        default: 90,
+        default: 1000,
         type: "number",
       },
 

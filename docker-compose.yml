@@ -13,3 +13,22 @@ services:
         ports:
           - "3000:3000"
         shm_size: 1gb
+        env_file:
+          - ./.env
+        environment:
+          - PROXY_HOST=localhost
+          - PROXY_PORT=8080
+          - PROXY_CA_URL=http://wsgiprox/download/pem
+          - PROXY_CA_FILE=/tmp/proxy-ca.pem
+          - DISPLAY=:99
+          - GEOMETRY=1360x1020x16
+          - BROWSER_VERSION=${BROWSER_VERSION}
+          - BROWSER_BIN=google-chrome
+          - OPENSSL_CONF=/app/openssl.conf
+          - STORE_PATH=/crawler-test-1/
+          - STORE_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+          - STORE_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+          - SESSION_TOKEN=${AWS_SESSION_TOKEN}
+          - ENVIRONMENT=${ENVIRONMENT}
+          - SOCKS_HOST=${SOCKS_HOST}
+          - SOCKS_PORT=${SOCKS_PORT}

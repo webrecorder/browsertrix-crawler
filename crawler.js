@@ -47,8 +47,8 @@ const HTTP_AGENT = HTTPAgent();
 
 const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
-const FETCH_TIMEOUT_SECS = 30;
-const PAGE_OP_TIMEOUT_SECS = 5;
+const FETCH_TIMEOUT_SECS = 3000;
+const PAGE_OP_TIMEOUT_SECS = 5000;
 
 const POST_CRAWL_STATES = ["generate-wacz", "uploading-wacz", "generate-cdx", "generate-warc"];
 
@@ -70,6 +70,11 @@ export class Crawler {
     logger.setDebugLogging(debugLogging);
     logger.setLogLevel(this.params.logLevel);
     logger.setContext(this.params.context);
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    this.current_date = `${year}-${month}-${day}`;
 
     logger.debug("Writing log to: " + this.logFilename, {}, "init");
 
@@ -321,17 +326,17 @@ export class Crawler {
       await this.crawl();
       logger.info("status",this.interrupted);
       status = (!this.interrupted ? "done" : "interrupted");
-      if(!this.interrupted){
+      if(!this.interrupted || this.s3FilePath){
         await this.redisHelper.pushEventToQueue("crawlStatus", JSON.stringify({
-          url: this.params.url,
+          url: this.params.url[0],
           event: "CRAWL_SUCCESS",
           domain: this.params.domain,
           level: this.params.level,
-          s3Path: this.warcFilePath
+          s3Path: this.s3FilePath
         }));
       }else{
         await this.redisHelper.pushEventToQueue("crawlStatus", JSON.stringify({
-          url: this.params.url,
+          url: this.params.url[0],
           event: "CRAWL_FAIL",
           domain: this.params.domain,
           level: this.params.level,
@@ -448,10 +453,10 @@ export class Crawler {
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    if (!this.isInScope(data, logDetails)) {
-      logger.info("Page no longer in scope", data);
-      return true;
-    }
+    // if (!this.isInScope(data, logDetails)) {
+    //   logger.info("Page no longer in scope", data);
+    //   return true;
+    // }
 
     // run custom driver here
     await this.driver({page, data, crawler: this});
@@ -821,7 +826,7 @@ export class Crawler {
     // extra wait for all resources to land into WARCs
     await this.awaitPendingClear();
 
-    await this.postCrawl();
+    await this.postCrawl(true);
   }
 
   async uploadToS3(filePath) {
@@ -838,28 +843,71 @@ export class Crawler {
     // Define the bucket name and file path
     const bucketName = "crawler-test-1";
 
+    let collectionDirectory = path.dirname(filePath);
+    let logDirectoryPath = path.join(collectionDirectory, "logs", "");
+    logger.info("log file path",logDirectoryPath);
+    let prefixKey = `${process.env.ENVIRONMENT}/${this.params.domain}/level_${this.params.level}/${this.params.crawlId}/${this.current_date}/`;
+
+
+    fs.readdir(logDirectoryPath, async (err, files) => {
+      if (err) {
+        console.error("Error reading directory:", err);
+        return;
+      }
+
+      console.log("Files in directory:");
+      for (const file of files) {
+        const logFilePath = path.join(logDirectoryPath, file);
+        const params = {
+          Bucket: bucketName,
+          Key: `${prefixKey}${file}`, // Specify the desired destination file name in the bucket
+          Body: fs.createReadStream(logFilePath),
+        };
+
+        try {
+          // Upload the file to S3
+          const result = await s3.upload(params).promise();
+          console.log("File uploaded successfully:", result.Location);
+          // remove  collection on successful upload TODO
+        } catch (e) {
+          logger.error("error", e);
+        }
+      }
+    });
+
     // Set the parameters for the S3 upload
     const params = {
       Bucket: bucketName,
-      Key: "test.warc.gz", // Specify the desired destination file name in the bucket
+      Key: `${prefixKey}${this.params.crawlId}.warc.gz`, // Specify the desired destination file name in the bucket
       Body: fs.createReadStream(filePath),
     };
 
     try {
       // Upload the file to S3
       const result = await s3.upload(params).promise();
+      this.s3FilePath = result.Location;
       console.log("File uploaded successfully:", result.Location);
+      // remove  collection on successful upload TODO
     } catch (e){
       logger.error("error",e);
     }
 
+    fs.rmdir(collectionDirectory, { recursive: true }, (err) => {
+      if (err) {
+        console.error("Error removing directory:", err);
+        return;
+      }
+
+      console.log("Directory removed:", collectionDirectory);
+    });
   }
 
-  async postCrawl() {
+  async postCrawl(done=false) {
     if (this.params.combineWARC) {
       // await this.combineWARC();
-      this.warcFilePath = await this.combineWARC();
-      await this.uploadToS3(this.warcFilePath);
+      let warcFilePath = await this.combineWARC();
+      if(done)
+        await this.uploadToS3(warcFilePath);
     }
 
     if (this.params.generateCDX) {
@@ -1117,13 +1165,14 @@ export class Crawler {
 
     logger.info("failed on seed",{failCrawlOnError: failCrawlOnError});
     try {
+      logger.info("goto options",gotoOpts);
       const resp = await page.goto(url, gotoOpts);
 
       // Handle 4xx or 5xx response as a page load error
       const statusCode = resp.status();
       if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
         if (failCrawlOnError) {
-          await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error, status code: ${statusCode}`}));
+          await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url[0], event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error, status code: ${statusCode}`}));
           logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails}, "general", statusCode);
         } else {
           logger.error("Page Load Error, skipping page", {statusCode, ...logDetails});
@@ -1141,7 +1190,7 @@ export class Crawler {
         if (e.name === "TimeoutError") {
           if (data.loadState !== LoadState.CONTENT_LOADED) {
             if (failCrawlOnError) {
-              await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Timeout: ${msg}`}));
+              await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url[0], event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Timeout: ${msg}`}));
               logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
             } else {
               logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
@@ -1153,7 +1202,7 @@ export class Crawler {
           }
         } else {
           if (failCrawlOnError) {
-            await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error: ${msg}`}));
+            await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url[0], event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error: ${msg}`}));
             logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
           } else {
             logger.error("Page Load Error, skipping page", {msg, ...logDetails});

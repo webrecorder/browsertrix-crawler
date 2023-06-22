@@ -23,6 +23,7 @@ server:
   failOnFailedSeed: true
   workers: 3
   scopeType: page
-  waitUntil: networkidle0
-  timeout: 30
-  behaviorTimeout: 30
+  waitUntil: load,networkidle0
+  timeout: 1000
+  behaviorTimeout: 1000
+  logging: stats,pywb
