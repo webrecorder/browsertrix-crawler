@@ -1,7 +1,7 @@
 import Redis from "ioredis";
-import dotenv from "dotenv";
-
-dotenv.config({path: "/.env"});
+// import dotenv from "dotenv";
+//
+// dotenv.config({path: "/.env"});
 
 export async function initBroadCrawlRedis() {
   const board_crawl_redis = new Redis({
