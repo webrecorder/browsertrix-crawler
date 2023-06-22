@@ -15,6 +15,7 @@ ENV PROXY_HOST=localhost \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=google-chrome \
     OPENSSL_CONF=/app/openssl.conf \
+    VNC_PASS=vncpassw0rd!
 
 WORKDIR /app
 
