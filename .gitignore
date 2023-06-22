@@ -4,7 +4,6 @@ __pycache__
 collections/
 node_modules/
 crawls/
-test-crawls/
 .DS_Store
 .env
 .idea/
