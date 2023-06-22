@@ -36,6 +36,9 @@ import {RedisHelper} from "./util/redisHelper.js";
 import {is_valid_link} from "./util/seedHelper.js";
 import {initBroadCrawlRedis} from "./util/broadCrawlRedis.js";
 
+import AWS from "aws-sdk";
+
+
 const HTTPS_AGENT = HTTPSAgent({
   rejectUnauthorized: false,
 });
@@ -44,8 +47,8 @@ const HTTP_AGENT = HTTPAgent();
 
 const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
-const FETCH_TIMEOUT_SECS = 30;
-const PAGE_OP_TIMEOUT_SECS = 5;
+const FETCH_TIMEOUT_SECS = 3000;
+const PAGE_OP_TIMEOUT_SECS = 5000;
 
 const POST_CRAWL_STATES = ["generate-wacz", "uploading-wacz", "generate-cdx", "generate-warc"];
 
@@ -55,7 +58,6 @@ export class Crawler {
   constructor() {
     const res = parseArgs();
     this.params = res.parsed;
-    logger.info("params",this.params);
     this.origConfig = res.origConfig;
 
     // root collections dir
@@ -67,6 +69,11 @@ export class Crawler {
     logger.setDebugLogging(debugLogging);
     logger.setLogLevel(this.params.logLevel);
     logger.setContext(this.params.context);
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    this.current_date = `${year}-${month}-${day}`;
 
     logger.debug("Writing log to: " + this.logFilename, {}, "init");
 
@@ -317,13 +324,21 @@ export class Crawler {
     try {
       await this.crawl();
       status = (!this.interrupted ? "done" : "interrupted");
-      if(!this.interrupted){
+      if(!this.interrupted || this.s3FilePath){
         await this.redisHelper.pushEventToQueue("crawlStatus", JSON.stringify({
-          url: this.params.url,
+          url: this.params.url[0],
           event: "CRAWL_SUCCESS",
           domain: this.params.domain,
           level: this.params.level,
-          s3Path: this.warcFilePath
+          s3Path: this.s3FilePath
+        }));
+      }else{
+        await this.redisHelper.pushEventToQueue("crawlStatus", JSON.stringify({
+          url: this.params.url[0],
+          event: "CRAWL_FAIL",
+          domain: this.params.domain,
+          level: this.params.level,
+          message: "Crawl interrupted. Please check logs for a detailed reason."
         }));
       }
     } catch(e) {
@@ -523,7 +538,6 @@ export class Crawler {
         this.healthChecker.incError();
       }
     }
-    logger.info("crawl complete");
 
     await this.serializeConfig();
 
@@ -809,11 +823,87 @@ export class Crawler {
     // extra wait for all resources to land into WARCs
     await this.awaitPendingClear();
 
-    await this.postCrawl();
+    await this.postCrawl(true);
   }
 
-  async postCrawl() {
+  async uploadToS3(filePath) {
+    // Configure AWS credentials
+    const credentials  = {
+      accessKeyId: process.env.STORE_ACCESS_KEY,
+      secretAccessKey: process.env.STORE_SECRET_KEY,
+      sessionToken: process.env.SESSION_TOKEN
+    };
+
+    // Create an S3 client
+    AWS.config.update({ credentials });
+    const s3 = new AWS.S3();
+    // Define the bucket name and file path
+    const bucketName = process.env.STORE_PATH;
+
+    let collectionDirectory = path.dirname(filePath);
+    let logDirectoryPath = path.join(collectionDirectory, "logs", "");
+    let prefixKey = `${process.env.ENVIRONMENT}/${this.params.domain}/level_${this.params.level}/${this.params.crawlId}/${this.current_date}/`;
+
+
+    fs.readdir(logDirectoryPath, async (err, files) => {
+      if (err) {
+        console.error("Error reading directory:", err);
+        return;
+      }
+
+      console.log("Files in directory:");
+      for (const file of files) {
+        const logFilePath = path.join(logDirectoryPath, file);
+        const params = {
+          Bucket: bucketName,
+          Key: `${prefixKey}${file}`, // Specify the desired destination file name in the bucket
+          Body: fs.createReadStream(logFilePath),
+        };
+
+        try {
+          // Upload the file to S3
+          const result = await s3.upload(params).promise();
+          console.log("File uploaded successfully:", result.Location);
+          // remove  collection on successful upload TODO
+        } catch (e) {
+          logger.error("error", e);
+        }
+      }
+    });
+
+    // Set the parameters for the S3 upload
+    const params = {
+      Bucket: bucketName,
+      Key: `${prefixKey}${this.params.crawlId}.warc.gz`, // Specify the desired destination file name in the bucket
+      Body: fs.createReadStream(filePath),
+    };
+
+    try {
+      // Upload the file to S3
+      const result = await s3.upload(params).promise();
+      this.s3FilePath = result.Location;
+      console.log("File uploaded successfully:", result.Location);
+      // remove  collection on successful upload TODO
+    } catch (e){
+      logger.error("error",e);
+    }
+
+    fs.rmdir(collectionDirectory, { recursive: true }, (err) => {
+      if (err) {
+        console.error("Error removing directory:", err);
+        return;
+      }
+
+      console.log("Directory removed:", collectionDirectory);
+    });
+  }
+
+  async postCrawl(done=false) {
     if (this.params.combineWARC) {
+      // await this.combineWARC();
+      let warcFilePath = await this.combineWARC();
+      if(done)
+        await this.uploadToS3(warcFilePath);
     }
 
     if (this.params.generateCDX) {
@@ -1069,7 +1159,6 @@ export class Crawler {
 
     logger.info("Awaiting page load", logDetails);
 
-    logger.info("failed on seed",{failCrawlOnError: failCrawlOnError});
     try {
       const resp = await page.goto(url, gotoOpts);
 
@@ -1077,7 +1166,7 @@ export class Crawler {
       const statusCode = resp.status();
       if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
         if (failCrawlOnError) {
-          await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error, status code: ${statusCode}`}));
+          await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url[0], event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error, status code: ${statusCode}`}));
           logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails}, "general", statusCode);
         } else {
           logger.error("Page Load Error, skipping page", {statusCode, ...logDetails});
@@ -1095,7 +1184,7 @@ export class Crawler {
         if (e.name === "TimeoutError") {
           if (data.loadState !== LoadState.CONTENT_LOADED) {
             if (failCrawlOnError) {
-              await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Timeout: ${msg}`}));
+              await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url[0], event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Timeout: ${msg}`}));
               logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
             } else {
               logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
@@ -1107,7 +1196,7 @@ export class Crawler {
           }
         } else {
           if (failCrawlOnError) {
-            await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url, event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error: ${msg}`}));
+            await this.redisHelper.pushEventToQueue("crawlStatus",JSON.stringify({url: this.params.url[0], event: "CRAWL_FAIL", domain: this.params.domain, level: this.params.level, message: `Seed Page Load Error: ${msg}`}));
             logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
           } else {
             logger.error("Page Load Error, skipping page", {msg, ...logDetails});
@@ -1484,8 +1573,6 @@ export class Crawler {
         // write combined warcs to root collection dir as they're output of a collection (like wacz)
         combinedWarcFullPath = path.join(this.collDir, combinedWarcName);
 
-        logger.info("full path " + combinedWarcFullPath);
-
         if (fh) {
           fh.end();
         }
@@ -1520,9 +1607,6 @@ export class Crawler {
   }
 
   async serializeConfig(done = false) {
-    logger.info("this.params.saveState",this.params.saveState);
-    logger.info("done",done);
-    logger.info("crawlstate",await this.crawlState.isFinished());
     switch (this.params.saveState) {
     case "never":
       return;
@@ -1549,7 +1633,6 @@ export class Crawler {
         return;
       }
     }
-    logger.info("STORAGE2",this.storage);
 
     this.lastSaveTime = now.getTime();
 
@@ -1589,7 +1672,6 @@ export class Crawler {
       }
     }
 
-    logger.info("STORAGE",this.storage);
     if (this.storage && done && this.params.saveState === "always") {
       const targetFilename = interpolateFilename(filenameOnly, this.crawlId);
 
