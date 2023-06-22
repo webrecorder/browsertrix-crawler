@@ -838,7 +838,7 @@ export class Crawler {
     AWS.config.update({ credentials });
     const s3 = new AWS.S3();
     // Define the bucket name and file path
-    const bucketName = "crawler-test-1";
+    const bucketName = process.env.STORE_PATH;
 
     let collectionDirectory = path.dirname(filePath);
     let logDirectoryPath = path.join(collectionDirectory, "logs", "");
