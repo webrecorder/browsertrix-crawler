@@ -15,10 +15,7 @@ ENV PROXY_HOST=localhost \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=google-chrome \
     OPENSSL_CONF=/app/openssl.conf \
-    VNC_PASS=vncpassw0rd! \
-    STORE_ENDPOINT_URL='http://localhost.localstack.cloud:4566' \
-    STORE_PATH=/staging/test \
-    STORE_FILENAME=filename
+    VNC_PASS=vncpassw0rd!
 
 
 WORKDIR /app
