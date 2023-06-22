@@ -21,7 +21,6 @@ export class S3StorageSync
     let url;
     let accessKey;
     let secretKey;
-    logger.info("url or data",urlOrData);
 
     if (typeof(urlOrData) === "string") {
       url = new URL(urlOrData);
@@ -48,7 +47,6 @@ export class S3StorageSync
       sessionToken: urlOrData.sessionToken
     });
 
-    logger.info("client",this.client);
 
     this.client.enableSHA256 = true;
 
