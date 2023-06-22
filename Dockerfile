@@ -15,12 +15,7 @@ ENV PROXY_HOST=localhost \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=google-chrome \
     OPENSSL_CONF=/app/openssl.conf \
-    VNC_PASS=vncpassw0rd! \
-    STORE_ENDPOINT_URL='{ENDPOINT}' \
-    STORE_PATH=/crawler-test-1/ \
-    STORE_ACCESS_KEY="{ACCESS_KEY}" \
-    STORE_SECRET_KEY="{SECRET_KEY}" \
-    SESSION_TOKEN="{SESSION_TOKEN}"
+    VNC_PASS=vncpassw0rd!
 
 
 WORKDIR /app
