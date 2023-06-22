@@ -58,7 +58,6 @@ export class Crawler {
   constructor() {
     const res = parseArgs();
     this.params = res.parsed;
-    logger.info("params",this.params);
     this.origConfig = res.origConfig;
 
     // root collections dir
@@ -324,7 +323,6 @@ export class Crawler {
 
     try {
       await this.crawl();
-      logger.info("status",this.interrupted);
       status = (!this.interrupted ? "done" : "interrupted");
       if(!this.interrupted || this.s3FilePath){
         await this.redisHelper.pushEventToQueue("crawlStatus", JSON.stringify({
@@ -540,7 +538,6 @@ export class Crawler {
         this.healthChecker.incError();
       }
     }
-    logger.info("crawl complete");
 
     await this.serializeConfig();
 
@@ -845,7 +842,6 @@ export class Crawler {
 
     let collectionDirectory = path.dirname(filePath);
     let logDirectoryPath = path.join(collectionDirectory, "logs", "");
-    logger.info("log file path",logDirectoryPath);
     let prefixKey = `${process.env.ENVIRONMENT}/${this.params.domain}/level_${this.params.level}/${this.params.crawlId}/${this.current_date}/`;
 
 
@@ -1163,9 +1159,7 @@ export class Crawler {
 
     logger.info("Awaiting page load", logDetails);
 
-    logger.info("failed on seed",{failCrawlOnError: failCrawlOnError});
     try {
-      logger.info("goto options",gotoOpts);
       const resp = await page.goto(url, gotoOpts);
 
       // Handle 4xx or 5xx response as a page load error
@@ -1579,8 +1573,6 @@ export class Crawler {
         // write combined warcs to root collection dir as they're output of a collection (like wacz)
         combinedWarcFullPath = path.join(this.collDir, combinedWarcName);
 
-        logger.info("full path " + combinedWarcFullPath);
-
         if (fh) {
           fh.end();
         }
@@ -1615,9 +1607,6 @@ export class Crawler {
   }
 
   async serializeConfig(done = false) {
-    logger.info("this.params.saveState",this.params.saveState);
-    logger.info("done",done);
-    logger.info("crawlstate",await this.crawlState.isFinished());
     switch (this.params.saveState) {
     case "never":
       return;
@@ -1644,7 +1633,6 @@ export class Crawler {
         return;
       }
     }
-    logger.info("STORAGE2",this.storage);
 
     this.lastSaveTime = now.getTime();
 
@@ -1684,7 +1672,6 @@ export class Crawler {
       }
     }
 
-    logger.info("STORAGE",this.storage);
     if (this.storage && done && this.params.saveState === "always") {
       const targetFilename = interpolateFilename(filenameOnly, this.crawlId);
 
