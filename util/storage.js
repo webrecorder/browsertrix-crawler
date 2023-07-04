@@ -150,10 +150,13 @@ export async function getDirSize(dir) {
   return size;
 }
 
-export async function getDiskUsage(path="/") {
+export async function getDiskUsage(path="/crawls") {
   const exec = util.promisify(child_process.exec);
   const result = await exec(`df ${path}`);
   const lines = result.stdout.split("\n");
+  if (lines.length < 1) {
+    return;
+  }
   const keys = lines[0].split(/\s+/ig);
   const rows = lines.slice(1).map(line => {
     const values = line.split(/\s+/ig);
