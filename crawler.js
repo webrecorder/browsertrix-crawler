@@ -13,7 +13,7 @@ import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtract } from "./util/textextract.js";
-import { initStorage, getFileSize, getDirSize, interpolateFilename, getDiskUsage } from "./util/storage.js";
+import { initStorage, getFileSize, getDirSize, interpolateFilename, getDiskUsage, calculatePercentageUsed } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
@@ -621,7 +621,8 @@ export class Crawler {
       // Check that disk usage isn't likely to cross threshold
       const kbUsed = parseInt(diskUsage["Used"]);
       const kbTotal = parseInt(diskUsage["1K-blocks"]);
-      let kbArchiveDirSize = Math.floor(size/1024);
+
+      let kbArchiveDirSize = Math.round(size/1024);
       if (this.params.combineWARC && this.params.generateWACZ) {
         kbArchiveDirSize *= 4;
       } else if (this.params.combineWARC || this.params.generateWACZ) {
@@ -629,7 +630,8 @@ export class Crawler {
       }
 
       const projectedTotal = kbUsed + kbArchiveDirSize;
-      const projectedUsedPercentage = Math.round((projectedTotal/kbTotal) * 100);
+      const projectedUsedPercentage = calculatePercentageUsed(projectedTotal, kbTotal);
+
       if (projectedUsedPercentage >= this.params.diskUtilization) {
         logger.info(`Disk utilization projected to reach threshold ${projectedUsedPercentage}% > ${this.params.diskUtilization}%, stopping`);
         interrupt = true;
