@@ -629,7 +629,7 @@ export class Crawler {
       }
 
       const projectedTotal = kbUsed + kbArchiveDirSize;
-      const projectedUsedPercentage = Math.round((projectedTotal/kbTotal) * 100)
+      const projectedUsedPercentage = Math.round((projectedTotal/kbTotal) * 100);
       if (projectedUsedPercentage >= this.params.diskUtilization) {
         logger.info(`Disk utilization projected to reach threshold ${projectedUsedPercentage}% > ${this.params.diskUtilization}%, stopping`);
         interrupt = true;
