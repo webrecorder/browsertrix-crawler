@@ -165,6 +165,10 @@ export async function getDiskUsage(path="/crawls") {
   return rows[0];
 }
 
+export function calculatePercentageUsed(used, total) {
+  return Math.round((used/total) * 100);
+}
+
 function checksumFile(hashName, path) {
   return new Promise((resolve, reject) => {
     const hash = createHash(hashName);
