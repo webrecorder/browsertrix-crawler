@@ -611,10 +611,7 @@ export class Crawler {
 
     if (this.params.diskUtilization) {
       // Check that disk usage isn't already above threshold
-      let diskUsage = await getDiskUsage();
-      if (!diskUsage) {
-        diskUsage = await getDiskUsage("/");
-      }
+      const diskUsage = await getDiskUsage();
       const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
       if (usedPercentage >= this.params.diskUtilization) {
         logger.info(`Disk utilization threshold reached ${usedPercentage}% > ${this.params.diskUtilization}%, stopping`);
