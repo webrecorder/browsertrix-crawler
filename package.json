@@ -33,9 +33,9 @@
   },
   "jest": {
     "transform": {},
-    "testTimeout": 90000,
-    "setupFiles": [
-        "./test-setup.js"
-    ]
+    "testTimeout": 90000
+    // "setupFiles": [
+    //     "./test-setup.js"
+    // ]
   }
 }
