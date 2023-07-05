@@ -13,7 +13,7 @@ import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtract } from "./util/textextract.js";
-import { initStorage, getFileSize, getDirSize, interpolateFilename, getDiskUsage, calculatePercentageUsed } from "./util/storage.js";
+import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
@@ -610,30 +610,9 @@ export class Crawler {
     }
 
     if (this.params.diskUtilization) {
-      // Check that disk usage isn't already above threshold
-      const diskUsage = await getDiskUsage();
-      const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
-      if (usedPercentage >= this.params.diskUtilization) {
-        logger.info(`Disk utilization threshold reached ${usedPercentage}% > ${this.params.diskUtilization}%, stopping`);
-        interrupt = true;
-      }
-
-      // Check that disk usage isn't likely to cross threshold
-      const kbUsed = parseInt(diskUsage["Used"]);
-      const kbTotal = parseInt(diskUsage["1K-blocks"]);
-
-      let kbArchiveDirSize = Math.round(size/1024);
-      if (this.params.combineWARC && this.params.generateWACZ) {
-        kbArchiveDirSize *= 4;
-      } else if (this.params.combineWARC || this.params.generateWACZ) {
-        kbArchiveDirSize *= 2;
-      }
-
-      const projectedTotal = kbUsed + kbArchiveDirSize;
-      const projectedUsedPercentage = calculatePercentageUsed(projectedTotal, kbTotal);
-
-      if (projectedUsedPercentage >= this.params.diskUtilization) {
-        logger.info(`Disk utilization projected to reach threshold ${projectedUsedPercentage}% > ${this.params.diskUtilization}%, stopping`);
+      // Check that disk usage isn't already or soon to be above threshold
+      const diskUtil = await checkDiskUtilization(this.params, size);
+      if (diskUtil.stop === true) {
         interrupt = true;
       }
     }

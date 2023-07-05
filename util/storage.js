@@ -150,10 +150,62 @@ export async function getDirSize(dir) {
   return size;
 }
 
-export async function getDiskUsage(path="/crawls") {
+export async function checkDiskUtilization(params, archiveDirSize, dfOutput=null) {
+  const diskUsage = await getDiskUsage("/crawls", dfOutput);
+  const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
+
+  // Check that disk usage isn't already above threshold
+  if (usedPercentage >= params.diskUtilization) {
+    logger.info(`Disk utilization threshold reached ${usedPercentage}% > ${params.diskUtilization}%, stopping`);
+    return {
+      stop: true,
+      used: usedPercentage,
+      projected: null,
+      threshold: params.diskUtilization
+    };
+  }
+
+  // Check that disk usage isn't likely to cross threshold
+  const kbUsed = parseInt(diskUsage["Used"]);
+  const kbTotal = parseInt(diskUsage["1K-blocks"]);
+
+  let kbArchiveDirSize = Math.round(archiveDirSize/1024);
+  if (params.combineWARC && params.generateWACZ) {
+    kbArchiveDirSize *= 4;
+  } else if (params.combineWARC || params.generateWACZ) {
+    kbArchiveDirSize *= 2;
+  }
+
+  const projectedTotal = kbUsed + kbArchiveDirSize;
+  const projectedUsedPercentage = calculatePercentageUsed(projectedTotal, kbTotal);
+
+  if (projectedUsedPercentage >= params.diskUtilization) {
+    logger.info(`Disk utilization projected to reach threshold ${projectedUsedPercentage}% > ${params.diskUtilization}%, stopping`);
+    return {
+      stop: true,
+      used: usedPercentage,
+      projected: projectedUsedPercentage,
+      threshold: params.diskUtilization
+    };
+  }
+
+  return {
+    stop: false,
+    used: usedPercentage,
+    projected: projectedUsedPercentage,
+    threshold: params.diskUtilization
+  };
+}
+
+export async function getDFOutput(path) {
   const exec = util.promisify(child_process.exec);
-  const result = await exec(`df ${path}`);
-  const lines = result.stdout.split("\n");
+  const res = await exec(`df ${path}`);
+  return res.stdout;
+}
+
+export async function getDiskUsage(path="/crawls", dfOutput = null) {
+  const result = dfOutput || await getDFOutput(path);
+  const lines = result.split("\n");
   const keys = lines[0].split(/\s+/ig);
   const rows = lines.slice(1).map(line => {
     const values = line.split(/\s+/ig);
