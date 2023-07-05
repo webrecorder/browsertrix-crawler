@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { getDiskUsage } from "./utils/storage.js";
+import { getDiskUsage } from "./util/storage.js";
 
 global.jest = jest;
 global.getDiskUsage = getDiskUsage;
