@@ -15,7 +15,7 @@ test("ensure calculatePercentageUsed returns expected values", () => {
 });
 
 
-storage.getDiskUsage = jest.fn().mockReturnValue(`Filesystem     1K-blocks      Used Available Use% Mounted on
+jest.spyOn(storage, "getDiskUsage").mockReturnValue(`Filesystem     1K-blocks      Used Available Use% Mounted on
 grpcfuse       971350180 270314600 701035580  28% /crawls`);
 
 test("verify end-to-end disk utilization check works as expected with mock df return", async () => {
