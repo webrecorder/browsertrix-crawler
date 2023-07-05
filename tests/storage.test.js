@@ -1,4 +1,4 @@
-import { calculatePercentageUsed, checkDiskUtilization } from "../util/storage.js";
+import { calculatePercentageUsed, checkDiskUtilization, getDiskUsage } from "../util/storage.js";
 
 test("ensure calculatePercentageUsed returns expected values", () => {
   expect(calculatePercentageUsed(30, 100)).toEqual(30);
