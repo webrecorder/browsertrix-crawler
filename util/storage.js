@@ -197,7 +197,7 @@ export async function checkDiskUtilization(params, archiveDirSize) {
   };
 }
 
-async function getDiskUsage(path="/crawls") {
+export async function getDiskUsage(path="/crawls") {
   const exec = util.promisify(child_process.exec);
   const result = await exec(`df ${path}`);
   const lines = result.stdout.split("\n");
