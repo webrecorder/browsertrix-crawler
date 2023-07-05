@@ -1,6 +1,6 @@
 import { calculatePercentageUsed } from "../util/storage.js";
 
-test("ensure percentage used values are accurate", () => {
+test("ensure calculatePercentageUsed returns expected values", () => {
   expect(calculatePercentageUsed(30, 100)).toEqual(30);
 
   expect(calculatePercentageUsed(1507, 35750)).toEqual(4);
