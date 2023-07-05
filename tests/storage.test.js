@@ -19,7 +19,7 @@ grpcfuse       971350180 270314600 701035580  28% /crawls`;
 });
 
 test("verify end-to-end disk utilization check works as expected with mock df return", async () => {
-  params = {
+  const params = {
     diskUtilization: 90,
     combineWARC: true,
     generateWACZ: true

@@ -169,7 +169,7 @@ export async function checkDiskUtilization(params, archiveDirSize) {
   const kbUsed = parseInt(diskUsage["Used"]);
   const kbTotal = parseInt(diskUsage["1K-blocks"]);
 
-  const kbArchiveDirSize = Math.round(size/1024);
+  let kbArchiveDirSize = Math.round(archiveDirSize/1024);
   if (params.combineWARC && params.generateWACZ) {
     kbArchiveDirSize *= 4;
   } else if (params.combineWARC || params.generateWACZ) {
