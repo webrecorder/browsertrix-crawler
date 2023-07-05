@@ -611,8 +611,8 @@ export class Crawler {
 
     if (this.params.diskUtilization) {
       // Check that disk usage isn't already or soon to be above threshold
-      const diskFull = checkDiskUtilization(this.params, size);
-      if (diskFull.stop === true) {
+      const diskUtil = await checkDiskUtilization(this.params, size);
+      if (diskUtil.stop === true) {
         interrupt = true;
       }
     }
