@@ -13,7 +13,7 @@ test("ensure calculatePercentageUsed returns expected values", () => {
 });
 
 
-jest.mock(getDiskUsage, () => jest.fn());
+jest.mock("./getDiskUsage", () => jest.fn());
 
 test("verify end-to-end disk utilization check works as expected with mock df return", async () => {
   const params = {
