@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import child_process from "child_process";
+import util from "util";
 import { calculatePercentageUsed, checkDiskUtilization } from "../util/storage.js";
 
 const mockDfOutput = `Filesystem     1K-blocks      Used Available Use% Mounted on
@@ -17,7 +17,11 @@ test("ensure calculatePercentageUsed returns expected values", () => {
   expect(calculatePercentageUsed(0, 5)).toEqual(0);
 });
 
-jest.mock("child_process");
+jest.mock("util", () => ({
+  promisify: jest.fn(() => {
+    return jest.fn().mockResolvedValue({ stdout: mockDfOutput });
+  })
+}));
 
 test("verify end-to-end disk utilization check works as expected with mock df return", async () => {
   const params = {
@@ -25,8 +29,6 @@ test("verify end-to-end disk utilization check works as expected with mock df re
     combineWARC: true,
     generateWACZ: true
   };
-
-  child_process.exec.mockImplementation((command, callback) => callback(null, {stdout: mockDfOutput}));
 
   const returnValue = await checkDiskUtilization(params, 7500000);
   expect(returnValue).toEqual({
