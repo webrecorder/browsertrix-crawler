@@ -17,7 +17,8 @@ test("ensure calculatePercentageUsed returns expected values", () => {
 
 jest.mock("../util/storage.js", () => ({
   ...jest.requireActual("../util/storage.js"),
-  getDiskUsage: jest.fn(),
+  getDiskUsage: () => {`Filesystem     1K-blocks      Used Available Use% Mounted on
+grpcfuse       971350180 270314600 701035580  28% /crawls`},
 }));
 
 test("verify end-to-end disk utilization check works as expected with mock df return", async () => {
@@ -26,9 +27,6 @@ test("verify end-to-end disk utilization check works as expected with mock df re
     combineWARC: true,
     generateWACZ: true
   };
-
-  getDiskUsage.mockImplementation(() => `Filesystem     1K-blocks      Used Available Use% Mounted on
-grpcfuse       971350180 270314600 701035580  28% /crawls`);
 
   const returnValue = await checkDiskUtilization(params, 7500000);
   expect(returnValue).toEqual({
