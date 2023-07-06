@@ -21,6 +21,7 @@ import { initRedis } from "./util/redis.js";
 import { logger, errJSON } from "./util/logger.js";
 import { runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
+import { collectAllFileSources } from "./util/file_reader.js";
 
 import { Browser } from "./util/browser.js";
 
@@ -120,6 +121,7 @@ export class Crawler {
 
     this.done = false;
 
+    this.customBehaviors = "";
     this.behaviorLastLine = null;
 
     this.browser = new Browser();
@@ -231,6 +233,10 @@ export class Crawler {
       } catch(e) {
         logger.error(`Unable to clear ${this.collDir}`, e);
       }
+    }
+
+    if (this.params.customBehaviors) {
+      this.customBehaviors = this.loadCustomBehaviors(this.params.customBehaviors);
     }
 
     let opts = {};
@@ -347,6 +353,10 @@ export class Crawler {
       }
       break;
 
+    case "error":
+      logger.error(message, details, "behaviorScript");
+      break;
+
     case "debug":
     default:
       logger.debug(message, details, "behaviorScript");
@@ -399,8 +409,26 @@ export class Crawler {
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
-      await this.browser.addInitScript(page, behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
+      await this.browser.addInitScript(page, behaviors);
+
+      const initScript = `
+self.__bx_behaviors.init(${this.params.behaviorOpts}, false);
+${this.customBehaviors}
+self.__bx_behaviors.selectMainBehavior();
+`;
+
+      await this.browser.addInitScript(page, initScript);
     }
+  }
+
+  loadCustomBehaviors(filename) {
+    let str = "";
+
+    for (const source of collectAllFileSources(filename, ".js")) {
+      str += `self.__bx_behaviors.load(${source});\n`;
+    }
+
+    return str;
   }
 
   async crawlPage(opts) {

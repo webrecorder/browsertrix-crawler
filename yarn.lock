@@ -1147,10 +1147,10 @@ browserslist@^4.21.3:
     node-releases "^2.0.6"
     update-browserslist-db "^1.0.9"
 
-browsertrix-behaviors@^0.5.0-beta.0:
-  version "0.5.0-beta.0"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.5.0-beta.0.tgz#d1a7c35cda31d740a374df1e833f36bd1890768d"
-  integrity sha512-RQMQlbV4OBAzYyhTI7imoem8p4MTj2XSDzlIZvA5sC5U89OMnJ0VM5KBAJzET3PUJkQlUQEOTiXtnsnodHXTUQ==
+browsertrix-behaviors@^0.5.1:
+  version "0.5.1"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.5.1.tgz#c4756b349dcabd23e25f851cec804d92e94eb63b"
+  integrity sha512-cNSSpQyQT73Y5NcBn2PFDkZM2ptxHVVcqxstryvtzZNOW9gGqzJlLPo8tmCBY00JHrMyn5rm8qImbFglcG/DKg==
 
 bser@2.1.1:
   version "2.1.1"

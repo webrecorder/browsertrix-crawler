@@ -385,7 +385,12 @@ class ArgParser {
         describe: "If set, crawler will fail with exit code 1 if any seed fails",
         type: "boolean",
         default: false
-      }
+      },
+
+      "customBehaviors": {
+        describe: "injects a custom behavior file or set of behavior files in a directory",
+        type: ["string"]
+      },
     };
   }
 
