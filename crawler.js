@@ -121,6 +121,7 @@ export class Crawler {
 
     this.done = false;
 
+    this.customBehaviors = "";
     this.behaviorLastLine = null;
 
     this.browser = new Browser();
@@ -232,6 +233,10 @@ export class Crawler {
       } catch(e) {
         logger.error(`Unable to clear ${this.collDir}`, e);
       }
+    }
+
+    if (this.params.customBehaviors) {
+      this.customBehaviors = this.loadCustomBehaviors(this.params.customBehaviors);
     }
 
     let opts = {};
@@ -400,15 +405,10 @@ export class Crawler {
     if (this.params.behaviorOpts) {
       await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
       await this.browser.addInitScript(page, behaviors);
-      let customBehaviors = "";
-
-      if (this.params.customBehaviors) {
-        customBehaviors = this.loadCustomBehaviors(this.params.customBehaviors);
-      }
 
       const initScript = `
 self.__bx_behaviors.init(${this.params.behaviorOpts}, false);
-${customBehaviors}
+${this.customBehaviors}
 self.__bx_behaviors.selectMainBehavior();
 `;
 

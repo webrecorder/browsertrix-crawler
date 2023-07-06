@@ -13,7 +13,7 @@ export function collectAllFileSources(fileOrDir, ext = null, depth = 0) {
 
   const stat = fs.statSync(resolvedPath);
 
-  if (stat.isFile && (ext === null || path.extname(resolvedPath) === ".js")) {
+  if (stat.isFile && (ext === null || path.extname(resolvedPath) === ext)) {
     const contents = fs.readFileSync(resolvedPath);
     return [`/* src: ${resolvedPath} */\n\n${contents}`];
   }
