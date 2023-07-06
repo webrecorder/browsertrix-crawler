@@ -1,4 +1,3 @@
-import { jest } from "@jest/globals";
 import { calculatePercentageUsed, checkDiskUtilization } from "../util/storage.js";
 
 
@@ -23,7 +22,7 @@ test("verify end-to-end disk utilization not exceeded threshold", async () => {
     generateWACZ: true
   };
 
- const mockDfOutput = `\
+  const mockDfOutput = `\
 Filesystem     1K-blocks      Used Available Use% Mounted on
 grpcfuse       971350180 270314600 701035580  28% /crawls`;
 
@@ -45,7 +44,7 @@ test("verify end-to-end disk utilization exceeds threshold", async () => {
     generateWACZ: true
   };
 
- const mockDfOutput = `\
+  const mockDfOutput = `\
 Filesystem     1K-blocks  Used Available Use% Mounted on
 grpcfuse       100000    85000     15000  85% /crawls`;
 
