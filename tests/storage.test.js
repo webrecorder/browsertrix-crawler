@@ -24,9 +24,11 @@ test("verify end-to-end disk utilization not exceeded threshold", async () => {
 
   const mockDfOutput = `\
 Filesystem     1K-blocks      Used Available Use% Mounted on
-grpcfuse       971350180 270314600 701035580  28% /crawls`;
+grpcfuse       1000000      285000    715000  28% /crawls`;
 
-  const returnValue = await checkDiskUtilization(params, 7500000 * 1024, mockDfOutput);
+  // with combineWARC + generateWACZ, projected is 285k + 4 * 5k = 310k = 31%
+  // does not exceed 90% threshold
+  const returnValue = await checkDiskUtilization(params, 5000 * 1024, mockDfOutput);
   expect(returnValue).toEqual({
     stop: false,
     used: 28,
@@ -48,6 +50,8 @@ test("verify end-to-end disk utilization exceeds threshold", async () => {
 Filesystem     1K-blocks  Used Available Use% Mounted on
 grpcfuse       100000    85000     15000  85% /crawls`;
 
+  // with generateWACZ, projected is 85k + 3k x 2 = 91k = 91%
+  // exceeds 90% threshold
   const returnValue = await checkDiskUtilization(params, 3000 * 1024, mockDfOutput);
   expect(returnValue).toEqual({
     stop: true,
