@@ -400,23 +400,30 @@ export class Crawler {
     if (this.params.behaviorOpts) {
       await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
       await this.browser.addInitScript(page, behaviors);
-      let customBehaviors = "null";
+      let customBehaviors = "";
 
       if (this.params.customBehaviors) {
         customBehaviors = this.loadCustomBehaviors(this.params.customBehaviors);
       }
-      await this.browser.addInitScript(page, `self.__bx_behaviors.init(${this.params.behaviorOpts}, false, ${customBehaviors});`);
+
+      const initScript = `
+self.__bx_behaviors.init(${this.params.behaviorOpts}, false);
+${customBehaviors}
+self.__bx_behaviors.selectMainBehavior();
+`;
+
+      await this.browser.addInitScript(page, initScript);
     }
   }
 
   loadCustomBehaviors(filename) {
-    let funcs = [];
+    let str = "";
 
     for (const source of collectAllFileSources(filename, ".js")) {
-      funcs.push(source);
+      str += `self.__bx_behaviors.load(${source});\n`;
     }
 
-    return "[" + funcs.join(",") + "]";
+    return str;
   }
 
   async crawlPage(opts) {
