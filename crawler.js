@@ -255,7 +255,12 @@ export class Crawler {
 
     subprocesses.push(child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio}));
 
-    opts.env = {...process.env, COLL: this.params.collection, ROLLOVER_SIZE: this.params.rolloverSize};
+    opts.env = {
+      ...process.env,
+      COLL: this.params.collection,
+      ROLLOVER_SIZE: this.params.rolloverSize,
+      DEDUP_POLICY: this.params.dedupPolicy
+    };
 
     subprocesses.push(child_process.spawn("uwsgi", [new URL("uwsgi.ini", import.meta.url).pathname], opts));
 

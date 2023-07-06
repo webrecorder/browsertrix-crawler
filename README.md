@@ -176,6 +176,8 @@ Options:
                                             econds) after behaviors before movin
                                             g on to next page
                                                            [number] [default: 0]
+      --dedupPolicy                         Deduplication policy
+                 [string] [choices: "skip", "revisit", "keep"] [default: "skip"]
       --profile                             Path to tar.gz file which will be ex
                                             tracted and used as the browser prof
                                             ile                         [string]

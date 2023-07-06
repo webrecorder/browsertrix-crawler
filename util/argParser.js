@@ -250,6 +250,13 @@ class ArgParser {
         type: "number",
       },
 
+      "dedupPolicy": {
+        describe: "Deduplication policy",
+        default: "skip",
+        type: "string",
+        choices: ["skip", "revisit", "keep"],
+      },
+
       "profile": {
         describe: "Path to tar.gz file which will be extracted and used as the browser profile",
         type: "string",
