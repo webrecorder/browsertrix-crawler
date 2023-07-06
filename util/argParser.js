@@ -13,6 +13,8 @@ import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
 import { logger } from "./logger.js";
 
+const DEDUP_OPTIONS = ["skip", "revisit", "keep"];
+
 
 // ============================================================================
 class ArgParser {
@@ -254,7 +256,7 @@ class ArgParser {
         describe: "Deduplication policy",
         default: "skip",
         type: "string",
-        choices: ["skip", "revisit", "keep"],
+        choices: DEDUP_OPTIONS,
       },
 
       "profile": {
@@ -531,6 +533,11 @@ class ArgParser {
 
     if ((argv.diskUtilization < 0 || argv.diskUtilization > 99)) {
       argv.diskUtilization = 90;
+    }
+
+    // dedup options - if input is invalid, use "skip"
+    if (DEDUP_OPTIONS.indexOf(argv.dedupPolicy) === -1) {
+      argv.dedupPolicy = DEDUP_OPTIONS[0];
     }
 
     return true;
