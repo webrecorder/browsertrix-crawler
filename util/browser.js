@@ -66,7 +66,7 @@ export class BaseBrowser
     if (this.customProfile) {
       logger.info("Disabling Service Workers for profile", {}, "browser");
 
-      await cdp.send("Network.setBypassServiceWorker", {bypass: true});
+      await page.setBypassServiceWorker(true);
     }
   }
 
