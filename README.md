@@ -69,7 +69,7 @@ Options:
       --crawlId, --id                       A user provided ID for this crawl or
                                              crawl configuration (can also be se
                                             t via CRAWL_ID env var)
-                                              [string] [default: "97792ef37eaf"]
+                                              [string] [default: "7760c6c5f6ca"]
       --newContext                          Deprecated as of 0.8.0, any values p
                                             assed will be ignored
                                                         [string] [default: null]
@@ -176,6 +176,8 @@ Options:
                                             econds) after behaviors before movin
                                             g on to next page
                                                            [number] [default: 0]
+      --dedupPolicy                         Deduplication policy
+                 [string] [choices: "skip", "revisit", "keep"] [default: "skip"]
       --profile                             Path to tar.gz file which will be ex
                                             tracted and used as the browser prof
                                             ile                         [string]
@@ -247,6 +249,9 @@ Options:
                                                            [array] [default: []]
       --logErrorsToRedis                    If set, write error messages to redi
                                             s         [boolean] [default: false]
+      --failOnFailedSeed                    If set, crawler will fail with exit
+                                            code 1 if any seed fails
+                                                      [boolean] [default: false]
       --config                              Path to YAML config file
 
 ```

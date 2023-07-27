@@ -62,13 +62,13 @@ export class BaseBrowser
     await this._init(launchOpts);
   }
 
-  async setupPage({page, cdp}) {
+  async setupPage({page}) {
     await this.addInitScript(page, "Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
     if (this.customProfile) {
       logger.info("Disabling Service Workers for profile", {}, "browser");
 
-      await cdp.send("Network.setBypassServiceWorker", {bypass: true});
+      await page.setBypassServiceWorker(true);
     }
   }
 

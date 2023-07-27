@@ -12,7 +12,7 @@ import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtract } from "./util/textextract.js";
-import { initStorage, getFileSize, getDirSize, interpolateFilename, getDiskUsage } from "./util/storage.js";
+import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
@@ -20,6 +20,7 @@ import { initRedis } from "./util/redis.js";
 import { logger, errJSON } from "./util/logger.js";
 import { runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
+import { collectAllFileSources } from "./util/file_reader.js";
 
 import { Browser } from "./util/browser.js";
 
@@ -120,6 +121,7 @@ export class Crawler {
 
     this.done = false;
 
+    this.customBehaviors = "";
     this.behaviorLastLine = null;
 
     this.browser = new Browser();
@@ -251,6 +253,10 @@ export class Crawler {
       }
     }
 
+    if (this.params.customBehaviors) {
+      this.customBehaviors = this.loadCustomBehaviors(this.params.customBehaviors);
+    }
+
     this.headers = {"User-Agent": this.configureUA()};
 
     process.on("exit", () => {
@@ -336,6 +342,10 @@ export class Crawler {
       }
       break;
 
+    case "error":
+      logger.error(message, details, "behaviorScript");
+      break;
+
     case "debug":
     default:
       logger.debug(message, details, "behaviorScript");
@@ -388,8 +398,26 @@ export class Crawler {
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
-      await this.browser.addInitScript(page, behaviors + `;\nself.__bx_behaviors.init(${this.params.behaviorOpts});`);
+      await this.browser.addInitScript(page, behaviors);
+
+      const initScript = `
+self.__bx_behaviors.init(${this.params.behaviorOpts}, false);
+${this.customBehaviors}
+self.__bx_behaviors.selectMainBehavior();
+`;
+
+      await this.browser.addInitScript(page, initScript);
     }
+  }
+
+  loadCustomBehaviors(filename) {
+    let str = "";
+
+    for (const source of collectAllFileSources(filename, ".js")) {
+      str += `self.__bx_behaviors.load(${source});\n`;
+    }
+
+    return str;
   }
 
   async crawlPage(opts) {
@@ -604,28 +632,9 @@ export class Crawler {
     }
 
     if (this.params.diskUtilization) {
-      // Check that disk usage isn't already above threshold
-      const diskUsage = await getDiskUsage();
-      const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
-      if (usedPercentage >= this.params.diskUtilization) {
-        logger.info(`Disk utilization threshold reached ${usedPercentage}% > ${this.params.diskUtilization}%, stopping`);
-        interrupt = true;
-      }
-
-      // Check that disk usage isn't likely to cross threshold
-      const kbUsed = parseInt(diskUsage["Used"]);
-      const kbTotal = parseInt(diskUsage["1K-blocks"]);
-      let kbArchiveDirSize = Math.floor(size/1024);
-      if (this.params.combineWARC && this.params.generateWACZ) {
-        kbArchiveDirSize *= 4;
-      } else if (this.params.combineWARC || this.params.generateWACZ) {
-        kbArchiveDirSize *= 2;
-      }
-
-      const projectedTotal = kbUsed + kbArchiveDirSize;
-      const projectedUsedPercentage = Math.floor(kbTotal/projectedTotal);
-      if (projectedUsedPercentage >= this.params.diskUtilization) {
-        logger.info(`Disk utilization projected to reach threshold ${projectedUsedPercentage}% > ${this.params.diskUtilization}%, stopping`);
+      // Check that disk usage isn't already or soon to be above threshold
+      const diskUtil = await checkDiskUtilization(this.params, size);
+      if (diskUtil.stop === true) {
         interrupt = true;
       }
     }

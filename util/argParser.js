@@ -250,6 +250,13 @@ class ArgParser {
         type: "number",
       },
 
+      "dedupPolicy": {
+        describe: "Deduplication policy",
+        default: "skip",
+        type: "string",
+        choices: ["skip", "revisit", "keep"],
+      },
+
       "profile": {
         describe: "Path to tar.gz file which will be extracted and used as the browser profile",
         type: "string",
@@ -378,7 +385,12 @@ class ArgParser {
         describe: "If set, crawler will fail with exit code 1 if any seed fails",
         type: "boolean",
         default: false
-      }
+      },
+
+      "customBehaviors": {
+        describe: "injects a custom behavior file or set of behavior files in a directory",
+        type: ["string"]
+      },
     };
   }
 

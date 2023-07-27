@@ -8,7 +8,7 @@ proxy:
   enable_wombat: true
 
 recorder:
-  dedup_policy: skip
+  dedup_policy: ${DEDUP_POLICY}
   source_coll: live
   cache: always
   rollover_size: ${ROLLOVER_SIZE}
