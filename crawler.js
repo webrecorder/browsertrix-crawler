@@ -117,7 +117,7 @@ export class Crawler {
 
     this.interrupted = false;
     this.finalExit = false;
-    this.clearOnExit = false;
+    this.uploadAndDeleteLocal = false;
 
     this.done = false;
 
@@ -630,7 +630,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (size >= this.params.sizeLimit) {
         logger.info(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
         interrupt = true;
-        this.clearOnExit = true;
+        this.uploadAndDeleteLocal = true;
       }
     }
 
@@ -666,7 +666,7 @@ self.__bx_behaviors.selectMainBehavior();
   prepareForExit(markDone = true) {
     if (!markDone) {
       this.params.waitOnDone = false;
-      this.clearOnExit = true;
+      this.uploadAndDeleteLocal = true;
       logger.info("SIGNAL: Preparing for exit of this crawler instance only");
     } else {
       logger.info("SIGNAL: Preparing for final exit of all crawlers");
@@ -816,11 +816,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.closeLog();
 
-    if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.clearOnExit)) {
-      await this.generateWACZ();
+    if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.uploadAndDeleteLocal)) {
+      const uploaded = await this.generateWACZ();
 
-      if (this.clearOnExit) {
-        logger.info(`Clearing ${this.collDir} before exit`);
+      if (uploaded && this.uploadAndDeleteLocal) {
+        logger.info(`Uploaded WACZ, deleting local data to free up space: ${this.collDir}`);
         try {
           fs.rmSync(this.collDir, { recursive: true, force: true });
         } catch(e) {
@@ -938,7 +938,10 @@ self.__bx_behaviors.selectMainBehavior();
       const targetFilename = interpolateFilename(filename, this.crawlId);
 
       await this.storage.uploadCollWACZ(waczPath, targetFilename, isFinished);
+      return true;
     }
+
+    return false;
   }
 
   awaitProcess(proc) {
