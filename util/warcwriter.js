@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
 
-import { CDXIndexer, WARCSerializer } from "warcio";
+import { CDXIndexer } from "warcio";
+import { WARCSerializer } from "warcio/node";
 import { logger, errJSON } from "./logger.js";
 
 

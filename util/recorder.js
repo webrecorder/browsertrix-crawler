@@ -14,7 +14,8 @@ import { RequestResponseInfo } from "./reqresp.js";
 import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
 import { rewriteDASH, rewriteHLS } from "@webrecorder/wabac/src/rewrite/rewriteVideo.js";
 
-import { WARCRecord, StreamingBufferIO, StreamingWARCSerializer, AsyncIterReader, concatChunks } from "warcio";
+import { WARCRecord, AsyncIterReader, concatChunks } from "warcio";
+import { WARCSerializer } from "warcio/node";
 import { streamFinish, WARCWriter } from "./warcwriter.js";
 
 const MAX_BROWSER_FETCH_SIZE = 2000000;
@@ -593,19 +594,16 @@ export class Recorder
 }
 
 // =================================================================
-class AsyncFetcher extends StreamingBufferIO
+class AsyncFetcher
 {
   constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId}) {
-    super();
-    
+    //super();
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
 
     this.networkId = networkId;
 
     this.recorder = recorder;
-
-    this.fh = null;
 
     this.tempdir = tempdir;
     this.filename = path.join(this.tempdir, `${timestampNow()}-${uuidv4()}.data`);
@@ -630,8 +628,17 @@ class AsyncFetcher extends StreamingBufferIO
       const responseRecord = createResponse(reqresp, pageid, body);
       const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
-      const serializer = new StreamingWARCSerializer(responseRecord, {gzip}, this);
-      await serializer.bufferRecord();
+      const serializer = new WARCSerializer(responseRecord, {gzip, maxMemSize: MAX_BROWSER_FETCH_SIZE});
+
+      try {
+        let readSize = await serializer.digestRecord();
+        if (serializer.httpHeadersBuff) {
+          readSize -= serializer.httpHeadersBuff.length;
+        }
+        reqresp.readSize = readSize;
+      } catch (e) {
+        logger.error("Error reading + digesting payload", {url, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
+      }
 
       if (reqresp.readSize === reqresp.expectedSize || reqresp.expectedSize < 0) {
         logger.debug("Async fetch: streaming done", {size: reqresp.readSize, expected: reqresp.expectedSize, networkId, url, ...this.logDetails}, "recorder");
@@ -687,80 +694,15 @@ class AsyncFetcher extends StreamingBufferIO
   }
 
   async* takeStreamIter(cdp, stream, reqresp) {
-    //let responded = false;
-    const buffs = [];
-    let buffLength = 0;
-    let sizeExceeded = false;
+    while (true) {
+      const {data, base64Encoded, eof} = await cdp.send("IO.read", {handle: stream});
+      const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
 
-    const logDetails = this.logDetails;
+      yield buff;
 
-    try {
-      while (true) {
-        const {data, base64Encoded, eof} = await cdp.send("IO.read", {handle: stream});
-        const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
-        if (buffLength + buff.length < MAX_BROWSER_FETCH_SIZE) {
-          buffs.push(buff);
-          buffLength += buff.length;
-        } else {
-          sizeExceeded = true;
-        }
-
-        yield buff;
-
-        if (eof) {
-          break;
-        }
+      if (eof) {
+        break;
       }
-
-      if (!sizeExceeded) {
-        reqresp.payload = concatChunks(buffs, buffLength);
-      }
-    } catch (e) {
-      logger.error("Error in takeStream", {...errJSON(e), url: reqresp.url, ...logDetails}, "recorder");
-    }
-  }
-
-  write(chunk) {
-    if (!this.fh) {
-      this.fh = fs.createWriteStream(this.filename);
-    }
-    try {
-      this.reqresp.readSize += chunk.length;
-      this.fh.write(chunk);
-    } catch (e) {
-      logger.error("Writing Record Buffer Error", e, "recorder");
-    }
-  }
-
-  async* readAll() {
-    if (this.fh) {
-      await streamFinish(this.fh);
-      this.fh = null;
-    } else {
-      yield new Uint8Array([]);
-      return;
-    }
-
-    const url = this.reqresp.url;
-
-    if (this.reqresp.payload) {
-      yield this.reqresp.payload;
-    } else {
-      try {
-        const reader = fs.createReadStream(this.filename);
-        for await (const buff of reader) {
-          yield buff;
-        }
-      } catch (e) {
-        logger.error("Error streaming from file", {url, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
-        return;
-      }
-    }
-
-    try {
-      await fsp.unlink(this.filename);
-    } catch (e) {
-      logger.error("Error closing buffer file", {url, filename: this.filename, ...errJSON(e), ...this.logDetails}, "recorder");
     }
   }
 }
@@ -835,7 +777,7 @@ class NetworkLoadStreamSyncFetcher extends AsyncFetcher
 
 // =================================================================
 // response
-function createResponse(reqresp, pageid, payload) {
+function createResponse(reqresp, pageid, contentIter) {
   const url = reqresp.url;
   const warcVersion = "WARC/1.1";
   const statusline = `HTTP/1.1 ${reqresp.status} ${reqresp.statusText}`;
@@ -847,7 +789,9 @@ function createResponse(reqresp, pageid, payload) {
     "WARC-Page-ID": pageid,
   };
 
-  const body = payload || [reqresp.payload];
+  if (!contentIter) {
+    contentIter = [reqresp.payload];
+  }
 
   if (Object.keys(reqresp.extraOpts).length) {
     warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
@@ -855,7 +799,7 @@ function createResponse(reqresp, pageid, payload) {
 
   return WARCRecord.create({
     url, date, warcVersion, type: "response", warcHeaders,
-    httpHeaders, statusline}, body);
+    httpHeaders, statusline}, contentIter);
 }
 
 // =================================================================
