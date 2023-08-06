@@ -7,7 +7,7 @@ export class ScopedSeed
   constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} = {}) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
-      logger.fatal(`Invalid Seed "${url}" - not a valid URL`);
+      logger.fatal(`Invalid Seed "${url}" specified, aborting crawl.`);
     }
     this.url = parsedUrl.href;
     this.include = this.parseRx(include);
@@ -44,11 +44,12 @@ export class ScopedSeed
     try {
       parsedUrl = new URL(url.trim());
     } catch (e) {
-      logger.warn("Invalid Seed - not a valid URL", {url, ...logDetails});
+      logger.warn("Invalid Page - not a valid URL", {url, ...logDetails});
+      return null;
     }
 
     if (parsedUrl.protocol !== "http:" && parsedUrl.protocol != "https:") {
-      logger.warn("Invalid Seed - URL must start with http:// or https://", {url, ...logDetails});
+      logger.warn("Invalid Page - URL must start with http:// or https://", {url, ...logDetails});
       parsedUrl = null;
     }
 
