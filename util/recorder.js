@@ -1,5 +1,4 @@
 import fs from "fs";
-import fsp from "fs/promises";
 import path from "path";
 import os from "os";
 
@@ -16,7 +15,7 @@ import { rewriteDASH, rewriteHLS } from "@webrecorder/wabac/src/rewrite/rewriteV
 
 import { WARCRecord, AsyncIterReader, concatChunks } from "warcio";
 import { WARCSerializer } from "warcio/node";
-import { streamFinish, WARCWriter } from "./warcwriter.js";
+import { WARCWriter } from "./warcwriter.js";
 
 const MAX_BROWSER_FETCH_SIZE = 2000000;
 
@@ -299,21 +298,22 @@ export class Recorder
       // fetching using response stream, await here and then either call fulFill, or if not started, return false
       if (contentLen < 0) {
         const fetcher = new ResponseStreamAsyncFetcher({...opts, requestId, cdp });
-        // didn't get stream, just continue
-        if (!await fetcher.load()) {
-          return false; 
+        // didn't get stream, attempt async approach
+        if (await fetcher.load()) {
+          streamingConsume = true;
         }
-        streamingConsume = true;
-      } else {
+      }
+
+      // if not consumed via takeStream, attempt async loading
+      if (!streamingConsume) {
         let fetcher = null;
 
         if (isSWorker || reqresp.method !== "GET") {
           fetcher = new AsyncFetcher(opts);
-          this.fetcherQ.add(() => fetcher.load());
         } else {
-          fetcher = new NetworkLoadStreamSyncFetcher(opts);
-          await fetcher.load();
+          fetcher = new NetworkLoadStreamAsyncFetcher(opts);
         }
+        this.fetcherQ.add(() => fetcher.load());
         return false;
       }
 
@@ -649,6 +649,16 @@ class AsyncFetcher
         //return fetched;
       }
 
+      const externalBuffer = serializer.externalBuffer;
+
+      if (externalBuffer) {
+        const { currSize, buffers, fh } = externalBuffer;
+
+        if (buffers && buffers.length && !fh) {
+          reqresp.payload = await concatChunks(buffers, currSize);
+        }
+      }
+
       if (Object.keys(reqresp.extraOpts).length) {
         responseRecord.warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
       }
@@ -693,7 +703,7 @@ class AsyncFetcher
     return AsyncIterReader.fromReadable(resp.body.getReader());
   }
 
-  async* takeStreamIter(cdp, stream, reqresp) {
+  async* takeStreamIter(cdp, stream) {
     while (true) {
       const {data, base64Encoded, eof} = await cdp.send("IO.read", {handle: stream});
       const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
@@ -723,12 +733,12 @@ class ResponseStreamAsyncFetcher extends AsyncFetcher
 
     const { stream } = await cdp.send("Fetch.takeResponseBodyAsStream", {requestId});
 
-    return this.takeStreamIter(cdp, stream, reqresp);
+    return this.takeStreamIter(cdp, stream);
   }
 }
 
 // =================================================================
-class NetworkLoadStreamSyncFetcher extends AsyncFetcher
+class NetworkLoadStreamAsyncFetcher extends AsyncFetcher
 {
   constructor(opts) {
     super(opts);
@@ -771,7 +781,7 @@ class NetworkLoadStreamSyncFetcher extends AsyncFetcher
     reqresp.status = httpStatusCode;
     reqresp.responseHeaders = headers;
 
-    return this.takeStreamIter(cdp, stream, reqresp);
+    return this.takeStreamIter(cdp, stream);
   }
 }
 
