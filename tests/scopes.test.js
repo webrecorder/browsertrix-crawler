@@ -49,6 +49,26 @@ exclude: https://example.com/pathexclude
 });
 
 
+test("default scope + exclude is numeric", async () => {
+  const seeds = getSeeds(`
+seeds:
+   - https://example.com/
+
+exclude: "2022"
+
+`);
+
+
+  expect(seeds.length).toEqual(1);
+  expect(seeds[0].scopeType).toEqual("prefix");
+  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
+  expect(seeds[0].exclude).toEqual([/2022/]);
+
+});
+
+
+
+
 test("prefix scope global + exclude", async () => {
   const seeds = getSeeds(`
 seeds:
@@ -271,3 +291,56 @@ exclude:
 
 });
 
+
+test("with exclude non-string types", async () => {
+  const seeds = getSeeds(`
+seeds:
+   - url: https://example.com/
+     exclude: "2023"
+
+   - url: https://example.com/
+     exclude: 2023
+
+   - url: https://example.com/
+     exclude: "0"
+
+   - url: https://example.com/
+     exclude: 0
+
+   - url: https://example.com/
+     exclude:
+
+   - url: https://example.com/
+     exclude: ""
+
+   - url: https://example.com/
+     exclude: null
+
+   - url: https://example.com/
+     exclude: "null"
+
+   - url: https://example.com/
+     exclude: false
+
+   - url: https://example.com/
+     exclude: true
+`);
+
+  expect(seeds.length).toEqual(10);
+  for (let i = 0; i < 10; i++) {
+    expect(seeds[i].scopeType).toEqual("prefix");
+    expect(seeds[i].include).toEqual([/^https?:\/\/example\.com\//]);
+  }
+
+  expect(seeds[0].exclude).toEqual([/2023/]);
+  expect(seeds[1].exclude).toEqual([/2023/]);
+  expect(seeds[2].exclude).toEqual([/0/]);
+  expect(seeds[3].exclude).toEqual([/0/]);
+  expect(seeds[4].exclude).toEqual([]);
+  expect(seeds[5].exclude).toEqual([]);
+  expect(seeds[6].exclude).toEqual([]);
+  expect(seeds[7].exclude).toEqual([/null/]);
+  expect(seeds[8].exclude).toEqual([/false/]);
+  expect(seeds[9].exclude).toEqual([/true/]);
+
+});
