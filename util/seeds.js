@@ -30,12 +30,12 @@ export class ScopedSeed
   }
 
   parseRx(value) {
-    if (!value) {
+    if (value === null || value === undefined || value === "") {
       return [];
-    } else if (typeof(value) === "string") {
+    } else if (!(value instanceof Array)) {
       return [new RegExp(value)];
     } else {
-      return value.map(e => typeof(e) === "string" ? new RegExp(e) : e);
+      return value.map(e => (e instanceof RegExp) ? e : new RegExp(e));
     }
   }
 
