@@ -758,9 +758,8 @@ self.__bx_behaviors.selectMainBehavior();
         if (this.limitHit) {
           break;
         }
-      }
-
-      if (seed.sitemap) {
+      // parse sitemap if seed is queued, otherwise assume already parsed
+      } else if (seed.sitemap) {
         await this.parseSitemap(seed.sitemap, i);
       }
     }
