@@ -23,7 +23,8 @@ export function runWorkers(crawler, numWorkers, maxPageTime) {
     const rx = new RegExp(rxEscape(process.env.CRAWL_ID) + "\\-([\\d]+)$");
     const m = os.hostname().match(rx);
     if (m) {
-      offset = m[1] * numWorkers;
+      offset = Number(m[1]) + (Number(process.env.CRAWL_INDEX_OFFSET) || 0);
+      offset = offset * numWorkers;
       logger.info("Starting workerid index at " + offset, "worker");
     }
   }
@@ -94,16 +95,22 @@ export class PageWorker
     this.reuseCount = 1;
     const workerid = this.id;
 
-    while (true) {
+    while (await this.crawler.isCrawlRunning()) {
       try {
         logger.debug("Getting page in new window", {workerid}, "worker");
-        const { page, cdp } = await timedRun(
+        const result = await timedRun(
           this.crawler.browser.newWindowPageWithCDP(),
           NEW_WINDOW_TIMEOUT,
           "New Window Timed Out",
           {workerid},
           "worker"
         );
+
+        if (!result) {
+          continue;
+        }
+
+        const { page, cdp } = result;
 
         this.page = page;
         this.cdp = cdp;
@@ -180,13 +187,16 @@ export class PageWorker
   async runLoop() {
     const crawlState = this.crawler.crawlState;
 
-    while (!this.crawler.interrupted && !await crawlState.isCrawlStopped()) {
+    while (await this.crawler.isCrawlRunning()) {
       const data = await crawlState.nextFromQueue();
 
       // see if any work data in the queue
       if (data) {
         // init page (new or reuse)
         const opts = await this.initPage();
+        if (!opts) {
+          break;
+        }
 
         // run timed crawl of page
         await this.timedCrawlPage({...opts, data});

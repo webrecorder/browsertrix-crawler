@@ -16,7 +16,7 @@ import { TextExtract } from "./util/textextract.js";
 import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
-import { parseArgs } from "./util/argParser.js";
+import { parseArgs, splitArgsQuoteSafe } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { logger, errJSON } from "./util/logger.js";
 import { runWorkers } from "./util/worker.js";
@@ -259,7 +259,9 @@ export class Crawler {
 
     const subprocesses = [];
 
-    subprocesses.push(child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio}));
+    const redisArgs = process.env.REDIS_ARGS ? splitArgsQuoteSafe(process.env.REDIS_ARGS) : [];
+
+    subprocesses.push(child_process.spawn("redis-server", redisArgs, {cwd: "/tmp/", stdio: redisStdio}));
 
     opts.env = {
       ...process.env,
@@ -677,6 +679,18 @@ self.__bx_behaviors.selectMainBehavior();
   async serializeAndExit() {
     await this.serializeConfig();
     process.exit(0);
+  }
+
+  async isCrawlRunning() {
+    if (this.interrupted) {
+      return false;
+    }
+
+    if (await this.crawlState.isCrawlStopped()) {
+      return false;
+    }
+
+    return true;
   }
 
   async crawl() {
