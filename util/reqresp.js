@@ -46,6 +46,12 @@ export class RequestResponseInfo
 
     this.readSize = 0;
     this.expectedSize = 0;
+
+    // set to true to indicate async loading in progress
+    this.asyncLoading = false;
+
+    // set to add truncated message
+    this.truncated = null;
   }
 
   fillRequest(params) {
