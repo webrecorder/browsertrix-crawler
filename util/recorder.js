@@ -717,7 +717,7 @@ class AsyncFetcher
         yield value;
       }
     } catch (e) {
-      logger.warn("takeStream interrupted", {...errJSON(e), url: this.reqresp.url, ...this.recorder.logDetails}, "recorder");
+      logger.warn("takeReader interrupted", {...errJSON(e), url: this.reqresp.url, ...this.recorder.logDetails}, "recorder");
       this.reqresp.truncated = "disconnect";
     }
   }
