@@ -219,7 +219,7 @@ export class Recorder
   handleLoadingFinished(params) {
     const reqresp = this.pendingReqResp(params.requestId, true);
 
-    if (!reqresp || !reqresp.asyncLoading) {
+    if (!reqresp || reqresp.asyncLoading) {
       return;
     }
 
