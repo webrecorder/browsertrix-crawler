@@ -679,6 +679,18 @@ self.__bx_behaviors.selectMainBehavior();
     process.exit(0);
   }
 
+  async isCrawlRunning() {
+    if (this.interrupted) {
+      return false;
+    }
+
+    if (await this.crawlState.isCrawlStopped()) {
+      return false;
+    }
+
+    return true;
+  }
+
   async crawl() {
     if (this.params.healthCheckPort) {
       this.healthChecker = new HealthChecker(this.params.healthCheckPort, this.params.workers);
