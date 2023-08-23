@@ -105,16 +105,24 @@ export class PageWorker
     this.reuseCount = 1;
     const workerid = this.id;
 
-    while (true) {
+    let retry = 0;
+
+    while (await this.crawler.isCrawlRunning()) {
       try {
         logger.debug("Getting page in new window", {workerid}, "worker");
-        const { page, cdp } = await timedRun(
+        const result = await timedRun(
           this.crawler.browser.newWindowPageWithCDP(),
           NEW_WINDOW_TIMEOUT,
           "New Window Timed Out",
           {workerid},
           "worker"
         );
+
+        if (!result) {
+          throw new Error("timed out");
+        }
+
+        const { page, cdp } = result;
 
         this.page = page;
         this.cdp = cdp;
@@ -143,8 +151,14 @@ export class PageWorker
 
       } catch (err) {
         logger.warn("Error getting new page", {"workerid": this.id, ...errJSON(err)}, "worker");
+        retry++;
+
+        if (retry >= MAX_REUSE) {
+          logger.fatal("Unable to get new page, browser likely crashed");
+        }
+
         await sleep(0.5);
-        logger.warn("Retry getting new page");
+        logger.warn("Retrying getting new page");
 
         if (this.crawler.healthChecker) {
           this.crawler.healthChecker.incError();
@@ -215,7 +229,7 @@ export class PageWorker
   async runLoop() {
     const crawlState = this.crawler.crawlState;
 
-    while (!this.crawler.interrupted && !await crawlState.isCrawlStopped()) {
+    while (await this.crawler.isCrawlRunning()) {
       const data = await crawlState.nextFromQueue();
 
       // see if any work data in the queue

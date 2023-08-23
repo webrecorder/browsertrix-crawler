@@ -619,7 +619,6 @@ self.__bx_behaviors.selectMainBehavior();
       if (size >= this.params.sizeLimit) {
         logger.info(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
         interrupt = true;
-        this.uploadAndDeleteLocal = true;
       }
     }
 
@@ -640,6 +639,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (interrupt) {
+      this.uploadAndDeleteLocal = true;
       this.gracefulFinish();
     }
   }
@@ -666,6 +666,18 @@ self.__bx_behaviors.selectMainBehavior();
   async serializeAndExit() {
     await this.serializeConfig();
     process.exit(0);
+  }
+
+  async isCrawlRunning() {
+    if (this.interrupted) {
+      return false;
+    }
+
+    if (await this.crawlState.isCrawlStopped()) {
+      return false;
+    }
+
+    return true;
   }
 
   async crawl() {

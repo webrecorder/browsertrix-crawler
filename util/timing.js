@@ -1,4 +1,4 @@
-import { logger, errJSON } from "./logger.js";
+import { logger } from "./logger.js";
 
 export function sleep(seconds) {
   return new Promise(resolve => setTimeout(resolve, seconds * 1000));
@@ -19,7 +19,8 @@ export function timedRun(promise, seconds, message="Promise timed out", logDetai
       if (err == "timeout reached") {
         logger.error(message, {"seconds": seconds, ...logDetails}, context);
       } else {
-        logger.error("Unknown exception", {...errJSON(err), ...logDetails}, context);
+        //logger.error("Unknown exception", {...errJSON(err), ...logDetails}, context);
+        throw err;
       }
     });
 }
