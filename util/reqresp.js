@@ -119,6 +119,19 @@ export class RequestResponseInfo
     }
   }
 
+  isSelfRedirect() {
+    if (this.status < 300 || this.status >= 400 || this.status === 304) {
+      return false;
+    }
+    try {
+      const headers = new Headers(this.responseHeaders);
+      const redirUrl = new URL(headers.get("location"), this.url).href;
+      return this.url === redirUrl;
+    } catch (e) {
+      return false;
+    }
+  }
+
   fillResponseReceivedExtraInfo(params) {
     // this.responseHeaders = params.headers;
     // if (params.headersText) {

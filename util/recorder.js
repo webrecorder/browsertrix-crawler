@@ -80,7 +80,6 @@ export class Recorder
     // Fetch
 
     cdp.on("Fetch.requestPaused", async (params) => {
-      logNetwork("Fetch.requestPaused", {requestId: params.requestId, ...this.logDetails});
       this.handleRequestPaused(params, cdp);
     });
 
@@ -170,13 +169,20 @@ export class Recorder
   handleRedirectResponse(params) {
     const { requestId, redirectResponse } = params;
 
-    // remove and serialize now as may redirect chain may reuse same requestId
-    const reqresp = this.removeReqResp(requestId);
+    // remove and serialize, but allow reusing requestId
+    // as redirect chain may reuse same requestId for subsequent request
+    const reqresp = this.removeReqResp(requestId, true);
     if (!reqresp) {
       return;
     }
 
     reqresp.fillResponse(redirectResponse);
+
+    if (reqresp.isSelfRedirect()) {
+      logger.warn("Skipping self redirect", {url: reqresp. url, status: reqresp.status, ...this.logDetails}, "recorder");
+      return;
+    }
+
     this.serializeToWARC(reqresp);
   }
 
@@ -236,6 +242,8 @@ export class Recorder
     const { requestId, request, responseStatusCode, responseErrorReason, resourceType, networkId } = params;
     const { method, headers, url } = request;
 
+    logNetwork("Fetch.requestPaused", {requestId, networkId, url, ...this.logDetails});
+
     let continued = false;
 
     try {
@@ -250,7 +258,7 @@ export class Recorder
       try {
         await cdp.send("Fetch.continueResponse", {requestId});
       } catch (e) {
-        logger.debug("continueResponse failed", {url, ...errJSON(e), ...this.logDetails}, "recorder");
+        logger.debug("continueResponse failed", {requestId, networkId, url, ...errJSON(e), ...this.logDetails}, "recorder");
       }
     }
   }
@@ -326,7 +334,7 @@ export class Recorder
         reqresp.payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
         logNetwork("Fetch done", {size: reqresp.payload.length, url, networkId, ...this.logDetails});
       } catch (e) {
-        logger.warn("Failed to load response body", {...errJSON(e), url, ...this.logDetails}, "recorder");
+        logger.warn("Failed to load response body", {url, networkId, ...errJSON(e), ...this.logDetails}, "recorder");
         return false;
       }
     }
@@ -570,10 +578,12 @@ export class Recorder
     }
   }
 
-  removeReqResp(requestId) {
+  removeReqResp(requestId, allowReuse=false) {
     const reqresp = this.pendingRequests.get(requestId);
     this.pendingRequests.delete(requestId);
-    this.skipIds.add(requestId);
+    if (!allowReuse) {
+      this.skipIds.add(requestId);
+    }
     return reqresp;
   }
 
