@@ -1335,7 +1335,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (favicon !== null) {
-      row.faviconUrl = favicon;
+      row.favIconUrl = favicon;
     }
 
     const processedRow = JSON.stringify(row) + "\n";

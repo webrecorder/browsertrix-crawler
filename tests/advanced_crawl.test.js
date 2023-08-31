@@ -16,10 +16,10 @@ test("check that the favicon made it into the pages jsonl file", () => {
   const data = [ data1, data2 ];
   for (const d of data) {
     if (d.url === "https://webrecorder.net/") {
-      expect(d.faviconUrl).toEqual("https://webrecorder.net/assets/favicon.ico");
+      expect(d.favIconUrl).toEqual("https://webrecorder.net/assets/favicon.ico");
     }
     if (d.url === "https://iana.org/") {
-      expect(d.faviconUrl).toEqual("https://www.iana.org/_img/bookmark_icon.ico");
+      expect(d.favIconUrl).toEqual("https://www.iana.org/_img/bookmark_icon.ico");
     }
   }
 });
