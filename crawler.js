@@ -431,6 +431,17 @@ self.__bx_behaviors.selectMainBehavior();
     return str;
   }
 
+  async getFavicon(page) {
+    const resp = await fetch("http://localhost:9221/json");
+    if (resp.status === 200) {
+      const browserJson = await resp.json();
+      if (browserJson.id === page.target()._titleId) {
+        return browserJson[0].faviconUrl;
+      }
+    }
+    logger.error("Localhost debugger failed with status", resp.status);
+  }
+
   async crawlPage(opts) {
     await this.writeStats();
 
@@ -451,6 +462,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.driver({page, data, crawler: this});
 
     data.title = await page.title();
+    data.favicon = await this.getFavicon(page);
 
     if (this.params.screenshot) {
       if (!data.isHTMLPage) {
@@ -1308,7 +1320,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async writePage({url, depth, title, text, loadState}) {
+  async writePage({url, depth, title, text, loadState, favicon}) {
     const id = uuidv4();
     const row = {id, url, title, loadState};
 
@@ -1318,6 +1330,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (text !== null) {
       row.text = text;
+    }
+
+    if (favicon !== null) {
+      row.faviconUrl = favicon;
     }
 
     const processedRow = JSON.stringify(row) + "\n";
