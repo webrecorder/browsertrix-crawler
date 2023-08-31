@@ -435,8 +435,10 @@ self.__bx_behaviors.selectMainBehavior();
     const resp = await fetch("http://localhost:9221/json");
     if (resp.status === 200) {
       const browserJson = await resp.json();
-      if (browserJson.id === page.target()._titleId) {
-        return browserJson[0].faviconUrl;
+      for (const jsons of browserJson) {
+        if (jsons.id === page.target()._targetId) {
+          return jsons.faviconUrl;
+        }
       }
     }
     logger.error("Localhost debugger failed with status", resp.status);
