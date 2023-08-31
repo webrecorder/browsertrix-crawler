@@ -1142,6 +1142,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
+      logger.debug("Skipping Link Extraction, At Max Depth");
       return;
     }
 

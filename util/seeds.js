@@ -23,6 +23,12 @@ export class ScopedSeed
       this.include = [...include, ...this.include];
     }
 
+    // for page scope, the depth is set to extraHops, as no other
+    // crawling is done
+    if (this.scopeType === "page") {
+      depth = extraHops;
+    }
+
     this.sitemap = this.resolveSiteMap(sitemap);
     this.allowHash = allowHash;
     this.maxExtraHops = extraHops;
