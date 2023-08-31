@@ -134,7 +134,7 @@ end
     });
 
     redis.defineCommand("requeue", {
-      numberOfKeys: 3,
+      numberOfKeys: 4,
       lua: `
 local res = redis.call('get', KEYS[3]);
 if not res then
@@ -148,6 +148,9 @@ if not res then
       redis.call('zadd', KEYS[2], 0, json);
       return 1;
     else
+      data['failed'] = '1';
+      json = cjson.encode(data);
+      redis.call('lpush', KEYS[3], json);
       return 2;
     end
   end
@@ -179,7 +182,8 @@ return 0;
   }
 
   async markFailed(url) {
-    await this.redis.movefailed(this.pkey, this.fkey, url, "1", "failed");
+    //await this.redis.movefailed(this.pkey, this.fkey, url, "1", "failed");
+    await this.requeueOrFail(url);
 
     return await this.redis.incr(this.dkey);
   }
@@ -416,17 +420,22 @@ return 0;
     const pendingUrls = await this.redis.hkeys(this.pkey);
 
     for (const url of pendingUrls) {
-      const res = await this.redis.requeue(this.pkey, this.qkey, this.pkey + ":" + url, url, this.maxRetryPending);
-      switch (res) {
-      case 1:
-        logger.info(`Requeued: ${url}`);
-        break;
-
-      case 2:
-        logger.info(`Not requeuing anymore: ${url}`);
-        break;
-      }
+      await this.requeueOrFail(url);
     }
+  }
+
+  async requeueOrFail(url) {
+    const res = await this.redis.requeue(this.pkey, this.qkey, this.pkey + ":" + url, this.fkey, url, this.maxRetryPending);
+    switch (res) {
+    case 1:
+      logger.info(`Requeued: ${url}`);
+      break;
+
+    case 2:
+      logger.info(`Not requeuing anymore: ${url}`);
+      break;
+    }
+    return res === 1;
   }
 
   async queueSize() {

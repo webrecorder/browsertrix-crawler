@@ -546,6 +546,10 @@ self.__bx_behaviors.selectMainBehavior();
       if (this.healthChecker) {
         this.healthChecker.incError();
       }
+      this.interrupted = this.healthChecker.isFailing();
+      if (this.interrupted) {
+        logger.warn("Interrupting due to too many failures, will restart");
+      }
     }
 
     await this.serializeConfig();
@@ -992,7 +996,7 @@ self.__bx_behaviors.selectMainBehavior();
           logger.debug(stdout.join("\n"));
         }
         if (stderr.length && this.params.logging.includes("debug")) {
-          logger.error(stderr.join("\n"));
+          logger.debug(stderr.join("\n"));
         }
         resolve(code);
       });
@@ -1046,20 +1050,24 @@ self.__bx_behaviors.selectMainBehavior();
 
     const failCrawlOnError = ((depth === 0) && this.params.failOnFailedSeed);
 
-    let isHTMLPage = await timedRun(
+    data.isHTMLPage = await timedRun(
       this.isHTML(url),
       FETCH_TIMEOUT_SECS,
       "HEAD request to determine if URL is HTML page timed out",
-      logDetails
+      logDetails,
+      "fetch",
+      true
     );
 
-    if (!isHTMLPage) {
+    if (!data.isHTMLPage) {
       try {
         const captureResult = await timedRun(
           this.directFetchCapture(url),
           FETCH_TIMEOUT_SECS,
           "Direct fetch capture attempt timed out",
-          logDetails
+          logDetails,
+          "fetch",
+          true
         );
         if (captureResult) {
           logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
@@ -1070,73 +1078,11 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    let ignoreAbort = false;
-
-    // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
-    // if so, don't report as an error
-    page.once("requestfailed", (req) => {
-      ignoreAbort = shouldIgnoreAbort(req);
-    });
-
-    if (isHTMLPage) {
-      page.once("domcontentloaded", () => {
-        data.loadState = LoadState.CONTENT_LOADED;
-      });
-    }
-
-    const gotoOpts = isHTMLPage ? this.gotoOpts : {waitUntil: "domcontentloaded"};
-
-    logger.info("Awaiting page load", logDetails);
-
-    try {
-      const resp = await page.goto(url, gotoOpts);
-
-      // Handle 4xx or 5xx response as a page load error
-      const statusCode = resp.status();
-      if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
-        if (failCrawlOnError) {
-          logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails});
-        } else {
-          logger.error("Page Load Error, skipping page", {statusCode, ...logDetails});
-          throw new Error(`Page ${url} returned status code ${statusCode}`);
-        }
-      }
-
-      const contentType = await this.browser.responseHeader(resp, "content-type");
-
-      isHTMLPage = this.isHTMLContentType(contentType);
-
-    } catch (e) {
-      let msg = e.message || "";
-      if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
-        if (e.name === "TimeoutError") {
-          if (data.loadState !== LoadState.CONTENT_LOADED) {
-            if (failCrawlOnError) {
-              logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
-            } else {
-              logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
-              throw e;
-            }
-          } else {
-            logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
-            data.skipBehaviors = true;
-          }
-        } else {
-          if (failCrawlOnError) {
-            logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
-          } else {
-            logger.error("Page Load Error, skipping page", {msg, ...logDetails});
-            throw e;
-          }
-        }
-      }
-    }
+    await this.doGotoPage(page, url, data, logDetails, failCrawlOnError);
 
     data.loadState = LoadState.FULL_PAGE_LOADED;
 
-    data.isHTMLPage = isHTMLPage;
-
-    if (isHTMLPage) {
+    if (data.isHTMLPage) {
       let frames = await page.frames();
       frames = await Promise.allSettled(frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)));
 
@@ -1147,7 +1093,7 @@ self.__bx_behaviors.selectMainBehavior();
       data.filteredFrames = [];
     }
 
-    if (!isHTMLPage) {
+    if (data.isHTMLPage) {
       logger.debug("Skipping link extraction for non-HTML page", logDetails);
       return;
     }
@@ -1169,6 +1115,82 @@ self.__bx_behaviors.selectMainBehavior();
     for (const opts of selectorOptsList) {
       const links = await this.extractLinks(page, data.filteredFrames, opts, logDetails);
       await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
+    }
+  }
+
+  async doGotoPage(page, url, data, logDetails, failCrawlOnError) {
+    let ignoreAbort = false;
+
+    // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
+    // if so, don't report as an error
+    page.once("requestfailed", (req) => {
+      ignoreAbort = shouldIgnoreAbort(req);
+    });
+
+    if (data.isHTMLPage) {
+      page.once("domcontentloaded", () => {
+        data.loadState = LoadState.CONTENT_LOADED;
+      });
+    }
+
+    const gotoOpts = data.isHTMLPage ? this.gotoOpts : {waitUntil: "domcontentloaded"};
+
+    logger.info("Awaiting page load", logDetails);
+
+    let mainPageResp = null;
+
+    try {
+      mainPageResp = await page.goto(url, gotoOpts);
+
+    } catch (e) {
+      let msg = e.message || "";
+      if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
+        if (e.name === "TimeoutError") {
+          if (data.loadState !== LoadState.CONTENT_LOADED) {
+            if (failCrawlOnError) {
+              logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
+            } else {
+              logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
+              e.message = "logged";
+              throw e;
+            }
+          } else {
+            logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
+            data.skipBehaviors = true;
+          }
+        } else {
+          if (failCrawlOnError) {
+            logger.fatal("Seed Page Load Error, failing crawl", {msg, ...logDetails});
+          } else {
+            logger.error("Page Load Error, skipping page", {msg, ...logDetails});
+            e.message = "logged";
+            throw e;
+          }
+        }
+      }
+    }
+
+    if (!mainPageResp) {
+      return;
+    }
+
+    // Handle 4xx or 5xx response as a page load error
+    const statusCode = mainPageResp.status();
+
+    if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
+      if (failCrawlOnError) {
+        logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails});
+      } else {
+        logger.error("Invalid status Code, skipping page", {statusCode, ...logDetails});
+        throw new Error("logged");
+      }
+    }
+
+    // attempt to determine content-type more accurately, ignore if failed
+    try {
+      data.isHTMLPage = this.isHTMLContentType(mainPageResp.headers()["content-type"]);
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -1267,7 +1289,11 @@ self.__bx_behaviors.selectMainBehavior();
 
       while (await timedRun(
         page.$("div.cf-browser-verification.cf-im-under-attack"),
-        PAGE_OP_TIMEOUT_SECS
+        PAGE_OP_TIMEOUT_SECS,
+        "Cloudflare check timed out",
+        logDetails,
+        "general",
+        true
       )) {
         logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
         await sleep(5.5);
