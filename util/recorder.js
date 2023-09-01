@@ -795,25 +795,25 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher
       return await super._doFetch();
     }
 
-    const { stream, headers, httpStatusCode } = result.resource;
+    const { stream, headers, httpStatusCode, success, netError, netErrorName } = result.resource;
 
-    if (reqresp.expectedSize < 0 && headers.get("content-length") && !headers.get("content-encoding")) {
+    if (!success || !stream) {
+      //await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
+      logger.debug("Network.loadNetworkResource failed, attempting node fetch", {url, netErrorName, netError, httpStatusCode}, "recorder");
+      return await super._doFetch();
+    }
+
+    if (reqresp.expectedSize < 0 && headers && headers.get("content-length") && !headers.get("content-encoding")) {
       reqresp.expectedSize = Number(headers.get("content-length") || -1);
     }
 
     if (reqresp.expectedSize === 0) {
       reqresp.payload = new Uint8Array();
       return;
-
-    } else if (!stream) {
-      //logger.error("Empty body, stopping fetch", {url}, "recorder");
-      //await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
-      logger.debug("Network.loadNetworkResource failed, attempting node fetch", {url}, "recorder");
-      return await super._doFetch();
     }
 
     reqresp.status = httpStatusCode;
-    reqresp.responseHeaders = headers;
+    reqresp.responseHeaders = headers || {};
 
     return this.takeStreamIter(cdp, stream);
   }
