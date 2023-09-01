@@ -679,7 +679,7 @@ class AsyncFetcher
       recorder.warcQ.add(() => recorder.writer.writeRecordPair(responseRecord, requestRecord, serializer));
 
     } catch (e) {
-      logger.error("Error streaming to file", {url, networkId, filename, ...errJSON(e), ...logDetails}, "recorder");
+      logger.error("Streaming Fetch Error", {url, networkId, filename, ...errJSON(e), ...logDetails}, "recorder");
       await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
     } finally {
       recorder.removeReqResp(networkId);
