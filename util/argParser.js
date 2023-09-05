@@ -227,6 +227,10 @@ class ArgParser {
         describe: "If enabled, check for sitemaps at /sitemap.xml, or custom URL if URL is specified",
       },
 
+      "sitemapLastmod": {
+        describe: "If set, filter URLs from sitemaps to those greater than or equal to provided YYYY-MM-DD string",
+      },
+
       "statsFilename": {
         describe: "If set, output stats as JSON to this file. (Relative filename resolves to crawl working directory)"
       },
@@ -514,6 +518,7 @@ class ArgParser {
     const scopeOpts = {
       scopeType: argv.scopeType,
       sitemap: argv.sitemap,
+      sitemapLastmod: argv.sitemapLastmod,
       include: argv.include,
       exclude: argv.exclude,
       depth: argv.depth,
