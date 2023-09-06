@@ -490,6 +490,14 @@ See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors
 
 With version 0.9.0, Browsertrix Crawler includes a `--pageExtraDelay`/`--delay` option, which can be used to have the crawler sleep for a configurable number of seconds after behaviors before moving on to the next page.
 
+Custom behaviours can also be mounted into the crawler and loaded from there. For example:
+
+```zsh
+docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors /custom-behaviors/
+```
+
+Which will load all the custom behaviors stored in the `tests/custom-behaviors` directory. 
+
 ### Screenshots
 
 With version 0.8.0, Browsertrix Crawler includes the ability to take screenshots of each page crawled via the `--screenshot` option.
