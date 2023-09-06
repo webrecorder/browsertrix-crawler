@@ -163,7 +163,7 @@ export class Crawler {
       } catch (e) {
         //logger.fatal("Unable to connect to state store Redis: " + redisUrl);
         logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
-        await sleep(3);
+        await sleep(1);
       }
     }
 
@@ -304,12 +304,16 @@ export class Crawler {
   async run() {
     await this.bootstrap();
 
-    let status;
+    let status = "done";
     let exitCode = 0;
 
     try {
       await this.crawl();
-      status = (!this.interrupted ? "done" : "interrupted");
+      const finished = await this.crawlState.isFinished();
+      if (this.interrupted && !finished) {
+        status = "interrupted";
+        exitCode = 11;
+      }
     } catch(e) {
       logger.error("Crawl failed", e);
       exitCode = 9;

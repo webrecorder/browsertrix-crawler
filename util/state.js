@@ -207,7 +207,15 @@ return 0;
   }
 
   async isCrawlStopped() {
-    return await this.redis.get(`${this.key}:stopping`) === "1";
+    if (await this.redis.get(`${this.key}:stopping`) === "1") {
+      return true;
+    }
+
+    if (await this.redis.hget(`${this.key}:stopone`, this.uid) === "1") {
+      return true;
+    }
+
+    return false;
   }
 
   // note: not currently called in crawler, but could be
