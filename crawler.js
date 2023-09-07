@@ -431,7 +431,7 @@ self.__bx_behaviors.selectMainBehavior();
     return str;
   }
 
-  async getFavicon(page) {
+  async getFavicon(page, logDetails) {
     const resp = await fetch("http://localhost:9221/json");
     if (resp.status === 200) {
       const browserJson = await resp.json();
@@ -441,7 +441,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
     }
-    logger.error("Localhost debugger failed with status", resp.status);
+    logger.warn("Failed to fetch Favicon from localhost debugger", logDetails);
   }
 
   async crawlPage(opts) {
@@ -464,7 +464,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.driver({page, data, crawler: this});
 
     data.title = await page.title();
-    data.favicon = await this.getFavicon(page);
+    data.favicon = await this.getFavicon(page, logDetails);
 
     if (this.params.screenshot) {
       if (!data.isHTMLPage) {
