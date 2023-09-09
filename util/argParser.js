@@ -347,6 +347,12 @@ class ArgParser {
         default: false
       },
 
+      "restartsOnError": {
+        describe: "if set, assume will be restarted if interrupted, don't run post-crawl processes on interrupt",
+        type: "boolean",
+        default: false
+      },
+
       "netIdleWait": {
         describe: "if set, wait for network idle after page load and after behaviors are done (in seconds). if -1 (default), determine based on scope",
         type: "number",
