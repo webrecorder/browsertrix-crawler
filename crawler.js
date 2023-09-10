@@ -435,6 +435,19 @@ self.__bx_behaviors.selectMainBehavior();
     return str;
   }
 
+  async getFavicon(page, logDetails) {
+    const resp = await fetch("http://localhost:9221/json");
+    if (resp.status === 200) {
+      const browserJson = await resp.json();
+      for (const jsons of browserJson) {
+        if (jsons.id === page.target()._targetId) {
+          return jsons.faviconUrl;
+        }
+      }
+    }
+    logger.warn("Failed to fetch Favicon from localhost debugger", logDetails);
+  }
+
   async crawlPage(opts) {
     await this.writeStats();
 
@@ -455,6 +468,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.driver({page, data, crawler: this});
 
     data.title = await page.title();
+    data.favicon = await this.getFavicon(page, logDetails);
 
     if (this.params.screenshot) {
       if (!data.isHTMLPage) {
@@ -1313,7 +1327,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async writePage({url, depth, title, text, loadState}) {
+  async writePage({url, depth, title, text, loadState, favicon}) {
     const id = uuidv4();
     const row = {id, url, title, loadState};
 
@@ -1323,6 +1337,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (text !== null) {
       row.text = text;
+    }
+
+    if (favicon !== null) {
+      row.favIconUrl = favicon;
     }
 
     const processedRow = JSON.stringify(row) + "\n";
