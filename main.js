@@ -28,7 +28,7 @@ async function handleTerminate(signame) {
   try {
     if (!crawler.interrupted) {
       logger.info("SIGNAL: gracefully finishing current pages...");
-      crawler.gracefulFinish();
+      crawler.gracefulFinishOnInterrupt();
 
     } else if (forceTerm || (Date.now() - lastSigInt) > 200) {
       logger.info("SIGNAL: stopping crawl now...");
@@ -47,18 +47,6 @@ process.on("SIGTERM", () => handleTerminate("SIGTERM"));
 process.on("SIGABRT", async () => {
   logger.info("SIGABRT received, will force immediate exit on SIGTERM/SIGINT");
   forceTerm = true;
-});
-
-process.on("SIGUSR1", () => {
-  if (crawler) {
-    crawler.prepareForExit(true);
-  }
-});
-
-process.on("SIGUSR2", () => {
-  if (crawler) {
-    crawler.prepareForExit(false);
-  }
 });
 
 crawler = new Crawler();

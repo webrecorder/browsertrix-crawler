@@ -658,25 +658,14 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (interrupt) {
       this.uploadAndDeleteLocal = true;
-      this.gracefulFinish();
+      this.gracefulFinishOnInterrupt();
     }
   }
 
-  gracefulFinish() {
+  gracefulFinishOnInterrupt() {
     this.interrupted = true;
     logger.info("Crawler interrupted, gracefully finishing current pages");
     if (!this.params.waitOnDone && !this.params.restartsOnError) {
-      this.finalExit = true;
-    }
-  }
-
-  prepareForExit(markDone = true) {
-    if (!markDone) {
-      this.params.waitOnDone = false;
-      this.uploadAndDeleteLocal = true;
-      logger.info("SIGNAL: Preparing for exit of this crawler instance only");
-    } else {
-      logger.info("SIGNAL: Preparing for final exit of all crawlers");
       this.finalExit = true;
     }
   }
