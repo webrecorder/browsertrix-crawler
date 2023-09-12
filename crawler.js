@@ -449,7 +449,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async crawlPage(opts) {
-    await this.writeStats();
+    await this.writeStats(this.params.liveStatsFile);
 
     const {page, cdp, data, workerid} = opts;
 
