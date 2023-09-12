@@ -21,7 +21,7 @@ import { initRedis } from "./util/redis.js";
 import { logger, errJSON } from "./util/logger.js";
 import { runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
-import { collectAllFileSources } from "./util/file_reader.js";
+import { determineFileSource } from "./util/file_reader.js";
 
 import { Browser } from "./util/browser.js";
 
@@ -438,7 +438,7 @@ self.__bx_behaviors.selectMainBehavior();
   loadCustomBehaviors(filename) {
     let str = "";
 
-    for (const source of collectAllFileSources(filename, ".js")) {
+    for (const source of determineFileSource(filename, ".js")) {
       str += `self.__bx_behaviors.load(${source});\n`;
     }
 

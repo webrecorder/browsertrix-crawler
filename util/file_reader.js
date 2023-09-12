@@ -1,7 +1,43 @@
 import fs from "fs";
 import path from "path";
+import https from "https";
 
 const MAX_DEPTH = 2;
+
+export function determineFileSource(fileOrUrl, ext = null) {
+  // Currently assuming if we pass more than one param, they're *all* URLs
+  if (typeof(fileOrUrl) === "string") {
+    if (fileOrUrl.startsWith("http") || typeof(fileOrUrl) === "object") {
+      return collectOnlineFileSource(fileOrUrl);
+    } else {
+      return collectAllFileSources(fileOrUrl, ext);
+    }
+  }
+}
+
+export function collectOnlineFileSource(url) {
+  if (typeof(url) === "string") {
+    collectSingleOnlineFile(url);
+  } else if (typeof(url) === "object") {
+    for (const u of url) {
+      collectSingleOnlineFile(u);
+    }
+  }
+  return collectAllFileSources("/app/behaviors", ".js");
+}
+
+export function collectSingleOnlineFile(url) {
+  const split = url.split("/");
+  const filename = split[split.length - 1];
+  const file = fs.createWriteStream("/app/behaviors/" + filename);
+  // TODO handle case where file is sent over HTTP?
+  https.get(url, function(response) {
+    response.pipe(file);
+    file.on("finish", () => {
+      file.close();
+    });
+  });
+}
 
 export function collectAllFileSources(fileOrDir, ext = null, depth = 0) {
   const resolvedPath = path.resolve(fileOrDir);
