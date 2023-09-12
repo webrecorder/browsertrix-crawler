@@ -323,7 +323,7 @@ export class Crawler {
       }
 
     } finally {
-      logger.info(`Crawl status: ${status}`);
+      logger.info(`Final crawl status: ${status}`);
 
       if (this.crawlState) {
         await this.crawlState.setStatus(status);
@@ -830,7 +830,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    await this.closeLog();
+    logger.info("Crawling done");
 
     if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.uploadAndDeleteLocal)) {
       const uploaded = await this.generateWACZ();
@@ -852,16 +852,6 @@ self.__bx_behaviors.selectMainBehavior();
 
       // wait forever until signal
       await new Promise(() => {});
-    }
-  }
-
-  async closeLog() {
-    // close file-based log
-    logger.setExternalLogStream(null);
-    try {
-      await new Promise(resolve => this.logFH.close(() => resolve()));
-    } catch (e) {
-      // ignore
     }
   }
 
@@ -889,6 +879,8 @@ self.__bx_behaviors.selectMainBehavior();
       }
       logger.fatal("No WARC Files, assuming crawl failed");
     }
+
+    logger.debug("End of log file, storing logs in WACZ");
 
     // Build the argument list to pass to the wacz create command
     const waczFilename = this.params.collection.concat(".wacz");
