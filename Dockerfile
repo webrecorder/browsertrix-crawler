@@ -45,6 +45,8 @@ ADD html/ /app/html/
 
 RUN ln -s /app/main.js /usr/bin/crawl; ln -s /app/create-login-profile.js /usr/bin/create-login-profile
 
+RUN mkdir -p /app/behaviors
+
 WORKDIR /crawls
 
 ADD docker-entrypoint.sh /docker-entrypoint.sh
