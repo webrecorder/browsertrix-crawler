@@ -329,6 +329,8 @@ export class Crawler {
         await this.crawlState.setStatus(status);
       }
 
+      await this.closeLog();
+
       process.exit(exitCode);
     }
   }
@@ -680,6 +682,7 @@ self.__bx_behaviors.selectMainBehavior();
 
   async serializeAndExit() {
     await this.serializeConfig();
+    await this.closeLog();
     process.exit(0);
   }
 
@@ -852,6 +855,19 @@ self.__bx_behaviors.selectMainBehavior();
 
       // wait forever until signal
       await new Promise(() => {});
+    }
+  }
+
+  async closeLog() {
+    // close file-based log
+    logger.setExternalLogStream(null);
+    if (!this.logFH) {
+      return;
+    }
+    try {
+      await new Promise(resolve => this.logFH.close(() => resolve()));
+    } catch (e) {
+      // ignore
     }
   }
 
