@@ -227,7 +227,8 @@ class ArgParser {
         describe: "If enabled, check for sitemaps at /sitemap.xml, or custom URL if URL is specified",
       },
 
-      "sitemapLastmod": {
+      "sitemapFromDate": {
+        alias: "sitemapFrom",
         describe: "If set, filter URLs from sitemaps to those greater than or equal to provided YYYY-MM-DD string",
       },
 

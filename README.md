@@ -162,7 +162,7 @@ Options:
       --useSitemap, --sitemap               If enabled, check for sitemaps at /s
                                             itemap.xml, or custom URL if URL is
                                             specified
-      --sitemapLastmod                      If set, filter URLs from sitemaps to
+      --sitemapFromDate                     If set, filter URLs from sitemaps to
                                             those greater than or equal to provi
                                             ded YYYY-MM-DD string       [string]
       --statsFilename                       If set, output stats as JSON to this

@@ -791,7 +791,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
 
       if (seed.sitemap) {
-        await this.parseSitemap(seed.sitemap, i, this.params.sitemapLastmod);
+        await this.parseSitemap(seed.sitemap, i, this.params.sitemapFromDate);
       }
     }
 
@@ -1420,30 +1420,30 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async parseSitemap(url, seedId, sitemapLastmod) {
-
+  async parseSitemap(url, seedId, sitemapFromDate) {
     // handle sitemap last modified date if passed
-    let lastmodTimestamp = null;
-    const dateObj = new Date(sitemapLastmod);
+    let lastmodFromTimestamp = null;
+    const dateObj = new Date(sitemapFromDate);
     if (isNaN(dateObj.getTime())) {
-      logger.warn(`Invalid sitemapLastmod date: ${sitemapLastmod}`);
+      logger.info("Fetching full sitemap (fromDate not specified/valid)", {url, sitemapFromDate}, "sitemap");
     } else {
-      lastmodTimestamp = dateObj.getTime();
+      lastmodFromTimestamp = dateObj.getTime();
+      logger.info("Fetching and filtering sitemap by date", {url, sitemapFromDate}, "sitemap");
     }
 
     const sitemapper = new Sitemapper({
       url,
       timeout: 15000,
       requestHeaders: this.headers,
-      lastmod: lastmodTimestamp
+      lastmod: lastmodFromTimestamp
     });
 
     try {
       const { sites } = await sitemapper.fetch();
-      logger.debug(`${sites.length} urls discovered from sitemap`);
+      logger.info("Sitemap Urls Found", {urls: sites.length}, "sitemap");
       await this.queueInScopeUrls(seedId, sites, 0);
     } catch(e) {
-      logger.warn("Error fetching sites from sitemap", e);
+      logger.warn("Error fetching sites from sitemap", e, "sitemap");
     }
   }
 
