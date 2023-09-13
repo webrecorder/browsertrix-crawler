@@ -519,7 +519,6 @@ class ArgParser {
     const scopeOpts = {
       scopeType: argv.scopeType,
       sitemap: argv.sitemap,
-      sitemapLastmod: argv.sitemapLastmod,
       include: argv.include,
       exclude: argv.exclude,
       depth: argv.depth,
