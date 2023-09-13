@@ -41,11 +41,4 @@ jobs:
     - name: build docker
       run: docker-compose build
     - name: run jest
-      run: sudo yarn test
-      env:
-          CRAWL_ARGS: "--diskUtilization 0"
-        
-
-
-
-
+      run: CRAWL_ARGS="--diskUtilization 0" yarn test
