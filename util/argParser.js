@@ -229,7 +229,7 @@ class ArgParser {
 
       "sitemapFromDate": {
         alias: "sitemapFrom",
-        describe: "If set, filter URLs from sitemaps to those greater than or equal to provided YYYY-MM-DD string",
+        describe: "If set, filter URLs from sitemaps to those greater than or equal to provided ISO Date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS or partial date)",
       },
 
       "statsFilename": {
