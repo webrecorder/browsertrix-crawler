@@ -3,8 +3,8 @@ import fs from "fs";
 import path from "path";
 import md5 from "md5";
 
-
-
+console.log("*** ENV ***");
+console.log(process.env);
 
 test("ensure basic crawl run with docker run passes", async () => {
   child_process.execSync("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://www.example.com/ --generateWACZ  --text --collection wr-net --combineWARC --rolloverSize 10000 --workers 2 --title \"test title\" --description \"test description\"");
