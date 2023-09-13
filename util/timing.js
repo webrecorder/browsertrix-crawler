@@ -4,7 +4,7 @@ export function sleep(seconds) {
   return new Promise(resolve => setTimeout(resolve, seconds * 1000));
 }
 
-export function timedRun(promise, seconds, message="Promise timed out", logDetails={}, context="general") {
+export function timedRun(promise, seconds, message="Promise timed out", logDetails={}, context="general", isWarn=false) {
   // return Promise return value or log error if timeout is reached first
   const timeout = seconds * 1000;
 
@@ -17,7 +17,8 @@ export function timedRun(promise, seconds, message="Promise timed out", logDetai
   return Promise.race([promise, rejectPromiseOnTimeout(timeout)])
     .catch((err) =>  {
       if (err == "timeout reached") {
-        logger.error(message, {"seconds": seconds, ...logDetails}, context);
+        const logFunc = isWarn ? logger.warn : logger.error;
+        logFunc.call(logger, message, {"seconds": seconds, ...logDetails}, context);
       } else {
         //logger.error("Unknown exception", {...errJSON(err), ...logDetails}, context);
         throw err;

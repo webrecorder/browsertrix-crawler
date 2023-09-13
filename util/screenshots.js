@@ -3,7 +3,7 @@ import path from "path";
 import * as warcio from "warcio";
 import sharp from "sharp";
 
-import { logger } from "./logger.js";
+import { logger, errJSON } from "./logger.js";
 
 // ============================================================================
 
@@ -47,7 +47,7 @@ export class Screenshots {
       await this.writeBufferToWARC(screenshotBuffer, screenshotType, options.type);
       logger.info(`Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.warcName}`);
     } catch (e) {
-      logger.error(`Taking screenshot (type: ${screenshotType}) failed for ${this.url}`, e.message);
+      logger.error("Taking screenshot failed", {"page": this.url, type: screenshotType, ...errJSON(e)}, "screenshots");
     }
   }
 
@@ -56,8 +56,8 @@ export class Screenshots {
   }
 
   async takeThumbnail() {
+    const screenshotType = "thumbnail";
     try {
-      const screenshotType = "thumbnail";
       await this.browser.setViewport(this.page, {width: 1920, height: 1080});
       const options = screenshotTypes[screenshotType];
       const screenshotBuffer = await this.page.screenshot(options);
@@ -68,7 +68,7 @@ export class Screenshots {
       await this.writeBufferToWARC(thumbnailBuffer, screenshotType, options.type);
       logger.info(`Screenshot (type: thumbnail) for ${this.url} written to ${this.warcName}`);
     } catch (e) {
-      logger.error(`Taking screenshot (type: thumbnail) failed for ${this.url}`, e.message);
+      logger.error("Taking screenshot failed", {"page": this.url, type: screenshotType, ...errJSON(e)}, "screenshots");
     }
   }
 

@@ -280,10 +280,6 @@ export class Browser extends BaseBrowser
     return {page, cdp};
   }
 
-  async responseHeader(resp, header) {
-    return await resp.headers()[header];
-  }
-
   async evaluateWithCLI(_, frame, cdp, funcString, logData, contextName) {
     const context = await frame.executionContext();
     cdp = context._client;
