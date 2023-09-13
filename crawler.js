@@ -992,7 +992,7 @@ self.__bx_behaviors.selectMainBehavior();
           logger.debug(stdout.join("\n"));
         }
         if (stderr.length && this.params.logging.includes("debug")) {
-          logger.error(stderr.join("\n"));
+          logger.debug(stderr.join("\n"));
         }
         resolve(code);
       });
@@ -1050,7 +1050,9 @@ self.__bx_behaviors.selectMainBehavior();
       this.isHTML(url),
       FETCH_TIMEOUT_SECS,
       "HEAD request to determine if URL is HTML page timed out",
-      logDetails
+      logDetails,
+      "fetch",
+      true
     );
 
     if (!isHTMLPage) {
@@ -1059,7 +1061,9 @@ self.__bx_behaviors.selectMainBehavior();
           this.directFetchCapture(url),
           FETCH_TIMEOUT_SECS,
           "Direct fetch capture attempt timed out",
-          logDetails
+          logDetails,
+          "fetch",
+          true
         );
         if (captureResult) {
           logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
@@ -1097,12 +1101,12 @@ self.__bx_behaviors.selectMainBehavior();
         if (failCrawlOnError) {
           logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails});
         } else {
-          logger.error("Page Load Error, skipping page", {statusCode, ...logDetails});
-          throw new Error(`Page ${url} returned status code ${statusCode}`);
+          logger.error("Non-200 Status Code, skipping page", {statusCode, ...logDetails});
+          throw new Error("logged");
         }
       }
 
-      const contentType = await this.browser.responseHeader(resp, "content-type");
+      const contentType = resp.headers()["content-type"];
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
@@ -1115,6 +1119,7 @@ self.__bx_behaviors.selectMainBehavior();
               logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
             } else {
               logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
+              e.message = "logged";
               throw e;
             }
           } else {
@@ -1126,6 +1131,7 @@ self.__bx_behaviors.selectMainBehavior();
             logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
           } else {
             logger.error("Page Load Error, skipping page", {msg, ...logDetails});
+            e.message = "logged";
             throw e;
           }
         }
@@ -1267,7 +1273,11 @@ self.__bx_behaviors.selectMainBehavior();
 
       while (await timedRun(
         page.$("div.cf-browser-verification.cf-im-under-attack"),
-        PAGE_OP_TIMEOUT_SECS
+        PAGE_OP_TIMEOUT_SECS,
+        "Cloudflare check timed out",
+        logDetails,
+        "general",
+        true
       )) {
         logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
         await sleep(5.5);
