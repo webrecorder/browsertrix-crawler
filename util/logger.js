@@ -101,7 +101,7 @@ class Logger
     }
   }
 
-  fatal(message, data={}, context="general", exitCode=1) {
+  fatal(message, data={}, context="general", exitCode=17) {
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
     process.exit(exitCode);
   }

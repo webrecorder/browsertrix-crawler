@@ -310,7 +310,10 @@ export class Crawler {
     try {
       await this.crawl();
       const finished = await this.crawlState.isFinished();
-      if (this.interrupted && !finished) {
+      const stopped = await this.crawlState.isCrawlStopped();
+      if (stopped) {
+        status = "crawl gracefully stopped";
+      } else if (this.interrupted && !finished) {
         status = "interrupted";
         exitCode = 11;
       }
@@ -671,25 +674,14 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (interrupt) {
       this.uploadAndDeleteLocal = true;
-      this.gracefulFinish();
+      this.gracefulFinishOnInterrupt();
     }
   }
 
-  gracefulFinish() {
+  gracefulFinishOnInterrupt() {
     this.interrupted = true;
     logger.info("Crawler interrupted, gracefully finishing current pages");
-    if (!this.params.waitOnDone) {
-      this.finalExit = true;
-    }
-  }
-
-  prepareForExit(markDone = true) {
-    if (!markDone) {
-      this.params.waitOnDone = false;
-      this.uploadAndDeleteLocal = true;
-      logger.info("SIGNAL: Preparing for exit of this crawler instance only");
-    } else {
-      logger.info("SIGNAL: Preparing for final exit of all crawlers");
+    if (!this.params.waitOnDone && !this.params.restartsOnError) {
       this.finalExit = true;
     }
   }
@@ -697,7 +689,7 @@ self.__bx_behaviors.selectMainBehavior();
   async serializeAndExit() {
     await this.serializeConfig();
     await this.closeLog();
-    process.exit(0);
+    process.exit(this.interrupted ? 13 : 0);
   }
 
   async isCrawlRunning() {
@@ -706,6 +698,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (await this.crawlState.isCrawlStopped()) {
+      logger.info("Crawler is stopped");
       return false;
     }
 
@@ -761,6 +754,7 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     } else if (await this.crawlState.isCrawlStopped()) {
       logger.info("crawl stopped, running post-crawl tasks");
+      this.finalExit = true;
       await this.postCrawl();
       return;
     }
@@ -827,6 +821,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     // extra wait for all resources to land into WARCs
     await this.awaitPendingClear();
+
+    // if crawl has been stopped, mark as final exit for post-crawl tasks
+    if (await this.crawlState.isCrawlStopped()) {
+      this.finalExit = true;
+    }
 
     await this.postCrawl();
   }
@@ -903,10 +902,16 @@ self.__bx_behaviors.selectMainBehavior();
       if (isFinished) {
         return;
       }
-      // if stopped, won't get anymore data, so consider failed
+      // if stopped, won't get anymore data
       if (await this.crawlState.isCrawlStopped()) {
+        // possibly restarted after committing, so assume done here!
+        if ((await this.crawlState.numDone()) > 0) {
+          return;
+        }
+        // stopped and no done pages, mark crawl as failed
         await this.crawlState.setStatus("failed");
       }
+      // fail for now, may restart to try again
       logger.fatal("No WARC Files, assuming crawl failed");
     }
 
