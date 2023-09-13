@@ -162,6 +162,10 @@ Options:
       --useSitemap, --sitemap               If enabled, check for sitemaps at /s
                                             itemap.xml, or custom URL if URL is
                                             specified
+      --sitemapFromDate, --sitemapFrom      If set, filter URLs from sitemaps to
+                                             those greater than or equal to prov
+                                            ided ISO Date string (YYYY-MM-DD or
+                                            YYYY-MM-DDTHH:MM:SS or partial date)
       --statsFilename                       If set, output stats as JSON to this
                                              file. (Relative filename resolves t
                                             o crawl working directory)
