@@ -167,14 +167,16 @@ export class PageWorker
           this.crawler.crawlPage(opts),
           this.maxPageTime,
           "Page Worker Timeout",
-          {workerid},
+          this.logDetails,
           "worker"
         ),
         this.crashBreak
       ]);
 
     } catch (e) {
-      logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
+      if (e.message !== "logged") {
+        logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
+      }
     } finally {
       await this.crawler.pageFinished(data);
     }
