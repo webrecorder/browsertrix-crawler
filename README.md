@@ -165,8 +165,6 @@ Options:
       --statsFilename                       If set, output stats as JSON to this
                                              file. (Relative filename resolves t
                                             o crawl working directory)
-      --liveStatsFile                       If set, output stats after each page
-                                             crawled [boolean] [default: false]
       --behaviors                           Which background behaviors to enable
                                              on each page
                 [string] [default: "autoplay,autofetch,autoscroll,siteSpecific"]

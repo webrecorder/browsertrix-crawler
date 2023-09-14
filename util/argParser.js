@@ -231,12 +231,6 @@ class ArgParser {
         describe: "If set, output stats as JSON to this file. (Relative filename resolves to crawl working directory)"
       },
 
-      "liveStatsFile": {
-        describe: "If set, output stats after each page crawled",
-        type: "boolean",
-        default: false,
-      },
-
       "behaviors": {
         describe: "Which background behaviors to enable on each page",
         default: "autoplay,autofetch,autoscroll,siteSpecific",

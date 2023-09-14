@@ -449,7 +449,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async crawlPage(opts) {
-    await this.writeStats(this.params.liveStatsFile);
+    await this.writeStats();
 
     const {page, cdp, data, workerid} = opts;
 
@@ -820,7 +820,7 @@ self.__bx_behaviors.selectMainBehavior();
       await this.pagesFH.close();
     }
 
-    await this.writeStats(true);
+    await this.writeStats();
 
     // extra wait for all resources to land into WARCs
     await this.awaitPendingClear();
@@ -1007,7 +1007,7 @@ self.__bx_behaviors.selectMainBehavior();
     logger.debug("Memory", {maxHeapUsed: this.maxHeapUsed, maxHeapTotal: this.maxHeapTotal, ...memUsage}, "memory");
   }
 
-  async writeStats(toFile=false) {
+  async writeStats() {
     if (!this.params.logging.includes("stats")) {
       return;
     }
@@ -1030,7 +1030,7 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info("Crawl statistics", stats, "crawlStatus");
     this.logMemory();
 
-    if (toFile && this.params.statsFilename) {
+    if (this.params.statsFilename) {
       try {
         await fsp.writeFile(this.params.statsFilename, JSON.stringify(stats, null, 2));
       } catch (err) {
