@@ -51,6 +51,7 @@ export class BaseBrowser
       handleSIGHUP: signals,
       handleSIGINT: signals,
       handleSIGTERM: signals,
+      protocolTimeout: 0,
 
       defaultViewport,
       waitForInitialPage: false,

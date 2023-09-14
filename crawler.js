@@ -25,7 +25,7 @@ import { collectAllFileSources } from "./util/file_reader.js";
 
 import { Browser } from "./util/browser.js";
 
-import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
+import { ADD_LINK_FUNC, BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
 import { OriginOverride } from "./util/originoverride.js";
@@ -381,7 +381,7 @@ export class Crawler {
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  async setupPage({page, cdp, workerid}) {
+  async setupPage({page, cdp, workerid, callbacks}) {
     await this.browser.setupPage({page, cdp});
 
     if ((this.adBlockRules && this.params.blockAds) ||
@@ -418,6 +418,8 @@ export class Crawler {
       logger.debug("Start Screencast", {workerid}, "screencast");
       await this.screencaster.screencastPage(page, cdp, workerid);
     }
+
+    await page.exposeFunction(ADD_LINK_FUNC, (url) => callbacks.addLink && callbacks.addLink(url));
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
@@ -459,7 +461,8 @@ self.__bx_behaviors.selectMainBehavior();
   async crawlPage(opts) {
     await this.writeStats();
 
-    const {page, cdp, data, workerid} = opts;
+    const {page, cdp, data, workerid, callbacks} = opts;
+    data.callbacks = callbacks;
 
     const {url} = data;
 
@@ -1066,7 +1069,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async loadPage(page, data, selectorOptsList = DEFAULT_SELECTORS) {
-    const {url, seedId, depth, extraHops = 0} = data;
+    const {url, seedId, depth} = data;
 
     const logDetails = data.logDetails;
 
@@ -1202,12 +1205,9 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    logger.debug("Extracting links");
+    logger.debug("Extracting links", logDetails);
 
-    for (const opts of selectorOptsList) {
-      const links = await this.extractLinks(page, data.filteredFrames, opts, logDetails);
-      await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
-    }
+    await this.extractLinks(page, data, selectorOptsList, logDetails);
   }
 
   async netIdle(page, details) {
@@ -1226,52 +1226,66 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async extractLinks(page, frames, {selector = "a[href]", extract = "href", isAttribute = false} = {}, logDetails) {
-    const results = [];
+  async extractLinks(page, data, selectors = DEFAULT_SELECTORS, logDetails) {
+    const {seedId, depth, extraHops = 0, filteredFrames, callbacks} = data;
 
-    const loadProp = (options) => {
-      const { selector, extract } = options;
-      return [...document.querySelectorAll(selector)].map(elem => elem[extract]);
+    let links = [];
+    const promiseList = [];
+
+    callbacks.addLink = (url) => {
+      links.push(url);
+      if (links.length == 500) {
+        promiseList.push(this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails));
+        links = [];
+      }
     };
 
-    const loadAttr = (options) => {
-      const { selector, extract } = options;
-      return [...document.querySelectorAll(selector)].map(elem => elem.getAttribute(extract));
+    const loadLinks = (options) => {
+      const { selector, extract, isAttribute, addLinkFunc } = options;
+      const urls = new Set();
+
+      const getAttr = elem => urls.add(elem.getAttribute(extract));
+      const getProp = elem => urls.add(elem[extract]);
+
+      const getter = isAttribute ? getAttr : getProp;
+
+      document.querySelectorAll(selector).forEach(getter);
+
+      const func = window[addLinkFunc];
+      urls.forEach(url => func.call(this, url));
+
+      return true;
     };
 
-    const loadFunc = isAttribute ? loadAttr : loadProp;
-
-    frames = frames || page.frames();
+    const frames = filteredFrames || page.frames();
 
     try {
-      const linkResults = await Promise.allSettled(
-        frames.map(frame => timedRun(
-          frame.evaluate(loadFunc, {selector, extract}),
-          PAGE_OP_TIMEOUT_SECS,
-          "Link extraction timed out",
-          logDetails,
-        ))
-      );
+      for (const {selector = "a[href]", extract = "href", isAttribute = false} of selectors) {
+        const promiseResults = await Promise.allSettled(
+          frames.map(frame => timedRun(
+            frame.evaluate(loadLinks, {selector, extract, isAttribute, addLinkFunc: ADD_LINK_FUNC}),
+            PAGE_OP_TIMEOUT_SECS,
+            "Link extraction timed out",
+            logDetails,
+          ))
+        );
 
-      if (linkResults) {
-        let i = 0;
-        for (const linkResult of linkResults) {
-          if (!linkResult) {
-            logger.warn("Link Extraction timed out in frame", {frameUrl: frames[i].url, ...logDetails});
-            continue;
+        for (let i = 0; i < promiseResults.length; i++) {
+          const {status, reason} = promiseResults[i];
+          if (status === "rejected") {
+            logger.warn("Link Extraction failed in frame", {reason, frameUrl: frames[i].url, ...logDetails});
           }
-          if (!linkResult.value) continue;
-          for (const link of linkResult.value) {
-            results.push(link);
-          }
-          i++;
         }
       }
-
     } catch (e) {
       logger.warn("Link Extraction failed", e);
     }
-    return results;
+
+    if (links.length) {
+      promiseList.push(this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails));
+    }
+
+    await Promise.allSettled(promiseList);
   }
 
   async queueInScopeUrls(seedId, urls, depth, extraHops = 0, logDetails = {}) {
@@ -1320,22 +1334,17 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async queueUrl(seedId, url, depth, extraHops = 0) {
-    logger.debug(`Queuing url ${url}`);
     if (this.limitHit) {
       return false;
     }
 
-    if (this.pageLimit > 0 && (await this.crawlState.numSeen() >= this.pageLimit)) {
+    if (!await this.crawlState.addToQueue({url, seedId, depth, extraHops}, this.pageLimit)) {
       this.limitHit = true;
       return false;
+    } else {
+      logger.debug(`Queued url ${url}`);
     }
 
-    if (await this.crawlState.has(url)) {
-      return false;
-    }
-
-    //await this.crawlState.add(url);
-    await this.crawlState.addToQueue({url, seedId, depth, extraHops});
     return true;
   }
 
