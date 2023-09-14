@@ -311,11 +311,14 @@ export class Crawler {
       await this.crawl();
       const finished = await this.crawlState.isFinished();
       const stopped = await this.crawlState.isCrawlStopped();
-      if (stopped) {
-        status = "crawl gracefully stopped";
-      } else if (this.interrupted && !finished) {
-        status = "interrupted";
-        exitCode = 11;
+      if (!finished) {
+        if (stopped) {
+          status = "done";
+          logger.info("Crawl gracefully stopped on request");
+        } else if (this.interrupted) {
+          status = "interrupted";
+          exitCode = 11;
+        }
       }
     } catch(e) {
       logger.error("Crawl failed", e);
