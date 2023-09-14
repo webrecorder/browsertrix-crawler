@@ -516,8 +516,9 @@ self.__bx_behaviors.selectMainBehavior();
           "behavior"
         );
 
-        if (res && res.length) {
-          logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
+        await this.netIdle(page, logDetails);
+
+        if (res) {
           data.loadState = LoadState.BEHAVIORS_DONE;
         }
       }
@@ -580,13 +581,22 @@ self.__bx_behaviors.selectMainBehavior();
 
       logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
-      return await Promise.allSettled(
+      const results = await Promise.allSettled(
         frames.map(frame => this.browser.evaluateWithCLI(page, frame, cdp, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
+      for (const {status, reason} in results) {
+        if (status === "rejected") {
+          logger.warn("Behavior run partially failed", {reason, ...logDetails}, "behavior");
+        }
+      }
+
+      logger.info("Behaviors finished", {finished: results.length, ...logDetails}, "behavior");
+      return true;
+
     } catch (e) {
       logger.warn("Behavior run failed", {...errJSON(e), ...logDetails}, "behavior");
-      return null;
+      return false;
     }
   }
 
