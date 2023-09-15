@@ -236,7 +236,7 @@ export class Crawler {
     }
 
     if (this.params.customBehaviors) {
-      this.customBehaviors = this.loadCustomBehaviors(this.params.customBehaviors);
+      this.customBehaviors = await this.loadCustomBehaviors(this.params.customBehaviors);
     }
 
     let opts = {};
@@ -425,10 +425,10 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  loadCustomBehaviors(filename) {
+  async loadCustomBehaviors(filename) {
     let str = "";
 
-    for (const source of determineFileSource(filename, ".js")) {
+    for (const source of await determineFileSource(filename, ".js")) {
       str += `self.__bx_behaviors.load(${source});\n`;
     }
 
