@@ -12,11 +12,11 @@ export async function determineFileSource(fileOrUrl, ext = null, logger) {
       return collectAllFileSources(fileOrUrl, ext);
     }
   } else if (typeof(fileOrUrl) === "object") {
-		const returnArray = [];
+    const returnArray = [];
     for (const f of fileOrUrl) {
       returnArray.concat(await determineFileSource(f, ext, logger));
     }
-		return returnArray;
+    return returnArray;
   }
 }
 
