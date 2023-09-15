@@ -609,7 +609,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
     // if there's no tag or an iframe tag, then assume its a regular frame
-    const tagName = await frame.evaluate("window.frameElement && window.frameElement.tagName");
+    const tagName = await frame.evaluate("self && self.frameElement && self.frameElement.tagName");
 
     if (tagName && tagName !== "IFRAME" && tagName !== "FRAME") {
       logger.debug("Skipping processing non-frame object", {tagName, frameUrl, ...logDetails}, "behavior");
@@ -1172,7 +1172,13 @@ self.__bx_behaviors.selectMainBehavior();
       let frames = await page.frames();
       frames = await Promise.allSettled(frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)));
 
-      data.filteredFrames = frames.filter((x) => x.status === "fulfilled" && x.value).map(x => x.value);
+      data.filteredFrames = frames.filter((x) => {
+        if (x.status === "fulfilled" && x.value) {
+          return true;
+        }
+        logger.warn("Error in iframe check", {reason: x.reason, ...logDetails});
+        return false;
+      }).map(x => x.value);
 
       //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
