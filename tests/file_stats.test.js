@@ -3,7 +3,7 @@ import fs from "fs";
 
 test("ensure that stats file is modified", async () => {
 
-  const child = child_process.exec("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --generateWACZ  --text  --limit 3 --collection file-stats --statsFilename progress.json");
+  const child = child_process.exec("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --generateWACZ --text --limit 3 --collection file-stats --statsFilename progress.json");
 
   // detect crawler exit
   let crawler_exited = false;
@@ -12,7 +12,7 @@ test("ensure that stats file is modified", async () => {
   });
 
   // helper function to sleep
-  const sleep = ms => new Promise( res => setTimeout(res, ms));
+  const sleep = ms => new Promise(res => setTimeout(res, ms));
 
   // wait for stats file creation up to 30 secs (to not wait indefinitely)
   let counter = 0;
