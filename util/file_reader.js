@@ -4,29 +4,29 @@ import crypto from "crypto";
 
 const MAX_DEPTH = 2;
 
-export async function determineFileSource(fileOrUrl, ext = null) {
+export async function determineFileSource(fileOrUrl, ext = null, logger) {
   if (typeof(fileOrUrl) === "string") {
     if (fileOrUrl.startsWith("http")) {
-      return await collectOnlineFileSource(fileOrUrl);
+      return await collectOnlineFileSource(fileOrUrl, logger);
     } else {
       return collectAllFileSources(fileOrUrl, ext);
     }
   } else if (typeof(fileOrUrl) === "object") {
+		const returnArray = [];
     for (const f of fileOrUrl) {
-      return await determineFileSource(f, null);
+      returnArray.concat(await determineFileSource(f, ext, logger));
     }
+		return returnArray;
   }
 }
 
-export async function collectOnlineFileSource(url) {
+export async function collectOnlineFileSource(url, logger) {
   const filename = crypto.randomBytes(4).toString("hex") + ".js";
   await fetch(url)
     .then(res => res.text())
     .then(file => {return fs.promises.writeFile("/app/behaviors/" + filename, file);})
-    .then(() => {
-      console.log("done");
-    }).catch(err => {
-      console.log(err);
+    .catch(err => {
+      logger.error(err);
     });
   return collectAllFileSources("/app/behaviors", ".js");
 }
