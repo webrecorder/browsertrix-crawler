@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
-    "browsertrix-behaviors": "^0.5.1",
+    "browsertrix-behaviors": "^0.5.2",
     "get-folder-size": "^4.0.0",
     "husky": "^8.0.3",
     "ioredis": "^4.27.1",

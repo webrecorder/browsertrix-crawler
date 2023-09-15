@@ -1147,10 +1147,10 @@ browserslist@^4.21.3:
     node-releases "^2.0.6"
     update-browserslist-db "^1.0.9"
 
-browsertrix-behaviors@^0.5.1:
-  version "0.5.1"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.5.1.tgz#c4756b349dcabd23e25f851cec804d92e94eb63b"
-  integrity sha512-cNSSpQyQT73Y5NcBn2PFDkZM2ptxHVVcqxstryvtzZNOW9gGqzJlLPo8tmCBY00JHrMyn5rm8qImbFglcG/DKg==
+browsertrix-behaviors@^0.5.2:
+  version "0.5.2"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.5.2.tgz#d2fe1d6ff08815ff0dd68a05fe1a3cdc4bbec8ca"
+  integrity sha512-8nhpnzY8OM1mxQ+mZ+m10dpGgMuhCnKUV5YUlitDpMyEfKlEybUmTz5sroVQH8e//NcJox7W6QYjaU2Y/ygxww==
 
 bser@2.1.1:
   version "2.1.1"
@@ -2441,6 +2441,11 @@ is-glob@^4.0.0, is-glob@^4.0.1:
   integrity sha512-5G0tKtBTFImOqDnLB2hG6Bp2qcKEFduo4tZu9MT/H6NQv/ghhy30o55ufafxJ/LdH79LLs2Kfrn85TLKyA7BUg==
   dependencies:
     is-extglob "^2.1.1"
+
+is-gzip@2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/is-gzip/-/is-gzip-2.0.0.tgz#f4fed2bbd9f96bf2cb39e19262797fdb15aad933"
+  integrity sha512-jtO4Njg6q58zDo/Pu4027beSZ0VdsZlt8/5Moco6yAg+DIxb5BK/xUYqYG2+MD4+piKldXJNHxRkhEYI2fvrxA==
 
 is-negative-zero@^2.0.1:
   version "2.0.1"
@@ -3990,12 +3995,14 @@ sisteransi@^1.0.5:
   resolved "https://registry.yarnpkg.com/sisteransi/-/sisteransi-1.0.5.tgz#134d681297756437cc05ca01370d3a7a571075ed"
   integrity sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==
 
-sitemapper@^3.1.2:
-  version "3.1.12"
-  resolved "https://registry.yarnpkg.com/sitemapper/-/sitemapper-3.1.12.tgz#58f6cb22112da4d73498c3d14c926c3a1c0d74ee"
-  integrity sha512-0BOXAhIfjQll1rrUkkFkpAhYy7MTs887H7Zpc4eAxLPPJJRFXNDdrryTadFWubGMn62bqGr3KdKBKhVdtt/HWg==
+sitemapper@^3.2.5:
+  version "3.2.6"
+  resolved "https://registry.yarnpkg.com/sitemapper/-/sitemapper-3.2.6.tgz#892ebdade9a1b0839bd3dee3b67f3d57b10b3a89"
+  integrity sha512-AZbim4lmKgchUj6yyJ9ru0eLJ4/S6QAqy5QEbpCpvBbBnXxTERLMC6rzgKy1gHM19YUEtYJFTC2t8lxDWO0wkQ==
   dependencies:
     got "^11.8.0"
+    is-gzip "2.0.0"
+    p-limit "^3.1.0"
     xml2js "^0.4.23"
 
 slash@^3.0.0:

@@ -47,6 +47,9 @@ RUN ln -s /app/main.js /usr/bin/crawl; ln -s /app/create-login-profile.js /usr/b
 
 WORKDIR /crawls
 
+# enable to test custom behaviors build (from browsertrix-behaviors)
+# COPY behaviors.js /app/node_modules/browsertrix-behaviors/dist/behaviors.js
+
 ADD docker-entrypoint.sh /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
 

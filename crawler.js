@@ -516,8 +516,9 @@ self.__bx_behaviors.selectMainBehavior();
           "behavior"
         );
 
-        if (res && res.length) {
-          logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
+        await this.netIdle(page, logDetails);
+
+        if (res) {
           data.loadState = LoadState.BEHAVIORS_DONE;
         }
       }
@@ -580,13 +581,22 @@ self.__bx_behaviors.selectMainBehavior();
 
       logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
-      return await Promise.allSettled(
+      const results = await Promise.allSettled(
         frames.map(frame => this.browser.evaluateWithCLI(page, frame, cdp, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
+      for (const {status, reason} in results) {
+        if (status === "rejected") {
+          logger.warn("Behavior run partially failed", {reason, ...logDetails}, "behavior");
+        }
+      }
+
+      logger.info("Behaviors finished", {finished: results.length, ...logDetails}, "behavior");
+      return true;
+
     } catch (e) {
       logger.warn("Behavior run failed", {...errJSON(e), ...logDetails}, "behavior");
-      return null;
+      return false;
     }
   }
 
@@ -597,11 +607,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     const frameUrl = frame.url();
 
-    const frameElem = await frame.frameElement();
+    // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
+    // if there's no tag or an iframe tag, then assume its a regular frame
+    const tagName = await frame.evaluate("self && self.frameElement && self.frameElement.tagName");
 
-    const tagName = await frame.evaluate(e => e.tagName, frameElem);
-
-    if (tagName !== "IFRAME" && tagName !== "FRAME") {
+    if (tagName && tagName !== "IFRAME" && tagName !== "FRAME") {
       logger.debug("Skipping processing non-frame object", {tagName, frameUrl, ...logDetails}, "behavior");
       return null;
     }
@@ -1162,7 +1172,13 @@ self.__bx_behaviors.selectMainBehavior();
       let frames = await page.frames();
       frames = await Promise.allSettled(frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)));
 
-      data.filteredFrames = frames.filter((x) => x.status === "fulfilled" && x.value).map(x => x.value);
+      data.filteredFrames = frames.filter((x) => {
+        if (x.status === "fulfilled" && x.value) {
+          return true;
+        }
+        logger.warn("Error in iframe check", {reason: x.reason, ...logDetails});
+        return false;
+      }).map(x => x.value);
 
       //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
