@@ -4,7 +4,7 @@ import fs from "fs";
 import os from "os";
 import fsp from "fs/promises";
 
-import { RedisCrawlState, LoadState } from "./util/state.js";
+import { RedisCrawlState, LoadState, QueueState } from "./util/state.js";
 import Sitemapper from "sitemapper";
 import { v4 as uuidv4 } from "uuid";
 import yaml from "js-yaml";
@@ -1305,7 +1305,7 @@ self.__bx_behaviors.selectMainBehavior();
         const {url, isOOS} = res;
 
         if (url) {
-          await this.queueUrl(seedId, url, depth, isOOS ? newExtraHops : extraHops);
+          await this.queueUrl(seedId, url, depth, isOOS ? newExtraHops : extraHops, logDetails);
         }
       }
     } catch (e) {
@@ -1333,19 +1333,29 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async queueUrl(seedId, url, depth, extraHops = 0) {
+  async queueUrl(seedId, url, depth, extraHops, logDetails = {}) {
     if (this.limitHit) {
       return false;
     }
 
-    if (!await this.crawlState.addToQueue({url, seedId, depth, extraHops}, this.pageLimit)) {
+    const result = await this.crawlState.addToQueue({url, seedId, depth, extraHops}, this.pageLimit);
+
+    switch (result) {
+    case QueueState.ADDED:
+      logger.debug("Queued new page url", {url, ...logDetails}, "links");
+      return true;
+
+    case QueueState.LIMIT_HIT:
+      logger.debug("Not queued page url, at page limit", {url, ...logDetails}, "links");
       this.limitHit = true;
       return false;
-    } else {
-      logger.debug(`Queued url ${url}`);
+
+    case QueueState.DUPE_URL:
+      logger.debug("Not queued page url, already seen", {url, ...logDetails}, "links");
+      return false;
     }
 
-    return true;
+    return false;
   }
 
   async initPages() {
