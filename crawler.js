@@ -428,7 +428,7 @@ self.__bx_behaviors.selectMainBehavior();
   async loadCustomBehaviors(filename) {
     let str = "";
 
-    for (const source of await determineFileSource(filename, ".js")) {
+    for (const source of await determineFileSource(filename, ".js", logger)) {
       str += `self.__bx_behaviors.load(${source});\n`;
     }
 
