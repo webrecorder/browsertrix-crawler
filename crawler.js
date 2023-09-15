@@ -607,11 +607,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     const frameUrl = frame.url();
 
-    const frameElem = await frame.frameElement();
+    // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
+    // if there's no tag or an iframe tag, then assume its a regular frame
+    const tagName = await frame.evaluate("window.frameElement && window.frameElement.tagName");
 
-    const tagName = await frame.evaluate(e => e.tagName, frameElem);
-
-    if (tagName !== "IFRAME" && tagName !== "FRAME") {
+    if (tagName && tagName !== "IFRAME" && tagName !== "FRAME") {
       logger.debug("Skipping processing non-frame object", {tagName, frameUrl, ...logDetails}, "behavior");
       return null;
     }
