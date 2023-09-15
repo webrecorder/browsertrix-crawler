@@ -5,37 +5,30 @@ import crypto from "crypto";
 const MAX_DEPTH = 2;
 
 export async function determineFileSource(fileOrUrl, ext = null) {
-  // Currently assuming if we pass more than one param, they're *all* URLs
   if (typeof(fileOrUrl) === "string") {
-    if (fileOrUrl.startsWith("http") || typeof(fileOrUrl) === "object") {
+    if (fileOrUrl.startsWith("http")) {
       return await collectOnlineFileSource(fileOrUrl);
     } else {
       return collectAllFileSources(fileOrUrl, ext);
+    }
+  } else if (typeof(fileOrUrl) === "object") {
+    for (const f of fileOrUrl) {
+      return await determineFileSource(f, null);
     }
   }
 }
 
 export async function collectOnlineFileSource(url) {
-  if (typeof(url) === "string") {
-    collectSingleOnlineFile(url);
-  } else if (typeof(url) === "object") {
-    for (const u of url) {
-      await collectSingleOnlineFile(u);
-    }
-  }
-  return collectAllFileSources("/app/behaviors", ".js");
-}
-
-export async function collectSingleOnlineFile(url) {
-	const filename = crypto.randomBytes(4).toString('hex') + ".js";
+  const filename = crypto.randomBytes(4).toString("hex") + ".js";
   await fetch(url)
     .then(res => res.text())
-    .then(file => {console.debug(file); return fs.promises.writeFile("/app/behaviors/" + filename, file);})
+    .then(file => {return fs.promises.writeFile("/app/behaviors/" + filename, file);})
     .then(() => {
       console.log("done");
     }).catch(err => {
       console.log(err);
     });
+  return collectAllFileSources("/app/behaviors", ".js");
 }
 
 export function collectAllFileSources(fileOrDir, ext = null, depth = 0) {
