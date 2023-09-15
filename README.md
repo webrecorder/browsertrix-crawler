@@ -233,6 +233,9 @@ Options:
       --waitOnDone                          if set, wait for interrupt signal wh
                                             en finished instead of exiting
                                                       [boolean] [default: false]
+      --restartsOnError                     if set, assume will be restarted if
+                                            interrupted, don't run post-crawl pr
+                                            ocesses on interrupt
       --netIdleWait                         if set, wait for network idle after
                                             page load and after behaviors are do
                                             ne (in seconds). if -1 (default), de
