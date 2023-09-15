@@ -337,7 +337,7 @@ export class Crawler {
 
       await this.closeLog();
 
-      process.exit(exitCode);
+      await this.setEndTimeAndExit(exitCode);
     }
   }
 
@@ -712,10 +712,22 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  async setEndTimeAndExit(exitCode = 0) {
+    await this.crawlState.setEndTime();
+    process.exit(exitCode);
+  }
+
   async serializeAndExit() {
+    // Set start time if crawler exits before it was able to set one
+    const startTimes = await this.crawlState.getStartTimes();
+    if (!startTimes.length) {
+      await this.crawlState.setStartTime();
+    }
+
     await this.serializeConfig();
     await this.closeLog();
-    process.exit(this.interrupted ? 13 : 0);
+
+    await this.setEndTimeAndExit(this.interrupted ? 13 : 0);
   }
 
   async isCrawlRunning() {
@@ -745,6 +757,8 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     await this.initCrawlState();
+
+    await this.crawlState.setStartTime();
 
     let initState = await this.crawlState.getStatus();
 
