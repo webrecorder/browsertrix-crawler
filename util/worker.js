@@ -48,6 +48,7 @@ export class PageWorker
     this.reuseCount = 0;
     this.page = null;
     this.cdp = null; 
+    this.callbacks = null;
 
     this.opts = null;
 
@@ -115,7 +116,8 @@ export class PageWorker
 
         this.page = page;
         this.cdp = cdp;
-        this.opts = {page: this.page, cdp: this.cdp, workerid};
+        this.callbacks = {};
+        this.opts = {page: this.page, cdp: this.cdp, workerid, callbacks: this.callbacks};
 
         // updated per page crawl
         this.crashed = false;
@@ -196,6 +198,8 @@ export class PageWorker
   async runLoop() {
     const crawlState = this.crawler.crawlState;
 
+    let loggedWaiting = false;
+
     while (await this.crawler.isCrawlRunning()) {
       const data = await crawlState.nextFromQueue();
 
@@ -207,6 +211,8 @@ export class PageWorker
         // run timed crawl of page
         await this.timedCrawlPage({...opts, data});
 
+        loggedWaiting = false;
+
       } else {
         // indicate that the worker has no more work (mostly for screencasting, status, etc...)
         // depending on other works, will either get more work or crawl will end
@@ -217,7 +223,10 @@ export class PageWorker
 
         // if pending, sleep and check again
         if (pending) {
-          logger.debug("No crawl tasks, but pending tasks remain, waiting", {pending, workerid: this.id}, "worker");
+          if (!loggedWaiting) {
+            logger.debug("No crawl tasks, but pending tasks remain, waiting", {pending, workerid: this.id}, "worker");
+            loggedWaiting = true;
+          }
           await sleep(0.5);
         } else {
           // if no pending and queue size is still empty, we're done!
