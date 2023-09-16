@@ -446,16 +446,20 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async getFavicon(page, logDetails) {
-    const resp = await fetch("http://localhost:9221/json");
-    if (resp.status === 200) {
-      const browserJson = await resp.json();
-      for (const jsons of browserJson) {
-        if (jsons.id === page.target()._targetId) {
-          return jsons.faviconUrl;
+    try {
+      const resp = await fetch("http://127.0.0.1:9221/json");
+      if (resp.status === 200) {
+        const browserJson = await resp.json();
+        for (const jsons of browserJson) {
+          if (jsons.id === page.target()._targetId) {
+            return jsons.faviconUrl;
+          }
         }
       }
+    } catch (e) {
+      // ignore
     }
-    logger.warn("Failed to fetch Favicon from localhost debugger", logDetails);
+    logger.warn("Failed to fetch favicon from browser /json endpoint", logDetails);
   }
 
   async crawlPage(opts) {
