@@ -5,7 +5,7 @@ import { rxEscape } from "./seeds.js";
 
 const MAX_REUSE = 5;
 
-const NEW_WINDOW_TIMEOUT = 10;
+const NEW_WINDOW_TIMEOUT = 20;
 
 // ===========================================================================
 export function runWorkers(crawler, numWorkers, maxPageTime) {
@@ -60,33 +60,41 @@ export class PageWorker
   }
 
   async closePage() {
-    if (this.page) {
+    if (!this.page) {
+      return;
+    }
 
-      if (!this.crashed) {
-        await this.crawler.teardownPage(this.opts);
-      } else {
-        logger.debug("Closing crashed page", {workerid: this.id}, "worker");
-      }
+    if (!this.crashed) {
+      await this.crawler.teardownPage(this.opts);
+    } else {
+      const numPagesRemaining = this.crawler.browser.numPages() - 1;
+      logger.debug("Skipped teardown of crashed page", {numPagesRemaining, workerid: this.id}, "worker");
+    }
 
-      try {
-        await this.page.close();
-      } catch (e) {
-        // ignore
-      }
-
-      if (this.crashed) {
-        const numPagesRemaining = this.crawler.browser.numPages() - 1;
-        logger.debug("Skipping teardown of crashed page", {numPagesRemaining, workerid: this.id}, "worker");
-      }
-
+    try {
+      logger.debug("Closing page", {crashed: this.crashed, workerid: this.id}, "worker");
+      await this.page.close();
+    } catch (e) {
+      // ignore
+    } finally {
       this.cdp = null;
       this.page = null;
     }
   }
 
-  async initPage() {
-    if (!this.crashed && this.page && ++this.reuseCount <= MAX_REUSE) {
-      logger.debug("Reusing page", {reuseCount: this.reuseCount}, "worker");
+  isSameOrigin(url) {
+    try {
+      const currURL = new URL(this.page.url());
+      const newURL = new URL(url);
+      return currURL.origin === newURL.origin;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async initPage(url) {
+    if (!this.crashed && this.page && ++this.reuseCount <= MAX_REUSE && this.isSameOrigin(url)) {
+      logger.debug("Reusing page", {reuseCount: this.reuseCount, ...this.logDetails}, "worker");
       return this.opts;
     } else if (this.page) {
       await this.closePage();
@@ -126,10 +134,13 @@ export class PageWorker
         this.logDetails = {page: this.page.url(), workerid};
 
         // more serious page crash, mark as failed
-        this.page.on("crash", (details) => {
-          logger.error("Page Crash", {details, ...this.logDetails}, "worker");
-          this.crashed = true;
-          this.markCrashed("crashed");
+        this.page.on("error", (err) => {
+          // ensure we're still on this page, otherwise ignore!
+          if (this.page === page) {
+            logger.error("Page Crash", {...errJSON(err), ...this.logDetails}, "worker");
+            this.crashed = true;
+            this.markCrashed("crashed");
+          }
         });
 
         await this.crawler.setupPage(this.opts);
@@ -141,11 +152,11 @@ export class PageWorker
         retry++;
 
         if (retry >= MAX_REUSE) {
-          logger.fatal("Unable to get new page, browser likely crashed");
+          logger.fatal("Unable to get new page, browser likely crashed", this.logDetails, "worker");
         }
 
         await sleep(0.5);
-        logger.warn("Retrying getting new page");
+        logger.warn("Retrying getting new page", this.logDetails, "worker");
 
         if (this.crawler.healthChecker) {
           this.crawler.healthChecker.incError();
@@ -191,7 +202,7 @@ export class PageWorker
       await this.runLoop();
       logger.info("Worker exiting, all tasks complete", {workerid: this.id}, "worker");
     } catch (e) {
-      logger.error("Worker errored", e, "worker");
+      logger.error("Worker error, exiting", {...errJSON(e), workerid: this.id}, "worker");
     }
   }
 
@@ -206,7 +217,7 @@ export class PageWorker
       // see if any work data in the queue
       if (data) {
         // init page (new or reuse)
-        const opts = await this.initPage();
+        const opts = await this.initPage(data.url);
 
         // run timed crawl of page
         await this.timedCrawlPage({...opts, data});

@@ -1144,29 +1144,22 @@ self.__bx_behaviors.selectMainBehavior();
       isHTMLPage = this.isHTMLContentType(contentType);
 
     } catch (e) {
-      let msg = e.message || "";
+      const msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
-        if (e.name === "TimeoutError") {
-          if (data.loadState !== LoadState.CONTENT_LOADED) {
-            if (failCrawlOnError) {
-              logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
-            } else {
-              logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
-              e.message = "logged";
-              throw e;
-            }
-          } else {
-            logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
-            data.skipBehaviors = true;
-          }
+        // if timeout error, and at least got to content loaded, continue on
+        if (e.name === "TimeoutError" && data.loadState == LoadState.CONTENT_LOADED) {
+          logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
+          data.skipBehaviors = true;
+        } else if (failCrawlOnError) {
+          // if fail on error, immediately fail here
+          logger.fatal("Page Load Timeout, failing crawl", {msg, ...logDetails});
         } else {
-          if (failCrawlOnError) {
-            logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
-          } else {
-            logger.error("Page Load Error, skipping page", {msg, ...logDetails});
+          // log if not already log and rethrow
+          if (msg !== "logged") {
+            logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
             e.message = "logged";
-            throw e;
           }
+          throw e;
         }
       }
     }
