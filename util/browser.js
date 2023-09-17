@@ -216,6 +216,7 @@ export class Browser extends BaseBrowser
 
   async close() {
     if (this.browser) {
+      this.browser.removeListener("disconnected", this._onDisconnectError);
       await this.browser.close();
       this.browser = null;
     }
@@ -225,8 +226,14 @@ export class Browser extends BaseBrowser
     return page.evaluateOnNewDocument(script);
   }
 
+  _onDisconnectError() {
+    logger.fatal("Browser crashed or disconnected, exiting", {}, "browser");
+  }
+
   async _init(launchOpts) {
     this.browser = await puppeteer.launch(launchOpts);
+
+    this.browser.on("disconnected", this._onDisconnectError);
 
     const target = this.browser.target();
 
