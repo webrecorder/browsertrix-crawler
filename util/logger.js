@@ -65,8 +65,8 @@ class Logger
     }
 
     let dataToLog = {
-      "logLevel": logLevel,
       "timestamp": new Date().toISOString(),
+      "logLevel": logLevel,
       "context": context,
       "message": message,
       "details": data ? data : {}

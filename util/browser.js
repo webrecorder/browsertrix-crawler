@@ -21,7 +21,7 @@ export class BaseBrowser
     this.emulateDevice = null;
   }
 
-  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}} = {}) {
+  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}, ondisconnect = null} = {}) {
     if (this.isLaunched()) {
       return;
     }
@@ -58,7 +58,7 @@ export class BaseBrowser
       userDataDir: this.profileDir
     };
 
-    await this._init(launchOpts);
+    await this._init(launchOpts, ondisconnect);
   }
 
   async setupPage({page}) {
@@ -216,6 +216,7 @@ export class Browser extends BaseBrowser
 
   async close() {
     if (this.browser) {
+      this.browser.removeAllListeners("disconnected");
       await this.browser.close();
       this.browser = null;
     }
@@ -225,16 +226,19 @@ export class Browser extends BaseBrowser
     return page.evaluateOnNewDocument(script);
   }
 
-  async _init(launchOpts) {
+  async _init(launchOpts, ondisconnect = null) {
     this.browser = await puppeteer.launch(launchOpts);
 
     const target = this.browser.target();
 
     this.firstCDP = await target.createCDPSession();
-  }
 
-  numPages() {
-    return this.browser ? this.browser.pages().length : 0;
+    if (ondisconnect) {
+      this.browser.on("disconnected", (err) => ondisconnect(err));
+    }
+    this.browser.on("disconnected", () => {
+      this.browser = null;
+    });
   }
 
   async newWindowPageWithCDP() {
@@ -255,6 +259,9 @@ export class Browser extends BaseBrowser
     try {
       await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
     } catch (e) {
+      if (!this.browser) {
+        throw e;
+      }
       const target = this.browser.target();
 
       this.firstCDP = await target.createCDPSession();
