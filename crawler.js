@@ -820,6 +820,10 @@ self.__bx_behaviors.selectMainBehavior();
         proxy: !process.env.NO_PROXY,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs()
+      },
+      ondisconnect: (err) => {
+        this.interrupted = true;
+        logger.error("Browser disconnected (crashed?), interrupting crawl", err, "browser");
       }
     });
 

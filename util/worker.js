@@ -6,6 +6,7 @@ import { rxEscape } from "./seeds.js";
 const MAX_REUSE = 5;
 
 const NEW_WINDOW_TIMEOUT = 20;
+const TEARDOWN_TIMEOUT = 10;
 
 // ===========================================================================
 export function runWorkers(crawler, numWorkers, maxPageTime) {
@@ -65,10 +66,17 @@ export class PageWorker
     }
 
     if (!this.crashed) {
-      await this.crawler.teardownPage(this.opts);
-    } else {
-      const numPagesRemaining = this.crawler.browser.numPages() - 1;
-      logger.debug("Skipped teardown of crashed page", {numPagesRemaining, workerid: this.id}, "worker");
+      try {
+        await timedRun(
+          this.crawler.teardownPage(this.opts),
+          TEARDOWN_TIMEOUT,
+          "Page Teardown Timed Out",
+          this.logDetails,
+          "worker"
+        );
+      } catch (e) {
+        // ignore
+      }
     }
 
     try {
@@ -137,7 +145,7 @@ export class PageWorker
         this.page.on("error", (err) => {
           // ensure we're still on this page, otherwise ignore!
           if (this.page === page) {
-            logger.error("Page Crash", {...errJSON(err), ...this.logDetails}, "worker");
+            logger.error("Page Crashed", {...errJSON(err), ...this.logDetails}, "worker");
             this.crashed = true;
             this.markCrashed("crashed");
           }
@@ -150,6 +158,10 @@ export class PageWorker
       } catch (err) {
         logger.warn("Error getting new page", {"workerid": this.id, ...errJSON(err)}, "worker");
         retry++;
+
+        if (!this.crawler.browser.browser) {
+          break;
+        }      
 
         if (retry >= MAX_REUSE) {
           logger.fatal("Unable to get new page, browser likely crashed", this.logDetails, "worker");
@@ -187,7 +199,7 @@ export class PageWorker
       ]);
 
     } catch (e) {
-      if (e.message !== "logged") {
+      if (e.message !== "logged" && !this.crashed) {
         logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
       }
     } finally {
