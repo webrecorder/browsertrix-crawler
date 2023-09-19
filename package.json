@@ -1,6 +1,6 @@
 {
   "name": "browsertrix-crawler",
-  "version": "1.0.0",
+  "version": "1.0.0-beta.0",
   "main": "browsertrix-crawler",
   "type": "module",
   "repository": "https://github.com/webrecorder/browsertrix-crawler",
@@ -21,7 +21,7 @@
     "js-yaml": "^4.1.0",
     "minio": "7.0.26",
     "p-queue": "^7.3.4",
-    "puppeteer-core": "^21.1.0",
+    "puppeteer-core": "^20.7.4",
     "sharp": "^0.32.1",
     "sitemapper": "^3.2.5",
     "uuid": "8.3.2",
