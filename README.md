@@ -162,6 +162,10 @@ Options:
       --useSitemap, --sitemap               If enabled, check for sitemaps at /s
                                             itemap.xml, or custom URL if URL is
                                             specified
+      --sitemapFromDate, --sitemapFrom      If set, filter URLs from sitemaps to
+                                             those greater than or equal to prov
+                                            ided ISO Date string (YYYY-MM-DD or
+                                            YYYY-MM-DDTHH:MM:SS or partial date)
       --statsFilename                       If set, output stats as JSON to this
                                              file. (Relative filename resolves t
                                             o crawl working directory)
@@ -229,6 +233,9 @@ Options:
       --waitOnDone                          if set, wait for interrupt signal wh
                                             en finished instead of exiting
                                                       [boolean] [default: false]
+      --restartsOnError                     if set, assume will be restarted if
+                                            interrupted, don't run post-crawl pr
+                                            ocesses on interrupt
       --netIdleWait                         if set, wait for network idle after
                                             page load and after behaviors are do
                                             ne (in seconds). if -1 (default), de
@@ -489,6 +496,17 @@ The site-specific behavior (or autoscroll) will start running after the page is 
 See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for more info on all of the currently available behaviors.
 
 With version 0.9.0, Browsertrix Crawler includes a `--pageExtraDelay`/`--delay` option, which can be used to have the crawler sleep for a configurable number of seconds after behaviors before moving on to the next page.
+
+### Additional Custom Behaviors
+
+Custom behaviours can now also be mounted into the crawler and loaded from there. For example:
+
+```sh
+docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors /custom-behaviors/
+```
+
+This will load all the custom behaviors stored in the `tests/custom-behaviors` directory. The first behavior which returns true for `isMatch()` will be run on a given page.
+Each behavior should container a single class that implements the behavior interface. See [the behaviors tutorial](https://github.com/webrecorder/browsertrix-behaviors/blob/main/docs/TUTORIAL.md) for more info on how to write behaviors.
 
 ### Screenshots
 

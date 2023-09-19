@@ -65,8 +65,8 @@ class Logger
     }
 
     let dataToLog = {
-      "logLevel": logLevel,
       "timestamp": new Date().toISOString(),
+      "logLevel": logLevel,
       "context": context,
       "message": message,
       "details": data ? data : {}
@@ -101,7 +101,7 @@ class Logger
     }
   }
 
-  fatal(message, data={}, context="general", exitCode=1) {
+  fatal(message, data={}, context="general", exitCode=17) {
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
     process.exit(exitCode);
   }

@@ -4,7 +4,7 @@ import fs from "fs";
 import os from "os";
 import fsp from "fs/promises";
 
-import { RedisCrawlState, LoadState } from "./util/state.js";
+import { RedisCrawlState, LoadState, QueueState } from "./util/state.js";
 import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
 
@@ -24,7 +24,7 @@ import { collectAllFileSources } from "./util/file_reader.js";
 
 import { Browser } from "./util/browser.js";
 
-import { BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
+import { ADD_LINK_FUNC, BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
 import { OriginOverride } from "./util/originoverride.js";
@@ -163,7 +163,7 @@ export class Crawler {
       } catch (e) {
         //logger.fatal("Unable to connect to state store Redis: " + redisUrl);
         logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
-        await sleep(3);
+        await sleep(1);
       }
     }
 
@@ -293,12 +293,22 @@ export class Crawler {
   async run() {
     await this.bootstrap();
 
-    let status;
+    let status = "done";
     let exitCode = 0;
 
     try {
       await this.crawl();
-      status = (!this.interrupted ? "done" : "interrupted");
+      const finished = await this.crawlState.isFinished();
+      const stopped = await this.crawlState.isCrawlStopped();
+      if (!finished) {
+        if (stopped) {
+          status = "done";
+          logger.info("Crawl gracefully stopped on request");
+        } else if (this.interrupted) {
+          status = "interrupted";
+          exitCode = 11;
+        }
+      }
     } catch(e) {
       logger.error("Crawl failed", e);
       exitCode = 9;
@@ -308,11 +318,13 @@ export class Crawler {
       }
 
     } finally {
-      logger.info(`Crawl status: ${status}`);
+      logger.info(`Final crawl status: ${status}`);
 
       if (this.crawlState) {
         await this.crawlState.setStatus(status);
       }
+
+      await this.closeLog();
 
       process.exit(exitCode);
     }
@@ -358,7 +370,7 @@ export class Crawler {
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  async setupPage({page, cdp, workerid}) {
+  async setupPage({page, cdp, workerid, callbacks}) {
     await this.browser.setupPage({page, cdp});
 
     if ((this.adBlockRules && this.params.blockAds) ||
@@ -396,6 +408,8 @@ export class Crawler {
       await this.screencaster.screencastPage(page, cdp, workerid);
     }
 
+    await page.exposeFunction(ADD_LINK_FUNC, (url) => callbacks.addLink && callbacks.addLink(url));
+
     if (this.params.behaviorOpts) {
       await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
       await this.browser.addInitScript(page, behaviors);
@@ -420,10 +434,28 @@ self.__bx_behaviors.selectMainBehavior();
     return str;
   }
 
+  async getFavicon(page, logDetails) {
+    try {
+      const resp = await fetch("http://127.0.0.1:9221/json");
+      if (resp.status === 200) {
+        const browserJson = await resp.json();
+        for (const jsons of browserJson) {
+          if (jsons.id === page.target()._targetId) {
+            return jsons.faviconUrl;
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    logger.warn("Failed to fetch favicon from browser /json endpoint", logDetails);
+  }
+
   async crawlPage(opts) {
     await this.writeStats();
 
-    const {page, cdp, data, workerid} = opts;
+    const {page, cdp, data, workerid, callbacks} = opts;
+    data.callbacks = callbacks;
 
     const {url} = data;
 
@@ -440,6 +472,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.driver({page, data, crawler: this});
 
     data.title = await page.title();
+    data.favicon = await this.getFavicon(page, logDetails);
 
     if (this.params.screenshot) {
       if (!data.isHTMLPage) {
@@ -479,8 +512,9 @@ self.__bx_behaviors.selectMainBehavior();
           "behavior"
         );
 
-        if (res && res.length) {
-          logger.info("Behaviors finished", {finished: res.length, ...logDetails}, "behavior");
+        await this.netIdle(page, logDetails);
+
+        if (res) {
           data.loadState = LoadState.BEHAVIORS_DONE;
         }
       }
@@ -543,13 +577,22 @@ self.__bx_behaviors.selectMainBehavior();
 
       logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
-      return await Promise.allSettled(
+      const results = await Promise.allSettled(
         frames.map(frame => this.browser.evaluateWithCLI(page, frame, cdp, "self.__bx_behaviors.run();", logDetails, "behavior"))
       );
 
+      for (const {status, reason} in results) {
+        if (status === "rejected") {
+          logger.warn("Behavior run partially failed", {reason, ...logDetails}, "behavior");
+        }
+      }
+
+      logger.info("Behaviors finished", {finished: results.length, ...logDetails}, "behavior");
+      return true;
+
     } catch (e) {
       logger.warn("Behavior run failed", {...errJSON(e), ...logDetails}, "behavior");
-      return null;
+      return false;
     }
   }
 
@@ -560,11 +603,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     const frameUrl = frame.url();
 
-    const frameElem = await frame.frameElement();
+    // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
+    // if there's no tag or an iframe tag, then assume its a regular frame
+    const tagName = await frame.evaluate("self && self.frameElement && self.frameElement.tagName");
 
-    const tagName = await frame.evaluate(e => e.tagName, frameElem);
-
-    if (tagName !== "IFRAME" && tagName !== "FRAME") {
+    if (tagName && tagName !== "IFRAME" && tagName !== "FRAME") {
       logger.debug("Skipping processing non-frame object", {tagName, frameUrl, ...logDetails}, "behavior");
       return null;
     }
@@ -640,32 +683,22 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (interrupt) {
       this.uploadAndDeleteLocal = true;
-      this.gracefulFinish();
+      this.gracefulFinishOnInterrupt();
     }
   }
 
-  gracefulFinish() {
+  gracefulFinishOnInterrupt() {
     this.interrupted = true;
     logger.info("Crawler interrupted, gracefully finishing current pages");
-    if (!this.params.waitOnDone) {
-      this.finalExit = true;
-    }
-  }
-
-  prepareForExit(markDone = true) {
-    if (!markDone) {
-      this.params.waitOnDone = false;
-      this.uploadAndDeleteLocal = true;
-      logger.info("SIGNAL: Preparing for exit of this crawler instance only");
-    } else {
-      logger.info("SIGNAL: Preparing for final exit of all crawlers");
+    if (!this.params.waitOnDone && !this.params.restartsOnError) {
       this.finalExit = true;
     }
   }
 
   async serializeAndExit() {
     await this.serializeConfig();
-    process.exit(0);
+    await this.closeLog();
+    process.exit(this.interrupted ? 13 : 0);
   }
 
   async isCrawlRunning() {
@@ -674,6 +707,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (await this.crawlState.isCrawlStopped()) {
+      logger.info("Crawler is stopped");
       return false;
     }
 
@@ -729,6 +763,7 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     } else if (await this.crawlState.isCrawlStopped()) {
       logger.info("crawl stopped, running post-crawl tasks");
+      this.finalExit = true;
       await this.postCrawl();
       return;
     }
@@ -762,7 +797,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
 
       if (seed.sitemap) {
-        await this.parseSitemap(seed.sitemap, i);
+        await this.parseSitemap(seed.sitemap, i, this.params.sitemapFromDate);
       }
     }
 
@@ -774,6 +809,10 @@ self.__bx_behaviors.selectMainBehavior();
         proxy: false,//!process.env.NO_PROXY,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs()
+      },
+      ondisconnect: (err) => {
+        this.interrupted = true;
+        logger.error("Browser disconnected (crashed?), interrupting crawl", err, "browser");
       }
     });
 
@@ -793,11 +832,16 @@ self.__bx_behaviors.selectMainBehavior();
       await this.pagesFH.close();
     }
 
-    await this.writeStats(true);
+    await this.writeStats();
 
     // extra wait for all resources to land into WARCs
     // now happens at end of each page
     // await this.awaitPendingClear();
+
+    // if crawl has been stopped, mark as final exit for post-crawl tasks
+    if (await this.crawlState.isCrawlStopped()) {
+      this.finalExit = true;
+    }
 
     await this.postCrawl();
   }
@@ -819,7 +863,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    await this.closeLog();
+    logger.info("Crawling done");
 
     if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.uploadAndDeleteLocal)) {
       const uploaded = await this.generateWACZ();
@@ -847,6 +891,9 @@ self.__bx_behaviors.selectMainBehavior();
   async closeLog() {
     // close file-based log
     logger.setExternalLogStream(null);
+    if (!this.logFH) {
+      return;
+    }
     try {
       await new Promise(resolve => this.logFH.close(() => resolve()));
     } catch (e) {
@@ -872,12 +919,20 @@ self.__bx_behaviors.selectMainBehavior();
       if (isFinished) {
         return;
       }
-      // if stopped, won't get anymore data, so consider failed
+      // if stopped, won't get anymore data
       if (await this.crawlState.isCrawlStopped()) {
+        // possibly restarted after committing, so assume done here!
+        if ((await this.crawlState.numDone()) > 0) {
+          return;
+        }
+        // stopped and no done pages, mark crawl as failed
         await this.crawlState.setStatus("failed");
       }
+      // fail for now, may restart to try again
       logger.fatal("No WARC Files, assuming crawl failed");
     }
+
+    logger.debug("End of log file, storing logs in WACZ");
 
     // Build the argument list to pass to the wacz create command
     const waczFilename = this.params.collection.concat(".wacz");
@@ -967,7 +1022,7 @@ self.__bx_behaviors.selectMainBehavior();
           logger.debug(stdout.join("\n"));
         }
         if (stderr.length && this.params.logging.includes("debug")) {
-          logger.error(stderr.join("\n"));
+          logger.debug(stderr.join("\n"));
         }
         resolve(code);
       });
@@ -982,7 +1037,7 @@ self.__bx_behaviors.selectMainBehavior();
     logger.debug("Memory", {maxHeapUsed: this.maxHeapUsed, maxHeapTotal: this.maxHeapTotal, ...memUsage}, "memory");
   }
 
-  async writeStats(toFile=false) {
+  async writeStats() {
     if (!this.params.logging.includes("stats")) {
       return;
     }
@@ -1005,7 +1060,7 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info("Crawl statistics", stats, "crawlStatus");
     this.logMemory();
 
-    if (toFile && this.params.statsFilename) {
+    if (this.params.statsFilename) {
       try {
         await fsp.writeFile(this.params.statsFilename, JSON.stringify(stats, null, 2));
       } catch (err) {
@@ -1015,7 +1070,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async loadPage(page, data, selectorOptsList = DEFAULT_SELECTORS) {
-    const {url, seedId, depth, extraHops = 0} = data;
+    const {url, seedId, depth} = data;
 
     const logDetails = data.logDetails;
 
@@ -1025,7 +1080,9 @@ self.__bx_behaviors.selectMainBehavior();
       this.isHTML(url),
       FETCH_TIMEOUT_SECS,
       "HEAD request to determine if URL is HTML page timed out",
-      logDetails
+      logDetails,
+      "fetch",
+      true
     );
 
     // if (!isHTMLPage) {
@@ -1073,37 +1130,32 @@ self.__bx_behaviors.selectMainBehavior();
         if (failCrawlOnError) {
           logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails});
         } else {
-          logger.error("Page Load Error, skipping page", {statusCode, ...logDetails});
-          throw new Error(`Page ${url} returned status code ${statusCode}`);
+          logger.error("Non-200 Status Code, skipping page", {statusCode, ...logDetails});
+          throw new Error("logged");
         }
       }
 
-      const contentType = await this.browser.responseHeader(resp, "content-type");
+      const contentType = resp.headers()["content-type"];
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
     } catch (e) {
-      let msg = e.message || "";
+      const msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
-        if (e.name === "TimeoutError") {
-          if (data.loadState !== LoadState.CONTENT_LOADED) {
-            if (failCrawlOnError) {
-              logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
-            } else {
-              logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
-              throw e;
-            }
-          } else {
-            logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
-            data.skipBehaviors = true;
-          }
+        // if timeout error, and at least got to content loaded, continue on
+        if (e.name === "TimeoutError" && data.loadState == LoadState.CONTENT_LOADED) {
+          logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
+          data.skipBehaviors = true;
+        } else if (failCrawlOnError) {
+          // if fail on error, immediately fail here
+          logger.fatal("Page Load Timeout, failing crawl", {msg, ...logDetails});
         } else {
-          if (failCrawlOnError) {
-            logger.fatal("Seed Page Load Timeout, failing crawl", {msg, ...logDetails});
-          } else {
-            logger.error("Page Load Error, skipping page", {msg, ...logDetails});
-            throw e;
+          // log if not already log and rethrow
+          if (msg !== "logged") {
+            logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
+            e.message = "logged";
           }
+          throw e;
         }
       }
     }
@@ -1116,7 +1168,13 @@ self.__bx_behaviors.selectMainBehavior();
       let frames = await page.frames();
       frames = await Promise.allSettled(frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)));
 
-      data.filteredFrames = frames.filter((x) => x.status === "fulfilled" && x.value).map(x => x.value);
+      data.filteredFrames = frames.filter((x) => {
+        if (x.status === "fulfilled" && x.value) {
+          return true;
+        }
+        logger.warn("Error in iframe check", {reason: x.reason, ...logDetails});
+        return false;
+      }).map(x => x.value);
 
       //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
@@ -1136,15 +1194,13 @@ self.__bx_behaviors.selectMainBehavior();
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
+      logger.debug("Skipping Link Extraction, At Max Depth");
       return;
     }
 
-    logger.debug("Extracting links");
+    logger.debug("Extracting links", logDetails);
 
-    for (const opts of selectorOptsList) {
-      const links = await this.extractLinks(page, data.filteredFrames, opts, logDetails);
-      await this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails);
-    }
+    await this.extractLinks(page, data, selectorOptsList, logDetails);
   }
 
   async netIdle(page, details) {
@@ -1163,52 +1219,66 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async extractLinks(page, frames, {selector = "a[href]", extract = "href", isAttribute = false} = {}, logDetails) {
-    const results = [];
+  async extractLinks(page, data, selectors = DEFAULT_SELECTORS, logDetails) {
+    const {seedId, depth, extraHops = 0, filteredFrames, callbacks} = data;
 
-    const loadProp = (options) => {
-      const { selector, extract } = options;
-      return [...document.querySelectorAll(selector)].map(elem => elem[extract]);
+    let links = [];
+    const promiseList = [];
+
+    callbacks.addLink = (url) => {
+      links.push(url);
+      if (links.length == 500) {
+        promiseList.push(this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails));
+        links = [];
+      }
     };
 
-    const loadAttr = (options) => {
-      const { selector, extract } = options;
-      return [...document.querySelectorAll(selector)].map(elem => elem.getAttribute(extract));
+    const loadLinks = (options) => {
+      const { selector, extract, isAttribute, addLinkFunc } = options;
+      const urls = new Set();
+
+      const getAttr = elem => urls.add(elem.getAttribute(extract));
+      const getProp = elem => urls.add(elem[extract]);
+
+      const getter = isAttribute ? getAttr : getProp;
+
+      document.querySelectorAll(selector).forEach(getter);
+
+      const func = window[addLinkFunc];
+      urls.forEach(url => func.call(this, url));
+
+      return true;
     };
 
-    const loadFunc = isAttribute ? loadAttr : loadProp;
-
-    frames = frames || page.frames();
+    const frames = filteredFrames || page.frames();
 
     try {
-      const linkResults = await Promise.allSettled(
-        frames.map(frame => timedRun(
-          frame.evaluate(loadFunc, {selector, extract}),
-          PAGE_OP_TIMEOUT_SECS,
-          "Link extraction timed out",
-          logDetails,
-        ))
-      );
+      for (const {selector = "a[href]", extract = "href", isAttribute = false} of selectors) {
+        const promiseResults = await Promise.allSettled(
+          frames.map(frame => timedRun(
+            frame.evaluate(loadLinks, {selector, extract, isAttribute, addLinkFunc: ADD_LINK_FUNC}),
+            PAGE_OP_TIMEOUT_SECS,
+            "Link extraction timed out",
+            logDetails,
+          ))
+        );
 
-      if (linkResults) {
-        let i = 0;
-        for (const linkResult of linkResults) {
-          if (!linkResult) {
-            logger.warn("Link Extraction timed out in frame", {frameUrl: frames[i].url, ...logDetails});
-            continue;
+        for (let i = 0; i < promiseResults.length; i++) {
+          const {status, reason} = promiseResults[i];
+          if (status === "rejected") {
+            logger.warn("Link Extraction failed in frame", {reason, frameUrl: frames[i].url, ...logDetails});
           }
-          if (!linkResult.value) continue;
-          for (const link of linkResult.value) {
-            results.push(link);
-          }
-          i++;
         }
       }
-
     } catch (e) {
       logger.warn("Link Extraction failed", e);
     }
-    return results;
+
+    if (links.length) {
+      promiseList.push(this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails));
+    }
+
+    await Promise.allSettled(promiseList);
   }
 
   async queueInScopeUrls(seedId, urls, depth, extraHops = 0, logDetails = {}) {
@@ -1228,7 +1298,7 @@ self.__bx_behaviors.selectMainBehavior();
         const {url, isOOS} = res;
 
         if (url) {
-          await this.queueUrl(seedId, url, depth, isOOS ? newExtraHops : extraHops);
+          await this.queueUrl(seedId, url, depth, isOOS ? newExtraHops : extraHops, logDetails);
         }
       }
     } catch (e) {
@@ -1242,7 +1312,11 @@ self.__bx_behaviors.selectMainBehavior();
 
       while (await timedRun(
         page.$("div.cf-browser-verification.cf-im-under-attack"),
-        PAGE_OP_TIMEOUT_SECS
+        PAGE_OP_TIMEOUT_SECS,
+        "Cloudflare check timed out",
+        logDetails,
+        "general",
+        true
       )) {
         logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
         await sleep(5.5);
@@ -1252,24 +1326,29 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async queueUrl(seedId, url, depth, extraHops = 0) {
-    logger.debug(`Queuing url ${url}`);
+  async queueUrl(seedId, url, depth, extraHops, logDetails = {}) {
     if (this.limitHit) {
       return false;
     }
 
-    if (this.pageLimit > 0 && (await this.crawlState.numSeen() >= this.pageLimit)) {
+    const result = await this.crawlState.addToQueue({url, seedId, depth, extraHops}, this.pageLimit);
+
+    switch (result) {
+    case QueueState.ADDED:
+      logger.debug("Queued new page url", {url, ...logDetails}, "links");
+      return true;
+
+    case QueueState.LIMIT_HIT:
+      logger.debug("Not queued page url, at page limit", {url, ...logDetails}, "links");
       this.limitHit = true;
       return false;
-    }
 
-    if (await this.crawlState.has(url)) {
+    case QueueState.DUPE_URL:
+      logger.debug("Not queued page url, already seen", {url, ...logDetails}, "links");
       return false;
     }
 
-    //await this.crawlState.add(url);
-    await this.crawlState.addToQueue({url, seedId, depth, extraHops});
-    return true;
+    return false;
   }
 
   async initPages() {
@@ -1302,7 +1381,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async writePage({pageid, url, depth, title, text, loadState}) {
+  async writePage({pageid, url, depth, title, text, loadState, favicon}) {
     const row = {id: pageid, url, title, loadState};
 
     if (depth === 0) {
@@ -1311,6 +1390,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (text !== null) {
       row.text = text;
+    }
+
+    if (favicon !== null) {
+      row.favIconUrl = favicon;
     }
 
     const processedRow = JSON.stringify(row) + "\n";
@@ -1390,18 +1473,30 @@ self.__bx_behaviors.selectMainBehavior();
   //   }
   // }
 
-  async parseSitemap(url, seedId) {
+  async parseSitemap(url, seedId, sitemapFromDate) {
+    // handle sitemap last modified date if passed
+    let lastmodFromTimestamp = null;
+    const dateObj = new Date(sitemapFromDate);
+    if (isNaN(dateObj.getTime())) {
+      logger.info("Fetching full sitemap (fromDate not specified/valid)", {url, sitemapFromDate}, "sitemap");
+    } else {
+      lastmodFromTimestamp = dateObj.getTime();
+      logger.info("Fetching and filtering sitemap by date", {url, sitemapFromDate}, "sitemap");
+    }
+
     const sitemapper = new Sitemapper({
       url,
       timeout: 15000,
-      requestHeaders: this.headers
+      requestHeaders: this.headers,
+      lastmod: lastmodFromTimestamp
     });
 
     try {
       const { sites } = await sitemapper.fetch();
+      logger.info("Sitemap Urls Found", {urls: sites.length}, "sitemap");
       await this.queueInScopeUrls(seedId, sites, 0);
     } catch(e) {
-      logger.warn("Error fetching sites from sitemap", e);
+      logger.warn("Error fetching sites from sitemap", e, "sitemap");
     }
   }
 

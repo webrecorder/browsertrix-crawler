@@ -30,7 +30,7 @@ test("check that URLs are crawled 2 extra hops beyond depth", async () => {
   ];
 
   // first line is the header, not page, so adding -1
-  expect(expectedPages.length).toEqual(crawledPagesArray.length - 1);
+  expect(crawledPagesArray.length - 1).toEqual(expectedPages.length);
 
   for (const page of crawledPagesArray) {
     const url = JSON.parse(page).url;

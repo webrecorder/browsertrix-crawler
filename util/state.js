@@ -12,6 +12,15 @@ export const LoadState = {
   BEHAVIORS_DONE: 4,
 };
 
+
+// ============================================================================
+export const QueueState = {
+  ADDED: 0,
+  LIMIT_HIT: 1,
+  DUPE_URL: 2,
+};
+
+
 // ============================================================================
 export class PageState
 {
@@ -68,9 +77,17 @@ export class RedisCrawlState
     redis.defineCommand("addqueue", {
       numberOfKeys: 3,
       lua: `
-redis.call('sadd', KEYS[3], ARGV[1]);
+local size = redis.call('scard', KEYS[3]);
+local limit = tonumber(ARGV[4]);
+if limit > 0 and size >= limit then
+  return 1;
+end
+if redis.call('sadd', KEYS[3], ARGV[1]) == 0 then
+  return 2;
+end
 redis.call('zadd', KEYS[2], ARGV[2], ARGV[3]);
 redis.call('hdel', KEYS[1], ARGV[1]);
+return 0;
 `
     });
 
@@ -208,7 +225,15 @@ return 0;
   }
 
   async isCrawlStopped() {
-    return await this.redis.get(`${this.key}:stopping`) === "1";
+    if (await this.redis.get(`${this.key}:stopping`) === "1") {
+      return true;
+    }
+
+    if (await this.redis.hget(`${this.key}:stopone`, this.uid) === "1") {
+      return true;
+    }
+
+    return false;
   }
 
   // note: not currently called in crawler, but could be
@@ -226,14 +251,18 @@ return 0;
     return (res >= 3);
   }
 
-  async addToQueue({url, seedId, depth = 0, extraHops = 0} = {}) {
+  async addToQueue({url, seedId, depth = 0, extraHops = 0} = {}, limit = 0) {
     const added = this._timestamp();
     const data = {added, url, seedId, depth};
     if (extraHops) {
       data.extraHops = extraHops;
     }
 
-    await this.redis.addqueue(this.pkey, this.qkey, this.skey, url, this._getScore(data), JSON.stringify(data));
+    // return codes
+    // 0 - url queued successfully
+    // 1 - url queue size limit reached
+    // 2 - url is a dupe
+    return await this.redis.addqueue(this.pkey, this.qkey, this.skey, url, this._getScore(data), JSON.stringify(data), limit);
   }
 
   async nextFromQueue() {

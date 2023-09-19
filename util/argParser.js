@@ -227,6 +227,11 @@ class ArgParser {
         describe: "If enabled, check for sitemaps at /sitemap.xml, or custom URL if URL is specified",
       },
 
+      "sitemapFromDate": {
+        alias: "sitemapFrom",
+        describe: "If set, filter URLs from sitemaps to those greater than or equal to provided ISO Date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS or partial date)",
+      },
+
       "statsFilename": {
         describe: "If set, output stats as JSON to this file. (Relative filename resolves to crawl working directory)"
       },
@@ -343,6 +348,12 @@ class ArgParser {
 
       "waitOnDone": {
         describe: "if set, wait for interrupt signal when finished instead of exiting",
+        type: "boolean",
+        default: false
+      },
+
+      "restartsOnError": {
+        describe: "if set, assume will be restarted if interrupted, don't run post-crawl processes on interrupt",
         type: "boolean",
         default: false
       },
