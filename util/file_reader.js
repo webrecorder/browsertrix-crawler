@@ -25,6 +25,9 @@ export async function collectOnlineFileSource(url, logger) {
   await fetch(url)
     .then(res => res.text())
     .then(file => {return fs.promises.writeFile("/app/behaviors/" + filename, file);})
+    .then(() => {
+      logger.info("File downloaded to /app/behaviors/" + filename);
+    })
     .catch(err => {
       logger.error(err);
     });
