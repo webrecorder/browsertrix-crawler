@@ -803,8 +803,8 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher
       return await super._doFetch();
     }
 
-    if (reqresp.expectedSize < 0 && headers && headers.get("content-length") && !headers.get("content-encoding")) {
-      reqresp.expectedSize = Number(headers.get("content-length") || -1);
+    if (reqresp.expectedSize < 0 && headers && headers["content-length"] && !headers["content-encoding"]) {
+      reqresp.expectedSize = Number(headers["content-length"] || -1);
     }
 
     if (reqresp.expectedSize === 0) {
