@@ -158,7 +158,7 @@ export class Recorder
   }
 
   handleRequestExtraInfo(params) {
-    if (!this.shouldSkip(null, params.headers, null)) {
+    if (!this.shouldSkip(params.headers)) {
       const reqresp = this.pendingReqResp(params.requestId, true);
       if (reqresp) {
         reqresp.fillRequestExtraInfo(params);
@@ -247,7 +247,7 @@ export class Recorder
     let continued = false;
 
     try {
-      if (responseStatusCode && !responseErrorReason && !this.shouldSkip(method, headers, resourceType) && !(isSWorker && networkId)) {
+      if (responseStatusCode && !responseErrorReason && !this.shouldSkip(headers, url, method, resourceType) && !(isSWorker && networkId)) {
         continued = await this.handleFetchResponse(params, cdp, isSWorker);
       }
     } catch (e) {
@@ -434,9 +434,13 @@ export class Recorder
     await this.writer.flush();
   }
 
-  shouldSkip(method, headers, resourceType) {
+  shouldSkip(headers, url, method, resourceType) {
     if (headers && !method) {
       method = headers[":method"];
+    }
+
+    if (!this.isValidUrl(url)) {
+      return true;
     }
 
     if (method === "OPTIONS" || method === "HEAD") {
@@ -669,6 +673,7 @@ class AsyncFetcher
 
         if (buffers && buffers.length && !fh) {
           reqresp.payload = Buffer.concat(buffers, currSize);
+          externalBuffer.buffers = [reqresp.payload];
         }
       }
 
