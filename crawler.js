@@ -592,9 +592,10 @@ self.__bx_behaviors.selectMainBehavior();
         frames.map(frame => this.browser.evaluateWithCLI(page, frame, cdp, `
           if (!self.__bx_behaviors) {
             console.error("__bx_behaviors missing, can't run behaviors");
-            return;
-          }
-          self.__bx_behaviors.run();`, logDetails, "behavior"))
+          } else {
+            self.__bx_behaviors.run();
+          }`
+        , logDetails, "behavior"))
       );
 
       for (const {status, reason} in results) {
