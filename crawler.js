@@ -578,7 +578,13 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
 
       const results = await Promise.allSettled(
-        frames.map(frame => this.browser.evaluateWithCLI(page, frame, cdp, "self.__bx_behaviors.run();", logDetails, "behavior"))
+        frames.map(frame => this.browser.evaluateWithCLI(page, frame, cdp, `
+          if (!self.__bx_behaviors) {
+            console.error("__bx_behaviors missing, can't run behaviors");
+          } else {
+            self.__bx_behaviors.run();
+          }`
+        , logDetails, "behavior"))
       );
 
       for (const {status, reason} in results) {
@@ -1169,8 +1175,8 @@ self.__bx_behaviors.selectMainBehavior();
       frames = await Promise.allSettled(frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)));
 
       data.filteredFrames = frames.filter((x) => {
-        if (x.status === "fulfilled" && x.value) {
-          return true;
+        if (x.status === "fulfilled") {
+          return !!x.value;
         }
         logger.warn("Error in iframe check", {reason: x.reason, ...logDetails});
         return false;

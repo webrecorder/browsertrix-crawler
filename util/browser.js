@@ -166,7 +166,13 @@ export class BaseBrowser
   }
 
   async evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName) {
-    let details = {frameUrl: frame.url(), ...logData};
+    const frameUrl = frame.url();
+    let details = {frameUrl, ...logData};
+
+    if (!frameUrl || frame.isDetached()) {
+      logger.info("Run Script Skipped, frame no longer attached or has no URL", details, contextName);
+      return false;
+    }
 
     logger.info("Run Script Started", details, contextName);
 
