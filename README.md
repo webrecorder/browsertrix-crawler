@@ -43,6 +43,8 @@ Here's how you can use some of the command-line options to configure the crawl:
 
 - To limit the crawl time, set `--timeLimit` (in seconds)
 
+- To limit the crawl to a maximum number of failures, set `--failedLimit` (in number of pages)
+
 - To run more than one browser worker and crawl in parallel, and `--workers N` where N is number of browsers to run in parallel. More browsers will require more CPU and network bandwidth, and does not guarantee faster crawling.
 
 - To crawl into a new directory, specify a different name for the `--collection` param, or, if omitted, a new collection directory based on current time will be created. Adding the `--overwrite` flag will delete the collection directory at the start of the crawl, if it exists.
@@ -224,6 +226,9 @@ Options:
       --timeLimit                           If set, save state and exit after ti
                                             me limit, in seconds
                                                            [number] [default: 0]
+      --failedLimit                         If set, save state and exit if numbe
+                                            r of failed pages exceeds this value
+                                                           [number] [default: 0]
       --healthCheckPort                     port to run healthcheck on
                                                            [number] [default: 0]
       --overwrite                           overwrite current crawl data: if set
@@ -260,6 +265,12 @@ Options:
                                             code 1 if any seed fails
                                                       [boolean] [default: false]
       --config                              Path to YAML config file
+      --pageLoadAttempts                    How many times the crawler retries t
+                                            o load a page if the error is recove
+                                            rable
+      --defaultRetryPause                   How long the crawler pauses when an
+                                            HTTP 429 error is received without `
+                                            Retry-After` header
 
 ```
 </details>

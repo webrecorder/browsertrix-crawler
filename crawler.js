@@ -698,6 +698,14 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
+    if (this.params.failedLimit) {
+      const numFailed = this.crawlState.numFailed();
+      if (numFailed >= this.params.failedLimit) {
+        logger.info(`Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, stopping`);
+        interrupt = true;
+      }
+    }
+
     if (interrupt) {
       this.uploadAndDeleteLocal = true;
       this.gracefulFinishOnInterrupt();
@@ -1136,11 +1144,37 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info("Awaiting page load", logDetails);
 
     try {
-      const resp = await page.goto(url, gotoOpts);
+      let nbAttempts = 0;
+      let resp = undefined;
+      while (true) {
+        resp = await page.goto(url, gotoOpts);
+        nbAttempts += 1;
 
-      // Handle 4xx or 5xx response as a page load error
-      const statusCode = resp.status();
-      if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
+        const statusCode = resp.status();
+
+        // If code is below 400, the page loaded successfully (3xx not supposed to happen here)
+        if (statusCode < 400) {
+          break;
+        }
+
+        // HTTP 429, let's make a pause (even if max attempts has been reached, to not overload the website)
+        if (statusCode === 429) {
+          const retryAfterStr = "Retry-After" in resp.headers() ? resp.headers()["Retry-After"] : undefined;
+          if (retryAfterStr) {
+            const retryAfterInt = Number.isInteger(retryAfterStr) ? parseInt(retryAfterStr): Math.ceil((Date.parse(retryAfterStr) - Date.now()) / 1000);
+            logger.warn("HTTP 429 with Retry-After, waiting", {retryAfterInt, ...logDetails});
+            sleep(retryAfterInt);
+          } else {
+            logger.warn("HTTP 429 without Retry-After, waiting", {...logDetails});
+            sleep(this.params.defaultRetryPause);
+          }
+          if (nbAttempts < this.params.pageLoadAttempts) {
+            // Retry if we have attempts left
+            continue;
+          }
+        }
+
+        // Handle 4xx or 5xx response as a page load error
         if (failCrawlOnError) {
           logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails});
         } else {

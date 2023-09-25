@@ -334,6 +334,12 @@ class ArgParser {
         default: 0,
       },
 
+      "failedLimit": {
+        describe: "If set, save state and exit if number of failed pages exceeds this value",
+        type: "number",
+        default: 0,
+      },
+
       "healthCheckPort": {
         describe: "port to run healthcheck on",
         type: "number",
@@ -401,6 +407,18 @@ class ArgParser {
       "customBehaviors": {
         describe: "injects a custom behavior file or set of behavior files in a directory",
         type: ["string"]
+      },
+
+      "pageLoadAttempts": {
+        describe: "How many time the crawler retries to load a page if the error is recoverable",
+        type: "number",
+        default: 2,
+      },
+
+      "defaultRetryPause": {
+        describe: "How long the crawler pauses when an HTTP 429 error is received without `Retry-After` header",
+        type: "number",
+        default: 60,
       },
     };
   }
