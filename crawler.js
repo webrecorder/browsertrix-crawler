@@ -1159,14 +1159,14 @@ self.__bx_behaviors.selectMainBehavior();
 
         // HTTP 429, let's make a pause (even if max attempts has been reached, to not overload the website)
         if (statusCode === 429) {
-          const retryAfterStr = "Retry-After" in resp.headers() ? resp.headers()["Retry-After"] : undefined;
+          const retryAfterStr = "retry-after" in resp.headers() ? resp.headers()["retry-after"] : undefined;
           if (retryAfterStr) {
             const retryAfterInt = Number.isInteger(retryAfterStr) ? parseInt(retryAfterStr): Math.ceil((Date.parse(retryAfterStr) - Date.now()) / 1000);
             logger.warn("HTTP 429 with Retry-After, waiting", {retryAfterInt, ...logDetails});
-            sleep(retryAfterInt);
+            await sleep(retryAfterInt);
           } else {
             logger.warn("HTTP 429 without Retry-After, waiting", {...logDetails});
-            sleep(this.params.defaultRetryPause);
+            await sleep(this.params.defaultRetryPause);
           }
           if (nbAttempts < this.params.pageLoadAttempts) {
             // Retry if we have attempts left
