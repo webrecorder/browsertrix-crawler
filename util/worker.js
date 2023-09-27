@@ -7,6 +7,7 @@ const MAX_REUSE = 5;
 
 const NEW_WINDOW_TIMEOUT = 20;
 const TEARDOWN_TIMEOUT = 10;
+const FINISHED_TIMEOUT = 60;
 
 // ===========================================================================
 export function runWorkers(crawler, numWorkers, maxPageTime) {
@@ -81,7 +82,13 @@ export class PageWorker
 
     try {
       logger.debug("Closing page", {crashed: this.crashed, workerid: this.id}, "worker");
-      await this.page.close();
+      await timedRun(
+        this.page.close(),
+        TEARDOWN_TIMEOUT,
+        "Page Close Timed Out",
+        this.logDetails,
+        "worker"
+      );
     } catch (e) {
       // ignore
     } finally {
@@ -203,7 +210,13 @@ export class PageWorker
         logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
       }
     } finally {
-      await this.crawler.pageFinished(data);
+      await timedRun(
+        this.crawler.pageFinished(data),
+        FINISHED_TIMEOUT,
+        "Page Finished Timed Out",
+        this.logDetails,
+        "worker"
+      );
     }
   }
 
