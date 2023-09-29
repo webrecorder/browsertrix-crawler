@@ -537,7 +537,18 @@ class ArgParser {
       if (typeof(seed) === "string") {
         seed = {url: seed};
       }
-      argv.scopedSeeds.push(new ScopedSeed({...scopeOpts, ...seed}));
+
+      try {
+        argv.scopedSeeds.push(new ScopedSeed({...scopeOpts, ...seed}));
+      } catch (e) {
+        if (argv.failOnFailedSeed) {
+          logger.fatal(`Invalid Seed "${seed.url}" specified, aborting crawl.`);
+        }
+      }
+    }
+
+    if (!argv.scopedSeeds.length) {
+      logger.fatal("No valid seeds specified, aborting crawl.");
     }
 
     // Resolve statsFilename
