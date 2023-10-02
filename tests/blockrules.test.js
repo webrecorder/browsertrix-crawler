@@ -27,6 +27,7 @@ function doesCDXContain(coll, value) {
 test("test crawl without block for specific URL", () => {
   const config = {
     "url": "https://www.iana.org/",
+    "pageExtraDelay": 10
   };
 
   runCrawl("block-1-no-block", config);
