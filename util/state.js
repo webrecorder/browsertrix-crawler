@@ -196,7 +196,13 @@ return 0;
   }
 
   async setEndTime() {
+    // Set start time if crawler exits before it was able to set one
+    if (!await this.redis.llen(`${this.startkey}:${this.uid}`)) {
+      await this.setStartTime();
+    }
+
     const endTime = this._timestamp();
+
     return await this.redis.rpush(`${this.endkey}:${this.uid}`, endTime);
   }
 

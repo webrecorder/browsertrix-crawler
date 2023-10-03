@@ -713,17 +713,13 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async setEndTimeAndExit(exitCode = 0) {
-    await this.crawlState.setEndTime();
+    if (this.crawlState) {
+      await this.crawlState.setEndTime();
+    }
     process.exit(exitCode);
   }
 
   async serializeAndExit() {
-    // Set start time if crawler exits before it was able to set one
-    const startTimes = await this.crawlState.getStartTimes();
-    if (!startTimes.length) {
-      await this.crawlState.setStartTime();
-    }
-
     await this.serializeConfig();
     await this.closeLog();
 
