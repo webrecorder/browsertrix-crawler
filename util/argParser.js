@@ -398,6 +398,12 @@ class ArgParser {
         default: false
       },
 
+      "failOnFailedLimit": {
+        describe: "If set, save state and exit if number of failed pages exceeds this value",
+        type: "number",
+        default: 0,
+      },
+
       "customBehaviors": {
         describe: "injects a custom behavior file or set of behavior files in a directory",
         type: ["string"]
