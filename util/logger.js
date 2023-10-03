@@ -103,7 +103,12 @@ class Logger
 
   fatal(message, data={}, context="general", exitCode=17) {
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
-    process.exit(exitCode);
+
+    if (this.crawlState) {
+      this.crawlState.setEndTime().finally(process.exit(exitCode));
+    } else {
+      process.exit(exitCode);
+    }
   }
 }
 
