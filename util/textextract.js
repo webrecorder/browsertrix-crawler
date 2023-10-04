@@ -1,7 +1,100 @@
-export class TextExtract {
-  
-  constructor(dom){
-    this.dom = dom;
+import { WARCResourceWriter } from "./warcresourcewriter.js";
+import { logger } from "./logger.js";
+
+
+// ============================================================================
+export class BaseTextExtract extends WARCResourceWriter {
+  constructor(cdp, opts) {
+    super({...opts, warcName: "text.warc.gz"});
+    this.cdp = cdp;
+    this.lastText = null;
+  }
+
+  async extractAndStoreText(resourceType, ignoreIfMatchesLast = false) {
+    try {
+      const text = await this.doGetText();
+      if (ignoreIfMatchesLast && text === this.lastText) {
+        logger.debug("Skipping, extracted text unchanged from last extraction", {url: this.url}, "text");
+        return false;
+      }
+      this.lastText = text;
+      await this.writeBufferToWARC(new TextEncoder().encode(text), resourceType, "text/plain");
+      logger.debug(`Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.warcName}`);
+      return true;
+    } catch (e) {
+      logger.debug("Error extracting text", e, "text");
+    }
+  }
+
+  async doGetText() {
+    throw new Error("unimplemented");
+  }
+}
+
+
+// ============================================================================
+export class TextExtractViaSnapshot extends BaseTextExtract {
+  async doGetText() {
+    const result = await this.cdp.send("DOMSnapshot.captureSnapshot", {computedStyles: []});
+    return this.parseTextFromDOMSnapshot(result);
+  }
+
+  parseTextFromDOMSnapshot(result) {
+    const TEXT_NODE = 3;
+    const ELEMENT_NODE = 1;
+
+    const SKIPPED_NODES = ["SCRIPT", "STYLE", "HEADER", "FOOTER", "BANNER-DIV", "NOSCRIPT"];
+
+    const {strings, documents} = result;
+
+    const accum = [];
+
+    for (const doc of documents) {
+      const nodeValues = doc.nodes.nodeValue;
+      const nodeNames = doc.nodes.nodeName;
+      const nodeTypes = doc.nodes.nodeType;
+      const parentIndex = doc.nodes.parentIndex;
+
+      for (let i = 0; i < nodeValues.length; i++) {
+        if (nodeValues[i] === -1) {
+          continue;
+        }
+
+        if (nodeTypes[i] === TEXT_NODE) {
+          const pi = parentIndex[i];
+          if (pi >= 0 && nodeTypes[pi] === ELEMENT_NODE) {
+            const name = strings[nodeNames[pi]];
+
+            if (!SKIPPED_NODES.includes(name)) {
+              const value = strings[nodeValues[i]].trim();
+              if (value) {
+                accum.push(value);
+              }
+            }
+          }
+        }
+      }
+
+      return accum.join("\n");
+    }
+  }
+}
+
+
+// ============================================================================
+export class TextExtractViaDocument extends BaseTextExtract {
+  async doGetText() {
+    const result = await this.cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
+    return this.parseTextFromDOM(result);
+  }
+
+  async parseTextFromDom(dom) {
+    const accum = [];
+    const metadata = {};
+
+    this.parseText(dom.root, metadata, accum);
+
+    return accum.join("\n");
   }
 
   async parseText(node, metadata, accum) {
@@ -44,15 +137,6 @@ export class TextExtract {
         this.parseText(node.contentDocument, null, accum);
       } 
     }
-  }
-
-  async parseTextFromDom() {
-    const accum = [];
-    const metadata = {};
-
-    this.parseText(this.dom.root, metadata, accum);
-
-    return accum.join("\n");
   }
 }
 
