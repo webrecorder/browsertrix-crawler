@@ -1,7 +1,5 @@
-ARG BROWSER_VERSION=112
-ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:chrome-${BROWSER_VERSION}
-#ARG BROWSER_VERSION=1.47.186
-#ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
+ARG BROWSER_VERSION=1.58.135
+ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
 FROM ${BROWSER_IMAGE_BASE}
 

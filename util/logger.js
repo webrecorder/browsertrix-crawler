@@ -103,7 +103,17 @@ class Logger
 
   fatal(message, data={}, context="general", exitCode=17) {
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
-    process.exit(exitCode);
+
+    async function markFailedAndEnd(crawlState) {
+      await crawlState.setStatus("failed");
+      await crawlState.setEndTime();
+    }
+
+    if (this.crawlState) {
+      markFailedAndEnd(this.crawlState).finally(process.exit(exitCode));
+    } else {
+      process.exit(exitCode);
+    }
   }
 }
 

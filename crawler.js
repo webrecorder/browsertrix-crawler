@@ -318,15 +318,9 @@ export class Crawler {
       }
 
     } finally {
-      logger.info(`Final crawl status: ${status}`);
+      logger.info(`Crawl status: ${status}`);
 
-      if (this.crawlState) {
-        await this.crawlState.setStatus(status);
-      }
-
-      await this.closeLog();
-
-      process.exit(exitCode);
+      await this.setEndTimeAndExit(exitCode, status);
     }
   }
 
@@ -687,6 +681,13 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
+    if (this.params.failOnFailedLimit) {
+      const numFailed = this.crawlState.numFailed();
+      if (numFailed >= this.params.failOnFailedLimit) {
+        logger.fatal(`Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`);
+      }
+    }
+
     if (interrupt) {
       this.uploadAndDeleteLocal = true;
       this.gracefulFinishOnInterrupt();
@@ -701,10 +702,26 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  async setEndTimeAndExit(exitCode, status) {
+    await this.closeLog();
+
+    if (this.crawlState) {
+      if (status) {
+        await this.crawlState.setStatus(status);
+      }
+      await this.crawlState.setEndTime();
+    }
+    process.exit(exitCode);
+  }
+
   async serializeAndExit() {
     await this.serializeConfig();
-    await this.closeLog();
-    process.exit(this.interrupted ? 13 : 0);
+
+    if (this.interrupted) {
+      await this.setEndTimeAndExit(13, "interrupted");
+    } else {
+      await this.setEndTimeAndExit(0, "done");
+    }
   }
 
   async isCrawlRunning() {
@@ -734,6 +751,8 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     await this.initCrawlState();
+
+    await this.crawlState.setStartTime();
 
     let initState = await this.crawlState.getStatus();
 
@@ -931,10 +950,8 @@ self.__bx_behaviors.selectMainBehavior();
         if ((await this.crawlState.numDone()) > 0) {
           return;
         }
-        // stopped and no done pages, mark crawl as failed
-        await this.crawlState.setStatus("failed");
       }
-      // fail for now, may restart to try again
+      // fail crawl otherwise
       logger.fatal("No WARC Files, assuming crawl failed");
     }
 

@@ -398,6 +398,12 @@ class ArgParser {
         default: false
       },
 
+      "failOnFailedLimit": {
+        describe: "If set, save state and exit if number of failed pages exceeds this value",
+        type: "number",
+        default: 0,
+      },
+
       "customBehaviors": {
         describe: "injects a custom behavior file or set of behavior files in a directory",
         type: ["string"]
@@ -537,7 +543,18 @@ class ArgParser {
       if (typeof(seed) === "string") {
         seed = {url: seed};
       }
-      argv.scopedSeeds.push(new ScopedSeed({...scopeOpts, ...seed}));
+
+      try {
+        argv.scopedSeeds.push(new ScopedSeed({...scopeOpts, ...seed}));
+      } catch (e) {
+        if (argv.failOnFailedSeed) {
+          logger.fatal(`Invalid Seed "${seed.url}" specified, aborting crawl.`);
+        }
+      }
+    }
+
+    if (!argv.scopedSeeds.length) {
+      logger.fatal("No valid seeds specified, aborting crawl.");
     }
 
     // Resolve statsFilename

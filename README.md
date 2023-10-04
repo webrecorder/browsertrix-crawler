@@ -651,7 +651,7 @@ Click 'Create Profile at the top when done. The profile will then be created in 
 It is also possible to extend an existing profiles by also passing in an existing profile via the `--profile` flag. In this way, it is possible to build new profiles by extending previous browsing sessions as needed.
 
 ```
-docker run -p 6080:6080 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles -it webrecorder/browsertrix-crawler create-login-profile --url "https://example.com/ --filename /crawls/profiles/newProfile.tar.gz --profile /crawls/profiles/oldProfile.tar.gz"
+docker run -p 6080:6080 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles -it webrecorder/browsertrix-crawler create-login-profile --url "https://example.com/" --filename "/crawls/profiles/newProfile.tar.gz" --profile "/crawls/profiles/oldProfile.tar.gz"
 ```
 
 #### Headless vs Headful Profiles

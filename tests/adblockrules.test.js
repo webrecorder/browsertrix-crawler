@@ -27,6 +27,7 @@ function doesCDXContain(coll, value) {
 test("test crawl without ad block for specific URL", () => {
   const config = {
     "url": "https://www.mozilla.org/en-US/firefox/",
+    "pageExtraDelay": 10
   };
 
   runCrawl("adblock-no-block", config);

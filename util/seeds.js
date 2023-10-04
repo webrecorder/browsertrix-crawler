@@ -7,7 +7,7 @@ export class ScopedSeed
   constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} = {}) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
-      logger.fatal(`Invalid Seed "${url}" specified, aborting crawl.`);
+      throw new Error("Invalid URL");
     }
     this.url = parsedUrl.href;
     this.include = this.parseRx(include);
