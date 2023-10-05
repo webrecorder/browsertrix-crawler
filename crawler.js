@@ -173,6 +173,8 @@ export class Crawler {
 
     this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.maxPageTime, os.hostname());
 
+    await this.crawlState.setStartTime();
+
     // clear any pending URLs from this instance
     await this.crawlState.clearOwnPendingLocks();
 
@@ -302,6 +304,8 @@ export class Crawler {
   }
 
   async run() {
+    await this.initCrawlState();
+
     await this.bootstrap();
 
     let status = "done";
@@ -760,10 +764,6 @@ self.__bx_behaviors.selectMainBehavior();
       logger.warn(`Error importing driver ${this.params.driver}`, e);
       return;
     }
-
-    await this.initCrawlState();
-
-    await this.crawlState.setStartTime();
 
     let initState = await this.crawlState.getStatus();
 
