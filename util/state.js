@@ -202,7 +202,7 @@ return 0;
     if (!endTimeTs) {
       endTimeTs = Date.now();
     }
-    const prevStartTime = await this.redis.getdel(this.startkey);
+    const prevStartTime = await this.redis.getset(this.startkey, "0");
     if (prevStartTime) {
       await this.redis.incrby(this.execTimeKey, (endTimeTs - Number(prevStartTime)) / 1000);
       return true;
