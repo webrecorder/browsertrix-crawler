@@ -425,6 +425,8 @@ export class Recorder
   }
 
   async onDone() {
+    await this.crawlState.setStatus("pending-wait");
+
     logger.debug("Finishing Fetcher Queue", this.logDetails, "recorder");
     await this.fetcherQ.onIdle();
 
@@ -796,7 +798,7 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher
     try {
       result = await cdp.send("Network.loadNetworkResource", {frameId: reqresp.frameId, url, options});
     } catch (e) {
-      logger.debug("Network.loadNetworkResource failed, attempting node fetch", {url}, "recorder");
+      logger.debug("Network.loadNetworkResource failed, attempting node fetch", {url, ...errJSON(e), ...this.recorder.logDetails}, "recorder");
       return await super._doFetch();
     }
 
@@ -804,7 +806,7 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher
 
     if (!success || !stream) {
       //await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
-      logger.debug("Network.loadNetworkResource failed, attempting node fetch", {url, netErrorName, netError, httpStatusCode}, "recorder");
+      logger.debug("Network.loadNetworkResource failed, attempting node fetch", {url, netErrorName, netError, httpStatusCode, ...this.recorder.logDetails}, "recorder");
       return await super._doFetch();
     }
 
