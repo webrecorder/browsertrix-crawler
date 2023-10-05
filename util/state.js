@@ -68,9 +68,9 @@ export class RedisCrawlState
     this.fkey = this.key + ":f";
     // crawler errors
     this.ekey = this.key + ":e";
-    // start and end times to compute execution minutes
-    this.startkey = this.key + ":start";
-    this.endkey = this.key + ":end";
+    // start time key to compute execution time
+    this.startkey = this.key + ":start:" + this.uid;
+    this.execTimeKey = this.key + ":execTime";
 
     this._initLuaCommands(this.redis);
   }
@@ -187,23 +187,27 @@ return 0;
   }
 
   async setStartTime() {
-    const startTime = this._timestamp();
-    return await this.redis.rpush(`${this.startkey}:${this.uid}`, startTime);
-  }
-
-  async getStartTimes() {
-    return await this.redis.lrange(`${this.startkey}:${this.uid}`, 0, -1);
+    const startTimeTs = Date.now();
+    await this.incExecTime(startTimeTs);
+    await this.redis.set(this.startkey, startTimeTs);
   }
 
   async setEndTime() {
-    // Set start time if crawler exits before it was able to set one
-    if (!await this.redis.llen(`${this.startkey}:${this.uid}`)) {
-      await this.setStartTime();
+    if (!await this.incExecTime()) {
+      logger.warn("start time missing", {}, "state");
     }
+  }
 
-    const endTime = this._timestamp();
-
-    return await this.redis.rpush(`${this.endkey}:${this.uid}`, endTime);
+  async incExecTime(endTimeTs = null) {
+    if (!endTimeTs) {
+      endTimeTs = Date.now();
+    }
+    const prevStartTime = await this.redis.getdel(this.startkey);
+    if (prevStartTime) {
+      await this.redis.incrby(this.execTimeKey, (endTimeTs - Number(prevStartTime)) / 1000);
+      return true;
+    }
+    return false;
   }
 
   async markStarted(url) {
