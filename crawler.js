@@ -209,6 +209,28 @@ export class Crawler {
   }
 
   async bootstrap() {
+    let opts = {};
+    let redisStdio;
+
+    const subprocesses = [];
+
+    if (this.params.logging.includes("pywb")) {
+      const pywbStderr = fs.openSync(path.join(this.logDir, "pywb.log"), "a");
+      const stdio = [process.stdin, pywbStderr, pywbStderr];
+
+      const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
+      redisStdio = [process.stdin, redisStderr, redisStderr];
+
+      opts = {stdio, cwd: this.params.cwd};
+    } else {
+      opts = {stdio: "ignore", cwd: this.params.cwd};
+      redisStdio = "ignore";
+    }
+
+    subprocesses.push(child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio}));
+
+    this._initRedis = this.initCrawlState();
+
     const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
 
     if (initRes.status) {
@@ -241,27 +263,7 @@ export class Crawler {
       this.customBehaviors = this.loadCustomBehaviors(this.params.customBehaviors);
     }
 
-    let opts = {};
-    let redisStdio;
-
-    if (this.params.logging.includes("pywb")) {
-      const pywbStderr = fs.openSync(path.join(this.logDir, "pywb.log"), "a");
-      const stdio = [process.stdin, pywbStderr, pywbStderr];
-
-      const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
-      redisStdio = [process.stdin, redisStderr, redisStderr];
-
-      opts = {stdio, cwd: this.params.cwd};
-    } else {
-      opts = {stdio: "ignore", cwd: this.params.cwd};
-      redisStdio = "ignore";
-    }
-
     this.headers = {"User-Agent": this.configureUA()};
-
-    const subprocesses = [];
-
-    subprocesses.push(child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio}));
 
     opts.env = {
       ...process.env,
@@ -304,9 +306,9 @@ export class Crawler {
   }
 
   async run() {
-    await this.initCrawlState();
-
     await this.bootstrap();
+
+    await this._initRedis;
 
     let status = "done";
     let exitCode = 0;
