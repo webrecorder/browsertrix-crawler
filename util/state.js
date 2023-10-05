@@ -202,9 +202,11 @@ return 0;
     if (!endTimeTs) {
       endTimeTs = Date.now();
     }
-    const prevStartTime = await this.redis.getset(this.startkey, "0");
+    const prevStartTime = await this.redis.getset(this.startkey, 0);
     if (prevStartTime) {
-      await this.redis.incrby(this.execTimeKey, (endTimeTs - Number(prevStartTime)) / 1000);
+      const newExecTime = Math.ceil((endTimeTs - Number(prevStartTime)) / 1000);
+      logger.debug("Adding exec time", {newExecTime}, "state");
+      await this.redis.incrby(this.execTimeKey, newExecTime);
       return true;
     }
     return false;
