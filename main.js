@@ -26,6 +26,8 @@ async function handleTerminate(signame) {
   setExitOnRedisError(true);
 
   try {
+    crawler.checkCanceled();
+
     if (!crawler.interrupted) {
       logger.info("SIGNAL: gracefully finishing current pages...");
       crawler.gracefulFinishOnInterrupt();

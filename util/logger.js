@@ -19,6 +19,12 @@ class Logger
     this.logLevels = [];
     this.contexts = [];
     this.crawlState = null;
+
+    this.fatalExitCode = 17;
+  }
+
+  setDefaultFatalExitCode(exitCode) {
+    this.fatalExitCode = exitCode;
   }
 
   setExternalLogStream(logFH) {
@@ -101,16 +107,12 @@ class Logger
     }
   }
 
-  fatal(message, data={}, context="general", exitCode=17) {
+  fatal(message, data={}, context="general", exitCode=0) {
+    exitCode = exitCode || this.fatalExitCode;
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
 
-    async function markFailedAndEnd(crawlState) {
-      await crawlState.setStatus("failed");
-      await crawlState.setEndTime();
-    }
-
     if (this.crawlState) {
-      markFailedAndEnd(this.crawlState).finally(process.exit(exitCode));
+      this.crawlState.setStatus("failed").finally(process.exit(exitCode));
     } else {
       process.exit(exitCode);
     }
