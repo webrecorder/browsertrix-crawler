@@ -24,6 +24,8 @@ function doesCDXContain(coll, value) {
   return data.indexOf(value) >= 0;
 }
 
+// Test Disabled for Brave -- should always be blocked, but seeing inconsistent ci behavior
+/*
 test("test crawl without ad block for specific URL", () => {
   const config = {
     "url": "https://www.mozilla.org/en-US/firefox/",
@@ -35,6 +37,7 @@ test("test crawl without ad block for specific URL", () => {
   // without ad blocking, URL with googletagmanager is included
   expect(doesCDXContain("adblock-no-block", "www.googletagmanager.com")).toBe(true);
 });
+*/
 
 test("testcrawl with ad block for specific URL", () => {
   const config = {
