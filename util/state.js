@@ -245,6 +245,66 @@ return 0;
     await this.redis.set(`${this.key}:stopping`, "1");
   }
 
+  async processMessage(seeds) {
+    while (true) {
+      const result = await this.redis.lpop(`${this.uid}:msg`);
+      if (!result) {
+        return;
+      }
+      try {
+        const {type, regex} = JSON.parse(result);
+        switch (type) {
+        case "addExclusion":
+          logger.debug("Add Exclusion", {type, regex}, "exclusion");
+          if (!regex) {
+            break;
+          }
+          for (const seed of seeds) {
+            seed.addExclusion(regex);
+          }
+          // can happen async w/o slowing down scrolling
+          // each page is still checked if in scope before crawling, even while
+          // queue is being filtered
+          this.filterQueue(regex);
+          break;
+
+        case "removeExclusion":
+          logger.debug("Remove Exclusion", {type, regex}, "exclusion");
+          if (!regex) {
+            break;
+          }
+          for (const seed of seeds) {
+            seed.removeExclusion(regex);
+          }
+          break;
+        }
+      } catch (e) {
+        logger.warn("Error processing message", e, "redisMessage");
+      }
+    }
+  }
+
+  async filterQueue(regexStr) {
+    const regex = new RegExp(regexStr);
+
+    const qsize = await this.redis.zcard(this.qkey);
+
+    const count = 50;
+
+    for (let i = 0; i < qsize; i += count) {
+      const results = await this.redis.zrangebyscore(this.qkey, 0, "inf", "limit", i, count);
+
+      for (const result of results) {
+        const { url } = JSON.parse(result);
+        if (regex.test(url)) {
+          const removed = await this.redis.zrem(this.qkey, result);
+          await this.redis.srem(this.skey, url);
+          logger.debug("Removing excluded URL", {url, regex, removed}, "exclusion");
+        }
+      }
+    }
+  }
+
   async incFailCount() {
     const key = `${this.key}:status:failcount:${this.uid}`;
     const res = await this.redis.incr(key);
