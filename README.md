@@ -226,9 +226,6 @@ Options:
       --timeLimit                           If set, save state and exit after ti
                                             me limit, in seconds
                                                            [number] [default: 0]
-      --failedLimit                         If set, save state and exit if numbe
-                                            r of failed pages exceeds this value
-                                                           [number] [default: 0]
       --healthCheckPort                     port to run healthcheck on
                                                            [number] [default: 0]
       --overwrite                           overwrite current crawl data: if set

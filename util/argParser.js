@@ -334,12 +334,6 @@ class ArgParser {
         default: 0,
       },
 
-      "failedLimit": {
-        describe: "If set, save state and exit if number of failed pages exceeds this value",
-        type: "number",
-        default: 0,
-      },
-
       "healthCheckPort": {
         describe: "port to run healthcheck on",
         type: "number",
