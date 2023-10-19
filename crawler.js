@@ -65,6 +65,13 @@ export class Crawler {
     logger.setLogLevel(this.params.logLevel);
     logger.setContext(this.params.context);
 
+    // if automatically restarts on error exit code,
+    // exit with 0 from fatal by default, to avoid unnecessary restart
+    // otherwise, exit with default fatal exit code
+    if (this.params.restartsOnError) {
+      logger.setDefaultFatalExitCode(0);
+    }
+
     logger.debug("Writing log to: " + this.logFilename, {}, "init");
 
     this.headers = {};
@@ -311,8 +318,11 @@ export class Crawler {
       await this.crawl();
       const finished = await this.crawlState.isFinished();
       const stopped = await this.crawlState.isCrawlStopped();
+      const canceled = await this.crawlState.isCrawlCanceled();
       if (!finished) {
-        if (stopped) {
+        if (canceled) {
+          status = "canceled";
+        } else if (stopped) {
           status = "done";
           logger.info("Crawl gracefully stopped on request");
         } else if (this.interrupted) {
@@ -329,15 +339,7 @@ export class Crawler {
       }
 
     } finally {
-      logger.info(`Final crawl status: ${status}`);
-
-      if (this.crawlState) {
-        await this.crawlState.setStatus(status);
-      }
-
-      await this.closeLog();
-
-      process.exit(exitCode);
+      await this.setStatusAndExit(exitCode, status);
     }
   }
 
@@ -698,11 +700,10 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.failedLimit) {
+    if (this.params.failOnFailedLimit) {
       const numFailed = this.crawlState.numFailed();
-      if (numFailed >= this.params.failedLimit) {
-        logger.info(`Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, stopping`);
-        interrupt = true;
+      if (numFailed >= this.params.failOnFailedLimit) {
+        logger.fatal(`Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`);
       }
     }
 
@@ -720,14 +721,40 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  async checkCanceled() {
+    if (this.crawlState && await this.crawlState.isCrawlCanceled()) {
+      await this.setStatusAndExit(0, "canceled");
+    }
+  }
+
+  async setStatusAndExit(exitCode, status) {
+    logger.info(`Exiting, Crawl status: ${status}`);
+
+    await this.closeLog();
+
+    if (this.crawlState && status) {
+      await this.crawlState.setStatus(status);
+    }
+    process.exit(exitCode);
+  }
+
   async serializeAndExit() {
     await this.serializeConfig();
-    await this.closeLog();
-    process.exit(this.interrupted ? 13 : 0);
+
+    if (this.interrupted) {
+      await this.setStatusAndExit(13, "interrupted");
+    } else {
+      await this.setStatusAndExit(0, "done");
+    }
   }
 
   async isCrawlRunning() {
     if (this.interrupted) {
+      return false;
+    }
+
+    if (await this.crawlState.isCrawlCanceled()) {
+      await this.setStatusAndExit(0, "canceled");
       return false;
     }
 
@@ -790,6 +817,9 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info("crawl stopped, running post-crawl tasks");
       this.finalExit = true;
       await this.postCrawl();
+      return;
+    } else if (await this.crawlState.isCrawlCanceled()) {
+      logger.info("crawl canceled, will exit");
       return;
     }
 
@@ -937,7 +967,7 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info(`Num WARC Files: ${warcFileList.length}`);
     if (!warcFileList.length) {
       // if finished, just return
-      if (isFinished) {
+      if (isFinished || await this.crawlState.isCrawlCanceled()) {
         return;
       }
       // if stopped, won't get anymore data
@@ -946,10 +976,8 @@ self.__bx_behaviors.selectMainBehavior();
         if ((await this.crawlState.numDone()) > 0) {
           return;
         }
-        // stopped and no done pages, mark crawl as failed
-        await this.crawlState.setStatus("failed");
       }
-      // fail for now, may restart to try again
+      // fail crawl otherwise
       logger.fatal("No WARC Files, assuming crawl failed");
     }
 

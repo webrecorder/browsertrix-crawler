@@ -235,6 +235,10 @@ return 0;
     return false;
   }
 
+  async isCrawlCanceled() {
+    return await this.redis.get(`${this.key}:canceled`) === "1";
+  }
+
   // note: not currently called in crawler, but could be
   // crawl may be stopped by setting this elsewhere in shared redis
   async stopCrawl() {
