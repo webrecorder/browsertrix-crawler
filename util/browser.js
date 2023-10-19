@@ -359,5 +359,6 @@ export const defaultArgs = [
   "--use-mock-keychain",
   // See https://chromium-review.googlesource.com/c/chromium/src/+/2436773
   "--no-service-autorun",
-  "--export-tagged-pdf"
+  "--export-tagged-pdf",
+  "--component-updater=url-source=http://invalid.dev/",
 ];
