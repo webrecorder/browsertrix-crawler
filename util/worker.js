@@ -151,7 +151,14 @@ export class PageWorker
         this.page = page;
         this.cdp = cdp;
         this.callbacks = {};
-        this.opts = {page: this.page, cdp: this.cdp, workerid, callbacks: this.callbacks};
+        const directFetchCapture = this.recorder ? (x) => this.recorder.directFetchCapture(x) : null;
+        this.opts = {
+          page: this.page,
+          cdp: this.cdp,
+          workerid,
+          callbacks: this.callbacks,
+          directFetchCapture,
+        };
 
         if (this.recorder) {
           await this.recorder.onCreatePage(this.opts);

@@ -448,7 +448,7 @@ self.__bx_behaviors.selectMainBehavior();
   async crawlPage(opts) {
     await this.writeStats();
 
-    const {page, cdp, data, workerid, callbacks} = opts;
+    const {page, cdp, data, workerid, callbacks, directFetchCapture} = opts;
     data.callbacks = callbacks;
 
     const {url} = data;
@@ -460,6 +460,38 @@ self.__bx_behaviors.selectMainBehavior();
     if (!this.isInScope(data, logDetails)) {
       logger.info("Page no longer in scope", data);
       return true;
+    }
+
+    data.isHTMLPage = await timedRun(
+      this.isHTML(url, logDetails),
+      FETCH_TIMEOUT_SECS,
+      "HEAD request to determine if URL is HTML page timed out",
+      logDetails,
+      "fetch",
+      true
+    );
+
+    if (!data.isHTMLPage && directFetchCapture) {
+      try {
+        const {fetched, mime} = await timedRun(
+          directFetchCapture(url),
+          FETCH_TIMEOUT_SECS,
+          "Direct fetch capture attempt timed out",
+          logDetails,
+          "fetch",
+          true
+        );
+        if (fetched) {
+          data.loadState = LoadState.FULL_PAGE_LOADED;
+          if (mime) {
+            data.mime = mime;
+          }
+          logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
+          return true;
+        }
+      } catch (e) {
+        // ignore failed direct fetch attempt, do browser-based capture
+      }
     }
 
     // run custom driver here
@@ -1099,33 +1131,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     const failCrawlOnError = ((depth === 0) && this.params.failOnFailedSeed);
 
-    let isHTMLPage = await timedRun(
-      this.isHTML(url),
-      FETCH_TIMEOUT_SECS,
-      "HEAD request to determine if URL is HTML page timed out",
-      logDetails,
-      "fetch",
-      true
-    );
-
-    // if (!isHTMLPage) {
-    //   try {
-    //     const captureResult = await timedRun(
-    //       this.directFetchCapture(url),
-    //       FETCH_TIMEOUT_SECS,
-    //       "Direct fetch capture attempt timed out",
-    //       logDetails
-    //     );
-    //     if (captureResult) {
-    //       logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
-    //       return;
-    //     }
-    //   } catch (e) {
-    //     console.log(e);
-    //     // ignore failed direct fetch attempt, do browser-based capture
-    //   }
-    // }
-
     let ignoreAbort = false;
 
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
@@ -1133,6 +1138,8 @@ self.__bx_behaviors.selectMainBehavior();
     page.once("requestfailed", (req) => {
       ignoreAbort = shouldIgnoreAbort(req);
     });
+
+    let isHTMLPage = data.isHTMLPage;
 
     if (isHTMLPage) {
       page.once("domcontentloaded", () => {
@@ -1404,8 +1411,12 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async writePage({pageid, url, depth, title, text, loadState, favicon}) {
+  async writePage({pageid, url, depth, title, text, loadState, mime, favicon}) {
     const row = {id: pageid, url, title, loadState};
+
+    if (mime) {
+      row.mime = mime;
+    }
 
     if (depth === 0) {
       row.seed = true;
@@ -1431,7 +1442,7 @@ self.__bx_behaviors.selectMainBehavior();
     return urlParsed.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT;
   }
 
-  async isHTML(url) {
+  async isHTML(url, logDetails) {
     try {
       const resp = await fetch(url, {
         method: "HEAD",
@@ -1439,7 +1450,7 @@ self.__bx_behaviors.selectMainBehavior();
         agent: this.resolveAgent
       });
       if (resp.status !== 200) {
-        logger.debug(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
+        logger.debug("HEAD response code != 200, loading in browser", {status: resp.status, ...logDetails});
         return true;
       }
 
@@ -1447,7 +1458,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     } catch(e) {
       // can't confirm not html, so try in browser
-      logger.debug("HEAD request failed", {...e, url});
+      logger.debug("HEAD request failed", {...errJSON(e), ...logDetails});
       return true;
     }
   }
@@ -1466,35 +1477,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     return false;
   }
-
-  // async directFetchCapture(url) {
-  //   const abort = new AbortController();
-  //   const signal = abort.signal;
-  //   const resp = await fetch(this.capturePrefix + url, {signal, headers: this.headers, redirect: "manual"});
-  //   abort.abort();
-  //   return resp.status === 200 && !resp.headers.get("set-cookie");
-  // }
-
-  // async awaitPendingClear() {
-  //   logger.info("Waiting to ensure pending data is written to WARCs...");
-  //   await this.crawlState.setStatus("pending-wait");
-
-  //   const redis = await initRedis("redis://localhost/0");
-
-  //   while (!this.interrupted) {
-  //     try {
-  //       const count = Number(await redis.get(`pywb:${this.params.collection}:pending`) || 0);
-  //       if (count <= 0) {
-  //         break;
-  //       }
-  //       logger.debug("Waiting for pending requests to finish", {numRequests: count});
-  //     } catch (e) {
-  //       break;
-  //     }
-
-  //     await sleep(1);
-  //   }
-  // }
 
   async parseSitemap(url, seedId, sitemapFromDate) {
     // handle sitemap last modified date if passed

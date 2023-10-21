@@ -327,9 +327,15 @@ export class Recorder
       // fetching using response stream, await here and then either call fulFill, or if not started, return false
       if (contentLen < 0) {
         const fetcher = new ResponseStreamAsyncFetcher({...opts, requestId, cdp });
-        // didn't get stream, attempt async approach
-        if (await fetcher.load()) {
+        const res = await fetcher.load();
+        switch (res) {
+        case "dupe":
+          this.removeReqResp(networkId);
+          return false;
+
+        case "fetched":
           streamingConsume = true;
+          break;
         }
       }
 
@@ -633,18 +639,39 @@ export class Recorder
 
     this.warcQ.add(() => this.writer.writeRecordPair(responseRecord, requestRecord));
   }
+
+  async directFetchCapture(url) {
+    const reqresp = new RequestResponseInfo(0);
+    reqresp.url = url;
+    reqresp.method = "GET";
+
+    logger.debug("Directly fetching page URL without browser", {url, ...this.logDetails}, "recorder");
+
+    const filter = (resp) => resp.status === 200 && !resp.headers.get("set-cookie");
+
+    // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
+    // should not get here, as dupe pages tracked via seen list
+    const fetcher = new AsyncFetcher({tempdir: this.tempdir, reqresp, recorder: this, networkId: 0, filter, ignoreDupe: true});
+    const res = await fetcher.load();
+
+    const mime = reqresp && reqresp.responseHeaders["content-type"] && reqresp.responseHeaders["content-type"].split(";")[0];
+
+    return {fetched: res === "fetched", mime};
+  }
 }
 
 // =================================================================
 class AsyncFetcher
 {
-  constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId}) {
+  constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId, filter = null, ignoreDupe = false}) {
     //super();
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
     this.reqresp.asyncLoading = true;
 
     this.networkId = networkId;
+    this.filter = filter;
+    this.ignoreDupe = ignoreDupe;
 
     this.recorder = recorder;
 
@@ -658,15 +685,18 @@ class AsyncFetcher
 
     const { pageid, crawlState, gzip, logDetails } = recorder;
 
-    let fetched = false;
+    let fetched = "notfetched";
 
     try {
       if (reqresp.method === "GET" && !await crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url)) {
-        return fetched;
+        if (!this.ignoreDupe) {
+          this.reqresp.asyncLoading = false;
+          return "dupe";
+        }
       }
 
       const body = await this._doFetch();
-      fetched = true;
+      fetched = "fetched";
 
       const responseRecord = createResponse(reqresp, pageid, body);
       const requestRecord = createRequest(reqresp, responseRecord, pageid);
@@ -726,7 +756,20 @@ class AsyncFetcher
 
     const headers = reqresp.getRequestHeadersDict();
 
-    const resp = await fetch(url, {method, headers, body: reqresp.postData || undefined});
+    let signal = null;
+    let abort = null;
+
+    if (this.filter) {
+      abort = new AbortController();
+      signal = abort.signal;
+    }
+
+    const resp = await fetch(url, {method, headers, body: reqresp.postData || undefined, signal});
+
+    if (this.filter && !this.filter(resp)) {
+      abort.abort();
+      throw new Error("invalid response, ignoring fetch");
+    }
 
     if (reqresp.expectedSize < 0 && resp.headers.get("content-length") && !resp.headers.get("content-encoding")) {
       reqresp.expectedSize = Number(resp.headers.get("content-length") || -1);
