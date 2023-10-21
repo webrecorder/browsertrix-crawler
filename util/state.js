@@ -427,15 +427,20 @@ return 0;
       seen.push(data.url);
     }
 
-    // retained in modified form for backwards compatibility
-    for (const json of state.done) {
-      const data = JSON.parse(json);
-      if (data.failed) {
-        await this.redis.zadd(this.qkey, this._getScore(data), json);
-      } else {
-        await this.redis.incr(this.dkey);
+    if (typeof(state.done) === "number") {
+      // done key is just an int counter
+      await this.redis.set(this.dkey, state.done);
+    } else if (state.done instanceof Array) {
+      // for backwards compatibility with old save states
+      for (const json of state.done) {
+        const data = JSON.parse(json);
+        if (data.failed) {
+          await this.redis.zadd(this.qkey, this._getScore(data), json);
+        } else {
+          await this.redis.incr(this.dkey);
+        }
+        seen.push(data.url);
       }
-      seen.push(data.url);
     }
 
     for (const json of state.failed) {
