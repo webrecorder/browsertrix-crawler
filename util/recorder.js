@@ -17,7 +17,8 @@ import { WARCRecord } from "warcio";
 import { WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
 
-const MAX_BROWSER_FETCH_SIZE = 2000000;
+const MAX_BROWSER_FETCH_SIZE = 2_000_000;
+const MAX_NETWORK_LOAD_SIZE = 200_000_000;
 
 const ASYNC_FETCH_DUPE_KEY = "s:fetchdupe";
 
@@ -45,8 +46,10 @@ export class Recorder
     this.pendingRequests = null;
     this.skipIds = null;
 
-    this.swFrameIds = null;
-    this.swUrls = null;
+    this.swSessionId = null;
+    this.swFrameIds = new Set();
+    this.swUrls = new Set();
+
 
     this.logDetails = {};
     this.skipping = false;
@@ -137,9 +140,19 @@ export class Recorder
     // Target
 
     cdp.on("Target.attachedToTarget", async (params) => {
-      const { url, type } = params.targetInfo;
+      const { url, type, sessionId } = params.targetInfo;
       if (type === "service_worker") {
+        this.swSessionId = sessionId;
         this.swUrls.add(url);
+      }
+    });
+
+    cdp.on("Target.detachedFromTarget", async (params) => {
+      const { sessionId } = params;
+      if (this.swSessionId && sessionId === this.swSessionId) {
+        this.swUrls.clear();
+        this.swFrameIds.clear();
+        this.swSessionId = null;
       }
     });
 
@@ -297,6 +310,12 @@ export class Recorder
 
     if (this.noResponseForStatus(responseStatusCode)) {
       reqresp.payload = new Uint8Array();
+
+      if (isSWorker) {
+        this.removeReqResp(networkId);
+        await this.serializeToWARC(reqresp);
+      }
+
       return false;
     }
 
@@ -318,7 +337,7 @@ export class Recorder
       if (!streamingConsume) {
         let fetcher = null;
 
-        if (isSWorker || reqresp.method !== "GET") {
+        if (reqresp.method !== "GET" || contentLen > MAX_NETWORK_LOAD_SIZE) {
           fetcher = new AsyncFetcher(opts);
         } else {
           fetcher = new NetworkLoadStreamAsyncFetcher(opts);
@@ -340,6 +359,13 @@ export class Recorder
     }
 
     const rewritten = await this.rewriteResponse(reqresp);
+
+    // if in service worker, serialize here
+    // as won't be getting a loadingFinished message
+    if (isSWorker && reqresp.payload) {
+      this.removeReqResp(networkId);
+      await this.serializeToWARC(reqresp);
+    }
 
     // not rewritten, and not streaming, return false to continue
     if (!rewritten && !streamingConsume) {
@@ -378,8 +404,6 @@ export class Recorder
     // if (this.pendingRequests && this.pendingRequests.size) {
     //   logger.warn("Interrupting timed out requests, moving to next page", this.logDetails, "recorder");
     // }
-    this.swFrameIds = new Set();
-    this.swUrls = new Set();
     this.pendingRequests = new Map();
     this.skipIds = new Set();
     this.skipping = false;

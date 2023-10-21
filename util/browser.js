@@ -315,7 +315,7 @@ export class Browser extends BaseBrowser
       let foundRecorder = null;
 
       for (const recorder of this.recorders) {
-        if (recorder.swUrls && recorder.swFrameIds && recorder.swUrls.has(request.url)) {
+        if (recorder.swUrls.has(request.url)) {
           //console.log(`*** found sw ${request.url} in recorder for worker ${recorder.workerid}`);
           recorder.swFrameIds.add(frameId);
         }
@@ -327,8 +327,15 @@ export class Browser extends BaseBrowser
       }
 
       if (!foundRecorder) {
-        logger.warn("frame for SW not found, using first recorder", {url: request.url}, "recorder");
-        foundRecorder = this.recorders[0];
+        logger.warn("Skipping URL from unknown frame", {url: request.url, frameId}, "recorder");
+
+        try {
+          await this.firstCDP.send("Fetch.continueResponse", {requestId});
+        } catch (e) {
+          logger.warn("continueResponse failed", {url: request.url}, "recorder");
+        }
+
+        return;
       }
 
       await foundRecorder.handleRequestPaused(params, this.firstCDP, true);
