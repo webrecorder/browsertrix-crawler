@@ -9,7 +9,7 @@ function waitForProcess() {
   const p = new Promise((resolve) => {
     callback = (/*error, stdout, stderr*/) => {
       //console.log(stdout);
-      resolve();
+      resolve(0);
     };
   });
 
@@ -67,6 +67,8 @@ test("check crawl interrupted + saved state written", async () => {
 
 
 test("check parsing saved state + page done + queue present", () => {
+  expect(savedStateFile).toBeTruthy();
+
   const savedState = fs.readFileSync(path.join("test-crawls/collections/int-state-test/crawls", savedStateFile), "utf-8");
   
   const saved = yaml.load(savedState);
@@ -88,7 +90,7 @@ test("check crawl restarted with saved state", async () => {
   const wait = waitForProcess();
 
   try {
-    proc = exec(`docker run -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis`, wait.callback);
+    proc = exec(`docker run -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`, wait.callback);
   }
   catch (error) {
     console.log(error);
@@ -115,11 +117,17 @@ test("check crawl restarted with saved state", async () => {
 
   } finally {
 
+    try {
+      await redis.disconnect();
+    } catch (e) {
+      // ignore
+    }
+
     proc.kill("SIGINT");
 
-    await wait.p;
+    const res = await wait.p;
 
-    await redis.disconnect();
+    expect(res).toBe(0);
   }
 
 });
