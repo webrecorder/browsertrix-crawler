@@ -19,6 +19,7 @@ function waitForProcess() {
 var savedStateFile;
 var state;
 var numDone;
+var redis;
 
 test("check crawl interrupted + saved state written", async () => {
   let proc = null;
@@ -98,7 +99,7 @@ test("check crawl restarted with saved state", async () => {
 
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
-  const redis = new Redis("redis://127.0.0.1:36379/0", {lazyConnect: true});
+  redis = new Redis("redis://127.0.0.1:36379/0", {lazyConnect: true});
 
   try {
     for (let i = 0; i < 10; i++) {
@@ -113,15 +114,7 @@ test("check crawl restarted with saved state", async () => {
 
     expect(await redis.get("test:d")).toBe(numDone + "");
 
-    await redis.disconnect();
-
   } finally {
-
-    try {
-      await redis.disconnect();
-    } catch (e) {
-      // ignore
-    }
 
     proc.kill("SIGINT");
 
@@ -130,5 +123,11 @@ test("check crawl restarted with saved state", async () => {
     expect(res).toBe(0);
   }
 
+});
+
+afterAll(async () => {
+  if (redis) {
+    await redis.quit();
+  }
 });
 
