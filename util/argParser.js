@@ -408,6 +408,11 @@ class ArgParser {
         describe: "injects a custom behavior file or set of behavior files in a directory",
         type: ["string"]
       },
+
+      "debugAccessRedis": {
+        describe: "if set, runs internal redis without protected mode to allow external access (for debugging)",
+        type: "boolean",
+      }
     };
   }
 
