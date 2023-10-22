@@ -45,6 +45,25 @@ export class ScopedSeed
     }
   }
 
+  addExclusion(value) {
+    if (!value) {
+      return;
+    }
+    if (!(value instanceof RegExp)) {
+      value = new RegExp(value);
+    }
+    this.exclude.push(value);
+  }
+
+  removeExclusion(value) {
+    for (let i = 0; i < this.exclude.length; i++) {
+      if (this.exclude[i].toString() == value.toString()) {
+        this.exclude.splice(i, 1);
+        return true;
+      }
+    }
+  }
+
   parseUrl(url, logDetails = {}) {
     let parsedUrl = null;
     try {
