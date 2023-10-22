@@ -20,6 +20,7 @@ var savedStateFile;
 var state;
 var numDone;
 var redis;
+var finishProcess;
 
 test("check crawl interrupted + saved state written", async () => {
   let proc = null;
@@ -27,7 +28,7 @@ test("check crawl interrupted + saved state written", async () => {
   const wait = waitForProcess();
 
   try {
-    proc = exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --limit 20", wait.callback);
+    proc = exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --limit 20", {"shell": "/bin/bash"}, wait.callback);
   }
   catch (error) {
     console.log(error);
@@ -91,7 +92,7 @@ test("check crawl restarted with saved state", async () => {
   const wait = waitForProcess();
 
   try {
-    proc = exec(`docker run -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`, wait.callback);
+    proc = exec(`docker run -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`, {shell: "/bin/bash"}, wait.callback);
   }
   catch (error) {
     console.log(error);
@@ -101,33 +102,19 @@ test("check crawl restarted with saved state", async () => {
 
   redis = new Redis("redis://127.0.0.1:36379/0", {lazyConnect: true});
 
-  try {
-    for (let i = 0; i < 10; i++) {
-      try {
-        await redis.connect();
-        break;
-      } catch (e) {
-        console.log("awaiting redis");
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-    }
+  await redis.connect({maxRetriesPerRequest: 50});
 
-    expect(await redis.get("test:d")).toBe(numDone + "");
+  expect(await redis.get("test:d")).toBe(numDone + "");
 
-  } finally {
+  proc.kill("SIGINT");
 
-    proc.kill("SIGINT");
-
-    const res = await wait.p;
-
-    expect(res).toBe(0);
-  }
-
+  finishProcess = wait.p;
 });
 
-afterAll(async () => {
-  if (redis) {
-    await redis.quit();
-  }
+test("interrupt crawl and exit", async () => {
+  const res = await Promise.allSettled([finishProcess, redis.quit()]);
+
+  expect(res[0].value).toBe(0);
 });
+
 
