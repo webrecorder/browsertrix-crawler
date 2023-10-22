@@ -7,6 +7,7 @@
   "author": "Ilya Kreymer <ikreymer@gmail.com>, Webrecorder Software",
   "license": "AGPL-3.0-or-later",
   "scripts": {
+    "tsc": "tsc",
     "lint": "eslint *.js util/*.js tests/*.test.js",
     "test": "yarn node --experimental-vm-modules $(yarn bin jest --bail 1)",
     "prepare": "husky install"
@@ -34,7 +35,8 @@
     "eslint": "^8.37.0",
     "eslint-plugin-react": "^7.22.0",
     "jest": "^29.2.1",
-    "md5": "^2.3.0"
+    "md5": "^2.3.0",
+    "typescript": "^5.2.2"
   },
   "jest": {
     "transform": {},
