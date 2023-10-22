@@ -12,6 +12,12 @@ const indexHTML = fs.readFileSync(new URL("../html/screencast.html", import.meta
 // ===========================================================================
 class WSTransport
 {
+  allWS = new Set<WebSocket>();
+  caster?: ScreenCaster;
+  wss: ws.Server;
+  httpServer: any;
+  
+
   constructor(port) {
     this.allWS = new Set();
 
@@ -87,8 +93,13 @@ class WSTransport
 // ===========================================================================
 class RedisPubSubTransport
 {
+  numConnections: number = 0;
+  castChannel: string;
+  caster?: ScreenCaster;
+  ctrlChannel: string;
+  redis: any;
+
   constructor(redisUrl, crawlId) {
-    this.numConnections = 0;
     this.castChannel = `c:${crawlId}:cast`;
     this.ctrlChannel = `c:${crawlId}:ctrl`;
 
@@ -143,6 +154,14 @@ class RedisPubSubTransport
 // ===========================================================================
 class ScreenCaster
 {
+  transport: WSTransport;
+  caches = new Map();
+  urls = new Map();
+  cdps = new Map();
+  maxWidth = 640;
+  maxHeight = 480;
+  initMsg: {[key: string]: any};
+
   constructor(transport, numWorkers) {
     this.transport = transport;
     this.transport.caster = this;
