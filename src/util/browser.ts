@@ -10,20 +10,26 @@ import { logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
 import puppeteer from "puppeteer-core";
+import { CDPSession, Target, Browser as PBrowser } from "puppeteer-core";
 
 
 // ==================================================================
-export class BaseBrowser
+export class Browser
 {
+  profileDir: string;
+  customProfile = false;
+  emulateDevice = null;
+
+  browser?: PBrowser = null;
+  firstCDP: CDPSession = null;
+
+  recorders: any[] = [];
+
   constructor() {
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
-    this.customProfile = false;
-    this.emulateDevice = null;
-
-    this.recorders = [];
   }
 
-  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}, ondisconnect = null} = {}) {
+  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}, ondisconnect = null}) {
     if (this.isLaunched()) {
       return;
     }
@@ -83,7 +89,7 @@ export class BaseBrowser
 
       const resp = await fetch(profileFilename);
       await pipeline(
-        Readable.fromWeb(resp.body),
+        Readable.fromWeb(resp.body as any),
         fs.createWriteStream(targetFilename)
       );
 
@@ -201,18 +207,6 @@ export class BaseBrowser
 
     return result.value;
   }
-}
-
-
-// ==================================================================
-export class Browser extends BaseBrowser
-{
-  constructor() {
-    super();
-    this.browser = null;
-
-    this.firstCDP = null;
-  }
 
   isLaunched() {
     if (this.browser) {
@@ -256,7 +250,7 @@ export class Browser extends BaseBrowser
     // unique url to detect new pages
     const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
 
-    const p = new Promise((resolve) => {
+    const p = new Promise<Target>((resolve) => {
       const listener = (target) => {
         if (target.url() === startPage) {
           resolve(target);
