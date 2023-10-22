@@ -10,7 +10,7 @@ import { logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
 import puppeteer from "puppeteer-core";
-import { CDPSession, Target, Browser as PBrowser } from "puppeteer-core";
+import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 
 
 // ==================================================================
@@ -20,7 +20,7 @@ export class Browser
   customProfile = false;
   emulateDevice = null;
 
-  browser?: PBrowser = null;
+  browser?: PptrBrowser = null;
   firstCDP: CDPSession = null;
 
   recorders: any[] = [];
