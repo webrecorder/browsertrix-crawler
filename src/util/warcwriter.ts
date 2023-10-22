@@ -5,7 +5,7 @@ import path from "path";
 import { CDXIndexer } from "warcio";
 import { WARCSerializer } from "warcio/dist/node";
 import { logger, errJSON } from "./logger.js";
-import type { IndexerOffsetLength } from "warcio";
+import type { IndexerOffsetLength, WARCRecord } from "warcio";
 
 
 // =================================================================
@@ -15,17 +15,18 @@ export class WARCWriter implements IndexerOffsetLength
   tempCdxDir: string;
   filename: string;
   gzip: boolean;
-  logDetails: object;
+  logDetails: Record<string, string>;
 
   offset = 0;
   recordLength = 0;
 
   indexer?: CDXIndexer;
 
-  fh: Writable = null;
-  cdxFH: Writable = null;
+  fh?: Writable | null;
+  cdxFH?: Writable | null;
 
-  constructor({archivesDir, tempCdxDir, filename, gzip, logDetails}) {
+  constructor({archivesDir, tempCdxDir, filename, gzip, logDetails} : 
+              {archivesDir: string, tempCdxDir: string, filename: string, gzip: boolean, logDetails: Record<string, string>}) {
     this.archivesDir = archivesDir;
     this.tempCdxDir = tempCdxDir;
     this.filename = filename;
@@ -37,12 +38,7 @@ export class WARCWriter implements IndexerOffsetLength
 
     if (this.tempCdxDir) {
       this.indexer = new CDXIndexer({format: "cdxj"});
-    } else {
-      this.indexer = null;
     }
-
-    this.fh = null;
-    this.cdxFH = null;
   }
 
   async initFH() {
@@ -54,7 +50,7 @@ export class WARCWriter implements IndexerOffsetLength
     }
   }
 
-  async writeRecordPair(responseRecord, requestRecord, responseSerializer = null) {
+  async writeRecordPair(responseRecord: WARCRecord, requestRecord: WARCRecord, responseSerializer: WARCSerializer | undefined) {
     const opts = {gzip: this.gzip};
 
     if (!responseSerializer) {
@@ -74,10 +70,14 @@ export class WARCWriter implements IndexerOffsetLength
 
   }
 
-  async _writeRecord(record, serializer) {
+  async _writeRecord(record: WARCRecord, serializer: WARCSerializer) {
     let total = 0;
     let count = 0;
     const url = record.warcTargetURI;
+
+    if (!this.fh) {
+      throw new Error("writer not initialized");
+    }
 
     for await (const chunk of serializer) {
       total += chunk.length;
@@ -95,7 +95,7 @@ export class WARCWriter implements IndexerOffsetLength
     return total;
   }
 
-  _writeCDX(record) {
+  _writeCDX(record: WARCRecord | null) {
     if (this.indexer) {
       const cdx = this.indexer.indexRecord(record, this, this.filename);
 
@@ -123,7 +123,7 @@ export class WARCWriter implements IndexerOffsetLength
 }
 
 // =================================================================
-export function streamFinish(fh) {
+export function streamFinish(fh: Writable) {
   const p = new Promise<void>(resolve => {
     fh.once("finish", () => resolve());
   });

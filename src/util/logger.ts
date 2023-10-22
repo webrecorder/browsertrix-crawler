@@ -1,50 +1,58 @@
 // ===========================================================================
 // to fix serialization of regexes for logging purposes
+
+import { Writable } from "node:stream";
+import { RedisCrawlState } from "./state";
+
 // RegExp.prototype.toJSON = RegExp.prototype.toString;
 Object.defineProperty(RegExp.prototype, "toJSON", { value: RegExp.prototype.toString });
 
 
 // ===========================================================================
-export function errJSON(e) {
-  return {"type": "exception", "message": e.message, "stack": e.stack};
+export function errJSON(e: any) {
+  if (e instanceof Error) {
+    return {"type": "exception", "message": e.message, "stack": e.stack};
+  } else {
+    return {"message": e.toString()};
+  }
 }
 
 
 // ===========================================================================
 class Logger
 {
-  logStream = null;
+  logStream : Writable | null = null;
   debugLogging = false;
   logErrorsToRedis = false;
   logLevels : string[] = [];
   contexts : string[] = [];
-  crawlState? : any = null;
+  crawlState? : RedisCrawlState | null = null;
 
-  setExternalLogStream(logFH) {
+  setExternalLogStream(logFH: Writable) {
     this.logStream = logFH;
   }
 
-  setDebugLogging(debugLog) {
+  setDebugLogging(debugLog: boolean) {
     this.debugLogging = debugLog;
   }
 
-  setLogErrorsToRedis(logErrorsToRedis) {
+  setLogErrorsToRedis(logErrorsToRedis: boolean) {
     this.logErrorsToRedis = logErrorsToRedis;
   }
 
-  setLogLevel(logLevels) {
+  setLogLevel(logLevels: string[]) {
     this.logLevels = logLevels;
   }
 
-  setContext(contexts) {
+  setContext(contexts: string[]) {
     this.contexts = contexts;
   }
 
-  setCrawlState(crawlState) {
+  setCrawlState(crawlState: RedisCrawlState) {
     this.crawlState = crawlState;
   }
 
-  logAsJSON(message, data, context, logLevel="info") {
+  logAsJSON(message: string, data: Record<string, string> | Error | any, context: string, logLevel="info") {
     if (data instanceof Error) {
       data = errJSON(data);
     } else if (typeof data !== "object") {
@@ -77,33 +85,33 @@ class Logger
     }
 
     const toLogToRedis = ["error", "fatal"];
-    if (this.logErrorsToRedis && toLogToRedis.includes(logLevel)) {
+    if (this.logErrorsToRedis && this.crawlState && toLogToRedis.includes(logLevel)) {
       this.crawlState.logError(string);
     }
   }
 
-  info(message, data={}, context="general") {
+  info(message: string, data={}, context="general") {
     this.logAsJSON(message, data, context);
   }
 
-  error(message, data={}, context="general") {
+  error(message: string, data={}, context="general") {
     this.logAsJSON(message, data, context, "error");
   }
 
-  warn(message, data={}, context="general") {
+  warn(message: string, data={}, context="general") {
     this.logAsJSON(message, data, context, "warn");
   }
 
-  debug(message, data={}, context="general") {
+  debug(message: string, data={}, context="general") {
     if (this.debugLogging) {
       this.logAsJSON(message, data, context, "debug");
     }
   }
 
-  fatal(message, data={}, context="general", exitCode=17) {
+  fatal(message: string, data={}, context="general", exitCode=17) {
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
 
-    async function markFailedAndEnd(crawlState) {
+    async function markFailedAndEnd(crawlState: RedisCrawlState) {
       await crawlState.setStatus("failed");
       await crawlState.setEndTime();
     }

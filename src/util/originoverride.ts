@@ -1,10 +1,12 @@
+import { HTTPRequest, Page } from "puppeteer-core";
 import { errJSON, logger } from "./logger.js";
+import { Browser } from "./browser.js";
 
 export class OriginOverride
 {
   originOverride: {origUrl: URL, destUrl: URL}[];
 
-  constructor(originOverride) {
+  constructor(originOverride: string[]) {
     this.originOverride = originOverride.map((override) => {
       let [orig, dest] = override.split("=");
       const origUrl = new URL(orig);
@@ -14,8 +16,8 @@ export class OriginOverride
     });
   }
 
-  async initPage(browser, page) {
-    const onRequest = async (request) => {
+  async initPage(browser: Browser, page: Page) {
+    const onRequest = async (request: HTTPRequest) => {
       try {
         const url = request.url();
 
@@ -30,12 +32,13 @@ export class OriginOverride
           }
         }
 
-        if (!newUrl) {
+        if (!newUrl || !orig) {
           request.continue({}, -1);
           return;
         }
 
         const headers = new Headers(request.headers());
+
         headers.set("host", orig.host);
         if (headers.get("origin")) {
           headers.set("origin", orig.origin);

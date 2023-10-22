@@ -9,7 +9,7 @@ import path from "path";
 import { logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
-import puppeteer from "puppeteer-core";
+import puppeteer, { Frame, HTTPRequest, Page, PuppeteerLaunchOptions, Viewport } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 
 
@@ -18,10 +18,10 @@ export class Browser
 {
   profileDir: string;
   customProfile = false;
-  emulateDevice = null;
+  emulateDevice : Record<string, any> | null = null;
 
-  browser?: PptrBrowser = null;
-  firstCDP: CDPSession = null;
+  browser?: PptrBrowser | null = null;
+  firstCDP: CDPSession | null = null;
 
   recorders: any[] = [];
 
@@ -29,7 +29,8 @@ export class Browser
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
   }
 
-  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}, ondisconnect = null}) {
+  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}, ondisconnect = null} :
+               {profileUrl: string, chromeOptions: Record<string, any>, signals: boolean, headless: boolean, emulateDevice?: Record<string, any>, ondisconnect?: Function | null}) {
     if (this.isLaunched()) {
       return;
     }
@@ -50,7 +51,7 @@ export class Browser
       defaultViewport = {width: Number(geom[0]), height: Number(geom[1])};
     }
 
-    const launchOpts = {
+    const launchOpts : PuppeteerLaunchOptions = {
       args,
       headless: headless ? "new" : false,
       executablePath: this.getBrowserExe(),
@@ -69,7 +70,7 @@ export class Browser
     await this._init(launchOpts, ondisconnect);
   }
 
-  async setupPage({page}) {
+  async setupPage({page} : {page: Page}) {
     await this.addInitScript(page, "Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
     if (this.customProfile) {
@@ -79,7 +80,7 @@ export class Browser
     }
   }
 
-  async loadProfile(profileFilename) {
+  async loadProfile(profileFilename: string) : Promise<boolean> {
     const targetFilename = "/tmp/profile.tar.gz";
 
     if (profileFilename &&
@@ -99,6 +100,7 @@ export class Browser
 
       if (!storage) {
         logger.fatal("Profile specified relative to s3 storage, but no S3 storage defined");
+        return false;
       }
 
       await storage.downloadFile(profileFilename.slice(1), targetFilename);
@@ -118,7 +120,7 @@ export class Browser
     return false;
   }
 
-  saveProfile(profileFilename) {
+  saveProfile(profileFilename: string) {
     child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {cwd: this.profileDir});
   }
 
@@ -148,11 +150,17 @@ export class Browser
   }
 
   getDefaultUA() {
-    let version = process.env.BROWSER_VERSION;
+    let version : string | undefined = process.env.BROWSER_VERSION;
 
     try {
-      version = child_process.execFileSync(this.getBrowserExe(), ["--version"], {encoding: "utf8"});
-      version = version.match(/[\d.]+/)[0];
+      const browser = this.getBrowserExe();
+      if (browser) {
+        version = child_process.execFileSync(browser, ["--version"], {encoding: "utf8"});
+        const match = version && version.match(/[\d.]+/);
+        if (match) {
+          version = match[0];
+        }
+      }
     } catch(e) {
       console.error(e);
     }
@@ -167,13 +175,11 @@ export class Browser
         return file;
       }
     }
-
-    return null;
   }
 
-  async evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName) {
+  async evaluateWithCLI_(cdp: CDPSession, frame: Frame, cdpContextId: number, funcString: string, logData: Record<string, string>, contextName: string) {
     const frameUrl = frame.url();
-    let details = {frameUrl, ...logData};
+    let details : Record<string, any> = {frameUrl, ...logData};
 
     if (!frameUrl || frame.isDetached()) {
       logger.info("Run Script Skipped, frame no longer attached or has no URL", details, contextName);
@@ -225,11 +231,11 @@ export class Browser
     }
   }
 
-  addInitScript(page, script) {
+  addInitScript(page: Page, script: string) {
     return page.evaluateOnNewDocument(script);
   }
 
-  async _init(launchOpts, ondisconnect = null) {
+  async _init(launchOpts: PuppeteerLaunchOptions, ondisconnect : Function | null = null) {
     this.browser = await puppeteer.launch(launchOpts);
 
     const target = this.browser.target();
@@ -251,15 +257,23 @@ export class Browser
     const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
 
     const p = new Promise<Target>((resolve) => {
-      const listener = (target) => {
+      const listener = (target: Target) => {
         if (target.url() === startPage) {
           resolve(target);
-          this.browser.removeListener("targetcreated", listener);
+          if (this.browser) {
+            this.browser.removeListener("targetcreated", listener);
+          }
         }
       };
 
-      this.browser.on("targetcreated", listener);
+      if (this.browser) {
+        this.browser.on("targetcreated", listener);
+      }
     });
+
+    if (!this.firstCDP) {
+      throw new Error("CDP missing");
+    }
 
     try {
       await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
@@ -280,9 +294,9 @@ export class Browser
 
     const device = this.emulateDevice;
 
-    if (device) {
+    if (device && page) {
       if (device.viewport && device.userAgent) {
-        await page.emulate(device);
+        await page.emulate(device as any);
       } else if (device.userAgent) {
         await page.setUserAgent(device.userAgent);
       }
@@ -294,8 +308,16 @@ export class Browser
   }
 
   async serviceWorkerFetch() {
+    if (!this.firstCDP) {
+      return;
+    }
+
     this.firstCDP.on("Fetch.requestPaused", async (params) => {
       const { frameId, requestId, networkId, request } = params;
+
+      if (!this.firstCDP) {
+        throw new Error("CDP missing");
+      }
 
       if (networkId) {
         try {
@@ -338,30 +360,30 @@ export class Browser
     await this.firstCDP.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
   }
 
-  async evaluateWithCLI(_, frame, cdp, funcString, logData, contextName) {
+  async evaluateWithCLI(_: unknown, frame: Frame, cdp: CDPSession, funcString: string, logData: Record<string, any>, contextName: string) {
     const context = await frame.executionContext();
     cdp = context._client;
     const cdpContextId = context._contextId;
     return await this.evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName);
   }
 
-  interceptRequest(page, callback) {
+  interceptRequest(page: Page, callback: (event: HTTPRequest) => void) {
     page.on("request", callback);
   }
 
-  async waitForNetworkIdle(page, params) {
+  async waitForNetworkIdle(page: Page, params: {timeout?: number}) {
     return await page.waitForNetworkIdle(params);
   }
 
-  async setViewport(page, params) {
+  async setViewport(page: Page, params: Viewport) {
     await page.setViewport(params);
   }
 
-  async getCookies(page) {
+  async getCookies(page: Page) {
     return await page.cookies();
   }
 
-  async setCookies(page, cookies) {
+  async setCookies(page: Page, cookies: any) {
     return await page.setCookie(...cookies);
   }
 }

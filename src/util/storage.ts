@@ -26,9 +26,10 @@ export class S3StorageSync
 
   userId: string;
   crawlId: string;
-  webhookUrl: string;
+  webhookUrl?: string;
 
-  constructor(urlOrData, {webhookUrl, userId, crawlId} : {webhookUrl: string, userId: string, crawlId: string}) {
+  constructor(urlOrData: string | any, {webhookUrl, userId, crawlId} : 
+      {webhookUrl?: string, userId: string, crawlId: string}) {
     let url;
     let accessKey;
     let secretKey;
@@ -70,7 +71,7 @@ export class S3StorageSync
     this.webhookUrl = webhookUrl;
   }
 
-  async uploadFile(srcFilename, targetFilename) {
+  async uploadFile(srcFilename: string, targetFilename: string) {
     const fileUploadInfo = {
       "bucket": this.bucketName,
       "crawlId": this.crawlId,
@@ -87,11 +88,11 @@ export class S3StorageSync
     return {"path": targetFilename, "hash": finalHash, "bytes": size};
   }
 
-  async downloadFile(srcFilename, destFilename) {
+  async downloadFile(srcFilename: string, destFilename: string) {
     await this.client.fGetObject(this.bucketName, this.objectPrefix + srcFilename, destFilename);
   }
 
-  async uploadCollWACZ(srcFilename, targetFilename, completed = true) {
+  async uploadCollWACZ(srcFilename: string, targetFilename: string, completed = true) {
     const resource = await this.uploadFile(srcFilename, targetFilename);
     logger.info("WACZ S3 file upload resource", resource, "s3Upload");
 
@@ -139,8 +140,8 @@ export function initStorage() {
 
   const opts = {
     crawlId: process.env.CRAWL_ID || os.hostname(),
-    webhookUrl: process.env.WEBHOOK_URL,
-    userId: process.env.STORE_USER,
+    webhookUrl: process.env.WEBHOOK_URL || "",
+    userId: process.env.STORE_USER || "",
   };
 
   logger.info("Initing Storage...");
