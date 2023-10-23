@@ -266,7 +266,12 @@ export class Crawler {
 
     const subprocesses = [];
 
-    subprocesses.push(child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio}));
+    let redisArgs = [];
+    if (this.params.debugAccessRedis) {
+      redisArgs = ["--protected-mode", "no"];
+    }
+
+    subprocesses.push(child_process.spawn("redis-server", redisArgs, {cwd: "/tmp/", stdio: redisStdio}));
 
     opts.env = {
       ...process.env,
