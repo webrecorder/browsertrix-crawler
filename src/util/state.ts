@@ -3,6 +3,7 @@ import Redis, { Result, Callback } from "ioredis";
 import { logger } from "./logger.js";
 
 import { MAX_DEPTH } from "./constants.js";
+import { ScopedSeed } from "./seeds.js";
 
 
 // ============================================================================
@@ -44,7 +45,7 @@ export class PageState
 
   logDetails = {};
 
-  constructor(redisData) {
+  constructor(redisData: {url: string, seedId: number, depth: number, extraHops: number}) {
     this.url = redisData.url;
     this.seedId = redisData.seedId;
     this.depth = redisData.depth;
@@ -124,7 +125,7 @@ export class RedisCrawlState
   startkey: string;
   endkey: string;
   
-  constructor(redis, key, maxPageTime, uid) {
+  constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
 
     //this.maxRetryPending = 1;
@@ -151,7 +152,7 @@ export class RedisCrawlState
     this._initLuaCommands(this.redis);
   }
 
-  _initLuaCommands(redis) {
+  _initLuaCommands(redis: Redis) {
     redis.defineCommand("addqueue", {
       numberOfKeys: 3,
       lua: `
@@ -282,25 +283,25 @@ return 0;
     return await this.redis.rpush(`${this.endkey}:${this.uid}`, endTime);
   }
 
-  async markStarted(url) {
+  async markStarted(url: string) {
     const started = this._timestamp();
 
     return await this.redis.markstarted(this.pkey, this.pkey + ":" + url, url, started, this.maxPageTime, this.uid);
   }
 
-  async markFinished(url) {
+  async markFinished(url: string) {
     await this.redis.call("hdel", this.pkey, url);
 
     return await this.redis.incr(this.dkey);
   }
 
-  async markFailed(url) {
+  async markFailed(url: string) {
     await this.redis.movefailed(this.pkey, this.fkey, url, "1", "failed");
 
     return await this.redis.incr(this.dkey);
   }
 
-  recheckScope(data, seeds) {
+  recheckScope(data: {url: string, depth: number, extraHops: number, seedId: number}, seeds: ScopedSeed[]) {
     const seed = seeds[data.seedId];
 
     return seed.isIncluded(data.url, data.depth, data.extraHops);
@@ -310,7 +311,7 @@ return 0;
     return (await this.queueSize() == 0) && (await this.numDone() > 0);
   }
 
-  async setStatus(status_) {
+  async setStatus(status_: string) {
     await this.redis.hset(`${this.key}:status`, this.uid, status_);
   }
 
@@ -318,7 +319,7 @@ return 0;
     return await this.redis.hget(`${this.key}:status`, this.uid);
   }
 
-  async setArchiveSize(size) {
+  async setArchiveSize(size: number) {
     return await this.redis.hset(`${this.key}:size`, this.uid, size);
   }
 
@@ -384,7 +385,7 @@ return 0;
     return new PageState(data);
   }
 
-  async has(url) {
+  async has(url: string) {
     return !!await this.redis.sismember(this.skey, url);
   }
 
@@ -399,11 +400,11 @@ return 0;
     return {done, queued, pending, failed, errors};
   }
 
-  _getScore(data) {
+  _getScore(data: {depth: number, extraHops: number}) {
     return (data.depth || 0) + (data.extraHops || 0) * MAX_DEPTH;
   }
 
-  async _iterSortedKey(key, inc = 100) {
+  async _iterSortedKey(key: string, inc = 100) {
     const results = [];
 
     const len = await this.redis.zcard(key);
@@ -416,7 +417,7 @@ return 0;
     return results;
   }
 
-  async _iterListKeys(key, inc = 100) {
+  async _iterListKeys(key: string, inc = 100) {
     const results = [];
 
     const len = await this.redis.llen(key);
@@ -428,7 +429,7 @@ return 0;
     return results;
   }
 
-  async load(state, seeds, checkScope) {
+  async load(state: Record<string, any>, seeds: ScopedSeed[], checkScope: boolean) {
     const seen = [];
 
     // need to delete existing keys, if exist to fully reset state
@@ -490,7 +491,7 @@ return 0;
 
   async numDone() {
     const done = await this.redis.get(this.dkey);
-    return parseInt(done);
+    return parseInt(done || "0");
   }
 
   async numSeen() {
@@ -528,7 +529,7 @@ return 0;
       for (const url of pendingUrls) {
         await this.redis.unlockpending(this.pkey + ":" + url, this.uid);
       }
-    } catch (e) {
+    } catch (e: any) {
       logger.error("Redis Del Pending Failed", e, "state");
     }
   }
@@ -555,15 +556,15 @@ return 0;
     return this._lastSize;
   }
 
-  async addIfNoDupe(key, value) {
+  async addIfNoDupe(key: string, value: string) {
     return await this.redis.sadd(key, value) === 1;
   }
 
-  async removeDupe(key, value) {
+  async removeDupe(key: string, value: string) {
     return await this.redis.srem(key, value);
   }
 
-  async logError(error) {
+  async logError(error: string) {
     return await this.redis.lpush(this.ekey, error);
   }
 }

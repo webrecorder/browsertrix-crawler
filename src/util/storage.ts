@@ -6,6 +6,7 @@ import util from "util";
 import os from "os";
 import { createHash } from "crypto";
 
+
 import Minio from "minio";
 
 import { initRedis } from "./redis.js";
@@ -149,12 +150,12 @@ export function initStorage() {
 }
 
 
-export async function getFileSize(filename) {
+export async function getFileSize(filename: string) {
   const stats = await fsp.stat(filename);
   return stats.size;
 }
 
-export async function getDirSize(dir) {
+export async function getDirSize(dir: string) {
   const { size, errors } = await getFolderSize(dir);
   if (errors && errors.length) {
     logger.warn("Size check errors", {errors}, "sizecheck");
@@ -162,8 +163,8 @@ export async function getDirSize(dir) {
   return size;
 }
 
-export async function checkDiskUtilization(params, archiveDirSize, dfOutput=null) {
-  const diskUsage = await getDiskUsage("/crawls", dfOutput);
+export async function checkDiskUtilization(params: Record<string, any>, archiveDirSize: number, dfOutput=null) {
+  const diskUsage : Record<string, string> = await getDiskUsage("/crawls", dfOutput);
   const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
 
   // Check that disk usage isn't already above threshold
@@ -209,7 +210,7 @@ export async function checkDiskUtilization(params, archiveDirSize, dfOutput=null
   };
 }
 
-export async function getDFOutput(path) {
+export async function getDFOutput(path: string) {
   const exec = util.promisify(child_process.exec);
   const res = await exec(`df ${path}`);
   return res.stdout;
@@ -221,7 +222,7 @@ export async function getDiskUsage(path="/crawls", dfOutput = null) {
   const keys = lines[0].split(/\s+/ig);
   const rows = lines.slice(1).map(line => {
     const values = line.split(/\s+/ig);
-    return keys.reduce((o, k, index) => {
+    return keys.reduce((o: Record<string, any>, k, index) => {
       o[k] = values[index];
       return o;
     }, {});
@@ -229,11 +230,11 @@ export async function getDiskUsage(path="/crawls", dfOutput = null) {
   return rows[0];
 }
 
-export function calculatePercentageUsed(used, total) {
+export function calculatePercentageUsed(used: number, total: number) {
   return Math.round((used/total) * 100);
 }
 
-function checksumFile(hashName, path) {
+function checksumFile(hashName: string, path: string) {
   return new Promise((resolve, reject) => {
     const hash = createHash(hashName);
     const stream = fs.createReadStream(path);
@@ -243,7 +244,7 @@ function checksumFile(hashName, path) {
   });
 }
 
-export function interpolateFilename(filename, crawlId) {
+export function interpolateFilename(filename: string, crawlId: string) {
   filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.-]/g, ""));
   filename = filename.replace("@hostname", os.hostname());
   filename = filename.replace("@hostsuffix", os.hostname().slice(-14));

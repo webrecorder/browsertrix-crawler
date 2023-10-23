@@ -361,7 +361,7 @@ export class Browser
   }
 
   async evaluateWithCLI(_: unknown, frame: Frame, cdp: CDPSession, funcString: string, logData: Record<string, any>, contextName: string) {
-    const context = await frame.executionContext();
+    const context = await (frame as any).executionContext();
     cdp = context._client;
     const cdpContextId = context._contextId;
     return await this.evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName);
