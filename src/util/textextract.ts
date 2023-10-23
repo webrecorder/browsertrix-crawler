@@ -1,14 +1,21 @@
+type DOMNode = {
+  children: DOMNode[];
+  nodeName: string;
+  nodeValue: string;
+  contentDocument?: DOMNode;
+}
+
 export class TextExtract {
   
-  dom: {root: string};
+  dom: {root: DOMNode};
 
-  constructor(dom){
+  constructor(dom: {root: DOMNode}){
     this.dom = dom;
   }
 
-  async parseText(node, metadata, accum) {
+  async parseText(node: DOMNode, metadata: Record<string, string> | null, accum: string[]) {
     const SKIPPED_NODES = ["head", "script", "style", "header", "footer", "banner-div", "noscript"];
-    const EMPTY_LIST = [];
+    const EMPTY_LIST : DOMNode[] = [];
     const TEXT = "#text";
     const TITLE = "title";
 
@@ -26,7 +33,7 @@ export class TextExtract {
         accum.push(value);
       }
     } else if (name === TITLE) {
-      const title = [];
+      const title : string[] = [];
 
       for (let child of children) {
         this.parseText(child, null, title);
@@ -49,7 +56,7 @@ export class TextExtract {
   }
 
   async parseTextFromDom() {
-    const accum = [];
+    const accum : string[] = [];
     const metadata = {};
 
     this.parseText(this.dom.root, metadata, accum);

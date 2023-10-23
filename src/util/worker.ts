@@ -1,5 +1,6 @@
 import os from "os";
 
+// @ts-ignore
 import { v4 as uuidv4 } from "uuid";
 
 import { logger, errJSON } from "./logger.js";
@@ -7,6 +8,7 @@ import { sleep, timedRun } from "./timing.js";
 import { Recorder } from "./recorder.js";
 import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
+import { PageState } from "./state.js";
 
 const MAX_REUSE = 5;
 
@@ -15,7 +17,7 @@ const TEARDOWN_TIMEOUT = 10;
 const FINISHED_TIMEOUT = 60;
 
 // ===========================================================================
-export function runWorkers(crawler, numWorkers, maxPageTime, collDir) {
+export function runWorkers(crawler: any, numWorkers: number, maxPageTime: number, collDir: string) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
   const workers = [];
@@ -36,7 +38,7 @@ export function runWorkers(crawler, numWorkers, maxPageTime, collDir) {
   }
 
   for (let i = 0; i < numWorkers; i++) {
-    workers.push(new PageWorker(i + offset, crawler, maxPageTime, collDir));
+    workers.push(new PageWorker(String(i + offset), crawler, maxPageTime, collDir));
   }
 
   return Promise.allSettled(workers.map((worker) => worker.run()));
@@ -44,14 +46,18 @@ export function runWorkers(crawler, numWorkers, maxPageTime, collDir) {
 
 
 // ===========================================================================
-type OptsType = {
+type WorkerOpts = Record<string, any> & {
   page: Page;
   cdp: CDPSession;
   workerid: string;
   callbacks: Record<string, Function>;
-  directFetchCapture?: (url: string) => Promise<{fetched: boolean, mime: string}>;
+  directFetchCapture?: ((url: string) => Promise<{fetched: boolean, mime: string}>) | null;
 };
 
+// ===========================================================================
+type WorkerState = WorkerOpts & {
+  data: PageState
+};
 
 // ===========================================================================
 export class PageWorker
@@ -61,12 +67,12 @@ export class PageWorker
   maxPageTime: number;
 
   reuseCount = 0;
-  page?: Page;
-  cdp?: CDPSession;
+  page?: Page | null;
+  cdp?: CDPSession | null;
 
   callbacks?: Record<string, Function>;
 
-  opts?: OptsType;
+  opts?: WorkerOpts;
 
   logDetails: Record<string, any> = {};
 
@@ -76,7 +82,7 @@ export class PageWorker
 
   recorder: Recorder;
 
-  constructor(id, crawler, maxPageTime, collDir) {
+  constructor(id: string, crawler: any, maxPageTime: number, collDir: string) {
     this.id = id;
     this.crawler = crawler;
     this.maxPageTime = maxPageTime;
@@ -128,9 +134,9 @@ export class PageWorker
     }
   }
 
-  isSameOrigin(url) {
+  isSameOrigin(url: string) {
     try {
-      const currURL = new URL(this.page.url());
+      const currURL = new URL(this.page ? this.page.url() : "");
       const newURL = new URL(url);
       return currURL.origin === newURL.origin;
     } catch (e) {
@@ -138,8 +144,8 @@ export class PageWorker
     }
   }
 
-  async initPage(url) {
-    if (!this.crashed && this.page && ++this.reuseCount <= MAX_REUSE && this.isSameOrigin(url)) {
+  async initPage(url: string) : Promise<WorkerOpts> {
+    if (!this.crashed && this.page && this.opts && ++this.reuseCount <= MAX_REUSE && this.isSameOrigin(url)) {
       logger.debug("Reusing page", {reuseCount: this.reuseCount, ...this.logDetails}, "worker");
       return this.opts;
     } else if (this.page) {
@@ -171,10 +177,10 @@ export class PageWorker
         this.page = page;
         this.cdp = cdp;
         this.callbacks = {};
-        const directFetchCapture = this.recorder ? (x) => this.recorder.directFetchCapture(x) : null;
+        const directFetchCapture = this.recorder ? (x: string) => this.recorder.directFetchCapture(x) : null;
         this.opts = {
-          page: this.page,
-          cdp: this.cdp,
+          page,
+          cdp,
           workerid,
           callbacks: this.callbacks,
           directFetchCapture,
@@ -188,15 +194,17 @@ export class PageWorker
         this.crashed = false;
         this.crashBreak = new Promise((resolve, reject) => this.markCrashed = reject);
 
-        this.logDetails = {page: this.page.url(), workerid};
+        this.logDetails = {page: page.url(), workerid};
 
         // more serious page crash, mark as failed
-        this.page.on("error", (err) => {
+        page.on("error", (err: any) => {
           // ensure we're still on this page, otherwise ignore!
           if (this.page === page) {
             logger.error("Page Crashed", {...errJSON(err), ...this.logDetails}, "worker");
             this.crashed = true;
-            this.markCrashed("crashed");
+            if (this.markCrashed) {
+              this.markCrashed("crashed");
+            }
           }
         });
 
@@ -224,9 +232,11 @@ export class PageWorker
         }
       }
     }
+
+    throw new Error("no page available, shouldn't get here");
   }
 
-  async crawlPage(opts) {
+  async crawlPage(opts: WorkerState) {
     const res = await this.crawler.crawlPage(opts);
     if (this.recorder) {
       await this.recorder.finishPage();
@@ -234,7 +244,7 @@ export class PageWorker
     return res;
   }
 
-  async timedCrawlPage(opts) {
+  async timedCrawlPage(opts: WorkerState) {
     const workerid = this.id;
     const { data } = opts;
     const { url } = data;
@@ -264,7 +274,7 @@ export class PageWorker
       ]);
 
     } catch (e) {
-      if (e.message !== "logged" && !this.crashed) {
+      if (e instanceof Error && e.message !== "logged" && !this.crashed) {
         logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
       }
     } finally {

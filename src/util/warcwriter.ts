@@ -50,7 +50,7 @@ export class WARCWriter implements IndexerOffsetLength
     }
   }
 
-  async writeRecordPair(responseRecord: WARCRecord, requestRecord: WARCRecord, responseSerializer: WARCSerializer | undefined) {
+  async writeRecordPair(responseRecord: WARCRecord, requestRecord: WARCRecord, responseSerializer: WARCSerializer | undefined = undefined) {
     const opts = {gzip: this.gzip};
 
     if (!responseSerializer) {

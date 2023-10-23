@@ -15,10 +15,10 @@ export class ScopedSeed
   url: string;
   scopeType: ScopeType;
   include: RegExp[];
-  exclude?: RegExp[] = [];
+  exclude: RegExp[] = [];
   allowHash = false;
   depth = -1;
-  sitemap?: string;
+  sitemap?: string | null;
   extraHops = 0;
 
   maxExtraHops = 0;
@@ -59,7 +59,7 @@ export class ScopedSeed
   }
 
   //parseRx(value? : union[string[], string, RegExp[]]) -> RegExp[] {
-  parseRx(value) {
+  parseRx(value : any) {
     if (value === null || value === undefined || value === "") {
       return [];
     } else if (!(value instanceof Array)) {
@@ -69,7 +69,7 @@ export class ScopedSeed
     }
   }
 
-  parseUrl(url, logDetails = {}) {
+  parseUrl(url: string, logDetails = {}) {
     let parsedUrl = null;
     try {
       parsedUrl = new URL(url.trim());
@@ -86,18 +86,18 @@ export class ScopedSeed
     return parsedUrl;
   }
 
-  resolveSiteMap(sitemap) {
+  resolveSiteMap(sitemap: boolean) : string | null {
     if (sitemap === true) {
       const url = new URL(this.url);
       url.pathname = "/sitemap.xml";
       return url.href;
     }
 
-    return sitemap;
+    return null;
   }
 
-  scopeFromType(scopeType, parsedUrl) : [RegExp[], boolean] {
-    let include : RegExp[];
+  scopeFromType(scopeType: ScopeType, parsedUrl: URL) : [RegExp[], boolean] {
+    let include : RegExp[] = [];
     let allowHash = false;
 
     switch (scopeType) {
@@ -137,26 +137,26 @@ export class ScopedSeed
     return [include, allowHash];
   }
 
-  isAtMaxDepth(depth) {
+  isAtMaxDepth(depth: number) {
     return depth >= this.maxDepth;
   }
 
-  isIncluded(url, depth, extraHops = 0, logDetails = {}) {
+  isIncluded(url: string, depth: number, extraHops = 0, logDetails = {}) {
     if (depth > this.maxDepth) {
       return false;
     }
 
-    url = this.parseUrl(url, logDetails);
-    if (!url) {
+    const urlParsed = this.parseUrl(url, logDetails);
+    if (!urlParsed) {
       return false;
     }
 
     if (!this.allowHash) {
       // remove hashtag
-      url.hash = "";
+      urlParsed.hash = "";
     }
 
-    url = url.href;
+    url = urlParsed.href;
 
     if (url === this.url) {
       return true;
@@ -199,11 +199,11 @@ export class ScopedSeed
   }
 }
 
-export function rxEscape(string) {
+export function rxEscape(string: string) {
   return string.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 }
 
-export function urlRxEscape(url, parsedUrl) {
+export function urlRxEscape(url: string, parsedUrl: URL) {
   return rxEscape(url).replace(parsedUrl.protocol, "https?:");
 }
 

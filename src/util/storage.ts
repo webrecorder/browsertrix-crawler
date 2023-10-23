@@ -6,12 +6,13 @@ import util from "util";
 import os from "os";
 import { createHash } from "crypto";
 
-
+// @ts-ignore
 import Minio from "minio";
 
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 
+// @ts-ignore
 import getFolderSize from "get-folder-size";
 
 

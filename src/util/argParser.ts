@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 
+// @ts-ignore
 import yaml from "js-yaml";
 import { KnownDevices as devices } from "puppeteer-core";
 import yargs, { Options } from "yargs";
@@ -411,7 +412,7 @@ class ArgParser {
     };
   }
 
-  parseArgs(argv) {
+  parseArgs(argv: string[]) {
     argv = argv || process.argv;
 
     if (process.env.CRAWL_ARGS) {
@@ -436,13 +437,14 @@ class ArgParser {
     return {parsed, origConfig};
   }
 
-  splitCrawlArgsQuoteSafe(crawlArgs) {
+  splitCrawlArgsQuoteSafe(crawlArgs: string) : string[] {
     // Split process.env.CRAWL_ARGS on spaces but retaining spaces within double quotes
     const regex = /"[^"]+"|[^\s]+/g;
-    return crawlArgs.match(regex).map(e => e.replace(/"(.+)"/, "$1"));
+    const res = crawlArgs.match(regex);
+    return res ? res.map(e => e.replace(/"(.+)"/, "$1")) : [];
   }
 
-  validateArgs(argv) {
+  validateArgs(argv: Record<string, any>) {
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
 
     // Check that the collection name is valid.
@@ -467,7 +469,7 @@ class ArgParser {
     if (argv.screenshot) {
       const passedScreenshotTypes = argv.screenshot.split(",");
       argv.screenshot = [];
-      passedScreenshotTypes.forEach((element) => {
+      passedScreenshotTypes.forEach((element: string) => {
         if (element in screenshotTypes) {
           argv.screenshot.push(element);
         } else {
@@ -486,7 +488,7 @@ class ArgParser {
     if (typeof argv.behaviors !== "object"){
       argv.behaviors = argv.behaviors.split(",");
     }
-    argv.behaviors.forEach((x) => behaviorOpts[x] = true);
+    argv.behaviors.forEach((x: string) => behaviorOpts[x] = true);
     behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 
@@ -496,7 +498,7 @@ class ArgParser {
 
 
     if (argv.mobileDevice) {
-      argv.emulateDevice = devices[argv.mobileDevice.replace("-", " ")];
+      argv.emulateDevice = (devices as Record<string, any>)[argv.mobileDevice.replace("-", " ")];
       if (!argv.emulateDevice) {
         logger.fatal("Unknown device: " + argv.mobileDevice);
       }
@@ -570,6 +572,6 @@ class ArgParser {
   }
 }
 
-export function parseArgs(argv) {
+export function parseArgs(argv: string[]) {
   return new ArgParser().parseArgs(argv);
 }

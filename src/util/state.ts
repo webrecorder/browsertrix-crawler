@@ -405,7 +405,7 @@ return 0;
   }
 
   async _iterSortedKey(key: string, inc = 100) {
-    const results = [];
+    const results : string[] = [];
 
     const len = await this.redis.zcard(key);
 
@@ -418,7 +418,7 @@ return 0;
   }
 
   async _iterListKeys(key: string, inc = 100) {
-    const results = [];
+    const results : string[] = [];
 
     const len = await this.redis.llen(key);
 
@@ -430,7 +430,7 @@ return 0;
   }
 
   async load(state: Record<string, any>, seeds: ScopedSeed[], checkScope: boolean) {
-    const seen = [];
+    const seen : string[] = [];
 
     // need to delete existing keys, if exist to fully reset state
     await this.redis.del(this.qkey);

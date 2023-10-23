@@ -4,10 +4,18 @@ import * as warcio from "warcio";
 import sharp from "sharp";
 
 import { logger, errJSON } from "./logger.js";
+import { Browser } from "./browser.js";
+import { Page } from "puppeteer-core";
 
 // ============================================================================
 
-export const screenshotTypes = {
+type ScreenShotType = {
+  type: string;
+  omitBackground: boolean;
+  fullPage: boolean;
+}
+
+export const screenshotTypes : Record<string, ScreenShotType> = {
   "view": {
     type: "png",
     omitBackground: true,
@@ -27,14 +35,15 @@ export const screenshotTypes = {
 
 
 export class Screenshots {
-  browser: any;
+  browser: Browser;
   page: any;
   url: string;
   directory: string;
   warcName: string;
   date: Date;
 
-  constructor({browser, page, url, date, directory}) {
+  constructor({browser, page, url, date, directory} : 
+              {browser: Browser, page: Page, url: string, date?: Date, directory: string}) {
     this.browser = browser;
     this.page = page;
     this.url = url;
@@ -78,13 +87,13 @@ export class Screenshots {
     }
   }
 
-  async writeBufferToWARC(screenshotBuffer, screenshotType, imageType) {
+  async writeBufferToWARC(screenshotBuffer: Uint8Array, screenshotType: string, imageType: string) {
     const warcRecord = await this.wrap(screenshotBuffer, screenshotType, imageType);
     const warcRecordBuffer = await warcio.WARCSerializer.serialize(warcRecord, {gzip: true});
     fs.appendFileSync(this.warcName, warcRecordBuffer);
   }
 
-  async wrap(buffer, screenshotType="screenshot", imageType="png") {
+  async wrap(buffer: Uint8Array, screenshotType="screenshot", imageType="png") {
     const warcVersion = "WARC/1.1";
     const warcRecordType = "resource";
     const warcHeaders = {"Content-Type": `image/${imageType}`};

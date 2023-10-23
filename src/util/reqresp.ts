@@ -1,4 +1,5 @@
-import { getStatusText } from "@webrecorder/wabac/src/utils.js";
+// @ts-ignore
+import { getStatusText } from "@webrecorder/wabac/src/utils";
 
 const CONTENT_LENGTH = "content-length";
 const CONTENT_TYPE = "content-type";
