@@ -381,7 +381,7 @@ that will take precedence over the `--extraHops`.
 
 #### Scope Rule Examples
 
-For example, the following seed will start on `https://example.com/startpage.html` and crawl all pages on the `https://example.com/` domain, except pages that match the regexes `example.com/skip.*` or `example.com/search.*`
+For example, the following seed will start on `https://example.com/startpage.html` and crawl all pages on the `https://example.com/` domain. With the .* regular expression, any character after will be exclude except pages that match the regexes `example.com/skip.*` or `example.com/search.*`. It will also match characters before if placed on the other end of the string, this means that example.com/skip/postfeed will also be excluded.
 
 ```
 seeds:
@@ -390,11 +390,11 @@ seeds:
     exclude:
       - example.com/skip.*
       - example.com/search.*
+      - .*postfeed&
 
 ```
 
-In the following example, the scope include regexes will crawl all page URLs that match `example.com/(crawl-this|crawl-that)`,
-but skip URLs that end with 'skip-me'. For example, `https://example.com/crawl-this/page.html` would be crawled, but `https://example.com/crawl-this/pages/skip` would not be.
+In the following example, the scope include regexes will crawl all page URLs that match `example.com/(crawl-this|crawl-that)` since the | indicates an "or". URLs that match skip$ will be excluded but skip-me wouldn't. For example, `https://example.com/crawl-this/page.html` and `https://example.com/crawl-this/pages/skipme/not` would be crawled, but `https://example.com/crawl-this/pages/skip` would not be.
 
 ```
 seeds:
@@ -404,11 +404,23 @@ seeds:
       - skip$
 ```
 
+It's possible to do more complex regular expressions. It will only target characters and numbers after search until the word ID= shows, and any numbers after the word ID will be matched. This means that https://example.com/search/6vH8R4TmID=5819 won't be crawled, but https://example.com/search/ID=5819, https://example.com/search/6vH8R4Tm and https://example.com/search/2o3Jq89cID=5ag8h19 will be crawled
+
+```
+seeds:
+  - url: https://the.example.com/startpage.html
+    scopeType: "host"
+    exclude:
+      - .*.example.com/search/[A-Za-z0-9]+ID=[0-9]+
+```
+
 The `include`, `exclude`, `scopeType` and `depth` settings can be configured per seed, or globally, for the entire crawl.
 
 The per-seed settings override the per-crawl settings, if any.
 
 The test suite [tests/scopes.test.js](tests/scopes.test.js) for additional examples of configuring scope inclusion and exclusion rules.
+
+It's important to note that the include and exclude rules will always have regular expressions in effect. This means that for your rules to match, you may have to escape special characters like ?
 
 ### Page Resource Block Rules
 
