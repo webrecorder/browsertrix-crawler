@@ -72,9 +72,12 @@ export class S3StorageSync
     await this.client.fPutObject(this.bucketName, this.objectPrefix + targetFilename, srcFilename);
 
     const {hash, crc32} = await checksumFile("sha256", srcFilename);
+    const path = targetFilename;
 
     const size = await getFileSize(srcFilename);
-    return {size, hash, crc32};
+
+    // for backwards compatibility, keep 'bytes'
+    return {path, size, hash, crc32, bytes: size};
   }
 
   async downloadFile(srcFilename, destFilename) {
