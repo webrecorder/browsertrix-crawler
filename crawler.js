@@ -138,7 +138,7 @@ export class Crawler {
     // override userAgent
     if (this.params.userAgent) {
       this.emulateDevice.userAgent = this.params.userAgent;
-      return;
+      return this.params.userAgent;
     }
 
     // if device set, it overrides the default Chrome UA
