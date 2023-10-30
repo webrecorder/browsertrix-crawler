@@ -10,19 +10,25 @@ export class BaseTextExtract extends WARCResourceWriter {
     this.lastText = null;
   }
 
-  async extractAndStoreText(resourceType, ignoreIfMatchesLast = false) {
+  async extractAndStoreText(resourceType, ignoreIfMatchesLast = false, saveToWarc = false) {
     try {
       const text = await this.doGetText();
+
       if (ignoreIfMatchesLast && text === this.lastText) {
+        this.lastText = this.text;
         logger.debug("Skipping, extracted text unchanged from last extraction", {url: this.url}, "text");
-        return false;
+        return {changed: false, text};
       }
-      this.lastText = text;
-      await this.writeBufferToWARC(new TextEncoder().encode(text), resourceType, "text/plain");
-      logger.debug(`Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.warcName}`);
-      return true;
+      if (saveToWarc) {
+        await this.writeBufferToWARC(new TextEncoder().encode(text), resourceType, "text/plain");
+        logger.debug(`Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.warcName}`);
+      }
+
+      this.lastText = this.text;
+      return {changed: true, text};
     } catch (e) {
       logger.debug("Error extracting text", e, "text");
+      return {changed: false, text: null};
     }
   }
 

@@ -514,9 +514,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (data.isHTMLPage) {
       textextract = new TextExtractViaSnapshot(cdp, {url, directory: archiveDir});
-      const text = await textextract.extractAndStoreText("text");
+      const {changed, text} = await textextract.extractAndStoreText("text", false, this.params.text.includes("to-warc"));
 
-      if (this.params.text) {
+      if (changed && text && this.params.text.includes("to-page")) {
         data.text = text;
       }
     }
@@ -543,8 +543,8 @@ self.__bx_behaviors.selectMainBehavior();
           data.loadState = LoadState.BEHAVIORS_DONE;
         }
 
-        if (textextract) {
-          await textextract.extractAndStoreText("textFinal", true);
+        if (textextract && this.params.text.includes("to-warc-final")) {
+          await textextract.extractAndStoreText("textFinal", true, true);
         }
       }
     }
