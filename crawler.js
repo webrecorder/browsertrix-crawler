@@ -543,7 +543,7 @@ self.__bx_behaviors.selectMainBehavior();
           data.loadState = LoadState.BEHAVIORS_DONE;
         }
 
-        if (textextract && this.params.text.includes("to-warc-final")) {
+        if (textextract && this.params.text.includes("final-to-warc")) {
           await textextract.extractAndStoreText("textFinal", true, true);
         }
       }
