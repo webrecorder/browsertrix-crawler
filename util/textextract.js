@@ -24,7 +24,7 @@ export class BaseTextExtract extends WARCResourceWriter {
         logger.debug(`Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.warcName}`);
       }
 
-      this.lastText = this.text;
+      this.lastText = text;
       return {changed: true, text};
     } catch (e) {
       logger.debug("Error extracting text", e, "text");
