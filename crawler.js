@@ -516,7 +516,7 @@ self.__bx_behaviors.selectMainBehavior();
       textextract = new TextExtractViaSnapshot(cdp, {url, directory: archiveDir});
       const {changed, text} = await textextract.extractAndStoreText("text", false, this.params.text.includes("to-warc"));
 
-      if (changed && text && this.params.text.includes("to-page")) {
+      if (changed && text && this.params.text.includes("to-pages")) {
         data.text = text;
       }
     }
@@ -1431,12 +1431,11 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (createNew) {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
-        if (this.params.text) {
-          header["hasText"] = true;
-          logger.debug("Text Extraction: Enabled");
+        header["hasText"] = this.params.text.includes("to-pages");
+        if (this.params.text.length) {
+          logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
-          header["hasText"] = false;
-          logger.debug("Text Extraction: Disabled");
+          logger.debug("Text Extraction: None");
         }
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);

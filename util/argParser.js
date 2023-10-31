@@ -464,7 +464,7 @@ class ArgParser {
 
     argv.screenshot = validateArrayOpts(argv.screenshot, "screenshot", Array.from(Object.keys(screenshotTypes)));
 
-    argv.text = validateArrayOpts(argv.screenshot, "text", EXTRACT_TEXT_TYPES);
+    argv.text = validateArrayOpts(argv.text, "text", EXTRACT_TEXT_TYPES);
 
     // log options
     argv.logging = argv.logging.split(",");
@@ -569,7 +569,7 @@ function validateArrayOpts(value, name, allowedValues) {
     return value;
   }
 
-  if (!(value instanceof String)) {
+  if (typeof(value) !== "string") {
     return [];
   }
 
