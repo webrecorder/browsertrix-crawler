@@ -49,7 +49,7 @@ export class TextExtractViaSnapshot extends BaseTextExtract {
     const TEXT_NODE = 3;
     const ELEMENT_NODE = 1;
 
-    const SKIPPED_NODES = ["SCRIPT", "STYLE", "HEADER", "FOOTER", "BANNER-DIV", "NOSCRIPT"];
+    const SKIPPED_NODES = ["SCRIPT", "STYLE", "HEADER", "FOOTER", "BANNER-DIV", "NOSCRIPT", "TITLE"];
 
     const {strings, documents} = result;
 

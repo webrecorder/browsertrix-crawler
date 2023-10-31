@@ -456,7 +456,7 @@ class ArgParser {
     }
 
     // split text options
-    if (argv.text === "") {
+    if (argv.text === "" || argv.text === "true") {
       argv.text = "to-pages";
     }
 
