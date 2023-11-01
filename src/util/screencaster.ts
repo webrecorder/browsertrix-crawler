@@ -1,10 +1,12 @@
-import ws from "ws";
-import http from "http";
+import ws, { WebSocket } from "ws";
+import http, { IncomingMessage, ServerResponse } from "http";
 import url from "url";
 import fs from "fs";
 
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
+import { Duplex } from "stream";
+import { CDPSession, Page, Protocol } from "puppeteer-core";
 
 const indexHTML = fs.readFileSync(new URL("../html/screencast.html", import.meta.url), {encoding: "utf8"});
 
@@ -13,23 +15,21 @@ const indexHTML = fs.readFileSync(new URL("../html/screencast.html", import.meta
 class WSTransport
 {
   allWS = new Set<WebSocket>();
-  caster?: ScreenCaster;
+  caster!: ScreenCaster;
   wss: ws.Server;
   httpServer: any;
   
 
-  constructor(port) {
+  constructor(port: number) {
     this.allWS = new Set();
-
-    this.caster = null;
 
     this.wss = new ws.Server({ noServer: true });
 
-    this.wss.on("connection", (ws) => this.initWebSocket(ws));
+    this.wss.on("connection", (ws: WebSocket) => this.initWebSocket(ws));
 
     this.httpServer = http.createServer((...args) => this.handleRequest(...args));
-    this.httpServer.on("upgrade", (request, socket, head) => {
-      const pathname = url.parse(request.url).pathname;
+    this.httpServer.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) => {
+      const pathname = url.parse(request.url || "").pathname;
 
       if (pathname === "/ws") {
         this.wss.handleUpgrade(request, socket, head, (ws) => {
@@ -41,8 +41,8 @@ class WSTransport
     this.httpServer.listen(port);
   }
 
-  async handleRequest(req, res) {
-    const pathname = url.parse(req.url).pathname;
+  async handleRequest(req: IncomingMessage, res: ServerResponse) {
+    const pathname = url.parse(req.url || "").pathname;
     switch (pathname) {
     case "/":
       res.writeHead(200, {"Content-Type": "text/html"});
@@ -54,7 +54,7 @@ class WSTransport
     res.end("Not Found");
   }
 
-  initWebSocket(ws) {
+  initWebSocket(ws: WebSocket) {
     for (const packet of this.caster.iterCachedData()) {
       ws.send(JSON.stringify(packet));
     }
@@ -77,10 +77,10 @@ class WSTransport
     });
   }
 
-  sendAll(packet) {
-    packet = JSON.stringify(packet);
+  sendAll(packet: Record<any, any>) {
+    const packetStr = JSON.stringify(packet);
     for (const ws of this.allWS) {
-      ws.send(packet);
+      ws.send(packetStr);
     }
   }
 
@@ -95,18 +95,18 @@ class RedisPubSubTransport
 {
   numConnections: number = 0;
   castChannel: string;
-  caster?: ScreenCaster;
+  caster!: ScreenCaster;
   ctrlChannel: string;
   redis: any;
 
-  constructor(redisUrl, crawlId) {
+  constructor(redisUrl: string, crawlId: string) {
     this.castChannel = `c:${crawlId}:cast`;
     this.ctrlChannel = `c:${crawlId}:ctrl`;
 
     this.init(redisUrl);
   }
 
-  async init(redisUrl) {
+  async init(redisUrl: string) {
     this.redis = await initRedis(redisUrl);
 
     const subRedis = await initRedis(redisUrl);
@@ -140,7 +140,7 @@ class RedisPubSubTransport
     });
   }
 
-  async sendAll(packet) {
+  async sendAll(packet: Record<any, any>) {
     await this.redis.publish(this.castChannel, JSON.stringify(packet));
   }
 
@@ -155,25 +155,16 @@ class RedisPubSubTransport
 class ScreenCaster
 {
   transport: WSTransport;
-  caches = new Map();
-  urls = new Map();
-  cdps = new Map();
+  caches = new Map<string, string>();
+  urls = new Map<string, string>();
+  cdps = new Map<string, CDPSession>();
   maxWidth = 640;
   maxHeight = 480;
   initMsg: {[key: string]: any};
 
-  constructor(transport, numWorkers) {
+  constructor(transport: WSTransport, numWorkers: number) {
     this.transport = transport;
     this.transport.caster = this;
-
-    this.caches = new Map();
-    this.urls = new Map();
-
-    this.cdps = new Map();
-
-    // todo: make customizable
-    this.maxWidth = 640;
-    this.maxHeight = 480;
 
     this.initMsg = {
       msg: "init",
@@ -193,7 +184,7 @@ class ScreenCaster
     }
   }
 
-  async screencastPage(page, cdp, id) {
+  async screencastPage(page: Page, cdp: CDPSession, id: string) {
     this.urls.set(id, page.url());
 
     // shouldn't happen, getting duplicate cdp
@@ -239,7 +230,7 @@ class ScreenCaster
     }
   }
 
-  async stopById(id, sendClose=false) {
+  async stopById(id: string, sendClose=false) {
     this.caches.delete(id);
     this.urls.delete(id);
 
@@ -260,24 +251,24 @@ class ScreenCaster
     this.cdps.delete(id);
   }
 
-  async startCast(cdp, id) {
-    if (cdp._startedCast) {
+  async startCast(cdp: CDPSession, id: string) {
+    if ((cdp as any)._startedCast) {
       return;
     }
 
-    cdp._startedCast = true;
+    (cdp as any)._startedCast = true;
 
     logger.info("Started Screencast", {workerid: id}, "screencast");
 
     await cdp.send("Page.startScreencast", {format: "png", everyNthFrame: 1, maxWidth: this.maxWidth, maxHeight: this.maxHeight});
   }
 
-  async stopCast(cdp, id) {
-    if (!cdp._startedCast) {
+  async stopCast(cdp: CDPSession, id: string) {
+    if (!(cdp as any)._startedCast) {
       return;
     }
 
-    cdp._startedCast = false;
+    (cdp as any)._startedCast = false;
 
     logger.info("Stopping Screencast", {workerid: id}, "screencast");
 

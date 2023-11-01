@@ -1,6 +1,8 @@
 // @ts-ignore
 import { getStatusText } from "@webrecorder/wabac/src/utils";
 
+import { Protocol } from "puppeteer-core";
+
 const CONTENT_LENGTH = "content-length";
 const CONTENT_TYPE = "content-type";
 const EXCLUDE_HEADERS = ["content-encoding", "transfer-encoding"];
@@ -16,7 +18,7 @@ export class RequestResponseInfo
   ts?: string;
 
   method?: string;
-  url?: string;
+  url!: string;
   protocol?: string = "HTTP/1.1";
 
   // request data
@@ -91,7 +93,7 @@ export class RequestResponseInfo
     this.frameId = params.frameId;
   }
 
-  fillResponse(response: Record<string, any>) {
+  fillResponse(response: Protocol.Network.Response) {
     // if initial fetch was a 200, but now replacing with 304, don't!
     if (response.status == 304 && this.status && this.status != 304 && this.url) {
       return;
