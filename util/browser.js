@@ -361,4 +361,5 @@ export const defaultArgs = [
   "--no-service-autorun",
   "--export-tagged-pdf",
   "--component-updater=url-source=http://invalid.dev/",
+  "--brave-stats-updater-server=url-source=http://invalid.dev/"
 ];

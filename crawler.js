@@ -12,7 +12,7 @@ import yaml from "js-yaml";
 import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
-import { TextExtract } from "./util/textextract.js";
+import { TextExtractViaSnapshot } from "./util/textextract.js";
 import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
@@ -492,11 +492,12 @@ self.__bx_behaviors.selectMainBehavior();
     data.title = await page.title();
     data.favicon = await this.getFavicon(page, logDetails);
 
+    const archiveDir = path.join(this.collDir, "archive");
+
     if (this.params.screenshot) {
       if (!data.isHTMLPage) {
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
-      const archiveDir = path.join(this.collDir, "archive");
       const screenshots = new Screenshots({browser: this.browser, page, url, directory: archiveDir});
       if (this.params.screenshot.includes("view")) {
         await screenshots.take();
@@ -509,9 +510,15 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.text && data.isHTMLPage) {
-      const result = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
-      data.text = await new TextExtract(result).parseTextFromDom();
+    let textextract = null;
+
+    if (data.isHTMLPage) {
+      textextract = new TextExtractViaSnapshot(cdp, {url, directory: archiveDir});
+      const {changed, text} = await textextract.extractAndStoreText("text", false, this.params.text.includes("to-warc"));
+
+      if (changed && text && this.params.text.includes("to-pages")) {
+        data.text = text;
+      }
     }
 
     data.loadState = LoadState.EXTRACTION_DONE;
@@ -534,6 +541,10 @@ self.__bx_behaviors.selectMainBehavior();
 
         if (res) {
           data.loadState = LoadState.BEHAVIORS_DONE;
+        }
+
+        if (textextract && this.params.text.includes("final-to-warc")) {
+          await textextract.extractAndStoreText("textFinal", true, true);
         }
       }
     }
@@ -1420,12 +1431,11 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (createNew) {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
-        if (this.params.text) {
-          header["hasText"] = true;
-          logger.debug("Text Extraction: Enabled");
+        header["hasText"] = this.params.text.includes("to-pages");
+        if (this.params.text.length) {
+          logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
-          header["hasText"] = false;
-          logger.debug("Text Extraction: Disabled");
+          logger.debug("Text Extraction: None");
         }
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
