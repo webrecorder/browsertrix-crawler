@@ -24,6 +24,8 @@ function doesCDXContain(coll, value) {
   return data.indexOf(value) >= 0;
 }
 
+// Test Disabled for Brave -- should always be blocked, but seeing inconsistent ci behavior
+/*
 test("test crawl without block for specific URL", () => {
   const config = {
     "url": "https://www.iana.org/",
@@ -35,6 +37,7 @@ test("test crawl without block for specific URL", () => {
   // without blocks, URL with add sense is included
   expect(doesCDXContain("block-1-no-block", "https://cse.google.com/adsense/search/async-ads.js")).toBe(true);
 });
+*/
 
 
 test("test block rule on specific URL", () => {

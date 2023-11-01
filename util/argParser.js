@@ -7,7 +7,7 @@ import { KnownDevices as devices } from "puppeteer-core";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
-import { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS } from "./constants.js";
+import { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS, EXTRACT_TEXT_TYPES } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -43,12 +43,6 @@ class ArgParser {
         describe: "A user provided ID for this crawl or crawl configuration (can also be set via CRAWL_ID env var)",
         type: "string",
         default: process.env.CRAWL_ID || os.hostname(),
-      },
-
-      "newContext": {
-        describe: "Deprecated as of 0.8.0, any values passed will be ignored",
-        default: null,
-        type: "string"
       },
 
       "waitUntil": {
@@ -197,8 +191,7 @@ class ArgParser {
 
       "text": {
         describe: "If set, extract text to the pages.jsonl file",
-        type: "boolean",
-        default: false,
+        type: "string",
       },
 
       "cwd": {
@@ -408,6 +401,11 @@ class ArgParser {
         describe: "injects a custom behavior file or set of behavior files in a directory",
         type: ["string"]
       },
+
+      "debugAccessRedis": {
+        describe: "if set, runs internal redis without protected mode to allow external access (for debugging)",
+        type: "boolean",
+      }
     };
   }
 
@@ -453,28 +451,20 @@ class ArgParser {
     // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
     // can be multiple separate by comma
     // (see: https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options)
-    if (typeof argv.waitUntil != "object"){
+    if (typeof argv.waitUntil != "object") {
       argv.waitUntil = argv.waitUntil.split(",");
     }
 
-    for (const opt of argv.waitUntil) {
-      if (!WAIT_UNTIL_OPTS.includes(opt)) {
-        logger.fatal("Invalid waitUntil option, must be one of: " + WAIT_UNTIL_OPTS.join(","));
-      }
+    // split text options
+    if (argv.text === "" || argv.text === "true") {
+      argv.text = "to-pages";
     }
 
-    // validate screenshot options
-    if (argv.screenshot) {
-      const passedScreenshotTypes = argv.screenshot.split(",");
-      argv.screenshot = [];
-      passedScreenshotTypes.forEach((element) => {
-        if (element in screenshotTypes) {
-          argv.screenshot.push(element);
-        } else {
-          logger.warn(`${element} not found in ${screenshotTypes}`);
-        }
-      });
-    }
+    argv.waitUntil = validateArrayOpts(argv.waitUntil, "waitUntil", WAIT_UNTIL_OPTS);
+
+    argv.screenshot = validateArrayOpts(argv.screenshot, "screenshot", Array.from(Object.keys(screenshotTypes)));
+
+    argv.text = validateArrayOpts(argv.text, "text", EXTRACT_TEXT_TYPES);
 
     // log options
     argv.logging = argv.logging.split(",");
@@ -568,6 +558,30 @@ class ArgParser {
 
     return true;
   }
+}
+
+function validateArrayOpts(value, name, allowedValues) {
+  if (!value) {
+    return [];
+  }
+
+  if (value instanceof Array) {
+    return value;
+  }
+
+  if (typeof(value) !== "string") {
+    return [];
+  }
+
+  const arrayValue = value.split(",");
+
+  for (value of arrayValue) {
+    if (!allowedValues.includes(value)) {
+      logger.fatal(`Invalid value "${value}" for field "${name}": allowed values are: ${allowedValues.join(",")}`);
+    }
+  }
+
+  return arrayValue;
 }
 
 export function parseArgs(argv) {

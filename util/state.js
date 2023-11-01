@@ -69,9 +69,6 @@ export class RedisCrawlState
     this.fkey = this.key + ":f";
     // crawler errors
     this.ekey = this.key + ":e";
-    // start and end times to compute execution minutes
-    this.startkey = this.key + ":start";
-    this.endkey = this.key + ":end";
 
     this._initLuaCommands(this.redis);
   }
@@ -187,26 +184,6 @@ return 0;
     return new Date().toISOString();
   }
 
-  async setStartTime() {
-    const startTime = this._timestamp();
-    return await this.redis.rpush(`${this.startkey}:${this.uid}`, startTime);
-  }
-
-  async getStartTimes() {
-    return await this.redis.lrange(`${this.startkey}:${this.uid}`, 0, -1);
-  }
-
-  async setEndTime() {
-    // Set start time if crawler exits before it was able to set one
-    if (!await this.redis.llen(`${this.startkey}:${this.uid}`)) {
-      await this.setStartTime();
-    }
-
-    const endTime = this._timestamp();
-
-    return await this.redis.rpush(`${this.endkey}:${this.uid}`, endTime);
-  }
-
   async markStarted(url) {
     const started = this._timestamp();
 
@@ -259,10 +236,74 @@ return 0;
     return false;
   }
 
+  async isCrawlCanceled() {
+    return await this.redis.get(`${this.key}:canceled`) === "1";
+  }
+
   // note: not currently called in crawler, but could be
   // crawl may be stopped by setting this elsewhere in shared redis
   async stopCrawl() {
     await this.redis.set(`${this.key}:stopping`, "1");
+  }
+
+  async processMessage(seeds) {
+    while (true) {
+      const result = await this.redis.lpop(`${this.uid}:msg`);
+      if (!result) {
+        return;
+      }
+      try {
+        const {type, regex} = JSON.parse(result);
+        switch (type) {
+        case "addExclusion":
+          logger.debug("Add Exclusion", {type, regex}, "exclusion");
+          if (!regex) {
+            break;
+          }
+          for (const seed of seeds) {
+            seed.addExclusion(regex);
+          }
+          // can happen async w/o slowing down scrolling
+          // each page is still checked if in scope before crawling, even while
+          // queue is being filtered
+          this.filterQueue(regex);
+          break;
+
+        case "removeExclusion":
+          logger.debug("Remove Exclusion", {type, regex}, "exclusion");
+          if (!regex) {
+            break;
+          }
+          for (const seed of seeds) {
+            seed.removeExclusion(regex);
+          }
+          break;
+        }
+      } catch (e) {
+        logger.warn("Error processing message", e, "redisMessage");
+      }
+    }
+  }
+
+  async filterQueue(regexStr) {
+    const regex = new RegExp(regexStr);
+
+    const qsize = await this.redis.zcard(this.qkey);
+
+    const count = 50;
+
+    for (let i = 0; i < qsize; i += count) {
+      const results = await this.redis.zrangebyscore(this.qkey, 0, "inf", "limit", i, count);
+
+      for (const result of results) {
+        const { url } = JSON.parse(result);
+        if (regex.test(url)) {
+          const removed = await this.redis.zrem(this.qkey, result);
+          await this.redis.srem(this.skey, url);
+          logger.debug("Removing excluded URL", {url, regex, removed}, "exclusion");
+        }
+      }
+    }
   }
 
   async incFailCount() {
@@ -387,15 +428,20 @@ return 0;
       seen.push(data.url);
     }
 
-    // retained in modified form for backwards compatibility
-    for (const json of state.done) {
-      const data = JSON.parse(json);
-      if (data.failed) {
-        await this.redis.zadd(this.qkey, this._getScore(data), json);
-      } else {
-        await this.redis.incr(this.dkey);
+    if (typeof(state.done) === "number") {
+      // done key is just an int counter
+      await this.redis.set(this.dkey, state.done);
+    } else if (state.done instanceof Array) {
+      // for backwards compatibility with old save states
+      for (const json of state.done) {
+        const data = JSON.parse(json);
+        if (data.failed) {
+          await this.redis.zadd(this.qkey, this._getScore(data), json);
+        } else {
+          await this.redis.incr(this.dkey);
+        }
+        seen.push(data.url);
       }
-      seen.push(data.url);
     }
 
     for (const json of state.failed) {
