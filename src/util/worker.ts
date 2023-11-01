@@ -1,6 +1,5 @@
 import os from "os";
 
-// @ts-ignore
 import { v4 as uuidv4 } from "uuid";
 
 import { logger, errJSON } from "./logger.js";

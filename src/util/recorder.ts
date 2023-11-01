@@ -240,7 +240,7 @@ export class Recorder
     case "net::ERR_ABORTED":
       // check if this is a false positive -- a valid download that's already been fetched
       // the abort is just for page, but download will succeed
-      if (url && type === "Document" && reqresp.isValidBinary()) {
+      if (type === "Document" && reqresp.isValidBinary()) {
         this.serializeToWARC(reqresp);
       //} else if (url) {
       } else if (url && reqresp.requestHeaders && reqresp.requestHeaders["x-browsertrix-fetch"]) {
@@ -672,7 +672,7 @@ export class Recorder
     this.warcQ.add(() => this.writer.writeRecordPair(responseRecord, requestRecord));
   }
 
-  async directFetchCapture(url: string) {
+  async directFetchCapture(url: string) : Promise<{fetched: boolean, mime: string}>{
     const reqresp = new RequestResponseInfo("0");
     reqresp.url = url;
     reqresp.method = "GET";
@@ -686,7 +686,7 @@ export class Recorder
     const fetcher = new AsyncFetcher({tempdir: this.tempdir, reqresp, recorder: this, networkId: "0", filter, ignoreDupe: true});
     const res = await fetcher.load();
 
-    const mime = reqresp && reqresp.responseHeaders && reqresp.responseHeaders["content-type"] && reqresp.responseHeaders["content-type"].split(";")[0];
+    const mime = reqresp && reqresp.responseHeaders && reqresp.responseHeaders["content-type"] && reqresp.responseHeaders["content-type"].split(";")[0] || "";
 
     return {fetched: res === "fetched", mime};
   }
