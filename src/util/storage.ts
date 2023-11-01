@@ -5,6 +5,8 @@ import util from "util";
 
 import os from "os";
 import { createHash } from "crypto";
+
+// @ts-ignore
 import crc32 from "crc/crc32";
 
 // @ts-ignore
@@ -100,7 +102,7 @@ export class S3StorageSync
 
   async uploadCollWACZ(srcFilename: string, targetFilename: string, completed = true) {
     const resource = await this.uploadFile(srcFilename, targetFilename);
-    logger.info("WACZ S3 file upload resource", {...targetFilename, resource}, "s3Upload");
+    logger.info("WACZ S3 file upload resource", {targetFilename, resource}, "s3Upload");
 
     if (this.webhookUrl) {
       const body = {
@@ -237,10 +239,10 @@ export function calculatePercentageUsed(used: number, total: number) {
   return Math.round((used/total) * 100);
 }
 
-function checksumFile(hashName: string, path: string) {
+function checksumFile(hashName: string, path: string) : Promise<{hash: string, crc32: number}>{
   return new Promise((resolve, reject) => {
     const hash = createHash(hashName);
-    let crc = null;
+    let crc : number = 0;
 
     const stream = fs.createReadStream(path);
     stream.on("error", err => reject(err));
