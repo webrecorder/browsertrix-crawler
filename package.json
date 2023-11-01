@@ -8,7 +8,7 @@
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "tsc": "tsc",
-    "lint": "eslint *.js util/*.js tests/*.test.js",
+    "lint": "eslint *.js tests/*.test.js",
     "test": "yarn node --experimental-vm-modules $(yarn bin jest --bail 1)",
     "prepare": "husky install"
   },
