@@ -27,6 +27,11 @@ class Logger
   logLevels : string[] = [];
   contexts : string[] = [];
   crawlState? : RedisCrawlState | null = null;
+  fatalExitCode = 17;
+
+  setDefaultFatalExitCode(exitCode: number) {
+    this.fatalExitCode = exitCode;
+  }
 
   setExternalLogStream(logFH: Writable) {
     this.logStream = logFH;
@@ -108,16 +113,12 @@ class Logger
     }
   }
 
-  fatal(message: string, data={}, context="general", exitCode=17) {
+  fatal(message: string, data={}, context="general", exitCode=0) {
+    exitCode = exitCode || this.fatalExitCode;
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
 
-    async function markFailedAndEnd(crawlState: RedisCrawlState) {
-      await crawlState.setStatus("failed");
-      await crawlState.setEndTime();
-    }
-
     if (this.crawlState) {
-      markFailedAndEnd(this.crawlState).finally(process.exit(exitCode));
+      this.crawlState.setStatus("failed").finally(process.exit(exitCode));
     } else {
       process.exit(exitCode);
     }

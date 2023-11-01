@@ -5,6 +5,7 @@ import util from "util";
 
 import os from "os";
 import { createHash } from "crypto";
+import crc32 from "crc/crc32";
 
 // @ts-ignore
 import Minio from "minio";
@@ -84,10 +85,13 @@ export class S3StorageSync
 
     await this.client.fPutObject(this.bucketName, this.objectPrefix + targetFilename, srcFilename);
 
-    const finalHash = await checksumFile("sha256", srcFilename);
+    const {hash, crc32} = await checksumFile("sha256", srcFilename);
+    const path = targetFilename;
 
     const size = await getFileSize(srcFilename);
-    return {"path": targetFilename, "hash": finalHash, "bytes": size};
+
+    // for backwards compatibility, keep 'bytes'
+    return {path, size, hash, crc32, bytes: size};
   }
 
   async downloadFile(srcFilename: string, destFilename: string) {
@@ -96,7 +100,7 @@ export class S3StorageSync
 
   async uploadCollWACZ(srcFilename: string, targetFilename: string, completed = true) {
     const resource = await this.uploadFile(srcFilename, targetFilename);
-    logger.info("WACZ S3 file upload resource", resource, "s3Upload");
+    logger.info("WACZ S3 file upload resource", {...targetFilename, resource}, "s3Upload");
 
     if (this.webhookUrl) {
       const body = {
@@ -106,9 +110,7 @@ export class S3StorageSync
         //filename: `s3://${this.bucketName}/${this.objectPrefix}${this.waczFilename}`,
         filename: this.fullPrefix + targetFilename,
 
-        hash: resource.hash,
-        size: resource.bytes,
-
+        ...resource,
         completed
       };
 
@@ -238,10 +240,15 @@ export function calculatePercentageUsed(used: number, total: number) {
 function checksumFile(hashName: string, path: string) {
   return new Promise((resolve, reject) => {
     const hash = createHash(hashName);
+    let crc = null;
+
     const stream = fs.createReadStream(path);
     stream.on("error", err => reject(err));
-    stream.on("data", chunk => hash.update(chunk));
-    stream.on("end", () => resolve(hash.digest("hex")));
+    stream.on("data", (chunk) => {
+      hash.update(chunk);
+      crc = crc32(chunk, crc);
+    });
+    stream.on("end", () => resolve({hash: hash.digest("hex"), crc32: crc}));
   });
 }
 

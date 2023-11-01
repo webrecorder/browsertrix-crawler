@@ -11,7 +11,7 @@ import yaml from "js-yaml";
 import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
-import { TextExtract } from "./util/textextract.js";
+import { TextExtractViaSnapshot } from "./util/textextract.js";
 import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
@@ -63,6 +63,13 @@ export class Crawler {
     logger.setDebugLogging(debugLogging);
     logger.setLogLevel(this.params.logLevel);
     logger.setContext(this.params.context);
+
+    // if automatically restarts on error exit code,
+    // exit with 0 from fatal by default, to avoid unnecessary restart
+    // otherwise, exit with default fatal exit code
+    if (this.params.restartsOnError) {
+      logger.setDefaultFatalExitCode(0);
+    }
 
     logger.debug("Writing log to: " + this.logFilename, {}, "init");
 
@@ -131,7 +138,7 @@ export class Crawler {
     // override userAgent
     if (this.params.userAgent) {
       this.emulateDevice.userAgent = this.params.userAgent;
-      return;
+      return this.params.userAgent;
     }
 
     // if device set, it overrides the default Chrome UA
@@ -217,7 +224,12 @@ export class Crawler {
       redisStdio = "ignore";
     }
 
-    return child_process.spawn("redis-server", {cwd: "/tmp/", stdio: redisStdio});
+    let redisArgs = [];
+    if (this.params.debugAccessRedis) {
+      redisArgs = ["--protected-mode", "no"];
+    }
+
+    return child_process.spawn("redis-server", redisArgs,{cwd: "/tmp/", stdio: redisStdio});
   }
 
   async bootstrap() {
@@ -300,8 +312,11 @@ export class Crawler {
       await this.crawl();
       const finished = await this.crawlState.isFinished();
       const stopped = await this.crawlState.isCrawlStopped();
+      const canceled = await this.crawlState.isCrawlCanceled();
       if (!finished) {
-        if (stopped) {
+        if (canceled) {
+          status = "canceled";
+        } else if (stopped) {
           status = "done";
           logger.info("Crawl gracefully stopped on request");
         } else if (this.interrupted) {
@@ -318,9 +333,7 @@ export class Crawler {
       }
 
     } finally {
-      logger.info(`Crawl status: ${status}`);
-
-      await this.setEndTimeAndExit(exitCode, status);
+      await this.setStatusAndExit(exitCode, status);
     }
   }
 
@@ -500,11 +513,12 @@ self.__bx_behaviors.selectMainBehavior();
     data.title = await page.title();
     data.favicon = await this.getFavicon(page, logDetails);
 
+    const archiveDir = path.join(this.collDir, "archive");
+
     if (this.params.screenshot) {
       if (!data.isHTMLPage) {
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
-      const archiveDir = path.join(this.collDir, "archive");
       const screenshots = new Screenshots({browser: this.browser, page, url, directory: archiveDir});
       if (this.params.screenshot.includes("view")) {
         await screenshots.take();
@@ -517,9 +531,15 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.text && data.isHTMLPage) {
-      const result = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
-      data.text = await new TextExtract(result).parseTextFromDom();
+    let textextract = null;
+
+    if (data.isHTMLPage) {
+      textextract = new TextExtractViaSnapshot(cdp, {url, directory: archiveDir});
+      const {changed, text} = await textextract.extractAndStoreText("text", false, this.params.text.includes("to-warc"));
+
+      if (changed && text && this.params.text.includes("to-pages")) {
+        data.text = text;
+      }
     }
 
     data.loadState = LoadState.EXTRACTION_DONE;
@@ -542,6 +562,10 @@ self.__bx_behaviors.selectMainBehavior();
 
         if (res) {
           data.loadState = LoadState.BEHAVIORS_DONE;
+        }
+
+        if (textextract && this.params.text.includes("final-to-warc")) {
+          await textextract.extractAndStoreText("textFinal", true, true);
         }
       }
     }
@@ -734,14 +758,19 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async setEndTimeAndExit(exitCode, status) {
+  async checkCanceled() {
+    if (this.crawlState && await this.crawlState.isCrawlCanceled()) {
+      await this.setStatusAndExit(0, "canceled");
+    }
+  }
+
+  async setStatusAndExit(exitCode, status) {
+    logger.info(`Exiting, Crawl status: ${status}`);
+
     await this.closeLog();
 
-    if (this.crawlState) {
-      if (status) {
-        await this.crawlState.setStatus(status);
-      }
-      await this.crawlState.setEndTime();
+    if (this.crawlState && status) {
+      await this.crawlState.setStatus(status);
     }
     process.exit(exitCode);
   }
@@ -750,14 +779,19 @@ self.__bx_behaviors.selectMainBehavior();
     await this.serializeConfig();
 
     if (this.interrupted) {
-      await this.setEndTimeAndExit(13, "interrupted");
+      await this.setStatusAndExit(13, "interrupted");
     } else {
-      await this.setEndTimeAndExit(0, "done");
+      await this.setStatusAndExit(0, "done");
     }
   }
 
   async isCrawlRunning() {
     if (this.interrupted) {
+      return false;
+    }
+
+    if (await this.crawlState.isCrawlCanceled()) {
+      await this.setStatusAndExit(0, "canceled");
       return false;
     }
 
@@ -783,8 +817,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     await this.initCrawlState();
-
-    await this.crawlState.setStartTime();
 
     let initState = await this.crawlState.getStatus();
 
@@ -822,6 +854,9 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info("crawl stopped, running post-crawl tasks");
       this.finalExit = true;
       await this.postCrawl();
+      return;
+    } else if (await this.crawlState.isCrawlCanceled()) {
+      logger.info("crawl canceled, will exit");
       return;
     }
 
@@ -973,7 +1008,7 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info(`Num WARC Files: ${warcFileList.length}`);
     if (!warcFileList.length) {
       // if finished, just return
-      if (isFinished) {
+      if (isFinished || await this.crawlState.isCrawlCanceled()) {
         return;
       }
       // if stopped, won't get anymore data
@@ -1395,12 +1430,11 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (createNew) {
         const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
-        if (this.params.text) {
-          header["hasText"] = true;
-          logger.debug("Text Extraction: Enabled");
+        header["hasText"] = this.params.text.includes("to-pages");
+        if (this.params.text.length) {
+          logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
-          header["hasText"] = false;
-          logger.debug("Text Extraction: Disabled");
+          logger.debug("Text Extraction: None");
         }
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);

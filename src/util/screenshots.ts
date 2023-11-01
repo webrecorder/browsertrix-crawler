@@ -1,11 +1,10 @@
-import fs from "fs";
-import path from "path";
-import * as warcio from "warcio";
 import sharp from "sharp";
 
+import { WARCResourceWriter } from "./warcresourcewriter.js";
 import { logger, errJSON } from "./logger.js";
 import { Browser } from "./browser.js";
 import { Page } from "puppeteer-core";
+
 
 // ============================================================================
 
@@ -33,23 +32,14 @@ export const screenshotTypes : Record<string, ScreenShotType> = {
   }
 };
 
-
-export class Screenshots {
+export class Screenshots extends WARCResourceWriter {
   browser: Browser;
   page: any;
-  url: string;
-  directory: string;
-  warcName: string;
-  date: Date;
 
-  constructor({browser, page, url, date, directory} : 
-              {browser: Browser, page: Page, url: string, date?: Date, directory: string}) {
-    this.browser = browser;
-    this.page = page;
-    this.url = url;
-    this.directory = directory;
-    this.warcName = path.join(this.directory, "screenshots.warc.gz");
-    this.date = date ? date : new Date();
+  constructor(opts: any) {
+    super({...opts, warcName: "screenshots.warc.gz"});
+    this.browser = opts.browser;
+    this.page = opts.page;
   }
 
   async take(screenshotType="view") {
@@ -59,7 +49,7 @@ export class Screenshots {
       }
       const options = screenshotTypes[screenshotType];
       const screenshotBuffer = await this.page.screenshot(options);
-      await this.writeBufferToWARC(screenshotBuffer, screenshotType, options.type);
+      await this.writeBufferToWARC(screenshotBuffer, screenshotType, "image/" + options.type);
       logger.info(`Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.warcName}`);
     } catch (e) {
       logger.error("Taking screenshot failed", {"page": this.url, type: screenshotType, ...errJSON(e)}, "screenshots");
@@ -80,32 +70,10 @@ export class Screenshots {
         // 16:9 thumbnail
         .resize(640, 360)
         .toBuffer();
-      await this.writeBufferToWARC(thumbnailBuffer, screenshotType, options.type);
+      await this.writeBufferToWARC(thumbnailBuffer, screenshotType, "image/" + options.type);
       logger.info(`Screenshot (type: thumbnail) for ${this.url} written to ${this.warcName}`);
     } catch (e) {
       logger.error("Taking screenshot failed", {"page": this.url, type: screenshotType, ...errJSON(e)}, "screenshots");
     }
-  }
-
-  async writeBufferToWARC(screenshotBuffer: Uint8Array, screenshotType: string, imageType: string) {
-    const warcRecord = await this.wrap(screenshotBuffer, screenshotType, imageType);
-    const warcRecordBuffer = await warcio.WARCSerializer.serialize(warcRecord, {gzip: true});
-    fs.appendFileSync(this.warcName, warcRecordBuffer);
-  }
-
-  async wrap(buffer: Uint8Array, screenshotType="screenshot", imageType="png") {
-    const warcVersion = "WARC/1.1";
-    const warcRecordType = "resource";
-    const warcHeaders = {"Content-Type": `image/${imageType}`};
-    async function* content() {
-      yield buffer;
-    }
-    let screenshotUrl = `urn:${screenshotType}:` + this.url;
-    return warcio.WARCRecord.create({
-      url: screenshotUrl,
-      date: this.date.toISOString(),
-      type: warcRecordType,
-      warcVersion,
-      warcHeaders}, content());
   }
 }
