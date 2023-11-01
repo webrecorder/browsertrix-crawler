@@ -32,6 +32,7 @@
     "yargs": "^17.7.2"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.8",
     "@types/node": "^20.8.7",
     "@types/uuid": "^9.0.6",
     "@types/ws": "^8.5.8",

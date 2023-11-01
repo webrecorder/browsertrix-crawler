@@ -45,7 +45,7 @@ export function runWorkers(crawler: any, numWorkers: number, maxPageTime: number
 
 
 // ===========================================================================
-type WorkerOpts = Record<string, any> & {
+export type WorkerOpts = Record<string, any> & {
   page: Page;
   cdp: CDPSession;
   workerid: string;
@@ -54,7 +54,7 @@ type WorkerOpts = Record<string, any> & {
 };
 
 // ===========================================================================
-type WorkerState = WorkerOpts & {
+export type WorkerState = WorkerOpts & {
   data: PageState
 };
 

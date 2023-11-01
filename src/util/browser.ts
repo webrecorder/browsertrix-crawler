@@ -12,6 +12,15 @@ import { initStorage } from "./storage.js";
 import puppeteer, { Frame, HTTPRequest, Page, PuppeteerLaunchOptions, Viewport } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 
+type LaunchOpts = {
+  profileUrl: string;
+  chromeOptions: Record<string, any>;
+  signals: boolean;
+  headless: boolean;
+  emulateDevice?: Record<string, any>;
+  ondisconnect?: ((err: any) => {}) | null;
+};
+
 
 // ==================================================================
 export class Browser
@@ -29,9 +38,7 @@ export class Browser
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
   }
 
-  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}, ondisconnect = null} :
-               {profileUrl: string, chromeOptions: Record<string, any>, signals: boolean, headless: boolean, emulateDevice?: Record<string, any>, ondisconnect?: Function | null}) {
-    if (this.isLaunched()) {
+  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}, ondisconnect = null} : LaunchOpts) {    if (this.isLaunched()) {
       return;
     }
 

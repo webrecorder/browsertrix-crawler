@@ -426,7 +426,7 @@ class ArgParser {
         if (configPath === "/crawls/stdin") {
           configPath = process.stdin.fd;
         }
-        origConfig = yaml.load(fs.readFileSync(configPath, "utf8"));
+        origConfig = yaml.load(fs.readFileSync(configPath, "utf8")) as any;
         return origConfig;
       })
       .check((argv) => this.validateArgs(argv))

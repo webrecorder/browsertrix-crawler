@@ -33,7 +33,7 @@ class Logger
     this.fatalExitCode = exitCode;
   }
 
-  setExternalLogStream(logFH: Writable) {
+  setExternalLogStream(logFH: Writable | null) {
     this.logStream = logFH;
   }
 

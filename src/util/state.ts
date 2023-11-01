@@ -4,6 +4,7 @@ import { logger } from "./logger.js";
 
 import { MAX_DEPTH } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
+import { Frame } from "puppeteer-core";
 
 
 // ============================================================================
@@ -32,15 +33,20 @@ export class PageState
   depth: number;
   extraHops: number;
 
-  workerid?: number;
+  workerid!: string;
+
   pageid?: string;
   title?: string;
+  mime?: string;
+
+  callbacks: any;
 
   isHTMLPage?: boolean;
   text?: string;
+  favicon?: string;
 
   skipBehaviors = false;
-  filteredFrames: string[] = [];
+  filteredFrames: Frame[] = [];
   loadState : LoadState = LoadState.FAILED;
 
   logDetails = {};
@@ -290,8 +296,8 @@ return 0;
     await this.redis.hset(`${this.key}:status`, this.uid, status_);
   }
 
-  async getStatus() {
-    return await this.redis.hget(`${this.key}:status`, this.uid);
+  async getStatus() : Promise<string> {
+    return await this.redis.hget(`${this.key}:status`, this.uid) || "";
   }
 
   async setArchiveSize(size: number) {
@@ -390,7 +396,7 @@ return 0;
   }
 
   //async addToQueue({url : string, seedId, depth = 0, extraHops = 0} = {}, limit = 0) {
-  async addToQueue({url, seedId, depth = 0, extraHops = 0} : {url: string, seedId: string, depth?: number, extraHops?: number}, limit = 0) {
+  async addToQueue({url, seedId, depth = 0, extraHops = 0} : {url: string, seedId: number, depth?: number, extraHops?: number}, limit = 0) {
     const added = this._timestamp();
     const data : any = {added, url, seedId, depth};
     if (extraHops) {

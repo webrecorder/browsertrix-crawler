@@ -94,7 +94,7 @@ function cliOpts() {
 }
 
 function getDefaultWindowSize() {
-  const values = process.env.GEOMETRY.split("x");
+  const values = (process.env.GEOMETRY || "").split("x");
   const x = Number(values[0]);
   const y = Number(values[1]);
   return `${x},${y}`;

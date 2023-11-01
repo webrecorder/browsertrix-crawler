@@ -1,10 +1,10 @@
-import child_process from "child_process";
+import child_process, { ChildProcess, StdioOptions } from "child_process";
 import path from "path";
-import fs from "fs";
+import fs, { WriteStream } from "fs";
 import os from "os";
-import fsp from "fs/promises";
+import fsp, { FileHandle } from "fs/promises";
 
-import { RedisCrawlState, LoadState, QueueState } from "./util/state.js";
+import { RedisCrawlState, LoadState, QueueState, PageState } from "./util/state.js";
 import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
 
@@ -12,13 +12,13 @@ import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
-import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization } from "./util/storage.js";
+import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization, S3StorageSync } from "./util/storage.js";
 import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { logger, errJSON } from "./util/logger.js";
-import { runWorkers } from "./util/worker.js";
+import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectAllFileSources } from "./util/file_reader.js";
 
@@ -32,12 +32,13 @@ import { OriginOverride } from "./util/originoverride.js";
 // to ignore HTTPS error for HEAD check
 import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
+import { CDPSession, Frame, HTTPRequest, Page } from "puppeteer-core";
 
-const HTTPS_AGENT = HTTPSAgent({
+const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
 });
 
-const HTTP_AGENT = HTTPAgent();
+const HTTP_AGENT = new HTTPAgent();
 
 const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
@@ -46,11 +47,85 @@ const PAGE_OP_TIMEOUT_SECS = 5;
 
 const POST_CRAWL_STATES = ["generate-wacz", "uploading-wacz", "generate-cdx", "generate-warc"];
 
+type LogDetails = Record<string, any>;
+
+type PageEntry = {
+  id: string;
+  url: string;
+  title?: string;
+  loadState?: number;
+  mime?: string;
+  seed?: boolean;
+  text?: string;
+  favIconUrl?: string;
+};
+
 
 // ============================================================================
 export class Crawler {
+  params: any;
+  origConfig: any;
+
+  collDir: string;
+  logDir: string;
+  logFilename: string;
+
+  headers: Record<string, string> = {};
+
+  crawlState!: RedisCrawlState;
+
+  pagesFH? : FileHandle | null = null;
+  logFH! : WriteStream;
+
+  crawlId: string;
+
+  startTime: number;
+
+  limitHit = false;
+  pageLimit: number;
+
+  saveStateFiles : string[] = [];
+  lastSaveTime: number;
+
+  maxPageTime: number;
+
+  emulateDevice: any = {};
+
+  captureBasePrefix = "";
+
+  infoString!: string;
+
+  gotoOpts: Record<string, any>;
+
+  pagesDir: string;
+  pagesFile: string;
+
+  blockRules: BlockRules | null;
+  adBlockRules: AdBlockRules | null;
+
+  healthChecker: HealthChecker | null = null;
+  originOverride: OriginOverride | null = null;
+
+  screencaster: ScreenCaster | null = null;
+
+  interrupted = false;
+  finalExit = false;
+  uploadAndDeleteLocal = false;
+  done = false;
+
+  customBehaviors = "";
+  behaviorLastLine?: string;
+
+  browser: Browser;
+  storage: S3StorageSync | null = null;
+
+  maxHeapUsed = 0;
+  maxHeapTotal = 0;
+
+  driver!: (opts: {page: Page, data: PageState, crawler: Crawler}) => {};
+  
   constructor() {
-    const res = parseArgs();
+    const res = parseArgs([]);
     this.params = res.parsed;
     this.origConfig = res.origConfig;
 
@@ -74,7 +149,6 @@ export class Crawler {
     logger.debug("Writing log to: " + this.logFilename, {}, "init");
 
     this.headers = {};
-    this.crawlState = null;
 
     // pages file
     this.pagesFH = null;
@@ -104,7 +178,7 @@ export class Crawler {
 
     //this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
     //this.capturePrefix = "";//process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
-    this.captureBasePrefix = null;
+    //this.captureBasePrefix = "";
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
@@ -129,7 +203,6 @@ export class Crawler {
     this.done = false;
 
     this.customBehaviors = "";
-    this.behaviorLastLine = null;
 
     this.browser = new Browser();
   }
@@ -201,10 +274,11 @@ export class Crawler {
     if (this.params.screencastPort) {
       transport = new WSTransport(this.params.screencastPort);
       logger.debug(`Screencast server started on: ${this.params.screencastPort}`, {}, "screencast");
-    } else if (this.params.redisStoreUrl && this.params.screencastRedis) {
-      transport = new RedisPubSubTransport(this.params.redisStoreUrl, this.crawlId);
-      logger.debug("Screencast enabled via redis pubsub", {}, "screencast");
     }
+    // } else if (this.params.redisStoreUrl && this.params.screencastRedis) {
+    //   transport = new RedisPubSubTransport(this.params.redisStoreUrl, this.crawlId);
+    //   logger.debug("Screencast enabled via redis pubsub", {}, "screencast");
+    // }
 
     if (!transport) {
       return null;
@@ -214,7 +288,7 @@ export class Crawler {
   }
 
   launchRedis() {
-    let redisStdio;
+    let redisStdio : StdioOptions;
 
     if (this.params.logging.includes("redis")) {
       const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
@@ -224,7 +298,7 @@ export class Crawler {
       redisStdio = "ignore";
     }
 
-    let redisArgs = [];
+    let redisArgs : string[] = [];
     if (this.params.debugAccessRedis) {
       redisArgs = ["--protected-mode", "no"];
     }
@@ -233,7 +307,7 @@ export class Crawler {
   }
 
   async bootstrap() {
-    const subprocesses = [];
+    const subprocesses : ChildProcess[] = [];
 
     subprocesses.push(this.launchRedis());
 
@@ -260,7 +334,7 @@ export class Crawler {
       logger.debug(`Clearing ${this.collDir} before starting`);
       try {
         fs.rmSync(this.collDir, { recursive: true, force: true });
-      } catch(e) {
+      } catch(e: any) {
         logger.error(`Unable to clear ${this.collDir}`, e);
       }
     }
@@ -281,12 +355,12 @@ export class Crawler {
 
     if (!this.params.headless && !process.env.NO_XVFB) {
       child_process.spawn("Xvfb", [
-        process.env.DISPLAY,
+        process.env.DISPLAY || "",
         "-listen",
         "tcp",
         "-screen",
         "0",
-        process.env.GEOMETRY,
+        process.env.GEOMETRY || "",
         "-ac",
         "+extension",
         "RANDR"
@@ -324,7 +398,7 @@ export class Crawler {
           exitCode = 11;
         }
       }
-    } catch(e) {
+    } catch(e: any) {
       logger.error("Crawl failed", e);
       exitCode = 9;
       status = "failing";
@@ -337,7 +411,7 @@ export class Crawler {
     }
   }
 
-  _behaviorLog({data, type}, pageUrl, workerid) {
+  _behaviorLog({data, type} : {data: string, type: string}, pageUrl: string, workerid: string) {
     let behaviorLine;
     let message;
     let details;
@@ -349,15 +423,15 @@ export class Crawler {
       details = logDetails;
     } else {
       message = type === "info" ? "Behavior log" : "Behavior debug";
-      details = typeof(data) === "object" ? {...data, ...logDetails} : logDetails;
+      details = typeof(data) === "object" ? {...data as object, ...logDetails} : logDetails;
     }
 
     switch (type) {
     case "info":
       behaviorLine = JSON.stringify(data);
-      if (behaviorLine != this._behaviorLastLine) {
+      if (behaviorLine !== this.behaviorLastLine) {
         logger.info(message, details, "behaviorScript");
-        this._behaviorLastLine = behaviorLine;
+        this.behaviorLastLine = behaviorLine;
       }
       break;
 
@@ -371,14 +445,14 @@ export class Crawler {
     }
   }
 
-  isInScope({seedId, url, depth, extraHops} = {}, logDetails = {}) {
+  isInScope({seedId, url, depth, extraHops} : {seedId: number, url: string, depth: number, extraHops: number}, logDetails = {}) {
     const seed = this.params.scopedSeeds[seedId];
 
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  async setupPage({page, cdp, workerid, callbacks}) {
-    await this.browser.setupPage({page, cdp});
+  async setupPage({page, cdp, workerid, callbacks} : {page: Page, cdp: CDPSession, workerid: string, callbacks: any}) {
+    await this.browser.setupPage({page});
 
     if ((this.adBlockRules && this.params.blockAds) ||
         this.blockRules || this.originOverride) {
@@ -415,10 +489,10 @@ export class Crawler {
       await this.screencaster.screencastPage(page, cdp, workerid);
     }
 
-    await page.exposeFunction(ADD_LINK_FUNC, (url) => callbacks.addLink && callbacks.addLink(url));
+    await page.exposeFunction(ADD_LINK_FUNC, (url: string) => callbacks.addLink && callbacks.addLink(url));
 
     if (this.params.behaviorOpts) {
-      await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
+      await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata: {data: string, type: string}) => this._behaviorLog(logdata, page.url(), workerid));
       await this.browser.addInitScript(page, behaviors);
 
       const initScript = `
@@ -431,7 +505,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  loadCustomBehaviors(filename) {
+  loadCustomBehaviors(filename: string) {
     let str = "";
 
     for (const source of collectAllFileSources(filename, ".js")) {
@@ -441,13 +515,13 @@ self.__bx_behaviors.selectMainBehavior();
     return str;
   }
 
-  async getFavicon(page, logDetails) {
+  async getFavicon(page: Page, logDetails: LogDetails) : Promise<string> {
     try {
       const resp = await fetch("http://127.0.0.1:9221/json");
       if (resp.status === 200) {
         const browserJson = await resp.json();
         for (const jsons of browserJson) {
-          if (jsons.id === page.target()._targetId) {
+          if (jsons.id === (page.target() as any)._targetId) {
             return jsons.faviconUrl;
           }
         }
@@ -456,9 +530,10 @@ self.__bx_behaviors.selectMainBehavior();
       // ignore
     }
     logger.warn("Failed to fetch favicon from browser /json endpoint", logDetails);
+    return "";
   }
 
-  async crawlPage(opts) {
+  async crawlPage(opts: WorkerState) {
     await this.writeStats();
 
     const {page, cdp, data, workerid, callbacks, directFetchCapture} = opts;
@@ -578,7 +653,7 @@ self.__bx_behaviors.selectMainBehavior();
     return true;
   }
 
-  async pageFinished(data) {
+  async pageFinished(data: PageState) {
     await this.writePage(data);
 
     // if page loaded, considered page finished successfully
@@ -608,20 +683,20 @@ self.__bx_behaviors.selectMainBehavior();
     await this.checkLimits();
   }
 
-  async teardownPage({workerid}) {
+  async teardownPage({workerid}: WorkerOpts) {
     if (this.screencaster) {
       await this.screencaster.stopById(workerid);
     }
   }
 
-  async workerIdle(workerid) {
+  async workerIdle(workerid: string) {
     if (this.screencaster) {
       //logger.debug("End Screencast", {workerid}, "screencast");
       await this.screencaster.stopById(workerid, true);
     }
   }
 
-  async runBehaviors(page, cdp, frames, logDetails) {
+  async runBehaviors(page: Page, cdp: CDPSession, frames: Frame[], logDetails: LogDetails) {
     try {
       frames = frames || page.frames();
 
@@ -637,7 +712,8 @@ self.__bx_behaviors.selectMainBehavior();
         , logDetails, "behavior"))
       );
 
-      for (const {status, reason} in results) {
+      for (const res of results) {
+        const {status, reason} : {status: string, reason?: string} = res;
         if (status === "rejected") {
           logger.warn("Behavior run partially failed", {reason, ...logDetails}, "behavior");
         }
@@ -652,7 +728,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async shouldIncludeFrame(frame, logDetails) {
+  async shouldIncludeFrame(frame: Frame, logDetails: LogDetails) {
     if (!frame.parentFrame()) {
       return frame;
     }
@@ -673,7 +749,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (frameUrl === "about:blank") {
       res = false;
     } else {
-      res = !this.adBlockRules.isAdUrl(frameUrl);
+      res = this.adBlockRules && !this.adBlockRules.isAdUrl(frameUrl);
     }
 
     if (!res) {
@@ -684,14 +760,14 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async getInfoString() {
-    const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
-    const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
+    const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json", {encoding: "utf-8"}));
+    const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json", {encoding: "utf-8"}));
     const pywbVersion = "0.0";//child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
 
     return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`;
   }
 
-  async createWARCInfo(filename) {
+  async createWARCInfo(filename: string) {
     const warcVersion = "WARC/1.0";
     const type = "warcinfo";
 
@@ -764,7 +840,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async setStatusAndExit(exitCode, status) {
+  async setStatusAndExit(exitCode: number, status: string) {
     logger.info(`Exiting, Crawl status: ${status}`);
 
     await this.closeLog();
@@ -810,8 +886,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     try {
       const driverUrl = new URL(this.params.driver, import.meta.url);
-      this.driver = (await import(driverUrl)).default;
-    } catch(e) {
+      this.driver = (await import(driverUrl.href)).default;
+    } catch(e: any) {
       logger.warn(`Error importing driver ${this.params.driver}`, e);
       return;
     }
@@ -902,11 +978,11 @@ self.__bx_behaviors.selectMainBehavior();
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs()
       },
-      ondisconnect: (err) => {
+      ondisconnect: (err: any) => {
         this.interrupted = true;
         logger.error("Browser disconnected (crashed?), interrupting crawl", err, "browser");
       }
-    });
+    } as any);
 
     //const archiveDir = path.join(this.collDir, "archive");
 
@@ -964,7 +1040,7 @@ self.__bx_behaviors.selectMainBehavior();
         logger.info(`Uploaded WACZ, deleting local data to free up space: ${this.collDir}`);
         try {
           fs.rmSync(this.collDir, { recursive: true, force: true });
-        } catch(e) {
+        } catch(e: any) {
           logger.warn(`Unable to clear ${this.collDir} before exit`, e);
         }
       }
@@ -980,14 +1056,14 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async closeLog() {
+  async closeLog() : Promise<void> {
     // close file-based log
     logger.setExternalLogStream(null);
     if (!this.logFH) {
       return;
     }
     try {
-      await new Promise(resolve => this.logFH.close(() => resolve()));
+      await new Promise<void>(resolve => this.logFH.close(() => resolve()));
     } catch (e) {
       // ignore
     }
@@ -1094,15 +1170,15 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  awaitProcess(proc) {
-    let stdout = [];
-    let stderr = [];
+  awaitProcess(proc: ChildProcess) {
+    let stdout : string[] = [];
+    let stderr : string[] = [];
 
-    proc.stdout.on("data", (data) => {
+    proc.stdout!.on("data", (data) => {
       stdout.push(data.toString());
     });
 
-    proc.stderr.on("data", (data) => {
+    proc.stderr!.on("data", (data) => {
       stderr.push(data.toString());
     });
 
@@ -1153,13 +1229,13 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.statsFilename) {
       try {
         await fsp.writeFile(this.params.statsFilename, JSON.stringify(stats, null, 2));
-      } catch (err) {
+      } catch (err: any) {
         logger.warn("Stats output failed", err);
       }
     }
   }
 
-  async loadPage(page, data, selectorOptsList = DEFAULT_SELECTORS) {
+  async loadPage(page: Page, data: PageState, selectorOptsList = DEFAULT_SELECTORS) {
     const {url, seedId, depth} = data;
 
     const logDetails = data.logDetails;
@@ -1170,7 +1246,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
     // if so, don't report as an error
-    page.once("requestfailed", (req) => {
+    page.once("requestfailed", (req: HTTPRequest) => {
       ignoreAbort = shouldIgnoreAbort(req);
     });
 
@@ -1189,6 +1265,10 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       const resp = await page.goto(url, gotoOpts);
 
+      if (!resp) {
+        throw new Error("page response missing");
+      }
+
       // Handle 4xx or 5xx response as a page load error
       const statusCode = resp.status();
       if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
@@ -1204,7 +1284,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
-    } catch (e) {
+    } catch (e: any) {
       const msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         // if timeout error, and at least got to content loaded, continue on
@@ -1230,16 +1310,17 @@ self.__bx_behaviors.selectMainBehavior();
     data.isHTMLPage = isHTMLPage;
 
     if (isHTMLPage) {
-      let frames = await page.frames();
-      frames = await Promise.allSettled(frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)));
+      const frames = await page.frames();
 
-      data.filteredFrames = frames.filter((x) => {
+      const filteredFrames = await Promise.allSettled(frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)));
+
+      data.filteredFrames = filteredFrames.filter((x: PromiseSettledResult<Frame | null>) => {
         if (x.status === "fulfilled") {
           return !!x.value;
         }
         logger.warn("Error in iframe check", {reason: x.reason, ...logDetails});
         return false;
-      }).map(x => x.value);
+      }).map(x => (x as PromiseFulfilledResult<Frame>).value);
 
       //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
@@ -1268,7 +1349,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.extractLinks(page, data, selectorOptsList, logDetails);
   }
 
-  async netIdle(page, details) {
+  async netIdle(page: Page, details: LogDetails) {
     if (!this.params.netIdleWait) {
       return;
     }
@@ -1284,13 +1365,13 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async extractLinks(page, data, selectors = DEFAULT_SELECTORS, logDetails) {
+  async extractLinks(page: Page, data: PageState, selectors = DEFAULT_SELECTORS, logDetails: LogDetails) {
     const {seedId, depth, extraHops = 0, filteredFrames, callbacks} = data;
 
-    let links = [];
+    let links : string[] = [];
     const promiseList = [];
 
-    callbacks.addLink = (url) => {
+    callbacks.addLink = (url: string) => {
       links.push(url);
       if (links.length == 500) {
         promiseList.push(this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails));
@@ -1298,18 +1379,18 @@ self.__bx_behaviors.selectMainBehavior();
       }
     };
 
-    const loadLinks = (options) => {
+    const loadLinks = (options: {selector: string, extract: string, isAttribute: boolean, addLinkFunc: string}) => {
       const { selector, extract, isAttribute, addLinkFunc } = options;
-      const urls = new Set();
+      const urls = new Set<string>();
 
-      const getAttr = elem => urls.add(elem.getAttribute(extract));
-      const getProp = elem => urls.add(elem[extract]);
+      const getAttr = (elem: any) => urls.add(elem.getAttribute(extract));
+      const getProp = (elem: any) => urls.add(elem[extract]);
 
       const getter = isAttribute ? getAttr : getProp;
 
       document.querySelectorAll(selector).forEach(getter);
 
-      const func = window[addLinkFunc];
+      const func = (window as any)[addLinkFunc] as (url: string) => {};
       urls.forEach(url => func.call(this, url));
 
       return true;
@@ -1329,13 +1410,13 @@ self.__bx_behaviors.selectMainBehavior();
         );
 
         for (let i = 0; i < promiseResults.length; i++) {
-          const {status, reason} = promiseResults[i];
+          const {status, reason} = promiseResults[i] as any;
           if (status === "rejected") {
             logger.warn("Link Extraction failed in frame", {reason, frameUrl: frames[i].url, ...logDetails});
           }
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       logger.warn("Link Extraction failed", e);
     }
 
@@ -1346,7 +1427,7 @@ self.__bx_behaviors.selectMainBehavior();
     await Promise.allSettled(promiseList);
   }
 
-  async queueInScopeUrls(seedId, urls, depth, extraHops = 0, logDetails = {}) {
+  async queueInScopeUrls(seedId: number, urls: string[], depth: number, extraHops = 0, logDetails: LogDetails = {}) {
     try {
       depth += 1;
 
@@ -1366,12 +1447,12 @@ self.__bx_behaviors.selectMainBehavior();
           await this.queueUrl(seedId, url, depth, isOOS ? newExtraHops : extraHops, logDetails);
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       logger.error("Queuing Error", e);
     }
   }
 
-  async checkCF(page, logDetails) {
+  async checkCF(page: Page, logDetails: LogDetails) {
     try {
       logger.debug("Check CF Blocking", logDetails);
 
@@ -1391,7 +1472,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async queueUrl(seedId, url, depth, extraHops, logDetails = {}) {
+  async queueUrl(seedId: number, url: string, depth: number, extraHops: number, logDetails: LogDetails = {}) {
     if (this.limitHit) {
       return false;
     }
@@ -1429,7 +1510,7 @@ self.__bx_behaviors.selectMainBehavior();
       this.pagesFH = await fsp.open(this.pagesFile, "a");
 
       if (createNew) {
-        const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
+        const header : Record<string, string> = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
         header["hasText"] = this.params.text.includes("to-pages");
         if (this.params.text.length) {
           logger.debug("Text Extraction: " + this.params.text.join(","));
@@ -1440,13 +1521,13 @@ self.__bx_behaviors.selectMainBehavior();
         await this.pagesFH.writeFile(header_formatted);
       }
 
-    } catch(err) {
+    } catch(err: any) {
       logger.error("pages/pages.jsonl creation failed", err);
     }
   }
 
-  async writePage({pageid, url, depth, title, text, loadState, mime, favicon}) {
-    const row = {id: pageid, url, title, loadState};
+  async writePage({pageid, url, depth, title, text, loadState, mime, favicon} : PageState) {
+    const row : PageEntry = {id: pageid!, url, title, loadState};
 
     if (mime) {
       row.mime = mime;
@@ -1466,23 +1547,23 @@ self.__bx_behaviors.selectMainBehavior();
 
     const processedRow = JSON.stringify(row) + "\n";
     try {
-      await this.pagesFH.writeFile(processedRow);
-    } catch (err) {
+      await this.pagesFH!.writeFile(processedRow);
+    } catch (err: any) {
       logger.warn("pages/pages.jsonl append failed", err);
     }
   }
 
-  resolveAgent(urlParsed) {
+  resolveAgent(urlParsed: URL) {
     return urlParsed.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT;
   }
 
-  async isHTML(url, logDetails) {
+  async isHTML(url: string, logDetails: LogDetails) {
     try {
       const resp = await fetch(url, {
         method: "HEAD",
         headers: this.headers,
         agent: this.resolveAgent
-      });
+      } as any);
       if (resp.status !== 200) {
         logger.debug("HEAD response code != 200, loading in browser", {status: resp.status, ...logDetails});
         return true;
@@ -1497,7 +1578,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  isHTMLContentType(contentType) {
+  isHTMLContentType(contentType: string | null) {
     // just load if no content-type
     if (!contentType) {
       return true;
@@ -1512,9 +1593,9 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async parseSitemap(url, seedId, sitemapFromDate) {
+  async parseSitemap(url: string, seedId: number, sitemapFromDate: number) {
     // handle sitemap last modified date if passed
-    let lastmodFromTimestamp = null;
+    let lastmodFromTimestamp = undefined;
     const dateObj = new Date(sitemapFromDate);
     if (isNaN(dateObj.getTime())) {
       logger.info("Fetching full sitemap (fromDate not specified/valid)", {url, sitemapFromDate}, "sitemap");
@@ -1534,7 +1615,7 @@ self.__bx_behaviors.selectMainBehavior();
       const { sites } = await sitemapper.fetch();
       logger.info("Sitemap Urls Found", {urls: sites.length}, "sitemap");
       await this.queueInScopeUrls(seedId, sites, 0);
-    } catch(e) {
+    } catch(e: any) {
       logger.warn("Error fetching sites from sitemap", e, "sitemap");
     }
   }
@@ -1617,11 +1698,13 @@ self.__bx_behaviors.selectMainBehavior();
 
       const reader = fs.createReadStream(fileSizeObjects[j].fileName);
 
-      const p = new Promise((resolve) => {
+      const p = new Promise<void>((resolve) => {
         reader.on("end", () => resolve());
       });
 
-      reader.pipe(fh, {end: false});
+      if (fh) {
+        reader.pipe(fh, {end: false});
+      }
 
       await p;
     }
@@ -1682,7 +1765,7 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       logger.info(`Saving crawl state to: ${filename}`);
       await fsp.writeFile(filename, res);
-    } catch (e) {
+    } catch (e: any) {
       logger.error(`Failed to write save state file: ${filename}`, e);
       return;
     }
@@ -1693,7 +1776,7 @@ self.__bx_behaviors.selectMainBehavior();
       const oldFilename = this.saveStateFiles.shift();
       logger.info(`Removing old save-state: ${oldFilename}`);
       try {
-        await fsp.unlink(oldFilename);
+        await fsp.unlink(oldFilename || "");
       } catch (e) {
         logger.error(`Failed to delete old save state file: ${oldFilename}`);
       }
@@ -1707,10 +1790,11 @@ self.__bx_behaviors.selectMainBehavior();
   }
 }
 
-function shouldIgnoreAbort(req) {
+function shouldIgnoreAbort(req: HTTPRequest) {
   try {
-    const failure = req.failure() && req.failure().errorText;
-    if (failure !== "net::ERR_ABORTED" || req.resourceType() !== "document") {
+    const failure = req.failure();
+    const failureText = failure && failure.errorText || "";
+    if (failureText !== "net::ERR_ABORTED" || req.resourceType() !== "document") {
       return false;
     }
 
@@ -1728,5 +1812,7 @@ function shouldIgnoreAbort(req) {
   } catch (e) {
     return false;
   }
+
+  return false;
 }
 

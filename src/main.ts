@@ -5,13 +5,13 @@ import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
 
 
-var crawler = null;
+var crawler : Crawler | null = null;
 
 var lastSigInt = 0;
 let forceTerm = false;
 
 
-async function handleTerminate(signame) {
+async function handleTerminate(signame: string) {
   logger.info(`${signame} received...`);
   if (!crawler || !crawler.crawlState) {
     logger.error("error: no crawler running, exiting");
@@ -23,7 +23,7 @@ async function handleTerminate(signame) {
     process.exit(0);
   }
 
-  setExitOnRedisError(true);
+  setExitOnRedisError();
 
   try {
     crawler.checkCanceled();
@@ -37,7 +37,7 @@ async function handleTerminate(signame) {
       await crawler.serializeAndExit();
     }
     lastSigInt = Date.now();
-  } catch (e) {
+  } catch (e: any) {
     logger.error("Error stopping crawl after receiving termination signal", e);
   }
 }

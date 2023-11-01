@@ -3,7 +3,7 @@ import path from "path";
 
 const MAX_DEPTH = 2;
 
-export function collectAllFileSources(fileOrDir: string, ext = null, depth = 0) : string[] {
+export function collectAllFileSources(fileOrDir: string, ext?: string, depth = 0) : string[] {
   const resolvedPath = path.resolve(fileOrDir);
 
   if (depth >= MAX_DEPTH) {
