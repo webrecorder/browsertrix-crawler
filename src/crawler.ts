@@ -5,6 +5,7 @@ import os from "os";
 import fsp, { FileHandle } from "fs/promises";
 
 import { RedisCrawlState, LoadState, QueueState, PageState } from "./util/state.js";
+
 import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
 
@@ -40,7 +41,7 @@ const HTTPS_AGENT = new HTTPSAgent({
 
 const HTTP_AGENT = new HTTPAgent();
 
-const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
+const behaviors = fs.readFileSync(new URL("../node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
 const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
@@ -452,7 +453,7 @@ export class Crawler {
   }
 
   async setupPage({page, cdp, workerid, callbacks} : {page: Page, cdp: CDPSession, workerid: string, callbacks: any}) {
-    await this.browser.setupPage({page});
+    await this.browser.setupPage({page, cdp});
 
     if ((this.adBlockRules && this.params.blockAds) ||
         this.blockRules || this.originOverride) {
@@ -1604,7 +1605,7 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info("Fetching and filtering sitemap by date", {url, sitemapFromDate}, "sitemap");
     }
 
-    const sitemapper = new Sitemapper({
+    const sitemapper = (Sitemapper as any)({
       url,
       timeout: 15000,
       requestHeaders: this.headers,

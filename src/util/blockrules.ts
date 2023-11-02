@@ -246,7 +246,7 @@ export class AdBlockRules extends BlockRules
 {
   adhosts: string[];
 
-  constructor(blockPutUrl: string, blockErrMsg: string, adhostsFilePath = "../ad-hosts.json") {
+  constructor(blockPutUrl: string, blockErrMsg: string, adhostsFilePath = "../../ad-hosts.json") {
     super([], blockPutUrl, blockErrMsg);
     this.adhosts = JSON.parse(fs.readFileSync(new URL(adhostsFilePath, import.meta.url), {"encoding": "utf-8"}));
   }

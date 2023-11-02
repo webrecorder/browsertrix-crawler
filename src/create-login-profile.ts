@@ -2,25 +2,26 @@
 
 import fs from "fs";
 import path from "path";
-import http from "http";
+import http, { IncomingMessage, ServerResponse } from "http";
 
 import readline from "readline";
 import child_process from "child_process";
 
-import yargs from "yargs";
+import yargs, { Options } from "yargs";
 
 import { logger } from "./util/logger.js";
 
 import { sleep } from "./util/timing.js";
 import { Browser } from "./util/browser.js";
 import { initStorage } from "./util/storage.js";
+import { CDPSession, Page, Protocol, PuppeteerLifeCycleEvent } from "puppeteer-core";
 
-const profileHTML = fs.readFileSync(new URL("html/createProfile.html", import.meta.url), {encoding: "utf8"});
-const vncHTML = fs.readFileSync(new URL("html/vnc_lite.html", import.meta.url), {encoding: "utf8"});
+const profileHTML = fs.readFileSync(new URL("../html/createProfile.html", import.meta.url), {encoding: "utf8"});
+const vncHTML = fs.readFileSync(new URL("../html/vnc_lite.html", import.meta.url), {encoding: "utf8"});
 
-const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
+const behaviors = fs.readFileSync(new URL("../node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
-function cliOpts() {
+function cliOpts(): { [key: string]: Options }  {
   return {
     "url": {
       describe: "The URL of the login page",
@@ -103,23 +104,22 @@ function getDefaultWindowSize() {
 
 
 async function main() {
-  const params = yargs(process.argv)
+  const params : any = yargs(process.argv)
     .usage("browsertrix-crawler profile [options]")
     .option(cliOpts())
     .argv;
 
   logger.setDebugLogging(true);
 
-
   if (!params.headless) {
     logger.debug("Launching XVFB");
     child_process.spawn("Xvfb", [
-      process.env.DISPLAY,
+      process.env.DISPLAY || "",
       "-listen",
       "tcp",
       "-screen",
       "0",
-      process.env.GEOMETRY,
+      process.env.GEOMETRY || "",
       "-ac",
       "+extension",
       "RANDR"
@@ -138,9 +138,9 @@ async function main() {
       "-rfbport",
       "6080",
       "-passwd",
-      process.env.VNC_PASS,
+      process.env.VNC_PASS || "",
       "-display",
-      process.env.DISPLAY
+      process.env.DISPLAY || ""
     ]);
   }
 
@@ -191,7 +191,7 @@ async function main() {
 
   const { page, cdp } = await browser.newWindowPageWithCDP();
 
-  const waitUntil = "load";
+  const waitUntil : PuppeteerLifeCycleEvent = "load";
 
   await page.setCacheEnabled(false);
 
@@ -216,7 +216,8 @@ async function main() {
   }
 }
 
-async function automatedProfile(params, browser, page, cdp, waitUntil) {
+async function automatedProfile(params: any, browser: Browser, page: Page, cdp: CDPSession,
+    waitUntil: PuppeteerLifeCycleEvent) {
   let u, p;
 
   logger.debug("Looking for username and password entry fields on page...");
@@ -235,12 +236,12 @@ async function automatedProfile(params, browser, page, cdp, waitUntil) {
     return;
   }
 
-  await u.type(params.user);
+  await u!.type(params.user);
 
-  await p.type(params.password);
+  await p!.type(params.password);
 
   await Promise.allSettled([
-    p.press("Enter"),
+    p!.press("Enter"),
     page.waitForNavigation({waitUntil})
   ]);
 
@@ -253,7 +254,7 @@ async function automatedProfile(params, browser, page, cdp, waitUntil) {
   process.exit(0);
 }
 
-async function createProfile(params, browser, page, cdp, targetFilename = "") {
+async function createProfile(params: any, browser: Browser, page: Page, cdp: CDPSession, targetFilename = "") {
   await cdp.send("Network.clearBrowserCache");
 
   await browser.close();
@@ -281,8 +282,8 @@ async function createProfile(params, browser, page, cdp, targetFilename = "") {
   return resource;
 }
 
-function promptInput(msg, hidden = false) {
-  const rl = readline.createInterface({
+function promptInput(msg: string, hidden = false) {
+  const rl : any = readline.createInterface({
     input: process.stdin,
     output: process.stdout
   });
@@ -303,17 +304,32 @@ function promptInput(msg, hidden = false) {
     });
   }
 
-  return new Promise((resolve) => {
-    rl.question(msg, function (res) {
+  return new Promise<string>((resolve) => {
+    rl.question(msg, function (res: string) {
       rl.close();
       resolve(res);
     });
   });
 }
 
+type OptionalCookie = Protocol.Network.Cookie | {
+
+};
+
 
 class InteractiveBrowser {
-  constructor(params, browser, page, cdp, targetId) {
+  params: any;
+  browser: Browser;
+  page: Page;
+  cdp: CDPSession;
+
+  targetId: string;
+  originSet = new Set<string>;
+
+  shutdownWait: number;
+  shutdownTimer: NodeJS.Timer | null;
+
+  constructor(params: any, browser: Browser, page: Page, cdp: CDPSession, targetId: string) {
     logger.info("Creating Profile Interactively...");
     child_process.spawn("socat", ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"]);
 
@@ -323,8 +339,6 @@ class InteractiveBrowser {
     this.cdp = cdp;
 
     this.targetId = targetId;
-
-    this.originSet = new Set();
 
     this.addOrigin();
 
@@ -348,7 +362,7 @@ class InteractiveBrowser {
       this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
       logger.debug(`Shutting down in ${this.shutdownWait}ms if no ping received`);
     } else {
-      this.shutdownTimer = 0;
+      this.shutdownTimer = null;
     }
 
     const httpServer = http.createServer((req, res) => this.handleRequest(req, res));
@@ -376,15 +390,17 @@ class InteractiveBrowser {
     }
   }
 
-  async saveCookiesFor(url) {
+  async saveCookiesFor(url: string) {
     try {
       if (this.params.cookieDays <= 0) {
         return;
       }
 
-      const cookies = await this.browser.getCookies(this.page, url);
-      for (const cookie of cookies) {
+      const cookies = await this.browser.getCookies(this.page);
+      for (const cookieOrig of cookies) {
+        const cookie = cookieOrig as any;
         cookie.expires = (new Date().getTime() / 1000) + this.params.cookieDays * 86400;
+        
         delete cookie.size;
         delete cookie.session;
         if (cookie.sameSite && cookie.sameSite !== "Lax" && cookie.sameSite !== "Strict") {
@@ -395,7 +411,7 @@ class InteractiveBrowser {
         }
       }
       await this.browser.setCookies(this.page, cookies);
-    } catch (e) {
+    } catch (e: any) {
       logger.error("Save Cookie Error: ", e);
     }
   }
@@ -408,8 +424,8 @@ class InteractiveBrowser {
     }
   }
 
-  async handleRequest(req, res) {
-    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+  async handleRequest(req: IncomingMessage, res: ServerResponse) {
+    const parsedUrl = new URL(req.url || "", `http://${req.headers.host}`);
     const pathname = parsedUrl.pathname;
     let targetUrl;
     let origins;
@@ -433,7 +449,7 @@ class InteractiveBrowser {
 
     case "/ping":
       if (this.shutdownWait) {
-        clearInterval(this.shutdownTimer);
+        clearTimeout(this.shutdownTimer as any);
         this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
         logger.debug(`Ping received, delaying shutdown for ${this.shutdownWait}ms`);
       }
@@ -469,7 +485,7 @@ class InteractiveBrowser {
 
         this.page.goto(url);
 
-      } catch (e) {
+      } catch (e: any) {
         res.writeHead(400, {"Content-Type": "application/json"});
         res.end(JSON.stringify({"error": e.toString()}));
         logger.warn("HTTP Error", e);
@@ -492,7 +508,7 @@ class InteractiveBrowser {
 
         res.writeHead(200, {"Content-Type": "application/json"});
         res.end(JSON.stringify({resource, origins}));
-      } catch (e) {
+      } catch (e: any) {
         res.writeHead(500, {"Content-Type": "application/json"});
         res.end(JSON.stringify({"error": e.toString()}));
         logger.warn("HTTP Error", e);
@@ -513,7 +529,7 @@ class InteractiveBrowser {
 
         res.writeHead(200, {"Content-Type": "text/html"});
         res.end("<html><body>Profile Created! You may now close this window.</body></html>");
-      } catch (e) {
+      } catch (e: any) {
         res.writeHead(500, {"Content-Type": "text/html"});
         res.end("<html><body>Profile creation failed! See the browsertrix-crawler console for more info");
         logger.warn("HTTP Error", e);
@@ -524,7 +540,7 @@ class InteractiveBrowser {
     }
 
     if (pathname.startsWith("/vnc/")) {
-      const fileUrl = new URL("node_modules/@novnc/novnc/" + pathname.slice("/vnc/".length), import.meta.url);
+      const fileUrl = new URL("../node_modules/@novnc/novnc/" + pathname.slice("/vnc/".length), import.meta.url);
       const file = fs.readFileSync(fileUrl, {encoding: "utf-8"});
       res.writeHead(200, {"Content-Type": "application/javascript"});
       res.end(file);
@@ -535,7 +551,7 @@ class InteractiveBrowser {
     res.end("Not Found");
   }
 
-  async readBodyJson(req) {
+  async readBodyJson(req: IncomingMessage) {
     const buffers = [];
 
     for await (const chunk of req) {

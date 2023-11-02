@@ -16,7 +16,7 @@ import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.j
 import { rewriteDASH, rewriteHLS } from "@webrecorder/wabac/src/rewrite/rewriteVideo.js";
 
 import { WARCRecord } from "warcio";
-import { TempFileBuffer, WARCSerializer } from "warcio/dist/node";
+import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
 import { RedisCrawlState } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";

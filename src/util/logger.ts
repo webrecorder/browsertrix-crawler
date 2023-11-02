@@ -2,7 +2,7 @@
 // to fix serialization of regexes for logging purposes
 
 import { Writable } from "node:stream";
-import { RedisCrawlState } from "./state";
+import { RedisCrawlState } from "./state.js";
 
 // RegExp.prototype.toJSON = RegExp.prototype.toString;
 Object.defineProperty(RegExp.prototype, "toJSON", { value: RegExp.prototype.toString });

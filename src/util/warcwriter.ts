@@ -3,7 +3,7 @@ import { Writable } from "stream";
 import path from "path";
 
 import { CDXIndexer } from "warcio";
-import { WARCSerializer } from "warcio/dist/node";
+import { WARCSerializer } from "warcio/node";
 import { logger, errJSON } from "./logger.js";
 import type { IndexerOffsetLength, WARCRecord } from "warcio";
 

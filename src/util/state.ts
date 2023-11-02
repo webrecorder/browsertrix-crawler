@@ -1,4 +1,4 @@
-import Redis, { Result, Callback } from "ioredis";
+import { Redis, Result, Callback } from "ioredis";
 
 import { logger } from "./logger.js";
 

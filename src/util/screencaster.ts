@@ -8,7 +8,7 @@ import { logger } from "./logger.js";
 import { Duplex } from "stream";
 import { CDPSession, Page, Protocol } from "puppeteer-core";
 
-const indexHTML = fs.readFileSync(new URL("../html/screencast.html", import.meta.url), {encoding: "utf8"});
+const indexHTML = fs.readFileSync(new URL("../../html/screencast.html", import.meta.url), {encoding: "utf8"});
 
 
 // ===========================================================================
@@ -113,7 +113,7 @@ class RedisPubSubTransport
 
     await subRedis.subscribe(this.ctrlChannel);
 
-    subRedis.on("message", async (channel, message) => {
+    subRedis.on("message", async (channel: string, message: string) => {
       if (channel !== this.ctrlChannel) {
         return;
       }

@@ -1,5 +1,5 @@
-import { WARCResourceWriter } from "./warcresourcewriter";
-import { logger } from "./logger";
+import { WARCResourceWriter } from "./warcresourcewriter.js";
+import { logger } from "./logger.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 
 // ============================================================================

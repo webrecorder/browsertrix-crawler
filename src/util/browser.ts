@@ -77,7 +77,7 @@ export class Browser
     await this._init(launchOpts, ondisconnect);
   }
 
-  async setupPage({page} : {page: Page}) {
+  async setupPage({page, cdp} : {page: Page, cdp: CDPSession}) {
     await this.addInitScript(page, "Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
     if (this.customProfile) {
@@ -259,7 +259,7 @@ export class Browser
     });
   }
 
-  async newWindowPageWithCDP() {
+  async newWindowPageWithCDP() : Promise<{cdp: CDPSession, page: Page}> {
     // unique url to detect new pages
     const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
 
@@ -298,6 +298,9 @@ export class Browser
     const target = await p;
 
     const page = await target.page();
+    if (!page) {
+      throw new Error("page missing");
+    }
 
     const device = this.emulateDevice;
 

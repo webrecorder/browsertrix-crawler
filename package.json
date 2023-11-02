@@ -25,9 +25,10 @@
     "p-queue": "^7.3.4",
     "puppeteer-core": "^20.7.4",
     "sharp": "^0.32.1",
-    "sitemapper": "^3.2.5",
+    "sitemapper": "^3.2.6",
+    "tsc": "^2.0.4",
     "uuid": "8.3.2",
-    "warcio": "^2.2.0",
+    "warcio": "^2.2.1",
     "ws": "^7.4.4",
     "yargs": "^17.7.2"
   },

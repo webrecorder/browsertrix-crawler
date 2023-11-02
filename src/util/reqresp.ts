@@ -1,5 +1,5 @@
 // @ts-ignore
-import { getStatusText } from "@webrecorder/wabac/src/utils";
+import { getStatusText } from "@webrecorder/wabac/src/utils.js";
 
 import { Protocol } from "puppeteer-core";
 

@@ -39,14 +39,20 @@ RUN mkdir -p /tmp/ads && cd /tmp/ads && \
 
 RUN yarn install --network-timeout 1000000
 
-ADD *.js /app/
-ADD util/*.js /app/util/
+#ADD *.js /app/
+#ADD util/*.js /app/util/
+ADD tsconfig.json /app/
+ADD src /app/src
+
+RUN yarn run tsc
 
 ADD config/ /app/
 
 ADD html/ /app/html/
 
-RUN ln -s /app/main.js /usr/bin/crawl; ln -s /app/create-login-profile.js /usr/bin/create-login-profile
+RUN chmod u+x /app/dist/main.js /app/dist/create-login-profile.js
+
+RUN ln -s /app/dist/main.js /usr/bin/crawl; ln -s /app/dist/create-login-profile.js /usr/bin/create-login-profile
 
 WORKDIR /crawls
 

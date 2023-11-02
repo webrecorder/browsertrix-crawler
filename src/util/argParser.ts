@@ -142,7 +142,7 @@ class ArgParser {
       "driver": {
         describe: "JS driver for the crawler",
         type: "string",
-        default: "./defaultDriver.js",
+        default: "../defaultDriver.js",
       },
 
       "generateCDX": {
