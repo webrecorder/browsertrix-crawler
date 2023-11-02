@@ -6,11 +6,9 @@ import util from "util";
 import os from "os";
 import { createHash } from "crypto";
 
-// @ts-ignore
 import crc32 from "crc/crc32";
 
-// @ts-ignore
-import Minio from "minio";
+import * as Minio from "minio";
 
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
@@ -62,8 +60,6 @@ export class S3StorageSync
       secretKey,
       partSize: 100*1024*1024
     });
-
-    this.client.enableSHA256 = true;
 
     this.bucketName = url.pathname.slice(1).split("/")[0];
 

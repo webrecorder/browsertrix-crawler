@@ -2,7 +2,6 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 
-// @ts-ignore
 import yaml from "js-yaml";
 import { KnownDevices as devices } from "puppeteer-core";
 import yargs, { Options } from "yargs";
