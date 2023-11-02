@@ -280,7 +280,7 @@ class ArgParser {
       },
 
       "screenshot": {
-        describe: "Screenshot options for crawler, can include: view, thumbnail, fullPage (comma-separated list)",
+        describe: "Screenshot options for crawler, can include: view, thumbnail, fullPage",
         type: "array",
         default: [],
         choices: Array.from(Object.keys(screenshotTypes)),
