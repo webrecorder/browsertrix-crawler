@@ -38,6 +38,8 @@ jobs:
         node-version: ${{ matrix.node-version }}
     - name: install requirements
       run: yarn install
+    - name: build js
+      run: yarn run tsc
     - name: build docker
       run: docker-compose build
     - name: run jest
