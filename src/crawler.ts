@@ -126,7 +126,7 @@ export class Crawler {
   driver!: (opts: {page: Page, data: PageState, crawler: Crawler}) => {};
   
   constructor() {
-    const res = parseArgs([]);
+    const res = parseArgs();
     this.params = res.parsed;
     this.origConfig = res.origConfig;
 
@@ -761,8 +761,8 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async getInfoString() {
-    const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json", {encoding: "utf-8"}));
-    const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json", {encoding: "utf-8"}));
+    const packageFileJSON = JSON.parse(await fsp.readFile(new URL("../package.json", import.meta.url), {encoding: "utf-8"}));
+    const warcioPackageJSON = JSON.parse(await fsp.readFile(new URL("../node_modules/warcio/package.json", import.meta.url), {encoding: "utf-8"}));
     const pywbVersion = "0.0";//child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
 
     return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`;

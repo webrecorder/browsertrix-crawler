@@ -142,7 +142,7 @@ class ArgParser {
       "driver": {
         describe: "JS driver for the crawler",
         type: "string",
-        default: "../defaultDriver.js",
+        default: "./defaultDriver.js",
       },
 
       "generateCDX": {
@@ -410,8 +410,8 @@ class ArgParser {
     };
   }
 
-  parseArgs(argv: string[]) {
-    argv = argv || process.argv;
+  parseArgs(argvParams?: string[]) {
+    let argv = argvParams || process.argv;
 
     if (process.env.CRAWL_ARGS) {
       argv = argv.concat(this.splitCrawlArgsQuoteSafe(process.env.CRAWL_ARGS));
@@ -586,6 +586,6 @@ function validateArrayOpts(value: string | string[], name: string, allowedValues
   return arrayValue;
 }
 
-export function parseArgs(argv: string[]) {
+export function parseArgs(argv?: string[]) {
   return new ArgParser().parseArgs(argv);
 }
