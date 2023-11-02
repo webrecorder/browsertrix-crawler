@@ -476,10 +476,7 @@ class ArgParser {
     behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 
-    if (argv.newContext) {
-      logger.info("Note: The newContext argument is deprecated in 0.8.0. Values passed to this option will be ignored");
-    }
-
+    argv.text = argv.text || [];
 
     if (argv.mobileDevice) {
       argv.emulateDevice = devices[argv.mobileDevice.replace("-", " ")];
