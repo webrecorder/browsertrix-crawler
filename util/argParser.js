@@ -17,6 +17,10 @@ import { logger } from "./logger.js";
 // ============================================================================
 class ArgParser {
   get cliOpts() {
+    const coerce = array => {
+      return array.flatMap(v => v.split(",")).filter(x => !!x);
+    };
+
     return {
       "seeds": {
         alias: "url",
@@ -40,14 +44,16 @@ class ArgParser {
 
       "crawlId": {
         alias: "id",
-        describe: "A user provided ID for this crawl or crawl configuration (can also be set via CRAWL_ID env var)",
+        describe: "A user provided ID for this crawl or crawl configuration (can also be set via CRAWL_ID env var, defaults to hostname)",
         type: "string",
-        default: process.env.CRAWL_ID || os.hostname(),
       },
 
       "waitUntil": {
         describe: "Puppeteer page.goto() condition to wait for before continuing, can be multiple separated by ','",
-        default: "load,networkidle2",
+        type: "array",
+        default: ["load", "networkidle2"],
+        choices: WAIT_UNTIL_OPTS,
+        coerce,
       },
 
       "depth": {
@@ -173,25 +179,36 @@ class ArgParser {
 
       "logging": {
         describe: "Logging options for crawler, can include: stats (enabled by default), jserrors, pywb, debug",
-        type: "string",
-        default: "stats",
+        type: "array",
+        default: ["stats"],
+        coerce,
       },
 
       "logLevel": {
         describe: "Comma-separated list of log levels to include in logs",
-        type: "string",
-        default: "",
+        type: "array",
+        default: [],
+        coerce,
       },
 
       "context": {
         describe: "Comma-separated list of contexts to include in logs",
-        type: "string",
-        default: "",
+        type: "array",
+        default: [],
+        coerce,
       },
 
       "text": {
-        describe: "If set, extract text to the pages.jsonl file",
-        type: "string",
+        describe: "Extract initial (default) or final text to pages.jsonl or WARC resource record(s)",
+        type: "array",
+        choices: EXTRACT_TEXT_TYPES,
+        coerce: (array) => {
+          // backwards compatibility: default --text true / --text -> --text to-pages
+          if (!array.length || (array.length === 1 && array[0] === "true")) {
+            return ["to-pages"];
+          }
+          return coerce(array);
+        }
       },
 
       "cwd": {
@@ -231,8 +248,10 @@ class ArgParser {
 
       "behaviors": {
         describe: "Which background behaviors to enable on each page",
-        default: "autoplay,autofetch,autoscroll,siteSpecific",
-        type: "string",
+        type: "array",
+        default: ["autoplay", "autofetch", "autoscroll", "siteSpecific"],
+        choices: ["autoplay", "autofetch", "autoscroll", "siteSpecific"],
+        coerce,
       },
 
       "behaviorTimeout": {
@@ -261,9 +280,11 @@ class ArgParser {
       },
 
       "screenshot": {
-        describe: "Screenshot options for crawler, can include: view, thumbnail, fullPage (comma-separated list)",
-        type: "string",
-        default: "",
+        describe: "Screenshot options for crawler, can include: view, thumbnail, fullPage",
+        type: "array",
+        default: [],
+        choices: Array.from(Object.keys(screenshotTypes)),
+        coerce,
       },
 
       "screencastPort": {
@@ -441,6 +462,7 @@ class ArgParser {
   }
 
   validateArgs(argv) {
+    argv.crawlId = argv.crawlId || process.env.CRAWL_ID || os.hostname;
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
 
     // Check that the collection name is valid.
@@ -448,42 +470,13 @@ class ArgParser {
       logger.fatal(`\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`);
     }
 
-    // waitUntil condition must be: load, domcontentloaded, networkidle0, networkidle2
-    // can be multiple separate by comma
-    // (see: https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#pagegotourl-options)
-    if (typeof argv.waitUntil != "object") {
-      argv.waitUntil = argv.waitUntil.split(",");
-    }
-
-    // split text options
-    if (argv.text === "" || argv.text === "true") {
-      argv.text = "to-pages";
-    }
-
-    argv.waitUntil = validateArrayOpts(argv.waitUntil, "waitUntil", WAIT_UNTIL_OPTS);
-
-    argv.screenshot = validateArrayOpts(argv.screenshot, "screenshot", Array.from(Object.keys(screenshotTypes)));
-
-    argv.text = validateArrayOpts(argv.text, "text", EXTRACT_TEXT_TYPES);
-
-    // log options
-    argv.logging = argv.logging.split(",");
-    argv.logLevel = argv.logLevel ? argv.logLevel.split(",") : [];
-    argv.context = argv.context ? argv.context.split(",") : [];
-
     // background behaviors to apply
     const behaviorOpts = {};
-    if (typeof argv.behaviors != "object"){
-      argv.behaviors = argv.behaviors.split(",");
-    }
     argv.behaviors.forEach((x) => behaviorOpts[x] = true);
     behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 
-    if (argv.newContext) {
-      logger.info("Note: The newContext argument is deprecated in 0.8.0. Values passed to this option will be ignored");
-    }
-
+    argv.text = argv.text || [];
 
     if (argv.mobileDevice) {
       argv.emulateDevice = devices[argv.mobileDevice.replace("-", " ")];
@@ -558,30 +551,6 @@ class ArgParser {
 
     return true;
   }
-}
-
-function validateArrayOpts(value, name, allowedValues) {
-  if (!value) {
-    return [];
-  }
-
-  if (value instanceof Array) {
-    return value;
-  }
-
-  if (typeof(value) !== "string") {
-    return [];
-  }
-
-  const arrayValue = value.split(",");
-
-  for (value of arrayValue) {
-    if (!allowedValues.includes(value)) {
-      logger.fatal(`Invalid value "${value}" for field "${name}": allowed values are: ${allowedValues.join(",")}`);
-    }
-  }
-
-  return arrayValue;
 }
 
 export function parseArgs(argv) {
