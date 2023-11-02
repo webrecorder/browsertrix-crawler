@@ -18,7 +18,7 @@ import { rewriteDASH, rewriteHLS } from "@webrecorder/wabac/src/rewrite/rewriteV
 import { WARCRecord } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
-import { RedisCrawlState } from "./state.js";
+import { RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 
 const MAX_BROWSER_FETCH_SIZE = 2_000_000;
@@ -40,7 +40,7 @@ function logNetwork(msg: string, data: any) {
 // =================================================================
 export class Recorder
 {
-  workerid: string;
+  workerid: WorkerId;
   collDir: string;
   crawler: any;
 
@@ -71,7 +71,7 @@ export class Recorder
 
   pageid!: string;
 
-  constructor({workerid, collDir, crawler} : {workerid: string, collDir: string, crawler: any}) {
+  constructor({workerid, collDir, crawler} : {workerid: WorkerId, collDir: string, crawler: any}) {
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;

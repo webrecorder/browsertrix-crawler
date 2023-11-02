@@ -4,7 +4,7 @@ import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp, { FileHandle } from "fs/promises";
 
-import { RedisCrawlState, LoadState, QueueState, PageState } from "./util/state.js";
+import { RedisCrawlState, LoadState, QueueState, PageState, WorkerId } from "./util/state.js";
 
 import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
@@ -412,7 +412,7 @@ export class Crawler {
     }
   }
 
-  _behaviorLog({data, type} : {data: string, type: string}, pageUrl: string, workerid: string) {
+  _behaviorLog({data, type} : {data: string, type: string}, pageUrl: string, workerid: WorkerId) {
     let behaviorLine;
     let message;
     let details;
@@ -452,7 +452,7 @@ export class Crawler {
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  async setupPage({page, cdp, workerid, callbacks} : {page: Page, cdp: CDPSession, workerid: string, callbacks: any}) {
+  async setupPage({page, cdp, workerid, callbacks} : {page: Page, cdp: CDPSession, workerid: WorkerId, callbacks: any}) {
     await this.browser.setupPage({page, cdp});
 
     if ((this.adBlockRules && this.params.blockAds) ||
@@ -690,7 +690,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async workerIdle(workerid: string) {
+  async workerIdle(workerid: WorkerId) {
     if (this.screencaster) {
       //logger.debug("End Screencast", {workerid}, "screencast");
       await this.screencaster.stopById(workerid, true);

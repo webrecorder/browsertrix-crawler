@@ -7,7 +7,7 @@ import { sleep, timedRun } from "./timing.js";
 import { Recorder } from "./recorder.js";
 import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
-import { PageState } from "./state.js";
+import { PageState, WorkerId } from "./state.js";
 
 const MAX_REUSE = 5;
 
@@ -37,7 +37,7 @@ export function runWorkers(crawler: any, numWorkers: number, maxPageTime: number
   }
 
   for (let i = 0; i < numWorkers; i++) {
-    workers.push(new PageWorker(String(i + offset), crawler, maxPageTime, collDir));
+    workers.push(new PageWorker((i + offset), crawler, maxPageTime, collDir));
   }
 
   return Promise.allSettled(workers.map((worker) => worker.run()));
@@ -48,7 +48,7 @@ export function runWorkers(crawler: any, numWorkers: number, maxPageTime: number
 export type WorkerOpts = Record<string, any> & {
   page: Page;
   cdp: CDPSession;
-  workerid: string;
+  workerid: WorkerId;
   callbacks: Record<string, Function>;
   directFetchCapture?: ((url: string) => Promise<{fetched: boolean, mime: string}>) | null;
 };
@@ -61,7 +61,7 @@ export type WorkerState = WorkerOpts & {
 // ===========================================================================
 export class PageWorker
 {
-  id: string;
+  id: WorkerId;
   crawler: any;
   maxPageTime: number;
 
@@ -81,7 +81,7 @@ export class PageWorker
 
   recorder: Recorder;
 
-  constructor(id: string, crawler: any, maxPageTime: number, collDir: string) {
+  constructor(id: WorkerId, crawler: any, maxPageTime: number, collDir: string) {
     this.id = id;
     this.crawler = crawler;
     this.maxPageTime = maxPageTime;

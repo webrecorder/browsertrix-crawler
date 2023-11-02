@@ -7,6 +7,7 @@ import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 import { Duplex } from "stream";
 import { CDPSession, Page, Protocol } from "puppeteer-core";
+import { WorkerId } from "./state.js";
 
 const indexHTML = fs.readFileSync(new URL("../../html/screencast.html", import.meta.url), {encoding: "utf8"});
 
@@ -155,9 +156,9 @@ class RedisPubSubTransport
 class ScreenCaster
 {
   transport: WSTransport;
-  caches = new Map<string, string>();
-  urls = new Map<string, string>();
-  cdps = new Map<string, CDPSession>();
+  caches = new Map<WorkerId, string>();
+  urls = new Map<WorkerId, string>();
+  cdps = new Map<WorkerId, CDPSession>();
   maxWidth = 640;
   maxHeight = 480;
   initMsg: {[key: string]: any};
@@ -184,7 +185,7 @@ class ScreenCaster
     }
   }
 
-  async screencastPage(page: Page, cdp: CDPSession, id: string) {
+  async screencastPage(page: Page, cdp: CDPSession, id: WorkerId) {
     this.urls.set(id, page.url());
 
     // shouldn't happen, getting duplicate cdp
@@ -230,7 +231,7 @@ class ScreenCaster
     }
   }
 
-  async stopById(id: string, sendClose=false) {
+  async stopById(id: WorkerId, sendClose=false) {
     this.caches.delete(id);
     this.urls.delete(id);
 
@@ -251,7 +252,7 @@ class ScreenCaster
     this.cdps.delete(id);
   }
 
-  async startCast(cdp: CDPSession, id: string) {
+  async startCast(cdp: CDPSession, id: WorkerId) {
     if ((cdp as any)._startedCast) {
       return;
     }
@@ -263,7 +264,7 @@ class ScreenCaster
     await cdp.send("Page.startScreencast", {format: "png", everyNthFrame: 1, maxWidth: this.maxWidth, maxHeight: this.maxHeight});
   }
 
-  async stopCast(cdp: CDPSession, id: string) {
+  async stopCast(cdp: CDPSession, id: WorkerId) {
     if (!(cdp as any)._startedCast) {
       return;
     }

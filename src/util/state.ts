@@ -26,6 +26,10 @@ export enum QueueState {
 
 
 // ============================================================================
+export type WorkerId = number;
+
+
+// ============================================================================
 export class PageState
 {
   url: string;
@@ -33,7 +37,7 @@ export class PageState
   depth: number;
   extraHops: number;
 
-  workerid!: string;
+  workerid!: WorkerId;
 
   pageid?: string;
   title?: string;
