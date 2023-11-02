@@ -1,4 +1,4 @@
-import { calculatePercentageUsed, checkDiskUtilization } from "../util/storage.js";
+import { calculatePercentageUsed, checkDiskUtilization } from "../dist/util/storage.js";
 
 
 test("ensure calculatePercentageUsed returns expected values", () => {

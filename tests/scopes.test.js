@@ -1,4 +1,4 @@
-import { parseArgs } from "../util/argParser.js";
+import { parseArgs } from "../dist/util/argParser.js";
 
 import fs from "fs";
 
