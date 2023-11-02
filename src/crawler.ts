@@ -1605,7 +1605,7 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info("Fetching and filtering sitemap by date", {url, sitemapFromDate}, "sitemap");
     }
 
-    const sitemapper = (Sitemapper as any)({
+    const sitemapper = new (Sitemapper as any)({
       url,
       timeout: 15000,
       requestHeaders: this.headers,

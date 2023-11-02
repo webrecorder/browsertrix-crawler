@@ -26,7 +26,7 @@ export class ScopedSeed
 
 
   constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} :
-              {url: string, scopeType: ScopeType, include: string[], exclude?: string[], allowHash?: boolean, depth?: number, sitemap?: boolean, extraHops?: number}) {
+              {url: string, scopeType: ScopeType, include: string[], exclude?: string[], allowHash?: boolean, depth?: number, sitemap?: string | boolean | null, extraHops?: number}) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");
@@ -105,10 +105,13 @@ export class ScopedSeed
     return parsedUrl;
   }
 
-  resolveSiteMap(sitemap: boolean) : string | null {
+  resolveSiteMap(sitemap: boolean | string | null) : string | null {
     if (sitemap === true) {
       const url = new URL(this.url);
       url.pathname = "/sitemap.xml";
+      return url.href;
+    } else if (typeof(sitemap) === "string") {
+      const url = new URL(sitemap, this.url);
       return url.href;
     }
 
