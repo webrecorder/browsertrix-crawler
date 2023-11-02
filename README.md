@@ -530,18 +530,6 @@ separately `--screenshot thumbnail --screenshot view --screenshot fullPage`.
 
 Screenshots are written into a `screenshots.warc.gz` WARC file in the `archives/` directory. If the `--generateWACZ` command line option is used, the screenshots WARC is written into the `archive` directory of the WACZ file and indexed alongside the other WARCs.
 
-### Watching the crawl -- Screencasting
-
-With version 0.4.0, Browsertrix Crawler includes an experimental 'screencasting' option, which allows watching the crawl in real-time via screencast (connected via a websocket).
-
-To enable, add `--screencastPort` command-line option and also map the port on the docker container. An example command might be:
-
-```
-docker run -p 9037:9037 -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl  --url https://www.example.com --screencastPort 9037
-```
-
-Then, you can open `http://localhost:9037/` and watch the crawl.
-
 ### Text Extraction
 
 Browsertrix Crawler supports text extraction via the `--text` flag.
@@ -554,6 +542,18 @@ With version 0.12.0, the `--text` flag accepts one or more of the following extr
 
 The options can be separate or combined into a comma separate list, eg. `--text to-warc,final-to-warc` or `--text to-warc --text final-to-warc`
 are equivalent. For backwards compatibility, `--text` alone is equivalent to `--text to-pages`.
+
+### Watching the crawl -- Screencasting
+
+With version 0.4.0, Browsertrix Crawler includes an experimental 'screencasting' option, which allows watching the crawl in real-time via screencast (connected via a websocket).
+
+To enable, add `--screencastPort` command-line option and also map the port on the docker container. An example command might be:
+
+```
+docker run -p 9037:9037 -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl  --url https://www.example.com --screencastPort 9037
+```
+
+Then, you can open `http://localhost:9037/` and watch the crawl.
 
 ### Uploading crawl output to S3-Compatible Storage
 
