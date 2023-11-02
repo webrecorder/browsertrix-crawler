@@ -18,7 +18,7 @@ import { logger } from "./logger.js";
 class ArgParser {
   get cliOpts() {
     const coerce = array => {
-      return array.flatMap(v => v.split(","));
+      return array.flatMap(v => v.split(",")).filter(x => !!x);
     };
 
     return {
@@ -450,7 +450,6 @@ class ArgParser {
       .check((argv) => this.validateArgs(argv))
       .argv;
 
-    console.log("parsed", parsed.text);
     return {parsed, origConfig};
   }
 
