@@ -103,8 +103,9 @@ test("check crawl restarted with saved state", async () => {
   redis = new Redis("redis://127.0.0.1:36379/0", {lazyConnect: true});
 
   try {
-
-    await redis.connect({maxRetriesPerRequest: 100});
+    await redis.connect({maxRetriesPerRequest: 100, retryStrategy(times) {
+      return times < 100 ? 1000 : null;
+    }});
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
