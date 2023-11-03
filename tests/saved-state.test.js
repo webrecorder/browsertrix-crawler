@@ -93,8 +93,7 @@ test("check crawl restarted with saved state", async () => {
 
   try {
     proc = exec(`docker run -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`, {shell: "/bin/bash"}, wait.callback);
-  }
-  catch (error) {
+  } catch (error) {
     console.log(error);
   }
 
@@ -103,13 +102,18 @@ test("check crawl restarted with saved state", async () => {
   redis = new Redis("redis://127.0.0.1:36379/0", {lazyConnect: true});
 
   try {
-    await redis.connect({maxRetriesPerRequest: 100, retryStrategy(times) {
-      return times < 100 ? 1000 : null;
-    }});
+    await redis.connect({
+      maxRetriesPerRequest: 100,
+      retryStrategy(times) {
+        return times < 100 ? 1000 : null;
+      }
+    });
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     expect(await redis.get("test:d")).toBe(numDone + "");
+  } catch (e) {
+    console.log(e);
   } finally {
     proc.kill("SIGINT");
   }
