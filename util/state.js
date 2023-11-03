@@ -190,7 +190,7 @@ return 0;
   }
 
   async markFinished(url) {
-    await this.redis.call("hdel", this.pkey, url);
+    await this.redis.hdel(this.pkey, url);
 
     return await this.redis.incr(this.dkey);
   }
@@ -199,6 +199,12 @@ return 0;
     await this.redis.movefailed(this.pkey, this.fkey, url, "1", "failed");
 
     return await this.redis.incr(this.dkey);
+  }
+
+  async markExcluded(url) {
+    await this.redis.hdel(this.pkey, url);
+
+    await this.redis.srem(this.skey, url);
   }
 
   recheckScope(data, seeds) {
@@ -284,25 +290,44 @@ return 0;
     }
   }
 
-  async filterQueue(regexStr) {
+  isStrMatch(s) {
+    // if matches original string, then consider not a regex
+    return s.replace(/\\/g, "").replace(/[\\^$*+?.()|[\]{}]/g, "\\$&") === s;
+  }
+
+  filterQueue(regexStr) {
     const regex = new RegExp(regexStr);
 
-    const qsize = await this.redis.zcard(this.qkey);
+    let matcher = undefined;
 
-    const count = 50;
+    // regexStr just a string, optimize by using glob matching
+    if (this.isStrMatch(regexStr)) {
+      matcher = {"match": `*${regexStr}*`};
+    }
 
-    for (let i = 0; i < qsize; i += count) {
-      const results = await this.redis.zrangebyscore(this.qkey, 0, "inf", "limit", i, count);
+    const stream = this.redis.zscanStream(this.qkey, matcher);
+
+    stream.on("data", async (results) => {
+      stream.pause();
 
       for (const result of results) {
         const { url } = JSON.parse(result);
         if (regex.test(url)) {
           const removed = await this.redis.zrem(this.qkey, result);
           await this.redis.srem(this.skey, url);
+          //await this.redis.hdel(this.pkey, url);
           logger.debug("Removing excluded URL", {url, regex, removed}, "exclusion");
         }
       }
-    }
+
+      stream.resume();
+    });
+
+    return new Promise(resolve => {
+      stream.on("end", () => {
+        resolve();
+      });
+    });
   }
 
   async incFailCount() {

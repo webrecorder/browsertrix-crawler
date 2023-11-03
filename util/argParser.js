@@ -207,6 +207,9 @@ class ArgParser {
           if (!array.length || (array.length === 1 && array[0] === "true")) {
             return ["to-pages"];
           }
+          if (array.length === 1 && array[0] === "false") {
+            return [];
+          }
           return coerce(array);
         }
       },
