@@ -102,11 +102,16 @@ test("check crawl restarted with saved state", async () => {
 
   redis = new Redis("redis://127.0.0.1:36379/0", {lazyConnect: true});
 
-  await redis.connect({maxRetriesPerRequest: 50});
+  try {
 
-  expect(await redis.get("test:d")).toBe(numDone + "");
+    await redis.connect({maxRetriesPerRequest: 100});
 
-  proc.kill("SIGINT");
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    expect(await redis.get("test:d")).toBe(numDone + "");
+  } finally {
+    proc.kill("SIGINT");
+  }
 
   finishProcess = wait.p;
 });
