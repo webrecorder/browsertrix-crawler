@@ -268,7 +268,7 @@ return 0;
           for (const seed of seeds) {
             seed.addExclusion(regex);
           }
-          // can happen async w/o slowing down scrolling
+          // can happen async w/o slowing down crawling
           // each page is still checked if in scope before crawling, even while
           // queue is being filtered
           this.filterQueue(regex);
@@ -314,9 +314,9 @@ return 0;
         const { url } = JSON.parse(result);
         if (regex.test(url)) {
           const removed = await this.redis.zrem(this.qkey, result);
-          if (removed) {
-            await this.markExcluded(url);
-          }
+          //if (removed) {
+          await this.markExcluded(url);
+          //}
           logger.debug("Removing excluded URL", {url, regex, removed}, "exclusion");
         }
       }
