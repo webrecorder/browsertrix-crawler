@@ -481,11 +481,6 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    if (!this.isInScope(data, logDetails)) {
-      logger.info("Page no longer in scope", data);
-      return true;
-    }
-
     // run custom driver here
     await this.driver({page, data, crawler: this});
 
