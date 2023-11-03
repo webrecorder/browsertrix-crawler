@@ -314,8 +314,9 @@ return 0;
         const { url } = JSON.parse(result);
         if (regex.test(url)) {
           const removed = await this.redis.zrem(this.qkey, result);
-          await this.redis.srem(this.skey, url);
-          //await this.redis.hdel(this.pkey, url);
+          if (removed) {
+            await this.markExcluded(url);
+          }
           logger.debug("Removing excluded URL", {url, regex, removed}, "exclusion");
         }
       }
