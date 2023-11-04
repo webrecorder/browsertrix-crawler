@@ -546,11 +546,6 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    if (!this.isInScope(data, logDetails)) {
-      logger.info("Page no longer in scope", data);
-      return true;
-    }
-
     data.isHTMLPage = await timedRun(
       this.isHTML(url, logDetails),
       FETCH_TIMEOUT_SECS,
