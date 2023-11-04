@@ -17,7 +17,7 @@ import { logger } from "./logger.js";
 // ============================================================================
 class ArgParser {
   get cliOpts() : { [key: string]: Options } {
-    const coerce = array => {
+    const coerce = (array : string[]) => {
       return array.flatMap(v => v.split(",")).filter(x => !!x);
     };
 

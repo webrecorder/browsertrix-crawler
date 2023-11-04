@@ -409,7 +409,7 @@ return 0;
       stream.resume();
     });
 
-    return new Promise(resolve => {
+    return new Promise<void>(resolve => {
       stream.on("end", () => {
         resolve();
       });
