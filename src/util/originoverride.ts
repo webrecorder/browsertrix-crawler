@@ -2,8 +2,9 @@ import { HTTPRequest, Page } from "puppeteer-core";
 import { errJSON, logger } from "./logger.js";
 import { Browser } from "./browser.js";
 
-export class OriginOverride {
-  originOverride: { origUrl: URL; destUrl: URL }[];
+export class OriginOverride
+{
+  originOverride: {origUrl: URL, destUrl: URL}[];
 
   constructor(originOverride: string[]) {
     this.originOverride = originOverride.map((override) => {
@@ -11,7 +12,7 @@ export class OriginOverride {
       const origUrl = new URL(orig);
       const destUrl = new URL(dest);
 
-      return { origUrl, destUrl };
+      return {origUrl, destUrl};
     });
   }
 
@@ -23,7 +24,7 @@ export class OriginOverride {
         let newUrl = null;
         let orig = null;
 
-        for (const { origUrl, destUrl } of this.originOverride) {
+        for (const {origUrl, destUrl} of this.originOverride) {
           if (url.startsWith(origUrl.origin)) {
             newUrl = destUrl.origin + url.slice(origUrl.origin.length);
             orig = origUrl;
@@ -43,25 +44,18 @@ export class OriginOverride {
           headers.set("origin", orig.origin);
         }
 
-        const resp = await fetch(newUrl, { headers });
+        const resp = await fetch(newUrl, {headers});
 
         const body = Buffer.from(await resp.arrayBuffer());
         const respHeaders = Object.fromEntries(resp.headers);
         const status = resp.status;
 
-        logger.debug(
-          "Origin overridden",
-          { orig: url, dest: newUrl, status, body: body.length },
-          "originoverride",
-        );
+        logger.debug("Origin overridden", {orig: url, dest: newUrl, status, body: body.length}, "originoverride");
 
-        request.respond({ body, headers: respHeaders, status }, -1);
+        request.respond({body, headers: respHeaders, status}, -1);
+
       } catch (e) {
-        logger.warn(
-          "Error overriding origin",
-          { ...errJSON(e), url: page.url() },
-          "originoverride",
-        );
+        logger.warn("Error overriding origin", {...errJSON(e), url: page.url()}, "originoverride");
         request.continue({}, -1);
       }
     };

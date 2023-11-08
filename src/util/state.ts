@@ -6,6 +6,7 @@ import { MAX_DEPTH } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 
+
 // ============================================================================
 export enum LoadState {
   FAILED = 0,
@@ -15,6 +16,7 @@ export enum LoadState {
   BEHAVIORS_DONE = 4,
 }
 
+
 // ============================================================================
 export enum QueueState {
   ADDED = 0,
@@ -22,11 +24,14 @@ export enum QueueState {
   DUPE_URL = 2,
 }
 
+
 // ============================================================================
 export type WorkerId = number;
 
+
 // ============================================================================
-export class PageState {
+export class PageState
+{
   url: string;
   seedId: number;
   depth: number;
@@ -48,16 +53,11 @@ export class PageState {
 
   skipBehaviors = false;
   filteredFrames: Frame[] = [];
-  loadState: LoadState = LoadState.FAILED;
+  loadState : LoadState = LoadState.FAILED;
 
   logDetails = {};
 
-  constructor(redisData: {
-    url: string;
-    seedId: number;
-    depth: number;
-    extraHops: number;
-  }) {
+  constructor(redisData: {url: string, seedId: number, depth: number, extraHops: number}) {
     this.url = redisData.url;
     this.seedId = redisData.seedId;
     this.depth = redisData.depth;
@@ -78,7 +78,10 @@ declare module "ioredis" {
       limit: number,
     ): Result<number, Context>;
 
-    getnext(qkey: string, pkey: string): Result<string, Context>;
+    getnext(
+      qkey: string,
+      pkey: string,
+    ): Result<string, Context>;
 
     markstarted(
       pkey: string,
@@ -100,7 +103,7 @@ declare module "ioredis" {
     unlockpending(
       pkeyUrl: string,
       uid: string,
-      callback?: Callback<string>,
+      callback?: Callback<string>
     ): Result<void, Context>;
 
     requeue(
@@ -110,11 +113,13 @@ declare module "ioredis" {
       url: string,
       maxRetryPending: number,
     ): Result<number, Context>;
+
   }
 }
 
 // ============================================================================
-export class RedisCrawlState {
+export class RedisCrawlState
+{
   redis: Redis;
   maxRetryPending = 1;
   _lastSize = 0;
@@ -129,7 +134,7 @@ export class RedisCrawlState {
   dkey: string;
   fkey: string;
   ekey: string;
-
+  
   constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
 
@@ -169,7 +174,7 @@ end
 redis.call('zadd', KEYS[2], ARGV[2], ARGV[3]);
 redis.call('hdel', KEYS[1], ARGV[1]);
 return 0;
-`,
+`
     });
 
     redis.defineCommand("getnext", {
@@ -184,7 +189,7 @@ if json then
 end
 
 return json;
-`,
+`
     });
 
     redis.defineCommand("markstarted", {
@@ -200,7 +205,7 @@ if json then
   redis.call('setex', KEYS[2], ARGV[3], ARGV[4]);
 end
 
-`,
+`
     });
 
     redis.defineCommand("unlockpending", {
@@ -212,7 +217,7 @@ if value == ARGV[1] then
   redis.call('del', KEYS[1])
 end
 
-`,
+`
     });
 
     redis.defineCommand("movefailed", {
@@ -229,7 +234,7 @@ if json then
   redis.call('hdel', KEYS[1], ARGV[1]);
 end
 
-`,
+`
     });
 
     redis.defineCommand("requeue", {
@@ -252,8 +257,9 @@ if not res then
   end
 end
 return 0;
-`,
+`
     });
+
   }
 
   async _getNext() {
@@ -267,14 +273,7 @@ return 0;
   async markStarted(url: string) {
     const started = this._timestamp();
 
-    return await this.redis.markstarted(
-      this.pkey,
-      this.pkey + ":" + url,
-      url,
-      started,
-      this.maxPageTime,
-      this.uid,
-    );
+    return await this.redis.markstarted(this.pkey, this.pkey + ":" + url, url, started, this.maxPageTime, this.uid);
   }
 
   async markFinished(url: string) {
@@ -295,24 +294,21 @@ return 0;
     await this.redis.srem(this.skey, url);
   }
 
-  recheckScope(
-    data: { url: string; depth: number; extraHops: number; seedId: number },
-    seeds: ScopedSeed[],
-  ) {
+  recheckScope(data: {url: string, depth: number, extraHops: number, seedId: number}, seeds: ScopedSeed[]) {
     const seed = seeds[data.seedId];
 
     return seed.isIncluded(data.url, data.depth, data.extraHops);
   }
 
   async isFinished() {
-    return (await this.queueSize()) == 0 && (await this.numDone()) > 0;
+    return ((await this.queueSize()) == 0) && ((await this.numDone()) > 0);
   }
 
   async setStatus(status_: string) {
     await this.redis.hset(`${this.key}:status`, this.uid, status_);
   }
 
-  async getStatus(): Promise<string> {
+  async getStatus() : Promise<string> {
     return (await this.redis.hget(`${this.key}:status`, this.uid)) || "";
   }
 
@@ -349,35 +345,35 @@ return 0;
         return;
       }
       try {
-        const { type, regex } = JSON.parse(result);
+        const {type, regex} = JSON.parse(result);
         switch (type) {
-          case "addExclusion":
-            logger.debug("Add Exclusion", { type, regex }, "exclusion");
-            if (!regex) {
-              break;
-            }
-            for (const seed of seeds) {
-              seed.addExclusion(regex);
-            }
-            // can happen async w/o slowing down crawling
-            // each page is still checked if in scope before crawling, even while
-            // queue is being filtered
-            this.filterQueue(regex);
+        case "addExclusion":
+          logger.debug("Add Exclusion", {type, regex}, "exclusion");
+          if (!regex) {
             break;
+          }
+          for (const seed of seeds) {
+            seed.addExclusion(regex);
+          }
+          // can happen async w/o slowing down crawling
+          // each page is still checked if in scope before crawling, even while
+          // queue is being filtered
+          this.filterQueue(regex);
+          break;
 
-          case "removeExclusion":
-            logger.debug("Remove Exclusion", { type, regex }, "exclusion");
-            if (!regex) {
-              break;
-            }
-            for (const seed of seeds) {
-              seed.removeExclusion(regex);
-            }
+        case "removeExclusion":
+          logger.debug("Remove Exclusion", {type, regex}, "exclusion");
+          if (!regex) {
             break;
+          }
+          for (const seed of seeds) {
+            seed.removeExclusion(regex);
+          }
+          break;
         }
-        // TODO: Fix this the next time the file is edited.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (e: any) {
+      } // TODO: Fix this the next time the file is edited.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      catch (e: any) {
         logger.warn("Error processing message", e, "redisMessage");
       }
     }
@@ -395,7 +391,7 @@ return 0;
 
     // regexStr just a string, optimize by using glob matching
     if (this.isStrMatch(regexStr)) {
-      matcher = { match: `*${regexStr}*` };
+      matcher = {"match": `*${regexStr}*`};
     }
 
     const stream = this.redis.zscanStream(this.qkey, matcher);
@@ -410,18 +406,14 @@ return 0;
           //if (removed) {
           await this.markExcluded(url);
           //}
-          logger.debug(
-            "Removing excluded URL",
-            { url, regex, removed },
-            "exclusion",
-          );
+          logger.debug("Removing excluded URL", {url, regex, removed}, "exclusion");
         }
       }
 
       stream.resume();
     });
 
-    return new Promise<void>((resolve) => {
+    return new Promise<void>(resolve => {
       stream.on("end", () => {
         resolve();
       });
@@ -434,23 +426,15 @@ return 0;
 
     // consider failed if 3 failed retries in 60 secs
     await this.redis.expire(key, 60);
-    return res >= 3;
+    return (res >= 3);
   }
 
   //async addToQueue({url : string, seedId, depth = 0, extraHops = 0} = {}, limit = 0) {
-  async addToQueue(
-    {
-      url,
-      seedId,
-      depth = 0,
-      extraHops = 0,
-    }: { url: string; seedId: number; depth?: number; extraHops?: number },
-    limit = 0,
-  ) {
+  async addToQueue({url, seedId, depth = 0, extraHops = 0} : {url: string, seedId: number, depth?: number, extraHops?: number}, limit = 0) {
     const added = this._timestamp();
     // TODO: Fix this the next time the file is edited.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = { added, url, seedId, depth };
+    const data : any = {added, url, seedId, depth};
     if (extraHops) {
       data.extraHops = extraHops;
     }
@@ -459,15 +443,7 @@ return 0;
     // 0 - url queued successfully
     // 1 - url queue size limit reached
     // 2 - url is a dupe
-    return await this.redis.addqueue(
-      this.pkey,
-      this.qkey,
-      this.skey,
-      url,
-      this._getScore(data),
-      JSON.stringify(data),
-      limit,
-    );
+    return await this.redis.addqueue(this.pkey, this.qkey, this.skey, url, this._getScore(data), JSON.stringify(data), limit);
   }
 
   async nextFromQueue() {
@@ -476,7 +452,7 @@ return 0;
 
     try {
       data = JSON.parse(json);
-    } catch (e) {
+    } catch(e) {
       logger.error("Invalid queued json", json);
       return null;
     }
@@ -502,27 +478,20 @@ return 0;
     const failed = await this._iterListKeys(this.fkey);
     const errors = await this.getErrorList();
 
-    return { done, queued, pending, failed, errors };
+    return {done, queued, pending, failed, errors};
   }
 
-  _getScore(data: { depth: number; extraHops: number }) {
+  _getScore(data: {depth: number, extraHops: number}) {
     return (data.depth || 0) + (data.extraHops || 0) * MAX_DEPTH;
   }
 
   async _iterSortedKey(key: string, inc = 100) {
-    const results: string[] = [];
+    const results : string[] = [];
 
     const len = await this.redis.zcard(key);
 
     for (let i = 0; i < len; i += inc) {
-      const someResults = await this.redis.zrangebyscore(
-        key,
-        0,
-        "inf",
-        "LIMIT",
-        i,
-        inc,
-      );
+      const someResults = await this.redis.zrangebyscore(key, 0, "inf", "LIMIT", i, inc);
       results.push(...someResults);
     }
 
@@ -530,7 +499,7 @@ return 0;
   }
 
   async _iterListKeys(key: string, inc = 100) {
-    const results: string[] = [];
+    const results : string[] = [];
 
     const len = await this.redis.llen(key);
 
@@ -541,14 +510,10 @@ return 0;
     return results;
   }
 
-  async load(
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    state: Record<string, any>,
-    seeds: ScopedSeed[],
-    checkScope: boolean,
-  ) {
-    const seen: string[] = [];
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async load(state: Record<string, any>, seeds: ScopedSeed[], checkScope: boolean) {
+    const seen : string[] = [];
 
     // need to delete existing keys, if exist to fully reset state
     await this.redis.del(this.qkey);
@@ -565,7 +530,7 @@ return 0;
           continue;
         }
       }
-
+ 
       await this.redis.zadd(this.qkey, this._getScore(data), json);
       seen.push(data.url);
     }
@@ -582,7 +547,7 @@ return 0;
       seen.push(data.url);
     }
 
-    if (typeof state.done === "number") {
+    if (typeof(state.done) === "number") {
       // done key is just an int counter
       await this.redis.set(this.dkey, state.done);
     } else if (state.done instanceof Array) {
@@ -638,7 +603,7 @@ return 0;
 
   async getPendingList() {
     const list = await this.redis.hvals(this.pkey);
-    return list.map((x) => JSON.parse(x));
+    return list.map(x => JSON.parse(x));
   }
 
   async getErrorList() {
@@ -652,9 +617,9 @@ return 0;
       for (const url of pendingUrls) {
         await this.redis.unlockpending(this.pkey + ":" + url, this.uid);
       }
-      // TODO: Fix this the next time the file is edited.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    catch (e: any) {
       logger.error("Redis Del Pending Failed", e, "state");
     }
   }
@@ -663,21 +628,15 @@ return 0;
     const pendingUrls = await this.redis.hkeys(this.pkey);
 
     for (const url of pendingUrls) {
-      const res = await this.redis.requeue(
-        this.pkey,
-        this.qkey,
-        this.pkey + ":" + url,
-        url,
-        this.maxRetryPending,
-      );
+      const res = await this.redis.requeue(this.pkey, this.qkey, this.pkey + ":" + url, url, this.maxRetryPending);
       switch (res) {
-        case 1:
-          logger.info(`Requeued: ${url}`);
-          break;
+      case 1:
+        logger.info(`Requeued: ${url}`);
+        break;
 
-        case 2:
-          logger.info(`Not requeuing anymore: ${url}`);
-          break;
+      case 2:
+        logger.info(`Not requeuing anymore: ${url}`);
+        break;
       }
     }
   }
@@ -699,3 +658,4 @@ return 0;
     return await this.redis.lpush(this.ekey, error);
   }
 }
+

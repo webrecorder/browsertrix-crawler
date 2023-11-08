@@ -51,6 +51,7 @@ Browsertrix Crawler includes a number of additional command-line options, explai
 
 ## Crawling Configuration Options
 
+
 <details>
       <summary><b>The Browsertrix Crawler docker image currently accepts the following parameters:</b></summary>
 
@@ -268,8 +269,8 @@ Options:
                                             ess (for debugging)        [boolean]
       --config                              Path to YAML config file
 ```
-
 </details>
+
 
 ### Waiting for Page Load
 
@@ -281,11 +282,13 @@ See [page.goto waitUntil options](https://pptr.dev/api/puppeteer.page.goto#remar
 
 The `--pageLoadTimeout`/`--timeout` option sets the timeout in seconds for page load, defaulting to 90 seconds. Behaviors will run on the page once either the page load condition or the page load timeout is met, whichever happens first.
 
+
 ### YAML Crawl Config
 
 Browsertix Crawler supports the use of a yaml file to set parameters for a crawl. This can be used by passing a valid yaml file to the `--config` option.
-
+ 
 The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used. For example, the following should start a crawl with config in `crawl-config.yaml`.
+
 
 ```
 docker run -v $PWD/crawl-config.yaml:/app/crawl-config.yaml -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl --config /app/crawl-config.yaml
@@ -296,6 +299,7 @@ The config can also be passed via stdin, which can simplify the command. Note th
 ```
 cat ./crawl-config.yaml | docker run -i -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl --config stdin
 ```
+
 
 An example config file (eg. crawl-config.yaml) might contain:
 
@@ -357,6 +361,7 @@ To make this configuration as simple as possible, there are several predefined s
 The scope settings for multi-page crawls (page-spa, prefix, host, domain) also include http/https versions, eg. given a prefix of `http://example.com/path/`,
 `https://example.com/path/` is also included.
 
+
 #### Custom Scope Inclusion Rules
 
 Instead of setting a scope type, it is possible to instead configure custom scope regex by setting `--include` config to one or more regular expressions.
@@ -370,6 +375,7 @@ In addition to the inclusion rules, Browsertrix Crawler supports a separate list
 
 The exclusion regexes are often used with a custom scope, but could be used with a predefined scopeType as well.
 
+
 #### Extra 'Hops' Beyond Current Scope
 
 Occasionally, it may be useful to augment the scope by allowing extra links N 'hops' beyond the current scope.
@@ -378,6 +384,7 @@ For example, this is most useful when crawling with a `host` or `prefix` scope, 
 
 The `--extraHops` setting can be set globally or per seed to allow expanding the current inclusion scope N 'hops' beyond the configured scope. Note that this mechanism only expands the inclusion scope, and any exclusion rules are still applied. If a URL is to be excluded via the exclusion rules,
 that will take precedence over the `--extraHops`.
+
 
 #### Scope Rule Examples
 
@@ -449,23 +456,26 @@ If the `--blockMessage` is also specified, a blocked URL is replaced with the sp
 
 If it seems confusing which rules should be used, here is a quick way to determine:
 
-- If you'd like to restrict _the pages that are being crawled_, use the crawl scope rules (defined above).
+- If you'd like to restrict *the pages that are being crawled*, use the crawl scope rules (defined above).
 
-- If you'd like to restrict _parts of a page_ that are being loaded, use the page resource block rules described in this section.
+- If you'd like to restrict *parts of a page* that are being loaded, use the page resource block rules described in this section.
 
 The blockRules add a filter to each URL loaded on a page and incur an extra overhead. They should only be used in advance uses cases where part of a page needs to be blocked.
 
 These rules can not be used to prevent entire pages for loading -- use the scope exclusion rules for that. (A warning will be printed if a page resource block rule matches a top-level page).
 
+
 ### Ad blocking
 
 With version 0.8.0, Browsertrix Crawler supports blocking ads from being loaded during capture based on [Stephen Black's list of known ad hosts](https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts). To enable ad blocking, use the `--blockAds` option. If `--adBlockMessage` is set, a record with the specified error message will be added in the ad's place.
+
 
 ### Custom Warcinfo Fields
 
 Custom fields can be added to the `warcinfo` WARC record, generated for each combined WARCs. The fields can be specified in the YAML config under `warcinfo` section or specifying individually via the command-line.
 
 For example, the following are equivalent ways to add additional warcinfo fields:
+
 
 via yaml config:
 
@@ -612,6 +622,7 @@ docker run -e CHROME_FLAGS="--disable-extensions-except=/ext/ublock --load-exten
 
 You can also directly use extensions from an existing chrome-profile by using e.g. `~/.config/chromium/Default/Extensions/cjpalhdlnbpafiamejdnhcphjbkeiagm/1.41.8_0/` as the path.
 
+
 ## Saving Crawl State: Interrupting and Restarting the Crawl
 
 With version 0.5.0, a crawl can be gracefully interrupted with Ctrl-C (SIGINT) or a SIGTERM.
@@ -631,10 +642,12 @@ or `never` respectively, to control when the crawl state file should be written.
 When the `--saveState` is set to always, Browsertrix Crawler will also save the state automatically during the crawl, as set by the `--saveStateInterval` setting.
 When The crawler will keep the last `--saveStateHistory` save states and delete older ones. This provides extra backup, in case the crawl fails unexpectedly, or is not terminated via Ctrl-C, several previous crawl states are still available.
 
+
 ## Creating and Using Browser Profiles
 
 Browsertrix Crawler also includes a way to use existing browser profiles when running a crawl. This allows pre-configuring the browser, such as by logging in
 to certain sites or setting other settings, and running a crawl exactly with those settings. By creating a logged in profile, the actual login credentials are not included in the crawl, only (temporary) session cookies.
+
 
 ### Interactive Profile Creation
 
@@ -706,6 +719,7 @@ The script will then prompt you for login credentials, attempt to login and crea
 
 - To specify the window size for the profile creation embedded browser, specify `--windowSize WIDTH,HEIGHT`. (The default is 1600x900)
 
+
 The current profile creation script is still experimental and the script attempts to detect the username and password fields on a site as generically as possible, but may not work for all sites. Additional automated profile creation functionality, such as support for custom profile creation scripts, may be added in the future.
 
 ### Using Browser Profile with a Crawl
@@ -729,6 +743,7 @@ All released Docker Images are available from Docker Hub, listed by release tag 
 
 Details for each corresponding release tag are also available on GitHub at: https://github.com/webrecorder/browsertrix-crawler/releases
 
+
 ## Architecture
 
 The Docker container provided here packages up several components used in Browsertrix.
@@ -736,6 +751,7 @@ The Docker container provided here packages up several components used in Browse
 The system uses `pywb` in recording mode for capturing the content. The crawl produces a single pywb collection, at `/crawls/collections/<collection name>` in the Docker container.
 
 To access the contents of the crawl, the `/crawls` directory in the container should be mounted to a volume (default in the Docker Compose setup).
+
 
 ### Usage with Docker Compose
 
@@ -759,7 +775,9 @@ docker-compose run crawler crawl --url https://webrecorder.net/ --generateCDX --
 
 In this example, the crawl data is written to `./crawls/collections/wr-net` by default.
 
+
 While the crawl is running, the status of the crawl prints the progress to the JSON log output. This can be disabled by using the `--logging` option and not including `stats`.
+
 
 ### Multi-Platform Build / Support for Apple Silicon (M1/M2)
 
@@ -769,6 +787,7 @@ This means Browsertrix Crawler can be built natively on Apple Silicon systems us
 
 On an Apple Silicon system, the browser used will be Chromium instead of Chrome since there is no Linux build of Chrome for ARM, and this now is handled automatically as part of the build. Note that Chromium is different than Chrome, and for example, some video codecs may not be supported in the ARM / Chromium-based version that would be in the amd64 / Chrome version. For production crawling, it is recommended to run on an amd64 Linux environment.
 
+
 ### Modifying Browser Image
 
 It is also possible to build Browsertrix Crawler with a different browser image. Currently, browser images using Chrome/Chromium (depending on host system chip architecture) and Brave Browser are supported via [browsertrix-browser-base](https://github.com/webrecorder/browsertrix-browser-base).
@@ -776,6 +795,7 @@ It is also possible to build Browsertrix Crawler with a different browser image.
 The browser base image used is specified and can be changed at the top of the Dockerfile in this repo.
 
 Custom browser images can be used by forking [browsertrix-browser-base](https://github.com/webrecorder/browsertrix-browser-base), locally building or publishing an image, and then modifying the Dockerfile in this repo to build from that image.
+
 
 ### Viewing crawled data with pywb
 
@@ -789,13 +809,17 @@ Then, loading the `http://localhost:8080/wr-net/https://webrecorder.net/` should
 
 (Previewing crawl results while a crawl its still running should also be possible soon!)
 
-## Support
+
+Support
+-------
 
 Initial support for development of Browsertrix Crawler, was provided by [Kiwix](https://kiwix.org/). The initial functionality for Browsertrix Crawler was developed to support the [zimit](https://github.com/openzim/zimit) project in a collaboration between. Webrecorder and Kiwix, and this project has been split off from Zimit into a core component of Webrecorder.
 
 Additional support for Browsertrix Crawler, including for the development of the 0.4.x version has been provided by [Portico](https://www.portico.org/).
 
-## License
+
+License
+-------
 
 [AGPLv3](https://www.gnu.org/licenses/agpl-3.0) or later, see
 [LICENSE](LICENSE) for more details.

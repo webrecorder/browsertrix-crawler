@@ -4,10 +4,12 @@ import { logger } from "./util/logger.js";
 import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
 
-let crawler: Crawler | null = null;
+
+let crawler : Crawler | null = null;
 
 let lastSigInt = 0;
 let forceTerm = false;
+
 
 async function handleTerminate(signame: string) {
   logger.info(`${signame} received...`);
@@ -51,3 +53,5 @@ process.on("SIGABRT", async () => {
 
 crawler = new Crawler();
 crawler.run();
+
+

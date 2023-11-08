@@ -5,29 +5,30 @@ import { Writable } from "node:stream";
 import { RedisCrawlState } from "./state.js";
 
 // RegExp.prototype.toJSON = RegExp.prototype.toString;
-Object.defineProperty(RegExp.prototype, "toJSON", {
-  value: RegExp.prototype.toString,
-});
+Object.defineProperty(RegExp.prototype, "toJSON", { value: RegExp.prototype.toString });
+
 
 // ===========================================================================
 // TODO: Fix this the next time the file is edited.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function errJSON(e: any) {
   if (e instanceof Error) {
-    return { type: "exception", message: e.message, stack: e.stack };
+    return {"type": "exception", "message": e.message, "stack": e.stack};
   } else {
-    return { message: e.toString() };
+    return {"message": e.toString()};
   }
 }
 
+
 // ===========================================================================
-class Logger {
-  logStream: Writable | null = null;
+class Logger
+{
+  logStream : Writable | null = null;
   debugLogging = false;
   logErrorsToRedis = false;
-  logLevels: string[] = [];
-  contexts: string[] = [];
-  crawlState?: RedisCrawlState | null = null;
+  logLevels : string[] = [];
+  contexts : string[] = [];
+  crawlState? : RedisCrawlState | null = null;
   fatalExitCode = 17;
 
   setDefaultFatalExitCode(exitCode: number) {
@@ -59,18 +60,18 @@ class Logger {
   }
 
   // TODO: Fix this the next time the file is edited.
-
+   
   logAsJSON(
     message: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: Record<string, string> | Error | any,
     context: string,
-    logLevel = "info",
+    logLevel="info"
   ) {
     if (data instanceof Error) {
       data = errJSON(data);
     } else if (typeof data !== "object") {
-      data = { message: data.toString() };
+      data = {"message": data.toString()};
     }
 
     if (this.logLevels.length) {
@@ -86,11 +87,11 @@ class Logger {
     }
 
     const dataToLog = {
-      timestamp: new Date().toISOString(),
-      logLevel: logLevel,
-      context: context,
-      message: message,
-      details: data ? data : {},
+      "timestamp": new Date().toISOString(),
+      "logLevel": logLevel,
+      "context": context,
+      "message": message,
+      "details": data ? data : {}
     };
     const string = JSON.stringify(dataToLog);
     console.log(string);
@@ -99,34 +100,30 @@ class Logger {
     }
 
     const toLogToRedis = ["error", "fatal"];
-    if (
-      this.logErrorsToRedis &&
-      this.crawlState &&
-      toLogToRedis.includes(logLevel)
-    ) {
+    if (this.logErrorsToRedis && this.crawlState && toLogToRedis.includes(logLevel)) {
       this.crawlState.logError(string);
     }
   }
 
-  info(message: string, data = {}, context = "general") {
+  info(message: string, data={}, context="general") {
     this.logAsJSON(message, data, context);
   }
 
-  error(message: string, data = {}, context = "general") {
+  error(message: string, data={}, context="general") {
     this.logAsJSON(message, data, context, "error");
   }
 
-  warn(message: string, data = {}, context = "general") {
+  warn(message: string, data={}, context="general") {
     this.logAsJSON(message, data, context, "warn");
   }
 
-  debug(message: string, data = {}, context = "general") {
+  debug(message: string, data={}, context="general") {
     if (this.debugLogging) {
       this.logAsJSON(message, data, context, "debug");
     }
   }
 
-  fatal(message: string, data = {}, context = "general", exitCode = 0) {
+  fatal(message: string, data={}, context="general", exitCode=0) {
     exitCode = exitCode || this.fatalExitCode;
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
 

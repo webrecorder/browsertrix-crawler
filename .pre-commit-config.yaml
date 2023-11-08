@@ -1,8 +1,8 @@
 repos:
-  - repo: local
-    hooks:
-      - id: husky-run-pre-commit
-        name: husky
-        language: system
-        entry: .husky/pre-commit
-        pass_filenames: false
+- repo: local
+  hooks:
+    - id: husky-run-pre-commit
+      name: husky
+      language: system
+      entry: .husky/pre-commit
+      pass_filenames: false

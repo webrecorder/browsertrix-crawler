@@ -9,32 +9,28 @@ import path from "path";
 import { logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
-import puppeteer, {
-  Frame,
-  HTTPRequest,
-  Page,
-  PuppeteerLaunchOptions,
-  Viewport,
-} from "puppeteer-core";
+import puppeteer, { Frame, HTTPRequest, Page, PuppeteerLaunchOptions, Viewport } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 
 type LaunchOpts = {
   profileUrl: string;
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  chromeOptions: Record<string, any>;
+  chromeOptions: Record<string, any>
   signals: boolean;
   headless: boolean;
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  emulateDevice?: Record<string, any>;
+  emulateDevice?: Record<string, any>
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ondisconnect?: ((err: any) => NonNullable<unknown>) | null;
+  ondisconnect?: ((err: any) => NonNullable<unknown>) | null
 };
 
+
 // ==================================================================
-export class Browser {
+export class Browser
+{
   profileDir: string;
   customProfile = false;
   // TODO: Fix this the next time the file is edited.
@@ -52,58 +48,47 @@ export class Browser {
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
   }
 
-  async launch({
-    profileUrl,
-    chromeOptions,
-    signals = false,
-    headless = false,
-    emulateDevice = {},
-    ondisconnect = null,
-  }: LaunchOpts) {
-    if (this.isLaunched()) {
-      return;
-    }
-
-    if (profileUrl) {
-      this.customProfile = await this.loadProfile(profileUrl);
-    }
-
-    this.emulateDevice = emulateDevice;
-
-    const args = this.chromeArgs(chromeOptions);
-
-    let defaultViewport = null;
-
-    if (process.env.GEOMETRY) {
-      const geom = process.env.GEOMETRY.split("x");
-
-      defaultViewport = { width: Number(geom[0]), height: Number(geom[1]) };
-    }
-
-    const launchOpts: PuppeteerLaunchOptions = {
-      args,
-      headless: headless ? "new" : false,
-      executablePath: this.getBrowserExe(),
-      ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
-      ignoreHTTPSErrors: true,
-      handleSIGHUP: signals,
-      handleSIGINT: signals,
-      handleSIGTERM: signals,
-      protocolTimeout: 0,
-
-      defaultViewport,
-      waitForInitialPage: false,
-      userDataDir: this.profileDir,
-    };
-
-    await this._init(launchOpts, ondisconnect);
+  async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}, ondisconnect = null} : LaunchOpts) {    if (this.isLaunched()) {
+    return;
   }
 
-  async setupPage({ page }: { page: Page; cdp: CDPSession }) {
-    await this.addInitScript(
-      page,
-      'Object.defineProperty(navigator, "webdriver", {value: false});',
-    );
+  if (profileUrl) {
+    this.customProfile = await this.loadProfile(profileUrl);
+  }
+
+  this.emulateDevice = emulateDevice;
+
+  const args = this.chromeArgs(chromeOptions);
+
+  let defaultViewport = null;
+
+  if (process.env.GEOMETRY) {
+    const geom = process.env.GEOMETRY.split("x");
+
+    defaultViewport = {width: Number(geom[0]), height: Number(geom[1])};
+  }
+
+  const launchOpts : PuppeteerLaunchOptions = {
+    args,
+    headless: headless ? "new" : false,
+    executablePath: this.getBrowserExe(),
+    ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
+    ignoreHTTPSErrors: true,
+    handleSIGHUP: signals,
+    handleSIGINT: signals,
+    handleSIGTERM: signals,
+    protocolTimeout: 0,
+
+    defaultViewport,
+    waitForInitialPage: false,
+    userDataDir: this.profileDir
+  };
+
+  await this._init(launchOpts, ondisconnect);
+  }
+
+  async setupPage({page} : {page: Page, cdp: CDPSession}) {
+    await this.addInitScript(page, "Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
     if (this.customProfile) {
       logger.info("Disabling Service Workers for profile", {}, "browser");
@@ -112,26 +97,20 @@ export class Browser {
     }
   }
 
-  async loadProfile(profileFilename: string): Promise<boolean> {
+  async loadProfile(profileFilename: string) : Promise<boolean> {
     const targetFilename = "/tmp/profile.tar.gz";
 
-    if (
-      profileFilename &&
-      (profileFilename.startsWith("http:") ||
-        profileFilename.startsWith("https:"))
-    ) {
-      logger.info(
-        `Downloading ${profileFilename} to ${targetFilename}`,
-        {},
-        "browserProfile",
-      );
+    if (profileFilename &&
+        (profileFilename.startsWith("http:") || profileFilename.startsWith("https:"))) {
+
+      logger.info(`Downloading ${profileFilename} to ${targetFilename}`, {}, "browserProfile");
 
       const resp = await fetch(profileFilename);
       await pipeline(
         // TODO: Fix this the next time the file is edited.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Readable.fromWeb(resp.body as any),
-        fs.createWriteStream(targetFilename),
+        fs.createWriteStream(targetFilename)
       );
 
       profileFilename = targetFilename;
@@ -139,9 +118,7 @@ export class Browser {
       const storage = initStorage();
 
       if (!storage) {
-        logger.fatal(
-          "Profile specified relative to s3 storage, but no S3 storage defined",
-        );
+        logger.fatal("Profile specified relative to s3 storage, but no S3 storage defined");
         return false;
       }
 
@@ -152,9 +129,7 @@ export class Browser {
 
     if (profileFilename) {
       try {
-        child_process.execSync("tar xvfz " + profileFilename, {
-          cwd: this.profileDir,
-        });
+        child_process.execSync("tar xvfz " + profileFilename, {cwd: this.profileDir});
         return true;
       } catch (e) {
         logger.error(`Profile filename ${profileFilename} not a valid tar.gz`);
@@ -165,12 +140,10 @@ export class Browser {
   }
 
   saveProfile(profileFilename: string) {
-    child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {
-      cwd: this.profileDir,
-    });
+    child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {cwd: this.profileDir});
   }
 
-  chromeArgs({ proxy = true, userAgent = null, extraArgs = [] } = {}) {
+  chromeArgs({proxy=true, userAgent=null, extraArgs=[]} = {}) {
     // Chrome Flags, including proxy server
     const args = [
       // eslint-disable-next-line no-use-before-define
@@ -189,29 +162,25 @@ export class Browser {
 
     if (proxy) {
       args.push("--ignore-certificate-errors");
-      args.push(
-        `--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`,
-      );
+      args.push(`--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`);
     }
 
     return args;
   }
 
   getDefaultUA() {
-    let version: string | undefined = process.env.BROWSER_VERSION;
+    let version : string | undefined = process.env.BROWSER_VERSION;
 
     try {
       const browser = this.getBrowserExe();
       if (browser) {
-        version = child_process.execFileSync(browser, ["--version"], {
-          encoding: "utf8",
-        });
+        version = child_process.execFileSync(browser, ["--version"], {encoding: "utf8"});
         const match = version && version.match(/[\d.]+/);
         if (match) {
           version = match[0];
         }
       }
-    } catch (e) {
+    } catch(e) {
       console.error(e);
     }
 
@@ -219,11 +188,7 @@ export class Browser {
   }
 
   getBrowserExe() {
-    const files = [
-      process.env.BROWSER_BIN,
-      "/usr/bin/google-chrome",
-      "/usr/bin/chromium-browser",
-    ];
+    const files = [process.env.BROWSER_BIN, "/usr/bin/google-chrome", "/usr/bin/chromium-browser"];
     for (const file of files) {
       if (file && fs.existsSync(file)) {
         return file;
@@ -231,25 +196,14 @@ export class Browser {
     }
   }
 
-  async evaluateWithCLI_(
-    cdp: CDPSession,
-    frame: Frame,
-    cdpContextId: number,
-    funcString: string,
-    logData: Record<string, string>,
-    contextName: string,
-  ) {
+  async evaluateWithCLI_(cdp: CDPSession, frame: Frame, cdpContextId: number, funcString: string, logData: Record<string, string>, contextName: string) {
     const frameUrl = frame.url();
     // TODO: Fix this the next time the file is edited.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let details: Record<string, any> = { frameUrl, ...logData };
+    let details : Record<string, any> = {frameUrl, ...logData};
 
     if (!frameUrl || frame.isDetached()) {
-      logger.info(
-        "Run Script Skipped, frame no longer attached or has no URL",
-        details,
-        contextName,
-      );
+      logger.info("Run Script Skipped, frame no longer attached or has no URL", details, contextName);
       return false;
     }
 
@@ -259,22 +213,19 @@ export class Browser {
     //const contextId = context._contextId;
     const expression = funcString + "\n//# sourceURL=__evaluation_script__";
 
-    const { exceptionDetails, result } = await cdp.send("Runtime.evaluate", {
-      expression,
-      contextId: cdpContextId,
-      returnByValue: true,
-      awaitPromise: true,
-      userGesture: true,
-      includeCommandLineAPI: true,
-    });
+    const { exceptionDetails, result } = await cdp
+      .send("Runtime.evaluate", {
+        expression,
+        contextId: cdpContextId,
+        returnByValue: true,
+        awaitPromise: true,
+        userGesture: true,
+        includeCommandLineAPI: true,
+      });
 
     if (exceptionDetails) {
       if (exceptionDetails.stackTrace) {
-        details = {
-          ...exceptionDetails.stackTrace,
-          text: exceptionDetails.text,
-          ...details,
-        };
+        details = {...exceptionDetails.stackTrace, text: exceptionDetails.text, ...details};
       }
       logger.error("Run Script Failed", details, contextName);
     } else {
@@ -305,11 +256,8 @@ export class Browser {
     return page.evaluateOnNewDocument(script);
   }
 
-  async _init(
-    launchOpts: PuppeteerLaunchOptions,
-    // eslint-disable-next-line @typescript-eslint/ban-types
-    ondisconnect: Function | null = null,
-  ) {
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  async _init(launchOpts: PuppeteerLaunchOptions, ondisconnect : Function | null = null) {
     this.browser = await puppeteer.launch(launchOpts);
 
     const target = this.browser.target();
@@ -326,10 +274,9 @@ export class Browser {
     });
   }
 
-  async newWindowPageWithCDP(): Promise<{ cdp: CDPSession; page: Page }> {
+  async newWindowPageWithCDP() : Promise<{cdp: CDPSession, page: Page}> {
     // unique url to detect new pages
-    const startPage =
-      "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
+    const startPage = "about:blank?_browsertrix" + Math.random().toString(36).slice(2);
 
     const p = new Promise<Target>((resolve) => {
       const listener = (target: Target) => {
@@ -351,10 +298,7 @@ export class Browser {
     }
 
     try {
-      await this.firstCDP.send("Target.createTarget", {
-        url: startPage,
-        newWindow: true,
-      });
+      await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
     } catch (e) {
       if (!this.browser) {
         throw e;
@@ -363,10 +307,7 @@ export class Browser {
 
       this.firstCDP = await target.createCDPSession();
 
-      await this.firstCDP.send("Target.createTarget", {
-        url: startPage,
-        newWindow: true,
-      });
+      await this.firstCDP.send("Target.createTarget", {url: startPage, newWindow: true});
     }
 
     const target = await p;
@@ -390,7 +331,7 @@ export class Browser {
 
     const cdp = await target.createCDPSession();
 
-    return { page, cdp };
+    return {page, cdp};
   }
 
   async serviceWorkerFetch() {
@@ -407,13 +348,9 @@ export class Browser {
 
       if (networkId) {
         try {
-          await this.firstCDP.send("Fetch.continueResponse", { requestId });
+          await this.firstCDP.send("Fetch.continueResponse", {requestId});
         } catch (e) {
-          logger.warn(
-            "continueResponse failed",
-            { url: request.url },
-            "recorder",
-          );
+          logger.warn("continueResponse failed", {url: request.url}, "recorder");
         }
         return;
       }
@@ -432,20 +369,12 @@ export class Browser {
       }
 
       if (!foundRecorder) {
-        logger.debug(
-          "Skipping URL from unknown frame",
-          { url: request.url, frameId },
-          "recorder",
-        );
+        logger.debug("Skipping URL from unknown frame", {url: request.url, frameId}, "recorder");
 
         try {
-          await this.firstCDP.send("Fetch.continueResponse", { requestId });
+          await this.firstCDP.send("Fetch.continueResponse", {requestId});
         } catch (e) {
-          logger.warn(
-            "continueResponse failed",
-            { url: request.url },
-            "recorder",
-          );
+          logger.warn("continueResponse failed", {url: request.url}, "recorder");
         }
 
         return;
@@ -454,13 +383,11 @@ export class Browser {
       await foundRecorder.handleRequestPaused(params, this.firstCDP, true);
     });
 
-    await this.firstCDP.send("Fetch.enable", {
-      patterns: [{ urlPattern: "*", requestStage: "Response" }],
-    });
+    await this.firstCDP.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
   }
 
   // TODO: Fix this the next time the file is edited.
-
+   
   async evaluateWithCLI(
     _: unknown,
     frame: Frame,
@@ -468,28 +395,21 @@ export class Browser {
     funcString: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     logData: Record<string, any>,
-    contextName: string,
+    contextName: string
   ) {
     // TODO: Fix this the next time the file is edited.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const context = await (frame as any).executionContext();
     cdp = context._client;
     const cdpContextId = context._contextId;
-    return await this.evaluateWithCLI_(
-      cdp,
-      frame,
-      cdpContextId,
-      funcString,
-      logData,
-      contextName,
-    );
+    return await this.evaluateWithCLI_(cdp, frame, cdpContextId, funcString, logData, contextName);
   }
 
   interceptRequest(page: Page, callback: (event: HTTPRequest) => void) {
     page.on("request", callback);
   }
 
-  async waitForNetworkIdle(page: Page, params: { timeout?: number }) {
+  async waitForNetworkIdle(page: Page, params: {timeout?: number}) {
     return await page.waitForNetworkIdle(params);
   }
 
@@ -507,6 +427,7 @@ export class Browser {
     return await page.setCookie(...cookies);
   }
 }
+
 
 // ==================================================================
 // Default Chromium args from playwright
@@ -549,5 +470,5 @@ export const defaultArgs = [
   "--apps-gallery-url=https://invalid.webstore.example.com/",
   "--apps-gallery-update-url=https://invalid.webstore.example.com/",
   "--component-updater=url-source=http://invalid.dev/",
-  "--brave-stats-updater-server=url-source=http://invalid.dev/",
+  "--brave-stats-updater-server=url-source=http://invalid.dev/"
 ];

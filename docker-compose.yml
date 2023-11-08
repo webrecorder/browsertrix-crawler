@@ -1,16 +1,17 @@
-version: "3.5"
-
+version: '3.5'
+  
 services:
-  crawler:
-    image: ${REGISTRY}webrecorder/browsertrix-crawler:latest
-    build:
-      context: ./
+    crawler:
+        image: ${REGISTRY}webrecorder/browsertrix-crawler:latest
+        build:
+          context: ./
 
-    volumes:
-      - ./crawls:/crawls
+        volumes:
+          - ./crawls:/crawls
 
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
+        cap_add:
+          - NET_ADMIN
+          - SYS_ADMIN
 
-    shm_size: 1gb
+        shm_size: 1gb
+

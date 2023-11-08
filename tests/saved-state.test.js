@@ -13,7 +13,7 @@ function waitForProcess() {
     };
   });
 
-  return { p, callback };
+  return {p, callback};
 }
 
 var savedStateFile;
@@ -28,12 +28,9 @@ test("check crawl interrupted + saved state written", async () => {
   const wait = waitForProcess();
 
   try {
-    proc = exec(
-      "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --limit 20",
-      { shell: "/bin/bash" },
-      wait.callback,
-    );
-  } catch (error) {
+    proc = exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --limit 20", {"shell": "/bin/bash"}, wait.callback);
+  }
+  catch (error) {
     console.log(error);
   }
 
@@ -48,15 +45,12 @@ test("check crawl interrupted + saved state written", async () => {
 
   while (true) {
     try {
-      const pages = fs
-        .readFileSync(pagesFile, { encoding: "utf-8" })
-        .trim()
-        .split("\n");
+      const pages = fs.readFileSync(pagesFile, {encoding: "utf-8"}).trim().split("\n");
 
       if (pages.length >= 2) {
         break;
       }
-    } catch (e) {
+    } catch(e) {
       // ignore
     }
 
@@ -67,22 +61,18 @@ test("check crawl interrupted + saved state written", async () => {
 
   await wait.p;
 
-  const savedStates = fs.readdirSync(
-    "test-crawls/collections/int-state-test/crawls",
-  );
+  const savedStates = fs.readdirSync("test-crawls/collections/int-state-test/crawls");
   expect(savedStates.length > 0).toEqual(true);
 
   savedStateFile = savedStates[savedStates.length - 1];
 });
 
+
 test("check parsing saved state + page done + queue present", () => {
   expect(savedStateFile).toBeTruthy();
 
-  const savedState = fs.readFileSync(
-    path.join("test-crawls/collections/int-state-test/crawls", savedStateFile),
-    "utf-8",
-  );
-
+  const savedState = fs.readFileSync(path.join("test-crawls/collections/int-state-test/crawls", savedStateFile), "utf-8");
+  
   const saved = yaml.load(savedState);
 
   expect(!!saved.state).toBe(true);
@@ -92,7 +82,9 @@ test("check parsing saved state + page done + queue present", () => {
 
   expect(state.done > 0).toEqual(true);
   expect(state.queued.length > 0).toEqual(true);
+
 });
+
 
 test("check crawl restarted with saved state", async () => {
   let proc = null;
@@ -100,25 +92,21 @@ test("check crawl restarted with saved state", async () => {
   const wait = waitForProcess();
 
   try {
-    proc = exec(
-      `docker run -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`,
-      { shell: "/bin/bash" },
-      wait.callback,
-    );
+    proc = exec(`docker run -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`, {shell: "/bin/bash"}, wait.callback);
   } catch (error) {
     console.log(error);
   }
 
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
-  redis = new Redis("redis://127.0.0.1:36379/0", { lazyConnect: true });
+  redis = new Redis("redis://127.0.0.1:36379/0", {lazyConnect: true});
 
   try {
     await redis.connect({
       maxRetriesPerRequest: 100,
       retryStrategy(times) {
         return times < 100 ? 1000 : null;
-      },
+      }
     });
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -138,3 +126,5 @@ test("interrupt crawl and exit", async () => {
 
   expect(res[0].value).toBe(0);
 });
+
+

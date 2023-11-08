@@ -2,18 +2,17 @@ import child_process from "child_process";
 import fs from "fs";
 
 test("ensure that stats file is modified", async () => {
-  const child = child_process.exec(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --generateWACZ --text --limit 3 --collection file-stats --statsFilename progress.json",
-  );
+
+  const child = child_process.exec("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --generateWACZ --text --limit 3 --collection file-stats --statsFilename progress.json");
 
   // detect crawler exit
   let crawler_exited = false;
-  child.on("exit", function () {
+  child.on("exit", function() {
     crawler_exited = true;
   });
 
   // helper function to sleep
-  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+  const sleep = ms => new Promise(res => setTimeout(res, ms));
 
   // wait for stats file creation up to 30 secs (to not wait indefinitely)
   let counter = 0;
@@ -24,9 +23,7 @@ test("ensure that stats file is modified", async () => {
   }
 
   // get initial modification time
-  const initial_mtime = fs.fstatSync(
-    fs.openSync("test-crawls/progress.json", "r"),
-  ).mtime;
+  const initial_mtime = fs.fstatSync(fs.openSync("test-crawls/progress.json", "r")).mtime;
 
   // wait for crawler exit
   while (!crawler_exited) {
@@ -34,13 +31,12 @@ test("ensure that stats file is modified", async () => {
   }
 
   // get final modification time
-  const final_mtime = fs.fstatSync(
-    fs.openSync("test-crawls/progress.json", "r"),
-  ).mtime;
+  const final_mtime = fs.fstatSync(fs.openSync("test-crawls/progress.json", "r")).mtime;
 
   // compare initial and final modification time
   const diff = Math.abs(final_mtime - initial_mtime);
   expect(diff > 0).toBe(true);
+
 });
 
 test("check that stats file format is correct", () => {

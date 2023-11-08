@@ -8,9 +8,10 @@ type ScopeType =
   | "page"
   | "page-spa"
   | "any"
-  | "custom";
+  | "custom"; 
 
-export class ScopedSeed {
+export class ScopedSeed
+{
   url: string;
   scopeType: ScopeType;
   include: RegExp[];
@@ -23,25 +24,11 @@ export class ScopedSeed {
   maxExtraHops = 0;
   maxDepth = 0;
 
-  constructor({
-    url,
-    scopeType,
-    include,
-    exclude = [],
-    allowHash = false,
-    depth = -1,
-    sitemap = false,
-    extraHops = 0,
-  }: {
-    url: string;
-    scopeType: ScopeType;
-    include: string[];
-    exclude?: string[];
-    allowHash?: boolean;
-    depth?: number;
-    sitemap?: string | boolean | null;
-    extraHops?: number;
-  }) {
+
+  constructor(
+    {url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} :
+                {url: string, scopeType: ScopeType, include: string[], exclude?: string[], allowHash?: boolean, depth?: number, sitemap?: string | boolean | null, extraHops?: number}
+  ) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");
@@ -56,10 +43,7 @@ export class ScopedSeed {
     }
 
     if (this.scopeType !== "custom") {
-      const [includeNew, allowHashNew] = this.scopeFromType(
-        this.scopeType,
-        parsedUrl,
-      );
+      const [includeNew, allowHashNew] = this.scopeFromType(this.scopeType, parsedUrl);
       this.include = [...includeNew, ...this.include];
       allowHash = allowHashNew;
     }
@@ -79,13 +63,13 @@ export class ScopedSeed {
   //parseRx(value? : union[string[], string, RegExp[]]) -> RegExp[] {
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  parseRx(value: any) {
+  parseRx(value : any) {
     if (value === null || value === undefined || value === "") {
       return [];
     } else if (!(value instanceof Array)) {
       return [new RegExp(value)];
     } else {
-      return value.map((e) => (e instanceof RegExp ? e : new RegExp(e)));
+      return value.map(e => (e instanceof RegExp) ? e : new RegExp(e));
     }
   }
 
@@ -113,27 +97,24 @@ export class ScopedSeed {
     try {
       parsedUrl = new URL(url.trim());
     } catch (e) {
-      logger.warn("Invalid Page - not a valid URL", { url, ...logDetails });
+      logger.warn("Invalid Page - not a valid URL", {url, ...logDetails});
       return null;
     }
 
     if (parsedUrl.protocol !== "http:" && parsedUrl.protocol != "https:") {
-      logger.warn("Invalid Page - URL must start with http:// or https://", {
-        url,
-        ...logDetails,
-      });
+      logger.warn("Invalid Page - URL must start with http:// or https://", {url, ...logDetails});
       parsedUrl = null;
     }
 
     return parsedUrl;
   }
 
-  resolveSiteMap(sitemap: boolean | string | null): string | null {
+  resolveSiteMap(sitemap: boolean | string | null) : string | null {
     if (sitemap === true) {
       const url = new URL(this.url);
       url.pathname = "/sitemap.xml";
       return url.href;
-    } else if (typeof sitemap === "string") {
+    } else if (typeof(sitemap) === "string") {
       const url = new URL(sitemap, this.url);
       return url.href;
     }
@@ -141,68 +122,42 @@ export class ScopedSeed {
     return null;
   }
 
-  scopeFromType(scopeType: ScopeType, parsedUrl: URL): [RegExp[], boolean] {
-    let include: RegExp[] = [];
+  scopeFromType(scopeType: ScopeType, parsedUrl: URL) : [RegExp[], boolean] {
+    let include : RegExp[] = [];
     let allowHash = false;
 
     switch (scopeType) {
-      case "page":
-        include = [];
-        break;
+    case "page":
+      include = [];
+      break;
 
-      case "page-spa":
-        // allow scheme-agnostic URLS as likely redirects
-        include = [
-          new RegExp("^" + urlRxEscape(parsedUrl.href, parsedUrl) + "#.+"),
-        ];
-        allowHash = true;
-        break;
+    case "page-spa":
+      // allow scheme-agnostic URLS as likely redirects
+      include = [new RegExp("^" + urlRxEscape(parsedUrl.href, parsedUrl) + "#.+")];
+      allowHash = true;
+      break;
 
-      case "prefix":
-        include = [
-          new RegExp(
-            "^" +
-              urlRxEscape(
-                parsedUrl.origin +
-                  parsedUrl.pathname.slice(
-                    0,
-                    parsedUrl.pathname.lastIndexOf("/") + 1,
-                  ),
-                parsedUrl,
-              ),
-          ),
-        ];
-        break;
+    case "prefix":
+      include = [new RegExp("^" + urlRxEscape(parsedUrl.origin + parsedUrl.pathname.slice(0, parsedUrl.pathname.lastIndexOf("/") + 1), parsedUrl))];
+      break;
 
-      case "host":
-        include = [
-          new RegExp("^" + urlRxEscape(parsedUrl.origin + "/", parsedUrl)),
-        ];
-        break;
+    case "host":
+      include = [new RegExp("^" + urlRxEscape(parsedUrl.origin + "/", parsedUrl))];
+      break;
 
-      case "domain":
-        if (parsedUrl.hostname.startsWith("www.")) {
-          parsedUrl.hostname = parsedUrl.hostname.replace("www.", "");
-        }
-        include = [
-          new RegExp(
-            "^" +
-              urlRxEscape(parsedUrl.origin + "/", parsedUrl).replace(
-                "\\/\\/",
-                "\\/\\/([^/]+\\.)*",
-              ),
-          ),
-        ];
-        break;
+    case "domain":
+      if (parsedUrl.hostname.startsWith("www.")) {
+        parsedUrl.hostname = parsedUrl.hostname.replace("www.", "");
+      }
+      include = [new RegExp("^" + urlRxEscape(parsedUrl.origin + "/", parsedUrl).replace("\\/\\/", "\\/\\/([^/]+\\.)*"))];
+      break;
 
-      case "any":
-        include = [/.*/];
-        break;
+    case "any":
+      include = [/.*/];
+      break;
 
-      default:
-        logger.fatal(
-          `Invalid scope type "${scopeType}" specified, valid types are: page, page-spa, prefix, host, domain, any`,
-        );
+    default:
+      logger.fatal(`Invalid scope type "${scopeType}" specified, valid types are: page, page-spa, prefix, host, domain, any`);
     }
 
     return [include, allowHash];
@@ -266,7 +221,7 @@ export class ScopedSeed {
       }
     }
 
-    return { url, isOOS };
+    return {url, isOOS};
   }
 }
 
@@ -277,3 +232,7 @@ export function rxEscape(string: string) {
 export function urlRxEscape(url: string, parsedUrl: URL) {
   return rxEscape(url).replace(parsedUrl.protocol, "https?:");
 }
+
+
+
+
