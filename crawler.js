@@ -937,7 +937,17 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info("Generating CDX");
       await fsp.mkdir(path.join(this.collDir, "indexes"), {recursive: true});
       await this.crawlState.setStatus("generate-cdx");
-      const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+
+      const warcList = await fsp.readdir(path.join(this.collDir, "archive"));
+      const warcListFull = warcList.map((filename) => path.join(this.collDir, "archive", filename));
+
+      //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+      const params = [
+        "-o",
+        path.join(this.collDir, "indexes", "index.cdxj"),
+        ...warcListFull
+      ];
+      const indexResult = await this.awaitProcess(child_process.spawn("cdxj-indexer", params, {cwd: this.params.cwd}));
       if (indexResult === 0) {
         logger.debug("Indexing complete, CDX successfully created");
       } else {
