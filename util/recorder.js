@@ -407,9 +407,9 @@ export class Recorder
   startPage({pageid, url}) {
     this.pageid = pageid;
     this.logDetails = {page: url, workerid: this.workerid};
-    // if (this.pendingRequests && this.pendingRequests.size) {
-    //   logger.warn("Interrupting timed out requests, moving to next page", this.logDetails, "recorder");
-    // }
+    if (this.pendingRequests && this.pendingRequests.size) {
+      logger.debug("Interrupting timed out requests, moving to next page", this.logDetails, "recorder");
+    }
     this.pendingRequests = new Map();
     this.skipIds = new Set();
     this.skipping = false;
