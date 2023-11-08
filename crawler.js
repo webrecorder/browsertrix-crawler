@@ -6,7 +6,6 @@ import fsp from "fs/promises";
 
 import { RedisCrawlState, LoadState, QueueState } from "./util/state.js";
 import Sitemapper from "sitemapper";
-import { v4 as uuidv4 } from "uuid";
 import yaml from "js-yaml";
 
 import * as warcio from "warcio";
@@ -103,8 +102,9 @@ export class Crawler {
 
     this.emulateDevice = this.params.emulateDevice || {};
 
-    this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
-    this.capturePrefix = process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
+    //this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
+    //this.capturePrefix = "";//process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
+    this.captureBasePrefix = null;
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
@@ -213,12 +213,35 @@ export class Crawler {
     return new ScreenCaster(transport, this.params.workers);
   }
 
-  async bootstrap() {
-    const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
+  launchRedis() {
+    let redisStdio;
 
-    if (initRes.status) {
-      logger.info("wb-manager init failed, collection likely already exists");
+    if (this.params.logging.includes("redis")) {
+      const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
+      redisStdio = [process.stdin, redisStderr, redisStderr];
+
+    } else {
+      redisStdio = "ignore";
     }
+
+    let redisArgs = [];
+    if (this.params.debugAccessRedis) {
+      redisArgs = ["--protected-mode", "no"];
+    }
+
+    return child_process.spawn("redis-server", redisArgs,{cwd: "/tmp/", stdio: redisStdio});
+  }
+
+  async bootstrap() {
+    const subprocesses = [];
+
+    subprocesses.push(this.launchRedis());
+
+    //const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
+
+    //if (initRes.status) {
+    //  logger.info("wb-manager init failed, collection likely already exists");
+    //}
 
     fs.mkdirSync(this.logDir, {recursive: true});
     this.logFH = fs.createWriteStream(this.logFilename);
@@ -246,41 +269,7 @@ export class Crawler {
       this.customBehaviors = this.loadCustomBehaviors(this.params.customBehaviors);
     }
 
-    let opts = {};
-    let redisStdio;
-
-    if (this.params.logging.includes("pywb")) {
-      const pywbStderr = fs.openSync(path.join(this.logDir, "pywb.log"), "a");
-      const stdio = [process.stdin, pywbStderr, pywbStderr];
-
-      const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
-      redisStdio = [process.stdin, redisStderr, redisStderr];
-
-      opts = {stdio, cwd: this.params.cwd};
-    } else {
-      opts = {stdio: "ignore", cwd: this.params.cwd};
-      redisStdio = "ignore";
-    }
-
     this.headers = {"User-Agent": this.configureUA()};
-
-    const subprocesses = [];
-
-    let redisArgs = [];
-    if (this.params.debugAccessRedis) {
-      redisArgs = ["--protected-mode", "no"];
-    }
-
-    subprocesses.push(child_process.spawn("redis-server", redisArgs, {cwd: "/tmp/", stdio: redisStdio}));
-
-    opts.env = {
-      ...process.env,
-      COLL: this.params.collection,
-      ROLLOVER_SIZE: this.params.rolloverSize,
-      DEDUP_POLICY: this.params.dedupPolicy
-    };
-
-    subprocesses.push(child_process.spawn("uwsgi", [new URL("uwsgi.ini", import.meta.url).pathname], opts));
 
     process.on("exit", () => {
       for (const proc of subprocesses) {
@@ -472,7 +461,7 @@ self.__bx_behaviors.selectMainBehavior();
   async crawlPage(opts) {
     await this.writeStats();
 
-    const {page, cdp, data, workerid, callbacks} = opts;
+    const {page, cdp, data, workerid, callbacks, directFetchCapture} = opts;
     data.callbacks = callbacks;
 
     const {url} = data;
@@ -480,6 +469,38 @@ self.__bx_behaviors.selectMainBehavior();
     const logDetails = {page: url, workerid};
     data.logDetails = logDetails;
     data.workerid = workerid;
+
+    data.isHTMLPage = await timedRun(
+      this.isHTML(url, logDetails),
+      FETCH_TIMEOUT_SECS,
+      "HEAD request to determine if URL is HTML page timed out",
+      logDetails,
+      "fetch",
+      true
+    );
+
+    if (!data.isHTMLPage && directFetchCapture) {
+      try {
+        const {fetched, mime} = await timedRun(
+          directFetchCapture(url),
+          FETCH_TIMEOUT_SECS,
+          "Direct fetch capture attempt timed out",
+          logDetails,
+          "fetch",
+          true
+        );
+        if (fetched) {
+          data.loadState = LoadState.FULL_PAGE_LOADED;
+          if (mime) {
+            data.mime = mime;
+          }
+          logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
+          return true;
+        }
+      } catch (e) {
+        // ignore failed direct fetch attempt, do browser-based capture
+      }
+    }
 
     // run custom driver here
     await this.driver({page, data, crawler: this});
@@ -660,9 +681,8 @@ self.__bx_behaviors.selectMainBehavior();
   async getInfoString() {
     const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
     const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
-    const pywbVersion = child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
 
-    return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`;
+    return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version})`;
   }
 
   async createWARCInfo(filename) {
@@ -872,7 +892,7 @@ self.__bx_behaviors.selectMainBehavior();
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
       chromeOptions: {
-        proxy: !process.env.NO_PROXY,
+        proxy: false,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs()
       },
@@ -882,9 +902,10 @@ self.__bx_behaviors.selectMainBehavior();
       }
     });
 
+
     // --------------
     // Run Crawl Here!
-    await runWorkers(this, this.params.workers, this.maxPageTime);
+    await runWorkers(this, this.params.workers, this.maxPageTime, this.collDir);
     // --------------
 
     await this.serializeConfig(true);
@@ -898,8 +919,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.writeStats();
 
-    // extra wait for all resources to land into WARCs
-    await this.awaitPendingClear();
 
     // if crawl has been stopped, mark as final exit for post-crawl tasks
     if (await this.crawlState.isCrawlStopped()) {
@@ -916,8 +935,19 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.generateCDX) {
       logger.info("Generating CDX");
+      await fsp.mkdir(path.join(this.collDir, "indexes"), {recursive: true});
       await this.crawlState.setStatus("generate-cdx");
-      const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+
+      const warcList = await fsp.readdir(path.join(this.collDir, "archive"));
+      const warcListFull = warcList.map((filename) => path.join(this.collDir, "archive", filename));
+
+      //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+      const params = [
+        "-o",
+        path.join(this.collDir, "indexes", "index.cdxj"),
+        ...warcListFull
+      ];
+      const indexResult = await this.awaitProcess(child_process.spawn("cdxj-indexer", params, {cwd: this.params.cwd}));
       if (indexResult === 0) {
         logger.debug("Indexing complete, CDX successfully created");
       } else {
@@ -1136,34 +1166,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     const failCrawlOnError = ((depth === 0) && this.params.failOnFailedSeed);
 
-    let isHTMLPage = await timedRun(
-      this.isHTML(url),
-      FETCH_TIMEOUT_SECS,
-      "HEAD request to determine if URL is HTML page timed out",
-      logDetails,
-      "fetch",
-      true
-    );
-
-    if (!isHTMLPage) {
-      try {
-        const captureResult = await timedRun(
-          this.directFetchCapture(url),
-          FETCH_TIMEOUT_SECS,
-          "Direct fetch capture attempt timed out",
-          logDetails,
-          "fetch",
-          true
-        );
-        if (captureResult) {
-          logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
-          return;
-        }
-      } catch (e) {
-        // ignore failed direct fetch attempt, do browser-based capture
-      }
-    }
-
     let ignoreAbort = false;
 
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
@@ -1171,6 +1173,8 @@ self.__bx_behaviors.selectMainBehavior();
     page.once("requestfailed", (req) => {
       ignoreAbort = shouldIgnoreAbort(req);
     });
+
+    let isHTMLPage = data.isHTMLPage;
 
     if (isHTMLPage) {
       page.once("domcontentloaded", () => {
@@ -1441,9 +1445,12 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async writePage({url, depth, title, text, loadState, favicon}) {
-    const id = uuidv4();
-    const row = {id, url, title, loadState};
+  async writePage({pageid, url, depth, title, text, loadState, mime, favicon}) {
+    const row = {id: pageid, url, title, loadState};
+
+    if (mime) {
+      row.mime = mime;
+    }
 
     if (depth === 0) {
       row.seed = true;
@@ -1469,7 +1476,7 @@ self.__bx_behaviors.selectMainBehavior();
     return urlParsed.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT;
   }
 
-  async isHTML(url) {
+  async isHTML(url, logDetails) {
     try {
       const resp = await fetch(url, {
         method: "HEAD",
@@ -1477,7 +1484,7 @@ self.__bx_behaviors.selectMainBehavior();
         agent: this.resolveAgent
       });
       if (resp.status !== 200) {
-        logger.debug(`Skipping HEAD check ${url}, invalid status ${resp.status}`);
+        logger.debug("HEAD response code != 200, loading in browser", {status: resp.status, ...logDetails});
         return true;
       }
 
@@ -1485,7 +1492,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     } catch(e) {
       // can't confirm not html, so try in browser
-      logger.debug("HEAD request failed", {...e, url});
+      logger.debug("HEAD request failed", {...errJSON(e), ...logDetails});
       return true;
     }
   }
@@ -1503,35 +1510,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     return false;
-  }
-
-  async directFetchCapture(url) {
-    const abort = new AbortController();
-    const signal = abort.signal;
-    const resp = await fetch(this.capturePrefix + url, {signal, headers: this.headers, redirect: "manual"});
-    abort.abort();
-    return resp.status === 200 && !resp.headers.get("set-cookie");
-  }
-
-  async awaitPendingClear() {
-    logger.info("Waiting to ensure pending data is written to WARCs...");
-    await this.crawlState.setStatus("pending-wait");
-
-    const redis = await initRedis("redis://localhost/0");
-
-    while (!this.interrupted) {
-      try {
-        const count = Number(await redis.get(`pywb:${this.params.collection}:pending`) || 0);
-        if (count <= 0) {
-          break;
-        }
-        logger.debug("Waiting for pending requests to finish", {numRequests: count});
-      } catch (e) {
-        break;
-      }
-
-      await sleep(1);
-    }
   }
 
   async parseSitemap(url, seedId, sitemapFromDate) {

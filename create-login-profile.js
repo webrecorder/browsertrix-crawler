@@ -11,7 +11,6 @@ import yargs from "yargs";
 
 import { logger } from "./util/logger.js";
 
-import { sleep } from "./util/timing.js";
 import { Browser } from "./util/browser.js";
 import { initStorage } from "./util/storage.js";
 
@@ -144,18 +143,6 @@ async function main() {
     ]);
   }
 
-  let useProxy = false;
-
-  if (params.proxy) {
-    child_process.spawn("wayback", ["--live", "--proxy", "live"], {stdio: "inherit", cwd: "/tmp"});
-
-    logger.debug("Running with pywb proxy");
-
-    await sleep(3000);
-
-    useProxy = true;
-  }
-
   const browser = new Browser();
 
   await browser.launch({
@@ -163,7 +150,7 @@ async function main() {
     headless: params.headless,
     signals: true,
     chromeOptions: {
-      proxy: useProxy,
+      proxy: false,
       extraArgs: [
         "--window-position=0,0",
         `--window-size=${params.windowSize}`,

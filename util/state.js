@@ -31,6 +31,7 @@ export class PageState
     this.extraHops = redisData.extraHops;
 
     this.workerid = null;
+    this.pageid = null;
     this.title = null;
 
     this.isHTMLPage = null;
@@ -548,6 +549,14 @@ return 0;
   async queueSize() {
     this._lastSize = await this.redis.zcard(this.qkey);
     return this._lastSize;
+  }
+
+  async addIfNoDupe(key, value) {
+    return await this.redis.sadd(key, value) === 1;
+  }
+
+  async removeDupe(key, value) {
+    return await this.redis.srem(key, value);
   }
 
   async logError(error) {

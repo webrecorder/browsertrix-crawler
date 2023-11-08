@@ -19,6 +19,8 @@ export class BaseBrowser
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
     this.customProfile = false;
     this.emulateDevice = null;
+
+    this.recorders = [];
   }
 
   async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}, ondisconnect = null} = {}) {
@@ -117,6 +119,7 @@ export class BaseBrowser
   chromeArgs({proxy=true, userAgent=null, extraArgs=[]} = {}) {
     // Chrome Flags, including proxy server
     const args = [
+      // eslint-disable-next-line no-use-before-define
       ...defaultArgs,
       ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
       //"--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
@@ -239,6 +242,8 @@ export class Browser extends BaseBrowser
 
     this.firstCDP = await target.createCDPSession();
 
+    await this.serviceWorkerFetch();
+
     if (ondisconnect) {
       this.browser.on("disconnected", (err) => ondisconnect(err));
     }
@@ -292,6 +297,50 @@ export class Browser extends BaseBrowser
     const cdp = await target.createCDPSession();
 
     return {page, cdp};
+  }
+
+  async serviceWorkerFetch() {
+    this.firstCDP.on("Fetch.requestPaused", async (params) => {
+      const { frameId, requestId, networkId, request } = params;
+
+      if (networkId) {
+        try {
+          await this.firstCDP.send("Fetch.continueResponse", {requestId});
+        } catch (e) {
+          logger.warn("continueResponse failed", {url: request.url}, "recorder");
+        }
+        return;
+      }
+
+      let foundRecorder = null;
+
+      for (const recorder of this.recorders) {
+        if (recorder.swUrls.has(request.url)) {
+          recorder.swFrameIds.add(frameId);
+        }
+
+        if (recorder.swFrameIds && recorder.swFrameIds.has(frameId)) {
+          foundRecorder = recorder;
+          break;
+        }
+      }
+
+      if (!foundRecorder) {
+        logger.debug("Skipping URL from unknown frame", {url: request.url, frameId}, "recorder");
+
+        try {
+          await this.firstCDP.send("Fetch.continueResponse", {requestId});
+        } catch (e) {
+          logger.warn("continueResponse failed", {url: request.url}, "recorder");
+        }
+
+        return;
+      }
+
+      await foundRecorder.handleRequestPaused(params, this.firstCDP, true);
+    });
+
+    await this.firstCDP.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
   }
 
   async evaluateWithCLI(_, frame, cdp, funcString, logData, contextName) {
@@ -360,6 +409,9 @@ export const defaultArgs = [
   // See https://chromium-review.googlesource.com/c/chromium/src/+/2436773
   "--no-service-autorun",
   "--export-tagged-pdf",
+  "--apps-keep-chrome-alive-in-tests",
+  "--apps-gallery-url=https://invalid.webstore.example.com/",
+  "--apps-gallery-update-url=https://invalid.webstore.example.com/",
   "--component-updater=url-source=http://invalid.dev/",
   "--brave-stats-updater-server=url-source=http://invalid.dev/"
 ];

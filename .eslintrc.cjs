@@ -30,6 +30,10 @@ module.exports = {
       "no-constant-condition": [
           "error",
           {"checkLoops": false }
+      ],
+      "no-use-before-define": [
+          "error",
+          {"variables": true, "functions": false, "classes": false, "allowNamedExports": true}
       ]
   }
 };
