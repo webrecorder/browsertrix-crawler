@@ -756,8 +756,8 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async getInfoString() {
-    const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
-    const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
+    const packageFileJSON = JSON.parse(await fsp.readFile(new URL("../package.json", import.meta.url), {encoding: "utf-8"}));
+    const warcioPackageJSON = JSON.parse(await fsp.readFile(new URL("../node_modules/warcio/package.json", import.meta.url), {encoding: "utf-8"}));
 
     return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version})`;
   }
