@@ -14,14 +14,13 @@ console.error = function (...args) {
     typeof args[0] === "string" &&
     args[0].indexOf("[ioredis] Unhandled error event") === 0
   ) {
+    const now = Date.now();
 
-    let now = Date.now();
-
-    if ((now - lastLogTime) > REDIS_ERROR_LOG_INTERVAL_SECS) {
+    if (now - lastLogTime > REDIS_ERROR_LOG_INTERVAL_SECS) {
       if (lastLogTime && exitOnError) {
         logger.fatal("Crawl interrupted, redis gone, exiting", {}, "redis");
       }
-      logger.warn("ioredis error", {error: args[0]}, "redis");
+      logger.warn("ioredis error", { error: args[0] }, "redis");
       lastLogTime = now;
     }
     return;
@@ -30,7 +29,7 @@ console.error = function (...args) {
 };
 
 export async function initRedis(url: string) {
-  const redis = new Redis(url, {lazyConnect: true});
+  const redis = new Redis(url, { lazyConnect: true });
   await redis.connect();
   return redis;
 }

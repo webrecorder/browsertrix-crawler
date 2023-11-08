@@ -6,7 +6,6 @@ on:
 
 jobs:
   lint:
-
     runs-on: ubuntu-latest
 
     strategy:
@@ -14,18 +13,17 @@ jobs:
         node-version: [18.x]
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-    - name: install requirements
-      run: yarn install
-    - name: run linter
-      run: yarn lint
-  
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: install requirements
+        run: yarn install
+      - name: run linter
+        run: yarn lint && yarn format
+
   build:
-
     runs-on: ubuntu-latest
 
     strategy:
@@ -33,21 +31,16 @@ jobs:
         node-version: [18.x]
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-    - name: install requirements
-      run: yarn install
-    - name: build js
-      run: yarn run tsc
-    - name: build docker
-      run: docker-compose build
-    - name: run jest
-      run: sudo yarn test
-        
-
-
-
-
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: install requirements
+        run: yarn install
+      - name: build js
+        run: yarn run tsc
+      - name: build docker
+        run: docker-compose build
+      - name: run jest
+        run: sudo yarn test

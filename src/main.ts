@@ -4,12 +4,10 @@ import { logger } from "./util/logger.js";
 import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
 
+let crawler: Crawler | null = null;
 
-var crawler : Crawler | null = null;
-
-var lastSigInt = 0;
+let lastSigInt = 0;
 let forceTerm = false;
-
 
 async function handleTerminate(signame: string) {
   logger.info(`${signame} received...`);
@@ -31,12 +29,12 @@ async function handleTerminate(signame: string) {
     if (!crawler.interrupted) {
       logger.info("SIGNAL: gracefully finishing current pages...");
       crawler.gracefulFinishOnInterrupt();
-
-    } else if (forceTerm || (Date.now() - lastSigInt) > 200) {
+    } else if (forceTerm || Date.now() - lastSigInt > 200) {
       logger.info("SIGNAL: stopping crawl now...");
       await crawler.serializeAndExit();
     }
     lastSigInt = Date.now();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     logger.error("Error stopping crawl after receiving termination signal", e);
   }
@@ -53,5 +51,3 @@ process.on("SIGABRT", async () => {
 
 crawler = new Crawler();
 crawler.run();
-
-

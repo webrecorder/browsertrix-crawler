@@ -1,8 +1,8 @@
-class TestBehavior
-{
+/* eslint-disable @typescript-eslint/no-unused-vars */
+class TestBehavior {
   static init() {
     return {
-      state: {}
+      state: {},
     };
   }
 
@@ -14,8 +14,7 @@ class TestBehavior
     return window.location.origin === "https://example.com";
   }
 
-
-  async* run(ctx) {
+  async *run(ctx) {
     ctx.log("In Test Behavior!");
     yield ctx.Lib.getState(ctx, "test-stat");
   }

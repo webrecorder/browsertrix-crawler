@@ -13,83 +13,101 @@ import { logger } from "./util/logger.js";
 
 import { Browser } from "./util/browser.js";
 import { initStorage } from "./util/storage.js";
-import { CDPSession, Page, Protocol, PuppeteerLifeCycleEvent } from "puppeteer-core";
+import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
 
-const profileHTML = fs.readFileSync(new URL("../html/createProfile.html", import.meta.url), {encoding: "utf8"});
-const vncHTML = fs.readFileSync(new URL("../html/vnc_lite.html", import.meta.url), {encoding: "utf8"});
+const profileHTML = fs.readFileSync(
+  new URL("../html/createProfile.html", import.meta.url),
+  { encoding: "utf8" },
+);
+const vncHTML = fs.readFileSync(
+  new URL("../html/vnc_lite.html", import.meta.url),
+  { encoding: "utf8" },
+);
 
-const behaviors = fs.readFileSync(new URL("../node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
+const behaviors = fs.readFileSync(
+  new URL(
+    "../node_modules/browsertrix-behaviors/dist/behaviors.js",
+    import.meta.url,
+  ),
+  { encoding: "utf8" },
+);
 
-function cliOpts(): { [key: string]: Options }  {
+function cliOpts(): { [key: string]: Options } {
   return {
-    "url": {
+    url: {
       describe: "The URL of the login page",
       type: "string",
       demandOption: true,
     },
 
-    "user": {
-      describe: "The username for the login. If not specified, will be prompted",
+    user: {
+      describe:
+        "The username for the login. If not specified, will be prompted",
     },
 
-    "password": {
-      describe: "The password for the login. If not specified, will be prompted (recommended)",
+    password: {
+      describe:
+        "The password for the login. If not specified, will be prompted (recommended)",
     },
 
-    "filename": {
+    filename: {
       describe: "The filename for the profile tarball",
       default: "/crawls/profiles/profile.tar.gz",
     },
 
-    "debugScreenshot": {
-      describe: "If specified, take a screenshot after login and save as this filename"
+    debugScreenshot: {
+      describe:
+        "If specified, take a screenshot after login and save as this filename",
     },
 
-    "headless": {
+    headless: {
       describe: "Run in headless mode, otherwise start xvfb",
       type: "boolean",
       default: false,
     },
 
-    "automated": {
+    automated: {
       describe: "Start in automated mode, no interactive browser",
       type: "boolean",
       default: false,
     },
 
-    "interactive": {
+    interactive: {
       describe: "Deprecated. Now the default option!",
       type: "boolean",
-      default: false
+      default: false,
     },
 
-    "shutdownWait": {
-      describe: "Shutdown browser in interactive after this many seconds, if no pings received",
+    shutdownWait: {
+      describe:
+        "Shutdown browser in interactive after this many seconds, if no pings received",
       type: "number",
-      default: 0
+      default: 0,
     },
 
-    "profile": {
-      describe: "Path to tar.gz file which will be extracted and used as the browser profile",
+    profile: {
+      describe:
+        "Path to tar.gz file which will be extracted and used as the browser profile",
       type: "string",
     },
 
-    "windowSize": {
+    windowSize: {
       type: "string",
       describe: "Browser window dimensions, specified as: width,height",
-      default: getDefaultWindowSize()
+      default: getDefaultWindowSize(),
     },
 
-    "proxy": {
+    proxy: {
       type: "boolean",
-      default: false
+      default: false,
     },
 
-    "cookieDays": {
+    cookieDays: {
       type: "number",
-      describe: "If >0, set all cookies, including session cookies, to have this duration in days before saving profile",
-      default: 7
-    }
+      describe:
+        "If >0, set all cookies, including session cookies, to have this duration in days before saving profile",
+      default: 7,
+    },
   };
 }
 
@@ -100,13 +118,11 @@ function getDefaultWindowSize() {
   return `${x},${y}`;
 }
 
-
-
 async function main() {
-  const params : any = yargs(process.argv)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params: any = yargs(process.argv)
     .usage("browsertrix-crawler profile [options]")
-    .option(cliOpts())
-    .argv;
+    .option(cliOpts()).argv;
 
   logger.setDebugLogging(true);
 
@@ -121,7 +137,7 @@ async function main() {
       process.env.GEOMETRY || "",
       "-ac",
       "+extension",
-      "RANDR"
+      "RANDR",
     ]);
 
     //await fsp.mkdir(path.join(homedir(), ".vnc"), {recursive: true});
@@ -139,7 +155,7 @@ async function main() {
       "-passwd",
       process.env.VNC_PASS || "",
       "-display",
-      process.env.DISPLAY || ""
+      process.env.DISPLAY || "",
     ]);
   }
 
@@ -155,13 +171,15 @@ async function main() {
         "--window-position=0,0",
         `--window-size=${params.windowSize}`,
         // to disable the 'stability will suffer' infobar
-        "--test-type"
-      ]
-    }
+        "--test-type",
+      ],
+    },
   });
 
   if (params.interactive) {
-    logger.warn("Note: the '--interactive' flag is now deprecated and is the default profile creation option. Use the --automated flag to specify non-interactive mode");
+    logger.warn(
+      "Note: the '--interactive' flag is now deprecated and is the default profile creation option. Use the --automated flag to specify non-interactive mode",
+    );
   }
 
   if (params.user || params.password) {
@@ -178,20 +196,23 @@ async function main() {
 
   const { page, cdp } = await browser.newWindowPageWithCDP();
 
-  const waitUntil : PuppeteerLifeCycleEvent = "load";
+  const waitUntil: PuppeteerLifeCycleEvent = "load";
 
   await page.setCacheEnabled(false);
 
   if (!params.automated) {
-    await browser.setupPage({page, cdp});
+    await browser.setupPage({ page, cdp });
 
     // for testing, inject browsertrix-behaviors
-    await browser.addInitScript(page, behaviors + ";\nself.__bx_behaviors.init();");
+    await browser.addInitScript(
+      page,
+      behaviors + ";\nself.__bx_behaviors.init();",
+    );
   }
 
   logger.info(`Loading page: ${params.url}`);
 
-  await page.goto(params.url, {waitUntil});
+  await page.goto(params.url, { waitUntil });
 
   if (!params.automated) {
     const target = await cdp.send("Target.getTargetInfo");
@@ -203,19 +224,29 @@ async function main() {
   }
 }
 
-async function automatedProfile(params: any, browser: Browser, page: Page, cdp: CDPSession,
-    waitUntil: PuppeteerLifeCycleEvent) {
+async function automatedProfile(
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: any,
+  browser: Browser,
+  page: Page,
+  cdp: CDPSession,
+  waitUntil: PuppeteerLifeCycleEvent,
+) {
   let u, p;
 
   logger.debug("Looking for username and password entry fields on page...");
 
   try {
-    u = await page.waitForSelector("//input[contains(@name, 'user') or contains(@name, 'email')]");
-    p = await page.waitForSelector("//input[contains(@name, 'pass') and @type='password']");
-
+    u = await page.waitForSelector(
+      "//input[contains(@name, 'user') or contains(@name, 'email')]",
+    );
+    p = await page.waitForSelector(
+      "//input[contains(@name, 'pass') and @type='password']",
+    );
   } catch (e) {
     if (params.debugScreenshot) {
-      await page.screenshot({path: params.debugScreenshot});
+      await page.screenshot({ path: params.debugScreenshot });
     }
     logger.debug("Login form could not be found");
     await page.close();
@@ -229,11 +260,11 @@ async function automatedProfile(params: any, browser: Browser, page: Page, cdp: 
 
   await Promise.allSettled([
     p!.press("Enter"),
-    page.waitForNavigation({waitUntil})
+    page.waitForNavigation({ waitUntil }),
   ]);
 
   if (params.debugScreenshot) {
-    await page.screenshot({path: params.debugScreenshot});
+    await page.screenshot({ path: params.debugScreenshot });
   }
 
   await createProfile(params, browser, page, cdp);
@@ -241,7 +272,15 @@ async function automatedProfile(params: any, browser: Browser, page: Page, cdp: 
   process.exit(0);
 }
 
-async function createProfile(params: any, browser: Browser, page: Page, cdp: CDPSession, targetFilename = "") {
+async function createProfile(
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: any,
+  browser: Browser,
+  page: Page,
+  cdp: CDPSession,
+  targetFilename = "",
+) {
   await cdp.send("Network.clearBrowserCache");
 
   await browser.close();
@@ -249,10 +288,10 @@ async function createProfile(params: any, browser: Browser, page: Page, cdp: CDP
   logger.info("Creating profile");
 
   const profileFilename = params.filename || "/crawls/profiles/profile.tar.gz";
- 
+
   const outputDir = path.dirname(profileFilename);
   if (outputDir && !fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, {recursive: true});
+    fs.mkdirSync(outputDir, { recursive: true });
   }
 
   browser.saveProfile(profileFilename);
@@ -270,9 +309,10 @@ async function createProfile(params: any, browser: Browser, page: Page, cdp: CDP
 }
 
 function promptInput(msg: string, hidden = false) {
-  const rl : any = readline.createInterface({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rl: any = readline.createInterface({
     input: process.stdin,
-    output: process.stdout
+    output: process.stdout,
   });
 
   if (hidden) {
@@ -299,26 +339,32 @@ function promptInput(msg: string, hidden = false) {
   });
 }
 
-type OptionalCookie = Protocol.Network.Cookie | {
-
-};
-
-
 class InteractiveBrowser {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   params: any;
   browser: Browser;
   page: Page;
   cdp: CDPSession;
 
   targetId: string;
-  originSet = new Set<string>;
+  originSet = new Set<string>();
 
   shutdownWait: number;
   shutdownTimer: NodeJS.Timer | null;
 
-  constructor(params: any, browser: Browser, page: Page, cdp: CDPSession, targetId: string) {
+  constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    params: any,
+    browser: Browser,
+    page: Page,
+    cdp: CDPSession,
+    targetId: string,
+  ) {
     logger.info("Creating Profile Interactively...");
-    child_process.spawn("socat", ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"]);
+    child_process.spawn("socat", [
+      "tcp-listen:9222,reuseaddr,fork",
+      "tcp:localhost:9221",
+    ]);
 
     this.params = params;
     this.browser = browser;
@@ -337,25 +383,31 @@ class InteractiveBrowser {
 
       cdp.on("Page.windowOpen", async (resp) => {
         if (resp.url) {
-          await cdp.send("Target.activateTarget", {targetId: this.targetId});
+          await cdp.send("Target.activateTarget", { targetId: this.targetId });
           await page.goto(resp.url);
         }
       });
     }
 
     this.shutdownWait = params.shutdownWait * 1000;
-    
+
     if (this.shutdownWait) {
       this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
-      logger.debug(`Shutting down in ${this.shutdownWait}ms if no ping received`);
+      logger.debug(
+        `Shutting down in ${this.shutdownWait}ms if no ping received`,
+      );
     } else {
       this.shutdownTimer = null;
     }
 
-    const httpServer = http.createServer((req, res) => this.handleRequest(req, res));
+    const httpServer = http.createServer((req, res) =>
+      this.handleRequest(req, res),
+    );
     const port = 9223;
     httpServer.listen(port);
-    logger.info(`Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`);
+    logger.info(
+      `Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`,
+    );
 
     if (!params.headless) {
       logger.info("Screencasting with VNC on port 6080");
@@ -385,12 +437,18 @@ class InteractiveBrowser {
 
       const cookies = await this.browser.getCookies(this.page);
       for (const cookieOrig of cookies) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cookie = cookieOrig as any;
-        cookie.expires = (new Date().getTime() / 1000) + this.params.cookieDays * 86400;
-        
+        cookie.expires =
+          new Date().getTime() / 1000 + this.params.cookieDays * 86400;
+
         delete cookie.size;
         delete cookie.session;
-        if (cookie.sameSite && cookie.sameSite !== "Lax" && cookie.sameSite !== "Strict") {
+        if (
+          cookie.sameSite &&
+          cookie.sameSite !== "Lax" &&
+          cookie.sameSite !== "Strict"
+        ) {
           delete cookie.sameSite;
         }
         if (!cookie.domain && !cookie.path) {
@@ -398,6 +456,7 @@ class InteractiveBrowser {
         }
       }
       await this.browser.setCookies(this.page, cookies);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.error("Save Cookie Error: ", e);
     }
@@ -405,7 +464,7 @@ class InteractiveBrowser {
 
   addOrigin() {
     const url = this.page.url();
-    logger.debug("Adding origin", {url});
+    logger.debug("Adding origin", { url });
     if (url.startsWith("http:") || url.startsWith("https:")) {
       this.originSet.add(new URL(url).origin);
     }
@@ -418,123 +477,149 @@ class InteractiveBrowser {
     let origins;
 
     switch (pathname) {
-    case "/":
-      res.writeHead(200, {"Content-Type": "text/html"});
-      if (this.params.headless) {
-        targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${this.targetId}&panel=resources`;
-      } else {
-        targetUrl = `http://$HOST:9223/vnc/?host=$HOST&port=6080&password=${process.env.VNC_PASS}`;
-      }
-      res.end(profileHTML.replace("$DEVTOOLS_SRC", targetUrl.replaceAll("$HOST", parsedUrl.hostname)));
-      return;
+      case "/":
+        res.writeHead(200, { "Content-Type": "text/html" });
+        if (this.params.headless) {
+          targetUrl = `http://$HOST:9222/devtools/inspector.html?ws=$HOST:9222/devtools/page/${this.targetId}&panel=resources`;
+        } else {
+          targetUrl = `http://$HOST:9223/vnc/?host=$HOST&port=6080&password=${process.env.VNC_PASS}`;
+        }
+        res.end(
+          profileHTML.replace(
+            "$DEVTOOLS_SRC",
+            targetUrl.replaceAll("$HOST", parsedUrl.hostname),
+          ),
+        );
+        return;
 
-    case "/vnc/":
-    case "/vnc/index.html":
-      res.writeHead(200, {"Content-Type": "text/html"});
-      res.end(vncHTML);
-      return;
+      case "/vnc/":
+      case "/vnc/index.html":
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(vncHTML);
+        return;
 
-    case "/ping":
-      if (this.shutdownWait) {
-        clearTimeout(this.shutdownTimer as any);
-        this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
-        logger.debug(`Ping received, delaying shutdown for ${this.shutdownWait}ms`);
-      }
+      case "/ping":
+        if (this.shutdownWait) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          clearTimeout(this.shutdownTimer as any);
+          this.shutdownTimer = setTimeout(
+            () => process.exit(0),
+            this.shutdownWait,
+          );
+          logger.debug(
+            `Ping received, delaying shutdown for ${this.shutdownWait}ms`,
+          );
+        }
 
-      origins = Array.from(this.originSet.values());
-
-      res.writeHead(200, {"Content-Type": "application/json"});
-
-      res.end(JSON.stringify({pong: true, origins}));
-      return;
-
-    case "/target":
-      res.writeHead(200, {"Content-Type": "application/json"});
-      res.end(JSON.stringify({targetId: this.targetId}));
-      return;
-
-    case "/vncpass":
-      res.writeHead(200, {"Content-Type": "application/json"});
-      res.end(JSON.stringify({password: process.env.VNC_PASS}));
-      return;
-
-    case "/navigate":
-      if (req.method !== "POST") {
-        break;
-      }
-
-      try {
-        const postData = await this.readBodyJson(req);
-        const url = new URL(postData.url).href;
-
-        res.writeHead(200, {"Content-Type": "application/json"});
-        res.end(JSON.stringify({success: true}));
-
-        this.page.goto(url);
-
-      } catch (e: any) {
-        res.writeHead(400, {"Content-Type": "application/json"});
-        res.end(JSON.stringify({"error": e.toString()}));
-        logger.warn("HTTP Error", e);
-      }
-      return;
-
-    case "/createProfileJS":
-      if (req.method !== "POST") {
-        break;
-      }
-
-      try {
-        const postData = await this.readBodyJson(req);
-        const targetFilename = postData.filename || "";
-
-        await this.saveAllCookies();
-
-        const resource = await createProfile(this.params, this.browser, this.page, this.cdp, targetFilename);
         origins = Array.from(this.originSet.values());
 
-        res.writeHead(200, {"Content-Type": "application/json"});
-        res.end(JSON.stringify({resource, origins}));
-      } catch (e: any) {
-        res.writeHead(500, {"Content-Type": "application/json"});
-        res.end(JSON.stringify({"error": e.toString()}));
-        logger.warn("HTTP Error", e);
-      }
+        res.writeHead(200, { "Content-Type": "application/json" });
 
-      setTimeout(() => process.exit(0), 200);
-      return;
+        res.end(JSON.stringify({ pong: true, origins }));
+        return;
 
-    case "/createProfile":
-      if (req.method !== "POST") {
-        break;
-      }
+      case "/target":
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ targetId: this.targetId }));
+        return;
 
-      try {
-        await this.saveAllCookies();
+      case "/vncpass":
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ password: process.env.VNC_PASS }));
+        return;
 
-        await createProfile(this.params, this.browser, this.page, this.cdp);
+      case "/navigate":
+        if (req.method !== "POST") {
+          break;
+        }
 
-        res.writeHead(200, {"Content-Type": "text/html"});
-        res.end("<html><body>Profile Created! You may now close this window.</body></html>");
-      } catch (e: any) {
-        res.writeHead(500, {"Content-Type": "text/html"});
-        res.end("<html><body>Profile creation failed! See the browsertrix-crawler console for more info");
-        logger.warn("HTTP Error", e);
-      }
+        try {
+          const postData = await this.readBodyJson(req);
+          const url = new URL(postData.url).href;
 
-      setTimeout(() => process.exit(0), 200);
-      return;
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true }));
+
+          this.page.goto(url);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (e: any) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: e.toString() }));
+          logger.warn("HTTP Error", e);
+        }
+        return;
+
+      case "/createProfileJS":
+        if (req.method !== "POST") {
+          break;
+        }
+
+        try {
+          const postData = await this.readBodyJson(req);
+          const targetFilename = postData.filename || "";
+
+          await this.saveAllCookies();
+
+          const resource = await createProfile(
+            this.params,
+            this.browser,
+            this.page,
+            this.cdp,
+            targetFilename,
+          );
+          origins = Array.from(this.originSet.values());
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ resource, origins }));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (e: any) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: e.toString() }));
+          logger.warn("HTTP Error", e);
+        }
+
+        setTimeout(() => process.exit(0), 200);
+        return;
+
+      case "/createProfile":
+        if (req.method !== "POST") {
+          break;
+        }
+
+        try {
+          await this.saveAllCookies();
+
+          await createProfile(this.params, this.browser, this.page, this.cdp);
+
+          res.writeHead(200, { "Content-Type": "text/html" });
+          res.end(
+            "<html><body>Profile Created! You may now close this window.</body></html>",
+          );
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (e: any) {
+          res.writeHead(500, { "Content-Type": "text/html" });
+          res.end(
+            "<html><body>Profile creation failed! See the browsertrix-crawler console for more info",
+          );
+          logger.warn("HTTP Error", e);
+        }
+
+        setTimeout(() => process.exit(0), 200);
+        return;
     }
 
     if (pathname.startsWith("/vnc/")) {
-      const fileUrl = new URL("../node_modules/@novnc/novnc/" + pathname.slice("/vnc/".length), import.meta.url);
-      const file = fs.readFileSync(fileUrl, {encoding: "utf-8"});
-      res.writeHead(200, {"Content-Type": "application/javascript"});
+      const fileUrl = new URL(
+        "../node_modules/@novnc/novnc/" + pathname.slice("/vnc/".length),
+        import.meta.url,
+      );
+      const file = fs.readFileSync(fileUrl, { encoding: "utf-8" });
+      res.writeHead(200, { "Content-Type": "application/javascript" });
       res.end(file);
       return;
     }
 
-    res.writeHead(404, {"Content-Type": "text/html"});
+    res.writeHead(404, { "Content-Type": "text/html" });
     res.end("Not Found");
   }
 
@@ -557,6 +642,4 @@ class InteractiveBrowser {
   }
 }
 
-
 main();
-

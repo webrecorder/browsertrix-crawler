@@ -6,21 +6,25 @@ test("dynamically add exclusion while crawl is running", async () => {
 
   const p = new Promise((resolve) => {
     callback = (error, stdout, stderr) => {
-      resolve({error, stdout, stderr});
+      resolve({ error, stdout, stderr });
     };
   });
 
   try {
-    exec("docker run -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection add-exclusion --url https://webrecorder.net/ --scopeType prefix --limit 20 --logging debug --debugAccessRedis", {"shell": "/bin/bash"}, callback);
+    exec(
+      "docker run -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection add-exclusion --url https://webrecorder.net/ --scopeType prefix --limit 20 --logging debug --debugAccessRedis",
+      { shell: "/bin/bash" },
+      callback,
+    );
   } catch (error) {
     console.log(error);
   }
 
   await new Promise((resolve) => setTimeout(resolve, 3000));
-  
-  const redis = new Redis("redis://127.0.0.1:36379/0", {lazyConnect: true});
 
-  await redis.connect({maxRetriesPerRequest: 50});
+  const redis = new Redis("redis://127.0.0.1:36379/0", { lazyConnect: true });
+
+  await redis.connect({ maxRetriesPerRequest: 50 });
 
   while (true) {
     if (Number(await redis.zcard("test:q")) > 1) {
@@ -33,7 +37,10 @@ test("dynamically add exclusion while crawl is running", async () => {
   const uids = await redis.hkeys("test:status");
 
   // exclude all pages containing 'webrecorder', should clear out the queue and end the crawl
-  await redis.rpush(`${uids[0]}:msg`, JSON.stringify({type: "addExclusion", regex: "webrecorder"}));
+  await redis.rpush(
+    `${uids[0]}:msg`,
+    JSON.stringify({ type: "addExclusion", regex: "webrecorder" }),
+  );
 
   // ensure 'Add Exclusion is contained in the debug logs
   const { stdout } = await p;
@@ -44,4 +51,3 @@ test("dynamically add exclusion while crawl is running", async () => {
 
   await redis.disconnect();
 });
-  
