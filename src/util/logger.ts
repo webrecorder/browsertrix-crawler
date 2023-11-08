@@ -9,6 +9,8 @@ Object.defineProperty(RegExp.prototype, "toJSON", { value: RegExp.prototype.toSt
 
 
 // ===========================================================================
+// TODO: Fix this the next time the file is edited.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function errJSON(e: any) {
   if (e instanceof Error) {
     return {"type": "exception", "message": e.message, "stack": e.stack};
@@ -57,7 +59,15 @@ class Logger
     this.crawlState = crawlState;
   }
 
-  logAsJSON(message: string, data: Record<string, string> | Error | any, context: string, logLevel="info") {
+  // TODO: Fix this the next time the file is edited.
+   
+  logAsJSON(
+    message: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: Record<string, string> | Error | any,
+    context: string,
+    logLevel="info"
+  ) {
     if (data instanceof Error) {
       data = errJSON(data);
     } else if (typeof data !== "object") {
@@ -76,7 +86,7 @@ class Logger
       }
     }
 
-    let dataToLog = {
+    const dataToLog = {
       "timestamp": new Date().toISOString(),
       "logLevel": logLevel,
       "context": context,

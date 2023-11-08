@@ -8,6 +8,8 @@ export abstract class BaseTextExtract extends WARCResourceWriter {
   lastText: string | null = null;
   text: string | null = null;
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(cdp: CDPSession, opts: any) {
     super({...opts, warcName: "text.warc.gz"});
     this.cdp = cdp;
@@ -29,7 +31,9 @@ export abstract class BaseTextExtract extends WARCResourceWriter {
 
       this.lastText = text;
       return {changed: true, text};
-    } catch (e: any) {
+    } // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    catch (e: any) {
       logger.debug("Error extracting text", e, "text");
       return {changed: false, text: null};
     }
@@ -126,7 +130,7 @@ export class TextExtractViaDocument extends BaseTextExtract {
     } else if (name === TITLE) {
       const title : string[] = [];
 
-      for (let child of children) {
+      for (const child of children) {
         this.parseText(child, null, title);
       }
 
@@ -136,7 +140,7 @@ export class TextExtractViaDocument extends BaseTextExtract {
         accum.push(title.join(" "));
       }
     } else {
-      for (let child of children) {
+      for (const child of children) {
         this.parseText(child, metadata, accum);
       }
 

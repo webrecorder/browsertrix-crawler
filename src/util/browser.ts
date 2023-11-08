@@ -14,11 +14,17 @@ import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 
 type LaunchOpts = {
   profileUrl: string;
-  chromeOptions: Record<string, any>;
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  chromeOptions: Record<string, any>
   signals: boolean;
   headless: boolean;
-  emulateDevice?: Record<string, any>;
-  ondisconnect?: ((err: any) => {}) | null;
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  emulateDevice?: Record<string, any>
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ondisconnect?: ((err: any) => NonNullable<unknown>) | null
 };
 
 
@@ -27,11 +33,15 @@ export class Browser
 {
   profileDir: string;
   customProfile = false;
-  emulateDevice : Record<string, any> | null = null;
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  emulateDevice: Record<string, any> | null = null;
 
   browser?: PptrBrowser | null = null;
   firstCDP: CDPSession | null = null;
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   recorders: any[] = [];
 
   constructor() {
@@ -39,45 +49,45 @@ export class Browser
   }
 
   async launch({profileUrl, chromeOptions, signals = false, headless = false, emulateDevice = {}, ondisconnect = null} : LaunchOpts) {    if (this.isLaunched()) {
-      return;
-    }
-
-    if (profileUrl) {
-      this.customProfile = await this.loadProfile(profileUrl);
-    }
-
-    this.emulateDevice = emulateDevice;
-
-    const args = this.chromeArgs(chromeOptions);
-
-    let defaultViewport = null;
-
-    if (process.env.GEOMETRY) {
-      const geom = process.env.GEOMETRY.split("x");
-
-      defaultViewport = {width: Number(geom[0]), height: Number(geom[1])};
-    }
-
-    const launchOpts : PuppeteerLaunchOptions = {
-      args,
-      headless: headless ? "new" : false,
-      executablePath: this.getBrowserExe(),
-      ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
-      ignoreHTTPSErrors: true,
-      handleSIGHUP: signals,
-      handleSIGINT: signals,
-      handleSIGTERM: signals,
-      protocolTimeout: 0,
-
-      defaultViewport,
-      waitForInitialPage: false,
-      userDataDir: this.profileDir
-    };
-
-    await this._init(launchOpts, ondisconnect);
+    return;
   }
 
-  async setupPage({page, cdp} : {page: Page, cdp: CDPSession}) {
+  if (profileUrl) {
+    this.customProfile = await this.loadProfile(profileUrl);
+  }
+
+  this.emulateDevice = emulateDevice;
+
+  const args = this.chromeArgs(chromeOptions);
+
+  let defaultViewport = null;
+
+  if (process.env.GEOMETRY) {
+    const geom = process.env.GEOMETRY.split("x");
+
+    defaultViewport = {width: Number(geom[0]), height: Number(geom[1])};
+  }
+
+  const launchOpts : PuppeteerLaunchOptions = {
+    args,
+    headless: headless ? "new" : false,
+    executablePath: this.getBrowserExe(),
+    ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
+    ignoreHTTPSErrors: true,
+    handleSIGHUP: signals,
+    handleSIGINT: signals,
+    handleSIGTERM: signals,
+    protocolTimeout: 0,
+
+    defaultViewport,
+    waitForInitialPage: false,
+    userDataDir: this.profileDir
+  };
+
+  await this._init(launchOpts, ondisconnect);
+  }
+
+  async setupPage({page} : {page: Page, cdp: CDPSession}) {
     await this.addInitScript(page, "Object.defineProperty(navigator, \"webdriver\", {value: false});");
 
     if (this.customProfile) {
@@ -97,6 +107,8 @@ export class Browser
 
       const resp = await fetch(profileFilename);
       await pipeline(
+        // TODO: Fix this the next time the file is edited.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Readable.fromWeb(resp.body as any),
         fs.createWriteStream(targetFilename)
       );
@@ -186,6 +198,8 @@ export class Browser
 
   async evaluateWithCLI_(cdp: CDPSession, frame: Frame, cdpContextId: number, funcString: string, logData: Record<string, string>, contextName: string) {
     const frameUrl = frame.url();
+    // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let details : Record<string, any> = {frameUrl, ...logData};
 
     if (!frameUrl || frame.isDetached()) {
@@ -242,6 +256,7 @@ export class Browser
     return page.evaluateOnNewDocument(script);
   }
 
+  // eslint-disable-next-line @typescript-eslint/ban-types
   async _init(launchOpts: PuppeteerLaunchOptions, ondisconnect : Function | null = null) {
     this.browser = await puppeteer.launch(launchOpts);
 
@@ -306,6 +321,8 @@ export class Browser
 
     if (device && page) {
       if (device.viewport && device.userAgent) {
+        // TODO: Fix this the next time the file is edited.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await page.emulate(device as any);
       } else if (device.userAgent) {
         await page.setUserAgent(device.userAgent);
@@ -369,7 +386,19 @@ export class Browser
     await this.firstCDP.send("Fetch.enable", {patterns: [{urlPattern: "*", requestStage: "Response"}]});
   }
 
-  async evaluateWithCLI(_: unknown, frame: Frame, cdp: CDPSession, funcString: string, logData: Record<string, any>, contextName: string) {
+  // TODO: Fix this the next time the file is edited.
+   
+  async evaluateWithCLI(
+    _: unknown,
+    frame: Frame,
+    cdp: CDPSession,
+    funcString: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    logData: Record<string, any>,
+    contextName: string
+  ) {
+    // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const context = await (frame as any).executionContext();
     cdp = context._client;
     const cdpContextId = context._contextId;
@@ -392,6 +421,8 @@ export class Browser
     return await page.cookies();
   }
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async setCookies(page: Page, cookies: any) {
     return await page.setCookie(...cookies);
   }

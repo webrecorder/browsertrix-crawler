@@ -10,9 +10,9 @@ import { logger, errJSON } from "./logger.js";
 import { sleep, timestampNow } from "./timing.js";
 import { RequestResponseInfo } from "./reqresp.js";
 
-// @ts-ignore
+// @ts-expect-error TODO fill in why error is expected
 import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
-// @ts-ignore
+// @ts-expect-error TODO fill in why error is expected
 import { rewriteDASH, rewriteHLS } from "@webrecorder/wabac/src/rewrite/rewriteVideo.js";
 
 import { WARCRecord } from "warcio";
@@ -30,9 +30,10 @@ const WRITE_DUPE_KEY = "s:writedupe";
 
 const encoder = new TextEncoder();
 
-type Params = Record<string, any> & {};
 
 // =================================================================
+// TODO: Fix this the next time the file is edited.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
 function logNetwork(msg: string, data: any) {
   // logger.debug(msg, data, "recorderNetwork");
 }
@@ -42,6 +43,8 @@ export class Recorder
 {
   workerid: WorkerId;
   collDir: string;
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   crawler: any;
 
   crawlState: RedisCrawlState;
@@ -56,6 +59,8 @@ export class Recorder
   swFrameIds = new Set<string>();
   swUrls = new Set<string>();
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logDetails: Record<string, any> = {};
   skipping = false;
 
@@ -71,7 +76,12 @@ export class Recorder
 
   pageid!: string;
 
-  constructor({workerid, collDir, crawler} : {workerid: WorkerId, collDir: string, crawler: any}) {
+  // TODO: Fix this the next time the file is edited.
+   
+  constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    {workerid, collDir, crawler} : {workerid: WorkerId, collDir: string, crawler: any}
+  ) {
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
@@ -576,7 +586,7 @@ export class Recorder
     if (!headers) {
       return null;
     }
-    for (let header of headers) {
+    for (const header of headers) {
       if (header.name.toLowerCase() === "content-type") {
         return header.value.split(";")[0];
       }
@@ -589,7 +599,7 @@ export class Recorder
     if (!headers) {
       return -1;
     }
-    for (let header of headers) {
+    for (const header of headers) {
       if (header.name.toLowerCase() === "content-length") {
         return Number(header.value);
       }
@@ -602,7 +612,7 @@ export class Recorder
     if (!headers) {
       return null;
     }
-    for (let header of headers) {
+    for (const header of headers) {
       if (header.name.toLowerCase() === "content-range") {
         return header.value;
       }
@@ -659,7 +669,7 @@ export class Recorder
       return;
     }
 
-    if (reqresp.url && reqresp.method === "GET" && !await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, reqresp.url)) {
+    if (reqresp.url && reqresp.method === "GET" && !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, reqresp.url))) {
       logNetwork("Skipping dupe", {url: reqresp.url});
       return;
     }
@@ -730,7 +740,7 @@ class AsyncFetcher
     let fetched = "notfetched";
 
     try {
-      if (reqresp.method === "GET" && url && !await crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url)) {
+      if (reqresp.method === "GET" && url && !(await crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url))) {
         if (!this.ignoreDupe) {
           this.reqresp.asyncLoading = false;
           return "dupe";
@@ -873,6 +883,8 @@ class ResponseStreamAsyncFetcher extends AsyncFetcher
   cdp: CDPSession;
   requestId: string;
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(opts: any) {
     super(opts);
     this.cdp = opts.cdp;
@@ -895,6 +907,8 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher
 {
   cdp: CDPSession;
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(opts: any) {
     super(opts);
     this.cdp = opts.cdp;

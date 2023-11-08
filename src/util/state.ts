@@ -14,7 +14,7 @@ export enum LoadState {
   FULL_PAGE_LOADED = 2,
   EXTRACTION_DONE = 3,
   BEHAVIORS_DONE = 4,
-};
+}
 
 
 // ============================================================================
@@ -22,7 +22,7 @@ export enum QueueState {
   ADDED = 0,
   LIMIT_HIT = 1,
   DUPE_URL = 2,
-};
+}
 
 
 // ============================================================================
@@ -43,6 +43,8 @@ export class PageState
   title?: string;
   mime?: string;
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   callbacks: any;
 
   isHTMLPage?: boolean;
@@ -299,7 +301,7 @@ return 0;
   }
 
   async isFinished() {
-    return (await this.queueSize() == 0) && (await this.numDone() > 0);
+    return ((await this.queueSize()) == 0) && ((await this.numDone()) > 0);
   }
 
   async setStatus(status_: string) {
@@ -307,7 +309,7 @@ return 0;
   }
 
   async getStatus() : Promise<string> {
-    return await this.redis.hget(`${this.key}:status`, this.uid) || "";
+    return (await this.redis.hget(`${this.key}:status`, this.uid)) || "";
   }
 
   async setArchiveSize(size: number) {
@@ -315,11 +317,11 @@ return 0;
   }
 
   async isCrawlStopped() {
-    if (await this.redis.get(`${this.key}:stopping`) === "1") {
+    if ((await this.redis.get(`${this.key}:stopping`)) === "1") {
       return true;
     }
 
-    if (await this.redis.hget(`${this.key}:stopone`, this.uid) === "1") {
+    if ((await this.redis.hget(`${this.key}:stopone`, this.uid)) === "1") {
       return true;
     }
 
@@ -327,7 +329,7 @@ return 0;
   }
 
   async isCrawlCanceled() {
-    return await this.redis.get(`${this.key}:canceled`) === "1";
+    return (await this.redis.get(`${this.key}:canceled`)) === "1";
   }
 
   // note: not currently called in crawler, but could be
@@ -369,7 +371,9 @@ return 0;
           }
           break;
         }
-      } catch (e: any) {
+      } // TODO: Fix this the next time the file is edited.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      catch (e: any) {
         logger.warn("Error processing message", e, "redisMessage");
       }
     }
@@ -428,6 +432,8 @@ return 0;
   //async addToQueue({url : string, seedId, depth = 0, extraHops = 0} = {}, limit = 0) {
   async addToQueue({url, seedId, depth = 0, extraHops = 0} : {url: string, seedId: number, depth?: number, extraHops?: number}, limit = 0) {
     const added = this._timestamp();
+    // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data : any = {added, url, seedId, depth};
     if (extraHops) {
       data.extraHops = extraHops;
@@ -461,7 +467,7 @@ return 0;
   }
 
   async has(url: string) {
-    return !!await this.redis.sismember(this.skey, url);
+    return !!(await this.redis.sismember(this.skey, url));
   }
 
   async serialize() {
@@ -504,6 +510,8 @@ return 0;
     return results;
   }
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async load(state: Record<string, any>, seeds: ScopedSeed[], checkScope: boolean) {
     const seen : string[] = [];
 
@@ -609,7 +617,9 @@ return 0;
       for (const url of pendingUrls) {
         await this.redis.unlockpending(this.pkey + ":" + url, this.uid);
       }
-    } catch (e: any) {
+    } // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    catch (e: any) {
       logger.error("Redis Del Pending Failed", e, "state");
     }
   }
@@ -637,7 +647,7 @@ return 0;
   }
 
   async addIfNoDupe(key: string, value: string) {
-    return await this.redis.sadd(key, value) === 1;
+    return (await this.redis.sadd(key, value)) === 1;
   }
 
   async removeDupe(key: string, value: string) {

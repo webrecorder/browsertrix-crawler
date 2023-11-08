@@ -16,6 +16,8 @@ const TEARDOWN_TIMEOUT = 10;
 const FINISHED_TIMEOUT = 60;
 
 // ===========================================================================
+// TODO: Fix this the next time the file is edited.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function runWorkers(crawler: any, numWorkers: number, maxPageTime: number, collDir: string) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
@@ -45,10 +47,13 @@ export function runWorkers(crawler: any, numWorkers: number, maxPageTime: number
 
 
 // ===========================================================================
+// TODO: Fix this the next time the file is edited.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type WorkerOpts = Record<string, any> & {
   page: Page;
   cdp: CDPSession;
   workerid: WorkerId;
+  // eslint-disable-next-line @typescript-eslint/ban-types
   callbacks: Record<string, Function>;
   directFetchCapture?: ((url: string) => Promise<{fetched: boolean, mime: string}>) | null;
 };
@@ -62,6 +67,8 @@ export type WorkerState = WorkerOpts & {
 export class PageWorker
 {
   id: WorkerId;
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   crawler: any;
   maxPageTime: number;
 
@@ -69,10 +76,13 @@ export class PageWorker
   page?: Page | null;
   cdp?: CDPSession | null;
 
+  // eslint-disable-next-line @typescript-eslint/ban-types
   callbacks?: Record<string, Function>;
 
   opts?: WorkerOpts;
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logDetails: Record<string, any> = {};
 
   crashed = false;
@@ -81,6 +91,8 @@ export class PageWorker
 
   recorder: Recorder;
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(id: WorkerId, crawler: any, maxPageTime: number, collDir: string) {
     this.id = id;
     this.crawler = crawler;
@@ -196,6 +208,8 @@ export class PageWorker
         this.logDetails = {page: page.url(), workerid};
 
         // more serious page crash, mark as failed
+        // TODO: Fix this the next time the file is edited.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         page.on("error", (err: any) => {
           // ensure we're still on this page, otherwise ignore!
           if (this.page === page) {
@@ -346,7 +360,7 @@ export class PageWorker
           await sleep(0.5);
         } else {
           // if no pending and queue size is still empty, we're done!
-          if (!await crawlState.queueSize()) {
+          if (!(await crawlState.queueSize())) {
             break;
           }
         }

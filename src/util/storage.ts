@@ -13,7 +13,7 @@ import * as Minio from "minio";
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 
-// @ts-ignore
+// @ts-expect-error TODO fill in why error is expected
 import getFolderSize from "get-folder-size";
 
 
@@ -31,8 +31,14 @@ export class S3StorageSync
   crawlId: string;
   webhookUrl?: string;
 
-  constructor(urlOrData: string | any, {webhookUrl, userId, crawlId} : 
-      {webhookUrl?: string, userId: string, crawlId: string}) {
+  // TODO: Fix this the next time the file is edited.
+   
+  constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    urlOrData: string | any,
+    {webhookUrl, userId, crawlId} : 
+        {webhookUrl?: string, userId: string, crawlId: string}
+  ) {
     let url;
     let accessKey;
     let secretKey;
@@ -164,6 +170,8 @@ export async function getDirSize(dir: string) {
   return size;
 }
 
+// TODO: Fix this the next time the file is edited.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function checkDiskUtilization(params: Record<string, any>, archiveDirSize: number, dfOutput=null) {
   const diskUsage : Record<string, string> = await getDiskUsage("/crawls", dfOutput);
   const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
@@ -218,11 +226,13 @@ export async function getDFOutput(path: string) {
 }
 
 export async function getDiskUsage(path="/crawls", dfOutput = null) {
-  const result = dfOutput || await getDFOutput(path);
+  const result = dfOutput || (await getDFOutput(path));
   const lines = result.split("\n");
   const keys = lines[0].split(/\s+/ig);
   const rows = lines.slice(1).map(line => {
     const values = line.split(/\s+/ig);
+    // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return keys.reduce((o: Record<string, any>, k, index) => {
       o[k] = values[index];
       return o;

@@ -449,6 +449,7 @@ class ArgParser {
         if (configPath === "/crawls/stdin") {
           configPath = process.stdin.fd;
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         origConfig = yaml.load(fs.readFileSync(configPath, "utf8")) as any;
         return origConfig;
       })
@@ -465,6 +466,7 @@ class ArgParser {
     return res ? res.map(e => e.replace(/"(.+)"/, "$1")) : [];
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   validateArgs(argv: Record<string, any>) {
     argv.crawlId = argv.crawlId || process.env.CRAWL_ID || os.hostname;
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
@@ -483,6 +485,7 @@ class ArgParser {
     argv.text = argv.text || [];
 
     if (argv.mobileDevice) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       argv.emulateDevice = (devices as Record<string, any>)[argv.mobileDevice.replace("-", " ")];
       if (!argv.emulateDevice) {
         logger.fatal("Unknown device: " + argv.mobileDevice);

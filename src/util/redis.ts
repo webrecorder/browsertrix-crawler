@@ -15,7 +15,7 @@ console.error = function (...args) {
     args[0].indexOf("[ioredis] Unhandled error event") === 0
   ) {
 
-    let now = Date.now();
+    const now = Date.now();
 
     if ((now - lastLogTime) > REDIS_ERROR_LOG_INTERVAL_SECS) {
       if (lastLogTime && exitOnError) {

@@ -4,6 +4,8 @@ import * as warcio from "warcio";
 
 export class WARCResourceWriter
 {
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   page: any;
   url: string;
   directory: string;
@@ -30,7 +32,7 @@ export class WARCResourceWriter
     async function* content() {
       yield buffer;
     }
-    let resourceUrl = `urn:${resourceType}:${this.url}`;
+    const resourceUrl = `urn:${resourceType}:${this.url}`;
 
     return warcio.WARCRecord.create({
       url: resourceUrl,

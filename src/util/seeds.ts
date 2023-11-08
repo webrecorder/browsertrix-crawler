@@ -25,8 +25,10 @@ export class ScopedSeed
   maxDepth = 0;
 
 
-  constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} :
-              {url: string, scopeType: ScopeType, include: string[], exclude?: string[], allowHash?: boolean, depth?: number, sitemap?: string | boolean | null, extraHops?: number}) {
+  constructor(
+    {url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} :
+                {url: string, scopeType: ScopeType, include: string[], exclude?: string[], allowHash?: boolean, depth?: number, sitemap?: string | boolean | null, extraHops?: number}
+  ) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");
@@ -59,6 +61,8 @@ export class ScopedSeed
   }
 
   //parseRx(value? : union[string[], string, RegExp[]]) -> RegExp[] {
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parseRx(value : any) {
     if (value === null || value === undefined || value === "") {
       return [];

@@ -8,7 +8,7 @@ export class OriginOverride
 
   constructor(originOverride: string[]) {
     this.originOverride = originOverride.map((override) => {
-      let [orig, dest] = override.split("=");
+      const [orig, dest] = override.split("=");
       const origUrl = new URL(orig);
       const destUrl = new URL(dest);
 

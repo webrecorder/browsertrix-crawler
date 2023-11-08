@@ -3,7 +3,6 @@ import fs from "fs";
 import { logger, errJSON } from "./logger.js";
 import { HTTPRequest, Page } from "puppeteer-core";
 import { Browser } from "./browser.js";
-import { IncomingMessage } from "http";
 
 const RULE_TYPES = ["block", "allowOnly"];
 
@@ -100,6 +99,7 @@ export class BlockRules
     await browser.interceptRequest(page, onRequest);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async handleRequest(request: HTTPRequest, logDetails: Record<string, any>) {
     const url = request.url();
 
@@ -119,6 +119,7 @@ export class BlockRules
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async shouldBlock(request: HTTPRequest, url: string, logDetails: Record<string, any>) {
     if (!url.startsWith("http:") && !url.startsWith("https:")) {
       return BlockState.ALLOW;
@@ -180,6 +181,7 @@ export class BlockRules
     return BlockState.ALLOW;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async ruleCheck(rule: BlockRule, request: HTTPRequest, reqUrl: string, frameUrl: string, isNavReq: boolean, logDetails: Record<string, any>) {
     const {url, inFrameUrl, frameTextMatch} = rule;
 
@@ -210,6 +212,7 @@ export class BlockRules
     return {block, done: false};
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async isTextMatch(request: HTTPRequest, reqUrl: string, frameTextMatch: RegExp, logDetails: Record<string, any>) {
     try {
       const res = await fetch(reqUrl);
@@ -257,6 +260,7 @@ export class AdBlockRules extends BlockRules
     return domain && this.adhosts.includes(domain);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async shouldBlock(request: HTTPRequest, url: string, logDetails: Record<string, any>) {
     if (this.isAdUrl(url)) {
       logger.debug("URL blocked for being an ad", {url, ...logDetails}, "blocking");

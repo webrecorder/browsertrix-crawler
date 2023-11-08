@@ -4,7 +4,17 @@ export function sleep(seconds: number) {
   return new Promise(resolve => setTimeout(resolve, seconds * 1000));
 }
 
-export function timedRun(promise: Promise<any>, seconds: number, message="Promise timed out", logDetails={}, context="general", isWarn=false) {
+// TODO: Fix this the next time the file is edited.
+ 
+export function timedRun(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  promise: Promise<any>,
+  seconds: number,
+  message="Promise timed out",
+  logDetails={},
+  context="general",
+  isWarn=false
+) {
   // return Promise return value or log error if timeout is reached first
   const timeout = seconds * 1000;
 

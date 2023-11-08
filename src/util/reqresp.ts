@@ -1,4 +1,4 @@
-// @ts-ignore
+// @ts-expect-error TODO fill in why error is expected
 import { getStatusText } from "@webrecorder/wabac/src/utils.js";
 
 import { Protocol } from "puppeteer-core";
@@ -47,6 +47,8 @@ export class RequestResponseInfo
 
   resourceType?: string;
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   extraOpts: Record<string, any> = {};
 
   // stats
@@ -63,6 +65,8 @@ export class RequestResponseInfo
     this.requestId = requestId;
   }
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fillRequest(params: Record<string, any>) {
     this.url = params.request.url;
     this.method = params.request.method;
@@ -78,6 +82,8 @@ export class RequestResponseInfo
 
   }
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fillFetchRequestPaused(params: Record<string, any>) {
     this.fillRequest(params);
 
@@ -149,6 +155,8 @@ export class RequestResponseInfo
     this.extraOpts.ipType = params.resourceIPAddressSpace;
   }
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fillFetchResponse(response: Record<string, any>) {
     this.responseHeaders = Object.fromEntries(response.headers);
     this.status = response.status;
@@ -156,6 +164,8 @@ export class RequestResponseInfo
 
   }
 
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fillRequestExtraInfo(params: Record<string, any>) {
     this.requestHeaders = params.headers;
   }
