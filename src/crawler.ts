@@ -4,7 +4,13 @@ import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp, { FileHandle } from "fs/promises";
 
-import { RedisCrawlState, LoadState, QueueState, PageState, WorkerId } from "./util/state.js";
+import {
+  RedisCrawlState,
+  LoadState,
+  QueueState,
+  PageState,
+  WorkerId,
+} from "./util/state.js";
 
 import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
@@ -13,7 +19,14 @@ import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
-import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization, S3StorageSync } from "./util/storage.js";
+import {
+  initStorage,
+  getFileSize,
+  getDirSize,
+  interpolateFilename,
+  checkDiskUtilization,
+  S3StorageSync,
+} from "./util/storage.js";
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
@@ -25,7 +38,12 @@ import { collectAllFileSources } from "./util/file_reader.js";
 
 import { Browser } from "./util/browser.js";
 
-import { ADD_LINK_FUNC, BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
+import {
+  ADD_LINK_FUNC,
+  BEHAVIOR_LOG_FUNC,
+  HTML_TYPES,
+  DEFAULT_SELECTORS,
+} from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
 import { OriginOverride } from "./util/originoverride.js";
@@ -41,12 +59,23 @@ const HTTPS_AGENT = new HTTPSAgent({
 
 const HTTP_AGENT = new HTTPAgent();
 
-const behaviors = fs.readFileSync(new URL("../node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
+const behaviors = fs.readFileSync(
+  new URL(
+    "../node_modules/browsertrix-behaviors/dist/behaviors.js",
+    import.meta.url
+  ),
+  { encoding: "utf8" }
+);
 
 const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
 
-const POST_CRAWL_STATES = ["generate-wacz", "uploading-wacz", "generate-cdx", "generate-warc"];
+const POST_CRAWL_STATES = [
+  "generate-wacz",
+  "uploading-wacz",
+  "generate-cdx",
+  "generate-warc",
+];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LogDetails = Record<string, any>;
@@ -61,7 +90,6 @@ type PageEntry = {
   text?: string;
   favIconUrl?: string;
 };
-
 
 // ============================================================================
 export class Crawler {
@@ -128,8 +156,12 @@ export class Crawler {
   maxHeapUsed = 0;
   maxHeapTotal = 0;
 
-  // eslint-disable-next-line no-use-before-define
-  driver!: (opts: { page: Page; data: PageState; crawler: Crawler }) => NonNullable<unknown>;
+  driver!: (opts: {
+    page: Page;
+    data: PageState;
+    // eslint-disable-next-line no-use-before-define
+    crawler: Crawler;
+  }) => NonNullable<unknown>;
 
   constructor() {
     const res = parseArgs();
@@ -375,7 +407,7 @@ export class Crawler {
       logger.debug(`Clearing ${this.collDir} before starting`);
       try {
         fs.rmSync(this.collDir, { recursive: true, force: true });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
         logger.error(`Unable to clear ${this.collDir}`, e);
       }
@@ -445,7 +477,7 @@ export class Crawler {
           exitCode = 11;
         }
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.error("Crawl failed", e);
       exitCode = 9;
@@ -481,21 +513,21 @@ export class Crawler {
     }
 
     switch (type) {
-    case "info":
-      behaviorLine = JSON.stringify(data);
-      if (behaviorLine !== this.behaviorLastLine) {
-        logger.info(message, details, "behaviorScript");
-        this.behaviorLastLine = behaviorLine;
-      }
-      break;
+      case "info":
+        behaviorLine = JSON.stringify(data);
+        if (behaviorLine !== this.behaviorLastLine) {
+          logger.info(message, details, "behaviorScript");
+          this.behaviorLastLine = behaviorLine;
+        }
+        break;
 
-    case "error":
-      logger.error(message, details, "behaviorScript");
-      break;
+      case "error":
+        logger.error(message, details, "behaviorScript");
+        break;
 
-    case "debug":
-    default:
-      logger.debug(message, details, "behaviorScript");
+      case "debug":
+      default:
+        logger.debug(message, details, "behaviorScript");
     }
   }
 
@@ -1067,7 +1099,7 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       const driverUrl = new URL(this.params.driver, import.meta.url);
       this.driver = (await import(driverUrl.href)).default;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.warn(`Error importing driver ${this.params.driver}`, e);
       return;
@@ -1181,7 +1213,7 @@ self.__bx_behaviors.selectMainBehavior();
           "browser"
         );
       },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     // --------------
@@ -1255,7 +1287,7 @@ self.__bx_behaviors.selectMainBehavior();
         );
         try {
           fs.rmSync(this.collDir, { recursive: true, force: true });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
           logger.warn(`Unable to clear ${this.collDir} before exit`, e);
         }
@@ -1352,9 +1384,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     createArgs.push("-f");
 
-    warcFileList.forEach((val) =>
-      createArgs.push(path.join(archiveDir, val))
-    );  
+    warcFileList.forEach((val) => createArgs.push(path.join(archiveDir, val)));
 
     // create WACZ
     const waczResult = await this.awaitProcess(
@@ -1463,7 +1493,7 @@ self.__bx_behaviors.selectMainBehavior();
           this.params.statsFilename,
           JSON.stringify(stats, null, 2)
         );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         logger.warn("Stats output failed", err);
       }
@@ -1533,7 +1563,7 @@ self.__bx_behaviors.selectMainBehavior();
       const contentType = resp.headers()["content-type"];
 
       isHTMLPage = this.isHTMLContentType(contentType);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       const msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
@@ -1676,7 +1706,9 @@ self.__bx_behaviors.selectMainBehavior();
       document.querySelectorAll(selector).forEach(getter);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const func = (window as any)[addLinkFunc] as (url: string) => NonNullable<unknown>;
+      const func = (window as any)[addLinkFunc] as (
+        url: string
+      ) => NonNullable<unknown>;
       urls.forEach((url) => func.call(this, url));
 
       return true;
@@ -1718,7 +1750,7 @@ self.__bx_behaviors.selectMainBehavior();
           }
         }
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.warn("Link Extraction failed", e);
     }
@@ -1767,7 +1799,7 @@ self.__bx_behaviors.selectMainBehavior();
           );
         }
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.error("Queuing Error", e);
     }
@@ -1815,26 +1847,26 @@ self.__bx_behaviors.selectMainBehavior();
     );
 
     switch (result) {
-    case QueueState.ADDED:
-      logger.debug("Queued new page url", { url, ...logDetails }, "links");
-      return true;
+      case QueueState.ADDED:
+        logger.debug("Queued new page url", { url, ...logDetails }, "links");
+        return true;
 
-    case QueueState.LIMIT_HIT:
-      logger.debug(
-        "Not queued page url, at page limit",
-        { url, ...logDetails },
-        "links"
-      );
-      this.limitHit = true;
-      return false;
+      case QueueState.LIMIT_HIT:
+        logger.debug(
+          "Not queued page url, at page limit",
+          { url, ...logDetails },
+          "links"
+        );
+        this.limitHit = true;
+        return false;
 
-    case QueueState.DUPE_URL:
-      logger.debug(
-        "Not queued page url, already seen",
-        { url, ...logDetails },
-        "links"
-      );
-      return false;
+      case QueueState.DUPE_URL:
+        logger.debug(
+          "Not queued page url, already seen",
+          { url, ...logDetails },
+          "links"
+        );
+        return false;
     }
 
     return false;
@@ -1867,7 +1899,7 @@ self.__bx_behaviors.selectMainBehavior();
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       logger.error("pages/pages.jsonl creation failed", err);
     }
@@ -1904,7 +1936,7 @@ self.__bx_behaviors.selectMainBehavior();
     const processedRow = JSON.stringify(row) + "\n";
     try {
       await this.pagesFH!.writeFile(processedRow);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       logger.warn("pages/pages.jsonl append failed", err);
     }
@@ -1920,7 +1952,7 @@ self.__bx_behaviors.selectMainBehavior();
         method: "HEAD",
         headers: this.headers,
         agent: this.resolveAgent,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
       if (resp.status !== 200) {
         logger.debug("HEAD response code != 200, loading in browser", {
@@ -1984,7 +2016,7 @@ self.__bx_behaviors.selectMainBehavior();
       const { sites } = await sitemapper.fetch();
       logger.info("Sitemap Urls Found", { urls: sites.length }, "sitemap");
       await this.queueInScopeUrls(seedId, sites, 0);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.warn("Error fetching sites from sitemap", e, "sitemap");
     }
@@ -2088,21 +2120,21 @@ self.__bx_behaviors.selectMainBehavior();
 
   async serializeConfig(done = false) {
     switch (this.params.saveState) {
-    case "never":
-      return;
-
-    case "partial":
-      if (!done) {
+      case "never":
         return;
-      }
-      if (await this.crawlState.isFinished()) {
-        return;
-      }
-      break;
 
-    case "always":
-    default:
-      break;
+      case "partial":
+        if (!done) {
+          return;
+        }
+        if (await this.crawlState.isFinished()) {
+          return;
+        }
+        break;
+
+      case "always":
+      default:
+        break;
     }
 
     const now = new Date();
@@ -2137,7 +2169,7 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       logger.info(`Saving crawl state to: ${filename}`);
       await fsp.writeFile(filename, res);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.error(`Failed to write save state file: ${filename}`, e);
       return;
@@ -2166,8 +2198,11 @@ self.__bx_behaviors.selectMainBehavior();
 function shouldIgnoreAbort(req: HTTPRequest) {
   try {
     const failure = req.failure();
-    const failureText = failure && failure.errorText || "";
-    if (failureText !== "net::ERR_ABORTED" || req.resourceType() !== "document") {
+    const failureText = (failure && failure.errorText) || "";
+    if (
+      failureText !== "net::ERR_ABORTED" ||
+      req.resourceType() !== "document"
+    ) {
       return false;
     }
 
@@ -2178,8 +2213,10 @@ function shouldIgnoreAbort(req: HTTPRequest) {
       return false;
     }
 
-    if (headers["content-disposition"] || 
-       (headers["content-type"] && !headers["content-type"].startsWith("text/"))) {
+    if (
+      headers["content-disposition"] ||
+      (headers["content-type"] && !headers["content-type"].startsWith("text/"))
+    ) {
       return true;
     }
   } catch (e) {
@@ -2188,4 +2225,3 @@ function shouldIgnoreAbort(req: HTTPRequest) {
 
   return false;
 }
-

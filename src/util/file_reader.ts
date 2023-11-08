@@ -3,11 +3,17 @@ import path from "path";
 
 const MAX_DEPTH = 2;
 
-export function collectAllFileSources(fileOrDir: string, ext?: string, depth = 0) : string[] {
+export function collectAllFileSources(
+  fileOrDir: string,
+  ext?: string,
+  depth = 0,
+): string[] {
   const resolvedPath = path.resolve(fileOrDir);
 
   if (depth >= MAX_DEPTH) {
-    console.warn(`WARN: MAX_DEPTH of ${MAX_DEPTH} reached traversing "${resolvedPath}"`);
+    console.warn(
+      `WARN: MAX_DEPTH of ${MAX_DEPTH} reached traversing "${resolvedPath}"`,
+    );
     return [];
   }
 
@@ -27,7 +33,9 @@ export function collectAllFileSources(fileOrDir: string, ext?: string, depth = 0
   }
 
   if (depth === 0) {
-    console.warn(`WARN: The provided path "${resolvedPath}" is not a .js file or directory.`);
+    console.warn(
+      `WARN: The provided path "${resolvedPath}" is not a .js file or directory.`,
+    );
   }
 
   return [];

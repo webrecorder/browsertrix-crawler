@@ -16,9 +16,14 @@ const TEARDOWN_TIMEOUT = 10;
 const FINISHED_TIMEOUT = 60;
 
 // ===========================================================================
-// TODO: Fix this the next time the file is edited.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function runWorkers(crawler: any, numWorkers: number, maxPageTime: number, collDir: string) {
+export function runWorkers(
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  crawler: any,
+  numWorkers: number,
+  maxPageTime: number,
+  collDir: string
+) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
   const workers = [];
@@ -39,12 +44,11 @@ export function runWorkers(crawler: any, numWorkers: number, maxPageTime: number
   }
 
   for (let i = 0; i < numWorkers; i++) {
-    workers.push(new PageWorker((i + offset), crawler, maxPageTime, collDir));
+    workers.push(new PageWorker(i + offset, crawler, maxPageTime, collDir));
   }
 
   return Promise.allSettled(workers.map((worker) => worker.run()));
 }
-
 
 // ===========================================================================
 // TODO: Fix this the next time the file is edited.
@@ -55,17 +59,18 @@ export type WorkerOpts = Record<string, any> & {
   workerid: WorkerId;
   // eslint-disable-next-line @typescript-eslint/ban-types
   callbacks: Record<string, Function>;
-  directFetchCapture?: ((url: string) => Promise<{fetched: boolean, mime: string}>) | null;
+  directFetchCapture?:
+    | ((url: string) => Promise<{ fetched: boolean; mime: string }>)
+    | null;
 };
 
 // ===========================================================================
 export type WorkerState = WorkerOpts & {
-  data: PageState
+  data: PageState;
 };
 
 // ===========================================================================
-export class PageWorker
-{
+export class PageWorker {
   id: WorkerId;
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,16 +96,25 @@ export class PageWorker
 
   recorder: Recorder;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(id: WorkerId, crawler: any, maxPageTime: number, collDir: string) {
+  constructor(
+    id: WorkerId,
+    // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    crawler: any,
+    maxPageTime: number,
+    collDir: string
+  ) {
     this.id = id;
     this.crawler = crawler;
     this.maxPageTime = maxPageTime;
 
-    this.logDetails = {workerid: this.id};
+    this.logDetails = { workerid: this.id };
 
-    this.recorder = new Recorder({workerid: id, collDir, crawler: this.crawler});
+    this.recorder = new Recorder({
+      workerid: id,
+      collDir,
+      crawler: this.crawler,
+    });
 
     this.crawler.browser.recorders.push(this.recorder);
   }
@@ -129,7 +143,11 @@ export class PageWorker
     }
 
     try {
-      logger.debug("Closing page", {crashed: this.crashed, workerid: this.id}, "worker");
+      logger.debug(
+        "Closing page",
+        { crashed: this.crashed, workerid: this.id },
+        "worker"
+      );
       await timedRun(
         this.page.close(),
         TEARDOWN_TIMEOUT,
@@ -155,14 +173,24 @@ export class PageWorker
     }
   }
 
-  async initPage(url: string) : Promise<WorkerOpts> {
-    if (!this.crashed && this.page && this.opts && ++this.reuseCount <= MAX_REUSE && this.isSameOrigin(url)) {
-      logger.debug("Reusing page", {reuseCount: this.reuseCount, ...this.logDetails}, "worker");
+  async initPage(url: string): Promise<WorkerOpts> {
+    if (
+      !this.crashed &&
+      this.page &&
+      this.opts &&
+      ++this.reuseCount <= MAX_REUSE &&
+      this.isSameOrigin(url)
+    ) {
+      logger.debug(
+        "Reusing page",
+        { reuseCount: this.reuseCount, ...this.logDetails },
+        "worker"
+      );
       return this.opts;
     } else if (this.page) {
       await this.closePage();
     }
-    
+
     this.reuseCount = 1;
     const workerid = this.id;
 
@@ -170,12 +198,12 @@ export class PageWorker
 
     while (await this.crawler.isCrawlRunning()) {
       try {
-        logger.debug("Getting page in new window", {workerid}, "worker");
+        logger.debug("Getting page in new window", { workerid }, "worker");
         const result = await timedRun(
           this.crawler.browser.newWindowPageWithCDP(),
           NEW_WINDOW_TIMEOUT,
           "New Window Timed Out",
-          {workerid},
+          { workerid },
           "worker"
         );
 
@@ -188,7 +216,9 @@ export class PageWorker
         this.page = page;
         this.cdp = cdp;
         this.callbacks = {};
-        const directFetchCapture = this.recorder ? (x: string) => this.recorder.directFetchCapture(x) : null;
+        const directFetchCapture = this.recorder
+          ? (x: string) => this.recorder.directFetchCapture(x)
+          : null;
         this.opts = {
           page,
           cdp,
@@ -203,9 +233,11 @@ export class PageWorker
 
         // updated per page crawl
         this.crashed = false;
-        this.crashBreak = new Promise((resolve, reject) => this.markCrashed = reject);
+        this.crashBreak = new Promise(
+          (resolve, reject) => (this.markCrashed = reject)
+        );
 
-        this.logDetails = {page: page.url(), workerid};
+        this.logDetails = { page: page.url(), workerid };
 
         // more serious page crash, mark as failed
         // TODO: Fix this the next time the file is edited.
@@ -213,7 +245,11 @@ export class PageWorker
         page.on("error", (err: any) => {
           // ensure we're still on this page, otherwise ignore!
           if (this.page === page) {
-            logger.error("Page Crashed", {...errJSON(err), ...this.logDetails}, "worker");
+            logger.error(
+              "Page Crashed",
+              { ...errJSON(err), ...this.logDetails },
+              "worker"
+            );
             this.crashed = true;
             if (this.markCrashed) {
               this.markCrashed("crashed");
@@ -224,17 +260,24 @@ export class PageWorker
         await this.crawler.setupPage(this.opts);
 
         return this.opts;
-
       } catch (err) {
-        logger.warn("Error getting new page", {"workerid": this.id, ...errJSON(err)}, "worker");
+        logger.warn(
+          "Error getting new page",
+          { workerid: this.id, ...errJSON(err) },
+          "worker"
+        );
         retry++;
 
         if (!this.crawler.browser.browser) {
           break;
-        }      
+        }
 
         if (retry >= MAX_REUSE) {
-          logger.fatal("Unable to get new page, browser likely crashed", this.logDetails, "worker");
+          logger.fatal(
+            "Unable to get new page, browser likely crashed",
+            this.logDetails,
+            "worker"
+          );
         }
 
         await sleep(0.5);
@@ -262,16 +305,16 @@ export class PageWorker
     const { data } = opts;
     const { url } = data;
 
-    logger.info("Starting page", {workerid, "page": url}, "worker");
+    logger.info("Starting page", { workerid, page: url }, "worker");
 
-    this.logDetails = {page: url, workerid};
+    this.logDetails = { page: url, workerid };
 
     // set new page id
     const pageid = uuidv4();
     data.pageid = pageid;
 
     if (this.recorder) {
-      this.recorder.startPage({pageid, url});
+      this.recorder.startPage({ pageid, url });
     }
 
     try {
@@ -283,12 +326,15 @@ export class PageWorker
           this.logDetails,
           "worker"
         ),
-        this.crashBreak
+        this.crashBreak,
       ]);
-
     } catch (e) {
       if (e instanceof Error && e.message !== "logged" && !this.crashed) {
-        logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
+        logger.error(
+          "Worker Exception",
+          { ...errJSON(e), ...this.logDetails },
+          "worker"
+        );
       }
     } finally {
       await timedRun(
@@ -302,13 +348,21 @@ export class PageWorker
   }
 
   async run() {
-    logger.info("Worker starting", {workerid: this.id}, "worker");
+    logger.info("Worker starting", { workerid: this.id }, "worker");
 
     try {
       await this.runLoop();
-      logger.info("Worker done, all tasks complete", {workerid: this.id}, "worker");
+      logger.info(
+        "Worker done, all tasks complete",
+        { workerid: this.id },
+        "worker"
+      );
     } catch (e) {
-      logger.error("Worker error, exiting", {...errJSON(e), workerid: this.id}, "worker");
+      logger.error(
+        "Worker error, exiting",
+        { ...errJSON(e), workerid: this.id },
+        "worker"
+      );
     } finally {
       if (this.recorder) {
         await this.recorder.onDone();
@@ -339,10 +393,9 @@ export class PageWorker
         const opts = await this.initPage(data.url);
 
         // run timed crawl of page
-        await this.timedCrawlPage({...opts, data});
+        await this.timedCrawlPage({ ...opts, data });
 
         loggedWaiting = false;
-
       } else {
         // indicate that the worker has no more work (mostly for screencasting, status, etc...)
         // depending on other works, will either get more work or crawl will end
@@ -354,7 +407,11 @@ export class PageWorker
         // if pending, sleep and check again
         if (pending) {
           if (!loggedWaiting) {
-            logger.debug("No crawl tasks, but pending tasks remain, waiting", {pending, workerid: this.id}, "worker");
+            logger.debug(
+              "No crawl tasks, but pending tasks remain, waiting",
+              { pending, workerid: this.id },
+              "worker"
+            );
             loggedWaiting = true;
           }
           await sleep(0.5);
@@ -368,5 +425,3 @@ export class PageWorker
     }
   }
 }
-
-

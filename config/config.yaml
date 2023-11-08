@@ -1,5 +1,5 @@
 debug: true
- 
+
 proxy:
   coll: ${COLL}
   recording: true
