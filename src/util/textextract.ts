@@ -18,7 +18,7 @@ export abstract class BaseTextExtract extends WARCResourceWriter {
   async extractAndStoreText(
     resourceType: string,
     ignoreIfMatchesLast = false,
-    saveToWarc = false
+    saveToWarc = false,
   ) {
     try {
       const text = await this.doGetText();
@@ -28,7 +28,7 @@ export abstract class BaseTextExtract extends WARCResourceWriter {
         logger.debug(
           "Skipping, extracted text unchanged from last extraction",
           { url: this.url },
-          "text"
+          "text",
         );
         return { changed: false, text };
       }
@@ -36,10 +36,10 @@ export abstract class BaseTextExtract extends WARCResourceWriter {
         await this.writeBufferToWARC(
           new TextEncoder().encode(text),
           resourceType,
-          "text/plain"
+          "text/plain",
         );
         logger.debug(
-          `Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.warcName}`
+          `Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.warcName}`,
         );
       }
 
@@ -66,7 +66,7 @@ export class TextExtractViaSnapshot extends BaseTextExtract {
   }
 
   parseTextFromDOMSnapshot(
-    result: Protocol.DOMSnapshot.CaptureSnapshotResponse
+    result: Protocol.DOMSnapshot.CaptureSnapshotResponse,
   ): string {
     const TEXT_NODE = 3;
     const ELEMENT_NODE = 1;
@@ -138,7 +138,7 @@ export class TextExtractViaDocument extends BaseTextExtract {
   parseText(
     node: Protocol.DOM.Node,
     metadata: Record<string, string> | null,
-    accum: string[]
+    accum: string[],
   ) {
     const SKIPPED_NODES = [
       "head",

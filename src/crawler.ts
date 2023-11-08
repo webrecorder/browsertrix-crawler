@@ -62,9 +62,9 @@ const HTTP_AGENT = new HTTPAgent();
 const behaviors = fs.readFileSync(
   new URL(
     "../node_modules/browsertrix-behaviors/dist/behaviors.js",
-    import.meta.url
+    import.meta.url,
   ),
-  { encoding: "utf8" }
+  { encoding: "utf8" },
 );
 
 const FETCH_TIMEOUT_SECS = 30;
@@ -172,12 +172,12 @@ export class Crawler {
     this.collDir = path.join(
       this.params.cwd,
       "collections",
-      this.params.collection
+      this.params.collection,
     );
     this.logDir = path.join(this.collDir, "logs");
     this.logFilename = path.join(
       this.logDir,
-      `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`
+      `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`,
     );
 
     const debugLogging = this.params.logging.includes("debug");
@@ -284,7 +284,7 @@ export class Crawler {
 
     if (!redisUrl.startsWith("redis://")) {
       logger.fatal(
-        "stateStoreUrl must start with redis:// -- Only redis-based store currently supported"
+        "stateStoreUrl must start with redis:// -- Only redis-based store currently supported",
       );
     }
 
@@ -304,7 +304,7 @@ export class Crawler {
     logger.debug(
       `Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`,
       {},
-      "state"
+      "state",
     );
 
     logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
@@ -313,7 +313,7 @@ export class Crawler {
       redis,
       this.params.crawlId,
       this.maxPageTime,
-      os.hostname()
+      os.hostname(),
     );
 
     // clear any pending URLs from this instance
@@ -323,7 +323,7 @@ export class Crawler {
       logger.debug(
         `Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`,
         {},
-        "state"
+        "state",
       );
     }
 
@@ -343,7 +343,7 @@ export class Crawler {
       logger.debug(
         `Screencast server started on: ${this.params.screencastPort}`,
         {},
-        "screencast"
+        "screencast",
       );
     }
     // } else if (this.params.redisStoreUrl && this.params.screencastRedis) {
@@ -415,7 +415,7 @@ export class Crawler {
 
     if (this.params.customBehaviors) {
       this.customBehaviors = this.loadCustomBehaviors(
-        this.params.customBehaviors
+        this.params.customBehaviors,
       );
     }
 
@@ -493,7 +493,7 @@ export class Crawler {
   _behaviorLog(
     { data, type }: { data: string; type: string },
     pageUrl: string,
-    workerid: WorkerId
+    workerid: WorkerId,
   ) {
     let behaviorLine;
     let message;
@@ -538,7 +538,7 @@ export class Crawler {
       depth,
       extraHops,
     }: { seedId: number; url: string; depth: number; extraHops: number },
-    logDetails = {}
+    logDetails = {},
   ) {
     const seed = this.params.scopedSeeds[seedId];
 
@@ -585,7 +585,7 @@ export class Crawler {
           logger.warn(
             msg.text(),
             { location: msg.location(), page: page.url(), workerid },
-            "jsError"
+            "jsError",
           );
         }
       });
@@ -594,7 +594,7 @@ export class Crawler {
         logger.warn(
           "Page Error",
           { ...errJSON(e), page: page.url(), workerid },
-          "jsError"
+          "jsError",
         );
       });
     }
@@ -606,14 +606,14 @@ export class Crawler {
 
     await page.exposeFunction(
       ADD_LINK_FUNC,
-      (url: string) => callbacks.addLink && callbacks.addLink(url)
+      (url: string) => callbacks.addLink && callbacks.addLink(url),
     );
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(
         BEHAVIOR_LOG_FUNC,
         (logdata: { data: string; type: string }) =>
-          this._behaviorLog(logdata, page.url(), workerid)
+          this._behaviorLog(logdata, page.url(), workerid),
       );
       await this.browser.addInitScript(page, behaviors);
 
@@ -654,7 +654,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
     logger.warn(
       "Failed to fetch favicon from browser /json endpoint",
-      logDetails
+      logDetails,
     );
     return "";
   }
@@ -677,7 +677,7 @@ self.__bx_behaviors.selectMainBehavior();
       "HEAD request to determine if URL is HTML page timed out",
       logDetails,
       "fetch",
-      true
+      true,
     );
 
     if (!data.isHTMLPage && directFetchCapture) {
@@ -688,7 +688,7 @@ self.__bx_behaviors.selectMainBehavior();
           "Direct fetch capture attempt timed out",
           logDetails,
           "fetch",
-          true
+          true,
         );
         if (fetched) {
           data.loadState = LoadState.FULL_PAGE_LOADED;
@@ -698,7 +698,7 @@ self.__bx_behaviors.selectMainBehavior();
           logger.info(
             "Direct fetch successful",
             { url, ...logDetails },
-            "fetch"
+            "fetch",
           );
           return true;
         }
@@ -746,7 +746,7 @@ self.__bx_behaviors.selectMainBehavior();
       const { changed, text } = await textextract.extractAndStoreText(
         "text",
         false,
-        this.params.text.includes("to-warc")
+        this.params.text.includes("to-warc"),
       );
 
       if (changed && text && this.params.text.includes("to-pages")) {
@@ -761,7 +761,7 @@ self.__bx_behaviors.selectMainBehavior();
         logger.debug(
           "Skipping behaviors for non-HTML page",
           logDetails,
-          "behavior"
+          "behavior",
         );
       } else if (data.skipBehaviors) {
         logger.info("Skipping behaviors for slow page", logDetails, "behavior");
@@ -771,7 +771,7 @@ self.__bx_behaviors.selectMainBehavior();
           this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
-          "behavior"
+          "behavior",
         );
 
         await this.netIdle(page, logDetails);
@@ -789,7 +789,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.pageExtraDelay) {
       logger.info(
         `Waiting ${this.params.pageExtraDelay} seconds before moving on to next page`,
-        logDetails
+        logDetails,
       );
       await sleep(this.params.pageExtraDelay);
     }
@@ -816,7 +816,7 @@ self.__bx_behaviors.selectMainBehavior();
       logger.warn(
         "Page Load Failed",
         { loadState, ...logDetails },
-        "pageStatus"
+        "pageStatus",
       );
 
       await this.crawlState.markFailed(data.url);
@@ -848,7 +848,7 @@ self.__bx_behaviors.selectMainBehavior();
     page: Page,
     cdp: CDPSession,
     frames: Frame[],
-    logDetails: LogDetails
+    logDetails: LogDetails,
   ) {
     try {
       frames = frames || page.frames();
@@ -860,7 +860,7 @@ self.__bx_behaviors.selectMainBehavior();
           frameUrls: frames.map((frame) => frame.url()),
           ...logDetails,
         },
-        "behavior"
+        "behavior",
       );
 
       const results = await Promise.allSettled(
@@ -876,9 +876,9 @@ self.__bx_behaviors.selectMainBehavior();
             self.__bx_behaviors.run();
           }`,
             logDetails,
-            "behavior"
-          )
-        )
+            "behavior",
+          ),
+        ),
       );
 
       for (const res of results) {
@@ -887,7 +887,7 @@ self.__bx_behaviors.selectMainBehavior();
           logger.warn(
             "Behavior run partially failed",
             { reason, ...logDetails },
-            "behavior"
+            "behavior",
           );
         }
       }
@@ -895,14 +895,14 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info(
         "Behaviors finished",
         { finished: results.length, ...logDetails },
-        "behavior"
+        "behavior",
       );
       return true;
     } catch (e) {
       logger.warn(
         "Behavior run failed",
         { ...errJSON(e), ...logDetails },
-        "behavior"
+        "behavior",
       );
       return false;
     }
@@ -918,14 +918,14 @@ self.__bx_behaviors.selectMainBehavior();
     // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
     // if there's no tag or an iframe tag, then assume its a regular frame
     const tagName = await frame.evaluate(
-      "self && self.frameElement && self.frameElement.tagName"
+      "self && self.frameElement && self.frameElement.tagName",
     );
 
     if (tagName && tagName !== "IFRAME" && tagName !== "FRAME") {
       logger.debug(
         "Skipping processing non-frame object",
         { tagName, frameUrl, ...logDetails },
-        "behavior"
+        "behavior",
       );
       return null;
     }
@@ -942,7 +942,7 @@ self.__bx_behaviors.selectMainBehavior();
       logger.debug(
         "Skipping processing frame",
         { frameUrl, ...logDetails },
-        "behavior"
+        "behavior",
       );
     }
 
@@ -953,13 +953,13 @@ self.__bx_behaviors.selectMainBehavior();
     const packageFileJSON = JSON.parse(
       await fsp.readFile(new URL("../package.json", import.meta.url), {
         encoding: "utf-8",
-      })
+      }),
     );
     const warcioPackageJSON = JSON.parse(
       await fsp.readFile(
         new URL("../node_modules/warcio/package.json", import.meta.url),
-        { encoding: "utf-8" }
-      )
+        { encoding: "utf-8" },
+      ),
     );
 
     return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version})`;
@@ -977,7 +977,7 @@ self.__bx_behaviors.selectMainBehavior();
     const warcInfo = { ...info, ...this.params.warcInfo };
     const record = await warcio.WARCRecord.createWARCInfo(
       { filename, type, warcVersion },
-      warcInfo
+      warcInfo,
     );
     const buffer = await warcio.WARCSerializer.serialize(record, {
       gzip: true,
@@ -996,7 +996,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.sizeLimit) {
       if (size >= this.params.sizeLimit) {
         logger.info(
-          `Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`
+          `Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`,
         );
         interrupt = true;
       }
@@ -1006,7 +1006,7 @@ self.__bx_behaviors.selectMainBehavior();
       const elapsed = secondsElapsed(this.startTime);
       if (elapsed >= this.params.timeLimit) {
         logger.info(
-          `Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`
+          `Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`,
         );
         interrupt = true;
       }
@@ -1024,7 +1024,7 @@ self.__bx_behaviors.selectMainBehavior();
       const numFailed = this.crawlState.numFailed();
       if (numFailed >= this.params.failOnFailedLimit) {
         logger.fatal(
-          `Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`
+          `Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`,
         );
       }
     }
@@ -1092,7 +1092,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.healthCheckPort) {
       this.healthChecker = new HealthChecker(
         this.params.healthCheckPort,
-        this.params.workers
+        this.params.workers,
       );
     }
 
@@ -1157,7 +1157,7 @@ self.__bx_behaviors.selectMainBehavior();
       await this.crawlState.load(
         this.params.state,
         this.params.scopedSeeds,
-        true
+        true,
       );
     }
 
@@ -1165,14 +1165,14 @@ self.__bx_behaviors.selectMainBehavior();
 
     this.adBlockRules = new AdBlockRules(
       this.captureBasePrefix,
-      this.params.adBlockMessage
+      this.params.adBlockMessage,
     );
 
     if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(
         this.params.blockRules,
         this.captureBasePrefix,
-        this.params.blockMessage
+        this.params.blockMessage,
       );
     }
 
@@ -1210,7 +1210,7 @@ self.__bx_behaviors.selectMainBehavior();
         logger.error(
           "Browser disconnected (crashed?), interrupting crawl",
           err,
-          "browser"
+          "browser",
         );
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1252,7 +1252,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       const warcList = await fsp.readdir(path.join(this.collDir, "archive"));
       const warcListFull = warcList.map((filename) =>
-        path.join(this.collDir, "archive", filename)
+        path.join(this.collDir, "archive", filename),
       );
 
       //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
@@ -1262,7 +1262,7 @@ self.__bx_behaviors.selectMainBehavior();
         ...warcListFull,
       ];
       const indexResult = await this.awaitProcess(
-        child_process.spawn("cdxj-indexer", params, { cwd: this.params.cwd })
+        child_process.spawn("cdxj-indexer", params, { cwd: this.params.cwd }),
       );
       if (indexResult === 0) {
         logger.debug("Indexing complete, CDX successfully created");
@@ -1283,7 +1283,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (uploaded && this.uploadAndDeleteLocal) {
         logger.info(
-          `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`
+          `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
         );
         try {
           fs.rmSync(this.collDir, { recursive: true, force: true });
@@ -1388,7 +1388,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // create WACZ
     const waczResult = await this.awaitProcess(
-      child_process.spawn("wacz", createArgs)
+      child_process.spawn("wacz", createArgs),
     );
 
     if (waczResult !== 0) {
@@ -1460,7 +1460,7 @@ self.__bx_behaviors.selectMainBehavior();
         maxHeapTotal: this.maxHeapTotal,
         ...memUsage,
       },
-      "memory"
+      "memory",
     );
   }
 
@@ -1491,7 +1491,7 @@ self.__bx_behaviors.selectMainBehavior();
       try {
         await fsp.writeFile(
           this.params.statsFilename,
-          JSON.stringify(stats, null, 2)
+          JSON.stringify(stats, null, 2),
         );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
@@ -1503,7 +1503,7 @@ self.__bx_behaviors.selectMainBehavior();
   async loadPage(
     page: Page,
     data: PageState,
-    selectorOptsList = DEFAULT_SELECTORS
+    selectorOptsList = DEFAULT_SELECTORS,
   ) {
     const { url, seedId, depth } = data;
 
@@ -1605,7 +1605,7 @@ self.__bx_behaviors.selectMainBehavior();
       const frames = await page.frames();
 
       const filteredFrames = await Promise.allSettled(
-        frames.map((frame) => this.shouldIncludeFrame(frame, logDetails))
+        frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)),
       );
 
       data.filteredFrames = filteredFrames
@@ -1670,7 +1670,7 @@ self.__bx_behaviors.selectMainBehavior();
     page: Page,
     data: PageState,
     selectors = DEFAULT_SELECTORS,
-    logDetails: LogDetails
+    logDetails: LogDetails,
   ) {
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
@@ -1681,7 +1681,7 @@ self.__bx_behaviors.selectMainBehavior();
       links.push(url);
       if (links.length == 500) {
         promiseList.push(
-          this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails)
+          this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
         );
         links = [];
       }
@@ -1707,7 +1707,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const func = (window as any)[addLinkFunc] as (
-        url: string
+        url: string,
       ) => NonNullable<unknown>;
       urls.forEach((url) => func.call(this, url));
 
@@ -1733,9 +1733,9 @@ self.__bx_behaviors.selectMainBehavior();
               }),
               PAGE_OP_TIMEOUT_SECS,
               "Link extraction timed out",
-              logDetails
-            )
-          )
+              logDetails,
+            ),
+          ),
         );
 
         for (let i = 0; i < promiseResults.length; i++) {
@@ -1757,7 +1757,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (links.length) {
       promiseList.push(
-        this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails)
+        this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
       );
     }
 
@@ -1769,7 +1769,7 @@ self.__bx_behaviors.selectMainBehavior();
     urls: string[],
     depth: number,
     extraHops = 0,
-    logDetails: LogDetails = {}
+    logDetails: LogDetails = {},
   ) {
     try {
       depth += 1;
@@ -1780,7 +1780,7 @@ self.__bx_behaviors.selectMainBehavior();
       for (const possibleUrl of urls) {
         const res = this.isInScope(
           { url: possibleUrl, extraHops: newExtraHops, depth, seedId },
-          logDetails
+          logDetails,
         );
 
         if (!res) {
@@ -1795,7 +1795,7 @@ self.__bx_behaviors.selectMainBehavior();
             url,
             depth,
             isOOS ? newExtraHops : extraHops,
-            logDetails
+            logDetails,
           );
         }
       }
@@ -1816,12 +1816,12 @@ self.__bx_behaviors.selectMainBehavior();
           "Cloudflare check timed out",
           logDetails,
           "general",
-          true
+          true,
         )
       ) {
         logger.debug(
           "Cloudflare Check Detected, waiting for reload...",
-          logDetails
+          logDetails,
         );
         await sleep(5.5);
       }
@@ -1835,7 +1835,7 @@ self.__bx_behaviors.selectMainBehavior();
     url: string,
     depth: number,
     extraHops: number,
-    logDetails: LogDetails = {}
+    logDetails: LogDetails = {},
   ) {
     if (this.limitHit) {
       return false;
@@ -1843,7 +1843,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     const result = await this.crawlState.addToQueue(
       { url, seedId, depth, extraHops },
-      this.pageLimit
+      this.pageLimit,
     );
 
     switch (result) {
@@ -1855,7 +1855,7 @@ self.__bx_behaviors.selectMainBehavior();
         logger.debug(
           "Not queued page url, at page limit",
           { url, ...logDetails },
-          "links"
+          "links",
         );
         this.limitHit = true;
         return false;
@@ -1864,7 +1864,7 @@ self.__bx_behaviors.selectMainBehavior();
         logger.debug(
           "Not queued page url, already seen",
           { url, ...logDetails },
-          "links"
+          "links",
         );
         return false;
     }
@@ -1993,14 +1993,14 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info(
         "Fetching full sitemap (fromDate not specified/valid)",
         { url, sitemapFromDate },
-        "sitemap"
+        "sitemap",
       );
     } else {
       lastmodFromTimestamp = dateObj.getTime();
       logger.info(
         "Fetching and filtering sitemap by date",
         { url, sitemapFromDate },
-        "sitemap"
+        "sitemap",
       );
     }
 

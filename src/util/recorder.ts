@@ -237,7 +237,7 @@ export class Recorder {
   }
 
   handleRequestExtraInfo(
-    params: Protocol.Network.RequestWillBeSentExtraInfoEvent
+    params: Protocol.Network.RequestWillBeSentExtraInfoEvent,
   ) {
     if (!this.shouldSkip(params.headers)) {
       const reqresp = this.pendingReqResp(params.requestId, true);
@@ -263,7 +263,7 @@ export class Recorder {
       logger.warn(
         "Skipping self redirect",
         { url: reqresp.url, status: reqresp.status, ...this.logDetails },
-        "recorder"
+        "recorder",
       );
       return;
     }
@@ -301,7 +301,7 @@ export class Recorder {
           logger.warn(
             "Attempt direct fetch of failed request",
             { url, ...this.logDetails },
-            "recorder"
+            "recorder",
           );
           const fetcher = new AsyncFetcher({
             tempdir: this.tempdir,
@@ -318,7 +318,7 @@ export class Recorder {
         logger.warn(
           "Request failed",
           { url, errorText, ...this.logDetails },
-          "recorder"
+          "recorder",
         );
     }
     this.removeReqResp(requestId);
@@ -343,7 +343,7 @@ export class Recorder {
   async handleRequestPaused(
     params: Protocol.Fetch.RequestPausedEvent,
     cdp: CDPSession,
-    isSWorker = false
+    isSWorker = false,
   ) {
     const {
       requestId,
@@ -377,7 +377,7 @@ export class Recorder {
       logger.error(
         "Error handling response, probably skipping URL",
         { url, ...errJSON(e), ...this.logDetails },
-        "recorder"
+        "recorder",
       );
     }
 
@@ -388,7 +388,7 @@ export class Recorder {
         logger.debug(
           "continueResponse failed",
           { requestId, networkId, url, ...errJSON(e), ...this.logDetails },
-          "recorder"
+          "recorder",
         );
       }
     }
@@ -397,7 +397,7 @@ export class Recorder {
   async handleFetchResponse(
     params: Protocol.Fetch.RequestPausedEvent,
     cdp: CDPSession,
-    isSWorker: boolean
+    isSWorker: boolean,
   ) {
     const { request } = params;
     const { url } = request;
@@ -414,7 +414,7 @@ export class Recorder {
       logger.warn(
         "Skipping failed response",
         { url, reason: responseErrorReason, ...this.logDetails },
-        "recorder"
+        "recorder",
       );
       return false;
     }
@@ -430,13 +430,13 @@ export class Recorder {
         logger.debug(
           "Keep 206 Response, Full Range",
           { range, contentLen, url, networkId, ...this.logDetails },
-          "recorder"
+          "recorder",
         );
       } else {
         logger.debug(
           "Skip 206 Response",
           { range, contentLen, url, ...this.logDetails },
-          "recorder"
+          "recorder",
         );
         this.removeReqResp(networkId);
         return false;
@@ -514,7 +514,7 @@ export class Recorder {
         });
         const { body, base64Encoded } = await cdp.send(
           "Fetch.getResponseBody",
-          { requestId }
+          { requestId },
         );
         reqresp.payload = Buffer.from(body, base64Encoded ? "base64" : "utf-8");
         logNetwork("Fetch done", {
@@ -527,7 +527,7 @@ export class Recorder {
         logger.warn(
           "Failed to load response body",
           { url, networkId, ...errJSON(e), ...this.logDetails },
-          "recorder"
+          "recorder",
         );
         return false;
       }
@@ -548,7 +548,7 @@ export class Recorder {
         logger.error(
           "Unable to get payload skipping recording",
           { url, ...this.logDetails },
-          "recorder"
+          "recorder",
         );
         this.removeReqResp(networkId);
       }
@@ -574,13 +574,13 @@ export class Recorder {
         logger.debug(
           "document not loaded in browser, possibly other URLs missing",
           { url, type: reqresp.resourceType },
-          "recorder"
+          "recorder",
         );
       } else {
         logger.debug(
           "URL not loaded in browser",
           { url, type: reqresp.resourceType },
-          "recorder"
+          "recorder",
         );
       }
     }
@@ -595,7 +595,7 @@ export class Recorder {
       logger.debug(
         "Interrupting timed out requests, moving to next page",
         this.logDetails,
-        "recorder"
+        "recorder",
       );
     }
     this.pendingRequests = new Map();
@@ -638,7 +638,7 @@ export class Recorder {
       logger.debug(
         "Finishing pending requests for page",
         { numPending, pending, ...this.logDetails },
-        "recorder"
+        "recorder",
       );
       await sleep(5.0);
       numPending = this.pendingRequests.size;
@@ -665,7 +665,7 @@ export class Recorder {
     headers: Protocol.Network.Headers,
     url?: string,
     method?: string,
-    resourceType?: string
+    resourceType?: string,
   ) {
     if (headers && !method) {
       method = headers[":method"];
@@ -748,7 +748,7 @@ export class Recorder {
       logger.debug(
         "Content Rewritten",
         { url, ...this.logDetails },
-        "recorder"
+        "recorder",
       );
       reqresp.payload = encoder.encode(newString);
       return true;
@@ -760,7 +760,7 @@ export class Recorder {
   }
 
   _getContentType(
-    headers?: Protocol.Fetch.HeaderEntry[] | { name: string; value: string }[]
+    headers?: Protocol.Fetch.HeaderEntry[] | { name: string; value: string }[],
   ) {
     if (!headers) {
       return null;
@@ -830,7 +830,7 @@ export class Recorder {
         logger.warn(
           "Invalid request id",
           { requestId, actualRequestId: reqresp.requestId },
-          "recorder"
+          "recorder",
         );
       }
       return reqresp;
@@ -865,12 +865,12 @@ export class Recorder {
     const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
 
     this.warcQ.add(() =>
-      this.writer.writeRecordPair(responseRecord, requestRecord)
+      this.writer.writeRecordPair(responseRecord, requestRecord),
     );
   }
 
   async directFetchCapture(
-    url: string
+    url: string,
   ): Promise<{ fetched: boolean; mime: string }> {
     const reqresp = new RequestResponseInfo("0");
     reqresp.url = url;
@@ -879,7 +879,7 @@ export class Recorder {
     logger.debug(
       "Directly fetching page URL without browser",
       { url, ...this.logDetails },
-      "recorder"
+      "recorder",
     );
 
     const filter = (resp: Response) =>
@@ -951,7 +951,7 @@ class AsyncFetcher {
     this.tempdir = tempdir;
     this.filename = path.join(
       this.tempdir,
-      `${timestampNow()}-${uuidv4()}.data`
+      `${timestampNow()}-${uuidv4()}.data`,
     );
   }
 
@@ -996,7 +996,7 @@ class AsyncFetcher {
         logger.error(
           "Error reading + digesting payload",
           { url, filename, ...errJSON(e), ...logDetails },
-          "recorder"
+          "recorder",
         );
       }
 
@@ -1013,7 +1013,7 @@ class AsyncFetcher {
             url,
             ...logDetails,
           },
-          "recorder"
+          "recorder",
         );
       } else {
         logger.warn(
@@ -1024,7 +1024,7 @@ class AsyncFetcher {
             url,
             ...logDetails,
           },
-          "recorder"
+          "recorder",
         );
         //await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
         //return fetched;
@@ -1045,7 +1045,7 @@ class AsyncFetcher {
       if (Object.keys(reqresp.extraOpts).length) {
         responseRecord.warcHeaders.headers.set(
           "WARC-JSON-Metadata",
-          JSON.stringify(reqresp.extraOpts)
+          JSON.stringify(reqresp.extraOpts),
         );
       }
 
@@ -1053,14 +1053,14 @@ class AsyncFetcher {
         recorder.writer.writeRecordPair(
           responseRecord,
           requestRecord,
-          serializer
-        )
+          serializer,
+        ),
       );
     } catch (e) {
       logger.error(
         "Streaming Fetch Error",
         { url, networkId, filename, ...errJSON(e), ...logDetails },
-        "recorder"
+        "recorder",
       );
       await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url!);
     } finally {
@@ -1133,7 +1133,7 @@ class AsyncFetcher {
       logger.warn(
         "takeReader interrupted",
         { ...errJSON(e), url: this.reqresp.url, ...this.recorder.logDetails },
-        "recorder"
+        "recorder",
       );
       this.reqresp.truncated = "disconnect";
     }
@@ -1157,7 +1157,7 @@ class AsyncFetcher {
       logger.warn(
         "takeStream interrupted",
         { ...errJSON(e), url: this.reqresp.url, ...this.recorder.logDetails },
-        "recorder"
+        "recorder",
       );
       this.reqresp.truncated = "disconnect";
     }
@@ -1220,7 +1220,7 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
       logger.debug(
         "Network.loadNetworkResource failed, attempting node fetch",
         { url, ...errJSON(e), ...this.recorder.logDetails },
-        "recorder"
+        "recorder",
       );
       return await super._doFetch();
     }
@@ -1239,7 +1239,7 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
           httpStatusCode,
           ...this.recorder.logDetails,
         },
-        "recorder"
+        "recorder",
       );
       return await super._doFetch();
     }
@@ -1270,7 +1270,7 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
 function createResponse(
   reqresp: RequestResponseInfo,
   pageid: string,
-  contentIter?: AsyncIterable<Uint8Array> | Iterable<Uint8Array>
+  contentIter?: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
 ) {
   const url = reqresp.url;
   const warcVersion = "WARC/1.1";
@@ -1278,7 +1278,7 @@ function createResponse(
   const date = new Date().toISOString();
 
   const httpHeaders = reqresp.getResponseHeadersDict(
-    reqresp.payload ? reqresp.payload.length : 0
+    reqresp.payload ? reqresp.payload.length : 0,
   );
 
   const warcHeaders: Record<string, string> = {
@@ -1307,7 +1307,7 @@ function createResponse(
       httpHeaders,
       statusline,
     },
-    contentIter
+    contentIter,
   );
 }
 
@@ -1316,7 +1316,7 @@ function createResponse(
 function createRequest(
   reqresp: RequestResponseInfo,
   responseRecord: WARCRecord,
-  pageid: string
+  pageid: string,
 ) {
   const url = reqresp.url;
   const warcVersion = "WARC/1.1";
@@ -1349,6 +1349,6 @@ function createRequest(
       httpHeaders,
       statusline,
     },
-    requestBody
+    requestBody,
   );
 }

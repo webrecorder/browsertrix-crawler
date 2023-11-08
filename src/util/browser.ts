@@ -102,7 +102,7 @@ export class Browser {
   async setupPage({ page }: { page: Page; cdp: CDPSession }) {
     await this.addInitScript(
       page,
-      'Object.defineProperty(navigator, "webdriver", {value: false});'
+      'Object.defineProperty(navigator, "webdriver", {value: false});',
     );
 
     if (this.customProfile) {
@@ -123,7 +123,7 @@ export class Browser {
       logger.info(
         `Downloading ${profileFilename} to ${targetFilename}`,
         {},
-        "browserProfile"
+        "browserProfile",
       );
 
       const resp = await fetch(profileFilename);
@@ -131,7 +131,7 @@ export class Browser {
         // TODO: Fix this the next time the file is edited.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Readable.fromWeb(resp.body as any),
-        fs.createWriteStream(targetFilename)
+        fs.createWriteStream(targetFilename),
       );
 
       profileFilename = targetFilename;
@@ -140,7 +140,7 @@ export class Browser {
 
       if (!storage) {
         logger.fatal(
-          "Profile specified relative to s3 storage, but no S3 storage defined"
+          "Profile specified relative to s3 storage, but no S3 storage defined",
         );
         return false;
       }
@@ -190,7 +190,7 @@ export class Browser {
     if (proxy) {
       args.push("--ignore-certificate-errors");
       args.push(
-        `--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`
+        `--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`,
       );
     }
 
@@ -237,7 +237,7 @@ export class Browser {
     cdpContextId: number,
     funcString: string,
     logData: Record<string, string>,
-    contextName: string
+    contextName: string,
   ) {
     const frameUrl = frame.url();
     // TODO: Fix this the next time the file is edited.
@@ -248,7 +248,7 @@ export class Browser {
       logger.info(
         "Run Script Skipped, frame no longer attached or has no URL",
         details,
-        contextName
+        contextName,
       );
       return false;
     }
@@ -308,7 +308,7 @@ export class Browser {
   async _init(
     launchOpts: PuppeteerLaunchOptions,
     // eslint-disable-next-line @typescript-eslint/ban-types
-    ondisconnect: Function | null = null
+    ondisconnect: Function | null = null,
   ) {
     this.browser = await puppeteer.launch(launchOpts);
 
@@ -412,7 +412,7 @@ export class Browser {
           logger.warn(
             "continueResponse failed",
             { url: request.url },
-            "recorder"
+            "recorder",
           );
         }
         return;
@@ -435,7 +435,7 @@ export class Browser {
         logger.debug(
           "Skipping URL from unknown frame",
           { url: request.url, frameId },
-          "recorder"
+          "recorder",
         );
 
         try {
@@ -444,7 +444,7 @@ export class Browser {
           logger.warn(
             "continueResponse failed",
             { url: request.url },
-            "recorder"
+            "recorder",
           );
         }
 
@@ -468,7 +468,7 @@ export class Browser {
     funcString: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     logData: Record<string, any>,
-    contextName: string
+    contextName: string,
   ) {
     // TODO: Fix this the next time the file is edited.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -481,7 +481,7 @@ export class Browser {
       cdpContextId,
       funcString,
       logData,
-      contextName
+      contextName,
     );
   }
 

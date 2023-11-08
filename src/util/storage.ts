@@ -38,7 +38,7 @@ export class S3StorageSync {
       webhookUrl,
       userId,
       crawlId,
-    }: { webhookUrl?: string; userId: string; crawlId: string }
+    }: { webhookUrl?: string; userId: string; crawlId: string },
   ) {
     let url;
     let accessKey;
@@ -90,7 +90,7 @@ export class S3StorageSync {
     await this.client.fPutObject(
       this.bucketName,
       this.objectPrefix + targetFilename,
-      srcFilename
+      srcFilename,
     );
 
     const { hash, crc32 } = await checksumFile("sha256", srcFilename);
@@ -106,20 +106,20 @@ export class S3StorageSync {
     await this.client.fGetObject(
       this.bucketName,
       this.objectPrefix + srcFilename,
-      destFilename
+      destFilename,
     );
   }
 
   async uploadCollWACZ(
     srcFilename: string,
     targetFilename: string,
-    completed = true
+    completed = true,
   ) {
     const resource = await this.uploadFile(srcFilename, targetFilename);
     logger.info(
       "WACZ S3 file upload resource",
       { targetFilename, resource },
-      "s3Upload"
+      "s3Upload",
     );
 
     if (this.webhookUrl) {
@@ -148,7 +148,7 @@ export class S3StorageSync {
         const parts = this.webhookUrl.split("/");
         if (parts.length !== 5) {
           logger.fatal(
-            "redis webhook url must be in format: redis://<host>:<port>/<db>/<key>"
+            "redis webhook url must be in format: redis://<host>:<port>/<db>/<key>",
           );
         }
         const redis = await initRedis(parts.slice(0, 4).join("/"));
@@ -199,18 +199,18 @@ export async function checkDiskUtilization(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   params: Record<string, any>,
   archiveDirSize: number,
-  dfOutput = null
+  dfOutput = null,
 ) {
   const diskUsage: Record<string, string> = await getDiskUsage(
     "/crawls",
-    dfOutput
+    dfOutput,
   );
   const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
 
   // Check that disk usage isn't already above threshold
   if (usedPercentage >= params.diskUtilization) {
     logger.info(
-      `Disk utilization threshold reached ${usedPercentage}% > ${params.diskUtilization}%, stopping`
+      `Disk utilization threshold reached ${usedPercentage}% > ${params.diskUtilization}%, stopping`,
     );
     return {
       stop: true,
@@ -234,12 +234,12 @@ export async function checkDiskUtilization(
   const projectedTotal = kbUsed + kbArchiveDirSize;
   const projectedUsedPercentage = calculatePercentageUsed(
     projectedTotal,
-    kbTotal
+    kbTotal,
   );
 
   if (projectedUsedPercentage >= params.diskUtilization) {
     logger.info(
-      `Disk utilization projected to reach threshold ${projectedUsedPercentage}% > ${params.diskUtilization}%, stopping`
+      `Disk utilization projected to reach threshold ${projectedUsedPercentage}% > ${params.diskUtilization}%, stopping`,
     );
     return {
       stop: true,
@@ -285,7 +285,7 @@ export function calculatePercentageUsed(used: number, total: number) {
 
 function checksumFile(
   hashName: string,
-  path: string
+  path: string,
 ): Promise<{ hash: string; crc32: number }> {
   return new Promise((resolve, reject) => {
     const hash = createHash(hashName);
@@ -304,7 +304,7 @@ function checksumFile(
 export function interpolateFilename(filename: string, crawlId: string) {
   filename = filename.replace(
     "@ts",
-    new Date().toISOString().replace(/[:TZz.-]/g, "")
+    new Date().toISOString().replace(/[:TZz.-]/g, ""),
   );
   filename = filename.replace("@hostname", os.hostname());
   filename = filename.replace("@hostsuffix", os.hostname().slice(-14));

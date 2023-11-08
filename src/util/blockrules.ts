@@ -69,7 +69,7 @@ export class BlockRules {
   constructor(
     blockRules: BlockRuleDecl[],
     blockPutUrl: string,
-    blockErrMsg: string
+    blockErrMsg: string,
   ) {
     this.rules = [];
     this.blockPutUrl = blockPutUrl;
@@ -98,7 +98,7 @@ export class BlockRules {
         logger.warn(
           "Error handling request",
           { ...errJSON(e), ...logDetails },
-          "blocking"
+          "blocking",
         );
       }
     };
@@ -123,7 +123,7 @@ export class BlockRules {
       logger.debug(
         `Block: (${blockState}) Failed On: ${url}`,
         { ...errJSON(e), ...logDetails },
-        "blocking"
+        "blocking",
       );
     }
   }
@@ -133,7 +133,7 @@ export class BlockRules {
     url: string,
     // TODO: Fix this the next time the file is edited.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    logDetails: Record<string, any>
+    logDetails: Record<string, any>,
   ) {
     if (!url.startsWith("http:") && !url.startsWith("https:")) {
       return BlockState.ALLOW;
@@ -182,7 +182,7 @@ export class BlockRules {
         url,
         frameUrl,
         isNavReq,
-        logDetails
+        logDetails,
       );
 
       if (block) {
@@ -190,14 +190,14 @@ export class BlockRules {
           logger.warn(
             "Block rule match for page request ignored, set --exclude to block full pages",
             { url, ...logDetails },
-            "blocking"
+            "blocking",
           );
           return BlockState.ALLOW;
         }
         logger.debug(
           "URL Blocked in iframe",
           { url, frameUrl, ...logDetails },
-          "blocking"
+          "blocking",
         );
         await this.recordBlockMsg(url);
         return blockState;
@@ -218,7 +218,7 @@ export class BlockRules {
     isNavReq: boolean,
     // TODO: Fix this the next time the file is edited.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    logDetails: Record<string, any>
+    logDetails: Record<string, any>,
   ) {
     const { url, inFrameUrl, frameTextMatch } = rule;
 
@@ -243,14 +243,14 @@ export class BlockRules {
         request,
         reqUrl,
         frameTextMatch,
-        logDetails
+        logDetails,
       ))
         ? !allowOnly
         : allowOnly;
       logger.debug(
         "URL Conditional rule in iframe",
         { ...logDetails, url, rule: block ? "BLOCKED" : "ALLOWED", frameUrl },
-        "blocking"
+        "blocking",
       );
       return { block, done: true };
     }
@@ -266,7 +266,7 @@ export class BlockRules {
     frameTextMatch: RegExp,
     // TODO: Fix this the next time the file is edited.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    logDetails: Record<string, any>
+    logDetails: Record<string, any>,
   ) {
     try {
       const res = await fetch(reqUrl);
@@ -277,7 +277,7 @@ export class BlockRules {
       logger.debug(
         "Error determining text match",
         { ...errJSON(e), ...logDetails },
-        "blocking"
+        "blocking",
       );
     }
   }
@@ -311,13 +311,13 @@ export class AdBlockRules extends BlockRules {
   constructor(
     blockPutUrl: string,
     blockErrMsg: string,
-    adhostsFilePath = "../../ad-hosts.json"
+    adhostsFilePath = "../../ad-hosts.json",
   ) {
     super([], blockPutUrl, blockErrMsg);
     this.adhosts = JSON.parse(
       fs.readFileSync(new URL(adhostsFilePath, import.meta.url), {
         encoding: "utf-8",
-      })
+      }),
     );
   }
 
@@ -332,13 +332,13 @@ export class AdBlockRules extends BlockRules {
     url: string,
     // TODO: Fix this the next time the file is edited.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    logDetails: Record<string, any>
+    logDetails: Record<string, any>,
   ) {
     if (this.isAdUrl(url)) {
       logger.debug(
         "URL blocked for being an ad",
         { url, ...logDetails },
-        "blocking"
+        "blocking",
       );
       await this.recordBlockMsg(url);
       return BlockState.BLOCK_AD;

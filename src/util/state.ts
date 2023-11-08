@@ -75,7 +75,7 @@ declare module "ioredis" {
       url: string,
       score: number,
       data: string,
-      limit: number
+      limit: number,
     ): Result<number, Context>;
 
     getnext(qkey: string, pkey: string): Result<string, Context>;
@@ -86,7 +86,7 @@ declare module "ioredis" {
       url: string,
       started: string,
       maxPageTime: number,
-      uid: string
+      uid: string,
     ): Result<void, Context>;
 
     movefailed(
@@ -94,13 +94,13 @@ declare module "ioredis" {
       fkey: string,
       url: string,
       value: string,
-      state: string
+      state: string,
     ): Result<void, Context>;
 
     unlockpending(
       pkeyUrl: string,
       uid: string,
-      callback?: Callback<string>
+      callback?: Callback<string>,
     ): Result<void, Context>;
 
     requeue(
@@ -108,7 +108,7 @@ declare module "ioredis" {
       qkey: string,
       pkeyUrl: string,
       url: string,
-      maxRetryPending: number
+      maxRetryPending: number,
     ): Result<number, Context>;
   }
 }
@@ -273,7 +273,7 @@ return 0;
       url,
       started,
       this.maxPageTime,
-      this.uid
+      this.uid,
     );
   }
 
@@ -297,7 +297,7 @@ return 0;
 
   recheckScope(
     data: { url: string; depth: number; extraHops: number; seedId: number },
-    seeds: ScopedSeed[]
+    seeds: ScopedSeed[],
   ) {
     const seed = seeds[data.seedId];
 
@@ -413,7 +413,7 @@ return 0;
           logger.debug(
             "Removing excluded URL",
             { url, regex, removed },
-            "exclusion"
+            "exclusion",
           );
         }
       }
@@ -445,7 +445,7 @@ return 0;
       depth = 0,
       extraHops = 0,
     }: { url: string; seedId: number; depth?: number; extraHops?: number },
-    limit = 0
+    limit = 0,
   ) {
     const added = this._timestamp();
     // TODO: Fix this the next time the file is edited.
@@ -466,7 +466,7 @@ return 0;
       url,
       this._getScore(data),
       JSON.stringify(data),
-      limit
+      limit,
     );
   }
 
@@ -521,7 +521,7 @@ return 0;
         "inf",
         "LIMIT",
         i,
-        inc
+        inc,
       );
       results.push(...someResults);
     }
@@ -546,7 +546,7 @@ return 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     state: Record<string, any>,
     seeds: ScopedSeed[],
-    checkScope: boolean
+    checkScope: boolean,
   ) {
     const seen: string[] = [];
 
@@ -668,7 +668,7 @@ return 0;
         this.qkey,
         this.pkey + ":" + url,
         url,
-        this.maxRetryPending
+        this.maxRetryPending,
       );
       switch (res) {
         case 1:

@@ -23,27 +23,25 @@ export class ScopedSeed {
   maxExtraHops = 0;
   maxDepth = 0;
 
-  constructor(
-    {
-      url,
-      scopeType,
-      include,
-      exclude = [],
-      allowHash = false,
-      depth = -1,
-      sitemap = false,
-      extraHops = 0,
-    }: {
-      url: string;
-      scopeType: ScopeType;
-      include: string[];
-      exclude?: string[];
-      allowHash?: boolean;
-      depth?: number;
-      sitemap?: string | boolean | null;
-      extraHops?: number;
-    }
-  ) {
+  constructor({
+    url,
+    scopeType,
+    include,
+    exclude = [],
+    allowHash = false,
+    depth = -1,
+    sitemap = false,
+    extraHops = 0,
+  }: {
+    url: string;
+    scopeType: ScopeType;
+    include: string[];
+    exclude?: string[];
+    allowHash?: boolean;
+    depth?: number;
+    sitemap?: string | boolean | null;
+    extraHops?: number;
+  }) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");

@@ -17,19 +17,19 @@ import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
 
 const profileHTML = fs.readFileSync(
   new URL("../html/createProfile.html", import.meta.url),
-  { encoding: "utf8" }
+  { encoding: "utf8" },
 );
 const vncHTML = fs.readFileSync(
   new URL("../html/vnc_lite.html", import.meta.url),
-  { encoding: "utf8" }
+  { encoding: "utf8" },
 );
 
 const behaviors = fs.readFileSync(
   new URL(
     "../node_modules/browsertrix-behaviors/dist/behaviors.js",
-    import.meta.url
+    import.meta.url,
   ),
-  { encoding: "utf8" }
+  { encoding: "utf8" },
 );
 
 function cliOpts(): { [key: string]: Options } {
@@ -178,7 +178,7 @@ async function main() {
 
   if (params.interactive) {
     logger.warn(
-      "Note: the '--interactive' flag is now deprecated and is the default profile creation option. Use the --automated flag to specify non-interactive mode"
+      "Note: the '--interactive' flag is now deprecated and is the default profile creation option. Use the --automated flag to specify non-interactive mode",
     );
   }
 
@@ -206,7 +206,7 @@ async function main() {
     // for testing, inject browsertrix-behaviors
     await browser.addInitScript(
       page,
-      behaviors + ";\nself.__bx_behaviors.init();"
+      behaviors + ";\nself.__bx_behaviors.init();",
     );
   }
 
@@ -231,7 +231,7 @@ async function automatedProfile(
   browser: Browser,
   page: Page,
   cdp: CDPSession,
-  waitUntil: PuppeteerLifeCycleEvent
+  waitUntil: PuppeteerLifeCycleEvent,
 ) {
   let u, p;
 
@@ -239,10 +239,10 @@ async function automatedProfile(
 
   try {
     u = await page.waitForSelector(
-      "//input[contains(@name, 'user') or contains(@name, 'email')]"
+      "//input[contains(@name, 'user') or contains(@name, 'email')]",
     );
     p = await page.waitForSelector(
-      "//input[contains(@name, 'pass') and @type='password']"
+      "//input[contains(@name, 'pass') and @type='password']",
     );
   } catch (e) {
     if (params.debugScreenshot) {
@@ -279,7 +279,7 @@ async function createProfile(
   browser: Browser,
   page: Page,
   cdp: CDPSession,
-  targetFilename = ""
+  targetFilename = "",
 ) {
   await cdp.send("Network.clearBrowserCache");
 
@@ -358,7 +358,7 @@ class InteractiveBrowser {
     browser: Browser,
     page: Page,
     cdp: CDPSession,
-    targetId: string
+    targetId: string,
   ) {
     logger.info("Creating Profile Interactively...");
     child_process.spawn("socat", [
@@ -394,19 +394,19 @@ class InteractiveBrowser {
     if (this.shutdownWait) {
       this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
       logger.debug(
-        `Shutting down in ${this.shutdownWait}ms if no ping received`
+        `Shutting down in ${this.shutdownWait}ms if no ping received`,
       );
     } else {
       this.shutdownTimer = null;
     }
 
     const httpServer = http.createServer((req, res) =>
-      this.handleRequest(req, res)
+      this.handleRequest(req, res),
     );
     const port = 9223;
     httpServer.listen(port);
     logger.info(
-      `Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`
+      `Browser Profile UI Server started. Load http://localhost:${port}/ to interact with a Chromium-based browser, click 'Create Profile' when done.`,
     );
 
     if (!params.headless) {
@@ -487,8 +487,8 @@ class InteractiveBrowser {
         res.end(
           profileHTML.replace(
             "$DEVTOOLS_SRC",
-            targetUrl.replaceAll("$HOST", parsedUrl.hostname)
-          )
+            targetUrl.replaceAll("$HOST", parsedUrl.hostname),
+          ),
         );
         return;
 
@@ -504,10 +504,10 @@ class InteractiveBrowser {
           clearTimeout(this.shutdownTimer as any);
           this.shutdownTimer = setTimeout(
             () => process.exit(0),
-            this.shutdownWait
+            this.shutdownWait,
           );
           logger.debug(
-            `Ping received, delaying shutdown for ${this.shutdownWait}ms`
+            `Ping received, delaying shutdown for ${this.shutdownWait}ms`,
           );
         }
 
@@ -565,7 +565,7 @@ class InteractiveBrowser {
             this.browser,
             this.page,
             this.cdp,
-            targetFilename
+            targetFilename,
           );
           origins = Array.from(this.originSet.values());
 
@@ -593,13 +593,13 @@ class InteractiveBrowser {
 
           res.writeHead(200, { "Content-Type": "text/html" });
           res.end(
-            "<html><body>Profile Created! You may now close this window.</body></html>"
+            "<html><body>Profile Created! You may now close this window.</body></html>",
           );
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
           res.writeHead(500, { "Content-Type": "text/html" });
           res.end(
-            "<html><body>Profile creation failed! See the browsertrix-crawler console for more info"
+            "<html><body>Profile creation failed! See the browsertrix-crawler console for more info",
           );
           logger.warn("HTTP Error", e);
         }
@@ -611,7 +611,7 @@ class InteractiveBrowser {
     if (pathname.startsWith("/vnc/")) {
       const fileUrl = new URL(
         "../node_modules/@novnc/novnc/" + pathname.slice("/vnc/".length),
-        import.meta.url
+        import.meta.url,
       );
       const file = fs.readFileSync(fileUrl, { encoding: "utf-8" });
       res.writeHead(200, { "Content-Type": "application/javascript" });

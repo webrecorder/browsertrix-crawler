@@ -22,7 +22,7 @@ export function runWorkers(
   crawler: any,
   numWorkers: number,
   maxPageTime: number,
-  collDir: string
+  collDir: string,
 ) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
@@ -102,7 +102,7 @@ export class PageWorker {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     crawler: any,
     maxPageTime: number,
-    collDir: string
+    collDir: string,
   ) {
     this.id = id;
     this.crawler = crawler;
@@ -135,7 +135,7 @@ export class PageWorker {
           TEARDOWN_TIMEOUT,
           "Page Teardown Timed Out",
           this.logDetails,
-          "worker"
+          "worker",
         );
       } catch (e) {
         // ignore
@@ -146,14 +146,14 @@ export class PageWorker {
       logger.debug(
         "Closing page",
         { crashed: this.crashed, workerid: this.id },
-        "worker"
+        "worker",
       );
       await timedRun(
         this.page.close(),
         TEARDOWN_TIMEOUT,
         "Page Close Timed Out",
         this.logDetails,
-        "worker"
+        "worker",
       );
     } catch (e) {
       // ignore
@@ -184,7 +184,7 @@ export class PageWorker {
       logger.debug(
         "Reusing page",
         { reuseCount: this.reuseCount, ...this.logDetails },
-        "worker"
+        "worker",
       );
       return this.opts;
     } else if (this.page) {
@@ -204,7 +204,7 @@ export class PageWorker {
           NEW_WINDOW_TIMEOUT,
           "New Window Timed Out",
           { workerid },
-          "worker"
+          "worker",
         );
 
         if (!result) {
@@ -234,7 +234,7 @@ export class PageWorker {
         // updated per page crawl
         this.crashed = false;
         this.crashBreak = new Promise(
-          (resolve, reject) => (this.markCrashed = reject)
+          (resolve, reject) => (this.markCrashed = reject),
         );
 
         this.logDetails = { page: page.url(), workerid };
@@ -248,7 +248,7 @@ export class PageWorker {
             logger.error(
               "Page Crashed",
               { ...errJSON(err), ...this.logDetails },
-              "worker"
+              "worker",
             );
             this.crashed = true;
             if (this.markCrashed) {
@@ -264,7 +264,7 @@ export class PageWorker {
         logger.warn(
           "Error getting new page",
           { workerid: this.id, ...errJSON(err) },
-          "worker"
+          "worker",
         );
         retry++;
 
@@ -276,7 +276,7 @@ export class PageWorker {
           logger.fatal(
             "Unable to get new page, browser likely crashed",
             this.logDetails,
-            "worker"
+            "worker",
           );
         }
 
@@ -324,7 +324,7 @@ export class PageWorker {
           this.maxPageTime,
           "Page Worker Timeout",
           this.logDetails,
-          "worker"
+          "worker",
         ),
         this.crashBreak,
       ]);
@@ -333,7 +333,7 @@ export class PageWorker {
         logger.error(
           "Worker Exception",
           { ...errJSON(e), ...this.logDetails },
-          "worker"
+          "worker",
         );
       }
     } finally {
@@ -342,7 +342,7 @@ export class PageWorker {
         FINISHED_TIMEOUT,
         "Page Finished Timed Out",
         this.logDetails,
-        "worker"
+        "worker",
       );
     }
   }
@@ -355,13 +355,13 @@ export class PageWorker {
       logger.info(
         "Worker done, all tasks complete",
         { workerid: this.id },
-        "worker"
+        "worker",
       );
     } catch (e) {
       logger.error(
         "Worker error, exiting",
         { ...errJSON(e), workerid: this.id },
-        "worker"
+        "worker",
       );
     } finally {
       if (this.recorder) {
@@ -410,7 +410,7 @@ export class PageWorker {
             logger.debug(
               "No crawl tasks, but pending tasks remain, waiting",
               { pending, workerid: this.id },
-              "worker"
+              "worker",
             );
             loggedWaiting = true;
           }
