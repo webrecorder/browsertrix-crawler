@@ -60,12 +60,10 @@ export class WARCWriter
 
   async _writeRecord(record, serializer) {
     let total = 0;
-    let count = 0;
     const url = record.warcTargetURI;
 
     for await (const chunk of serializer) {
       total += chunk.length;
-      count++;
       try {
         this.fh.write(chunk);
       } catch (e) {

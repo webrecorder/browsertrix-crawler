@@ -449,7 +449,7 @@ export class Recorder
   }
 
   async onClosePage() {
-// Any page-specific handling before page is closed.
+    // Any page-specific handling before page is closed.
   }
 
   async onDone() {
