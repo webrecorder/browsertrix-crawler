@@ -72,7 +72,6 @@ export class WARCWriter implements IndexerOffsetLength
 
   async _writeRecord(record: WARCRecord, serializer: WARCSerializer) {
     let total = 0;
-    let count = 0;
     const url = record.warcTargetURI;
 
     if (!this.fh) {
@@ -81,14 +80,10 @@ export class WARCWriter implements IndexerOffsetLength
 
     for await (const chunk of serializer) {
       total += chunk.length;
-      count++;
       try {
         this.fh.write(chunk);
       } catch (e) {
         logger.error("Error writing to WARC, corruption possible", {...errJSON(e), url, ...this.logDetails}, "writer");
-      }
-      if (!(count % 10)) {
-        //logNetwork("Writing WARC Chunk", {total, count, url, logDetails});
       }
     }
 

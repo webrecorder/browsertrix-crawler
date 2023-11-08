@@ -430,17 +430,15 @@ export class Recorder
   startPage({pageid, url} : {pageid: string, url: string}) {
     this.pageid = pageid;
     this.logDetails = {page: url, workerid: this.workerid};
-    // if (this.pendingRequests && this.pendingRequests.size) {
-    //   logger.warn("Interrupting timed out requests, moving to next page", this.logDetails, "recorder");
-    // }
+    if (this.pendingRequests && this.pendingRequests.size) {
+      logger.debug("Interrupting timed out requests, moving to next page", this.logDetails, "recorder");
+    }
     this.pendingRequests = new Map();
     this.skipIds = new Set();
     this.skipping = false;
   }
 
   async finishPage() {
-    //this.skipping = true;
-
     for (const [requestId, reqresp] of this.pendingRequests.entries()) {
       if (reqresp.payload) {
         this.removeReqResp(requestId);
@@ -474,7 +472,7 @@ export class Recorder
   }
 
   async onClosePage() {
-
+    // Any page-specific handling before page is closed.
   }
 
   async onDone() {
@@ -709,7 +707,6 @@ class AsyncFetcher
   constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId, filter = undefined, ignoreDupe = false} :
               {tempdir: string, reqresp: RequestResponseInfo, expectedSize?: number, recorder: Recorder, 
               networkId: string, filter?: (resp: Response) => boolean, ignoreDupe?: boolean }) {
-    //super();
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
     this.reqresp.asyncLoading = true;

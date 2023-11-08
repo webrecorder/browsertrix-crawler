@@ -756,11 +756,10 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async getInfoString() {
-    const packageFileJSON = JSON.parse(await fsp.readFile(new URL("../package.json", import.meta.url), {encoding: "utf-8"}));
-    const warcioPackageJSON = JSON.parse(await fsp.readFile(new URL("../node_modules/warcio/package.json", import.meta.url), {encoding: "utf-8"}));
-    const pywbVersion = "0.0";//child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
+    const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
+    const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
 
-    return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`;
+    return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version})`;
   }
 
   async createWARCInfo(filename: string) {
@@ -970,7 +969,7 @@ self.__bx_behaviors.selectMainBehavior();
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
       chromeOptions: {
-        proxy: false,//!process.env.NO_PROXY,
+        proxy: false,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs()
       },
@@ -980,7 +979,6 @@ self.__bx_behaviors.selectMainBehavior();
       }
     } as any);
 
-    //const archiveDir = path.join(this.collDir, "archive");
 
     // --------------
     // Run Crawl Here!
@@ -998,9 +996,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.writeStats();
 
-    // extra wait for all resources to land into WARCs
-    // now happens at end of each page
-    // await this.awaitPendingClear();
 
     // if crawl has been stopped, mark as final exit for post-crawl tasks
     if (await this.crawlState.isCrawlStopped()) {
@@ -1019,7 +1014,17 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info("Generating CDX");
       await fsp.mkdir(path.join(this.collDir, "indexes"), {recursive: true});
       await this.crawlState.setStatus("generate-cdx");
-      const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+
+      const warcList = await fsp.readdir(path.join(this.collDir, "archive"));
+      const warcListFull = warcList.map((filename) => path.join(this.collDir, "archive", filename));
+
+      //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
+      const params = [
+        "-o",
+        path.join(this.collDir, "indexes", "index.cdxj"),
+        ...warcListFull
+      ];
+      const indexResult = await this.awaitProcess(child_process.spawn("cdxj-indexer", params, {cwd: this.params.cwd}));
       if (indexResult === 0) {
         logger.debug("Indexing complete, CDX successfully created");
       } else {
