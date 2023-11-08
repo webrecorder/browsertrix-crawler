@@ -681,9 +681,8 @@ self.__bx_behaviors.selectMainBehavior();
   async getInfoString() {
     const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
     const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
-    const pywbVersion = "0.0";//child_process.execSync("pywb -V", {encoding: "utf8"}).trim().split(" ")[1];
 
-    return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version} pywb ${pywbVersion})`;
+    return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version})`;
   }
 
   async createWARCInfo(filename) {
@@ -893,7 +892,7 @@ self.__bx_behaviors.selectMainBehavior();
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
       chromeOptions: {
-        proxy: false,//!process.env.NO_PROXY,
+        proxy: false,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs()
       },
@@ -903,7 +902,6 @@ self.__bx_behaviors.selectMainBehavior();
       }
     });
 
-    //const archiveDir = path.join(this.collDir, "archive");
 
     // --------------
     // Run Crawl Here!
@@ -921,9 +919,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.writeStats();
 
-    // extra wait for all resources to land into WARCs
-    // now happens at end of each page
-    // await this.awaitPendingClear();
 
     // if crawl has been stopped, mark as final exit for post-crawl tasks
     if (await this.crawlState.isCrawlStopped()) {

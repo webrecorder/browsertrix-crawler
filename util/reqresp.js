@@ -67,7 +67,6 @@ export class RequestResponseInfo
       this.resourceType = params.type;
     }
 
-    //this.loaderId = params.loaderId;
   }
 
   fillFetchRequestPaused(params) {

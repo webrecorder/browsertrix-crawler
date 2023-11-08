@@ -416,8 +416,6 @@ export class Recorder
   }
 
   async finishPage() {
-    //this.skipping = true;
-
     for (const [requestId, reqresp] of this.pendingRequests.entries()) {
       if (reqresp.payload) {
         this.removeReqResp(requestId);
@@ -451,7 +449,7 @@ export class Recorder
   }
 
   async onClosePage() {
-
+// Any page-specific handling before page is closed.
   }
 
   async onDone() {
@@ -664,7 +662,6 @@ export class Recorder
 class AsyncFetcher
 {
   constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId, filter = null, ignoreDupe = false}) {
-    //super();
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
     this.reqresp.asyncLoading = true;

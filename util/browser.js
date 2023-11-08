@@ -316,7 +316,6 @@ export class Browser extends BaseBrowser
 
       for (const recorder of this.recorders) {
         if (recorder.swUrls.has(request.url)) {
-          //console.log(`*** found sw ${request.url} in recorder for worker ${recorder.workerid}`);
           recorder.swFrameIds.add(frameId);
         }
 
@@ -327,7 +326,7 @@ export class Browser extends BaseBrowser
       }
 
       if (!foundRecorder) {
-        logger.warn("Skipping URL from unknown frame", {url: request.url, frameId}, "recorder");
+        logger.debug("Skipping URL from unknown frame", {url: request.url, frameId}, "recorder");
 
         try {
           await this.firstCDP.send("Fetch.continueResponse", {requestId});

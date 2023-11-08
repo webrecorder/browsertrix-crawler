@@ -71,9 +71,6 @@ export class WARCWriter
       } catch (e) {
         logger.error("Error writing to WARC, corruption possible", {...errJSON(e), url, ...this.logDetails}, "writer");
       }
-      if (!(count % 10)) {
-        //logNetwork("Writing WARC Chunk", {total, count, url, logDetails});
-      }
     }
 
     return total;
