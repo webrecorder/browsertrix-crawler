@@ -6,3 +6,4 @@ node_modules/
 crawls/
 test-crawls/
 .DS_Store
+dist

@@ -7,10 +7,8 @@ import { WARCSerializer } from "warcio/node";
 import { logger, errJSON } from "./logger.js";
 import type { IndexerOffsetLength, WARCRecord } from "warcio";
 
-
 // =================================================================
-export class WARCWriter implements IndexerOffsetLength
-{
+export class WARCWriter implements IndexerOffsetLength {
   archivesDir: string;
   tempCdxDir: string;
   filename: string;
@@ -25,8 +23,19 @@ export class WARCWriter implements IndexerOffsetLength
   fh?: Writable | null;
   cdxFH?: Writable | null;
 
-  constructor({archivesDir, tempCdxDir, filename, gzip, logDetails} : 
-              {archivesDir: string, tempCdxDir: string, filename: string, gzip: boolean, logDetails: Record<string, string>}) {
+  constructor({
+    archivesDir,
+    tempCdxDir,
+    filename,
+    gzip,
+    logDetails,
+  }: {
+    archivesDir: string;
+    tempCdxDir: string;
+    filename: string;
+    gzip: boolean;
+    logDetails: Record<string, string>;
+  }) {
     this.archivesDir = archivesDir;
     this.tempCdxDir = tempCdxDir;
     this.filename = filename;
@@ -37,21 +46,29 @@ export class WARCWriter implements IndexerOffsetLength
     this.recordLength = 0;
 
     if (this.tempCdxDir) {
-      this.indexer = new CDXIndexer({format: "cdxj"});
+      this.indexer = new CDXIndexer({ format: "cdxj" });
     }
   }
 
   async initFH() {
     if (!this.fh) {
-      this.fh = fs.createWriteStream(path.join(this.archivesDir, this.filename));
+      this.fh = fs.createWriteStream(
+        path.join(this.archivesDir, this.filename),
+      );
     }
     if (!this.cdxFH && this.tempCdxDir) {
-      this.cdxFH = fs.createWriteStream(path.join(this.tempCdxDir, this.filename + ".cdx"));
+      this.cdxFH = fs.createWriteStream(
+        path.join(this.tempCdxDir, this.filename + ".cdx"),
+      );
     }
   }
 
-  async writeRecordPair(responseRecord: WARCRecord, requestRecord: WARCRecord, responseSerializer: WARCSerializer | undefined = undefined) {
-    const opts = {gzip: this.gzip};
+  async writeRecordPair(
+    responseRecord: WARCRecord,
+    requestRecord: WARCRecord,
+    responseSerializer: WARCSerializer | undefined = undefined,
+  ) {
+    const opts = { gzip: this.gzip };
 
     if (!responseSerializer) {
       responseSerializer = new WARCSerializer(responseRecord, opts);
@@ -59,15 +76,20 @@ export class WARCWriter implements IndexerOffsetLength
 
     await this.initFH();
 
-    this.recordLength = await this._writeRecord(responseRecord, responseSerializer);
+    this.recordLength = await this._writeRecord(
+      responseRecord,
+      responseSerializer,
+    );
 
     this._writeCDX(responseRecord);
 
     const requestSerializer = new WARCSerializer(requestRecord, opts);
-    this.recordLength = await this._writeRecord(requestRecord, requestSerializer);
+    this.recordLength = await this._writeRecord(
+      requestRecord,
+      requestSerializer,
+    );
 
     this._writeCDX(requestRecord);
-
   }
 
   async _writeRecord(record: WARCRecord, serializer: WARCSerializer) {
@@ -83,7 +105,11 @@ export class WARCWriter implements IndexerOffsetLength
       try {
         this.fh.write(chunk);
       } catch (e) {
-        logger.error("Error writing to WARC, corruption possible", {...errJSON(e), url, ...this.logDetails}, "writer");
+        logger.error(
+          "Error writing to WARC, corruption possible",
+          { ...errJSON(e), url, ...this.logDetails },
+          "writer",
+        );
       }
     }
 
@@ -119,7 +145,7 @@ export class WARCWriter implements IndexerOffsetLength
 
 // =================================================================
 export function streamFinish(fh: Writable) {
-  const p = new Promise<void>(resolve => {
+  const p = new Promise<void>((resolve) => {
     fh.once("finish", () => resolve());
   });
   fh.end();

@@ -7,10 +7,8 @@ const CONTENT_LENGTH = "content-length";
 const CONTENT_TYPE = "content-type";
 const EXCLUDE_HEADERS = ["content-encoding", "transfer-encoding"];
 
-
 // ===========================================================================
-export class RequestResponseInfo
-{
+export class RequestResponseInfo {
   _created: Date = new Date();
 
   requestId: string;
@@ -33,7 +31,7 @@ export class RequestResponseInfo
   statusText?: string;
 
   responseHeaders?: Record<string, string>;
-  responseHeadersList?: {name: string, value: string}[];
+  responseHeadersList?: { name: string; value: string }[];
   responseHeadersText?: string;
 
   payload?: Uint8Array;
@@ -79,7 +77,6 @@ export class RequestResponseInfo
     if (params.type) {
       this.resourceType = params.type;
     }
-
   }
 
   // TODO: Fix this the next time the file is edited.
@@ -100,12 +97,17 @@ export class RequestResponseInfo
 
   fillResponse(response: Protocol.Network.Response) {
     // if initial fetch was a 200, but now replacing with 304, don't!
-    if (response.status == 304 && this.status && this.status != 304 && this.url) {
+    if (
+      response.status == 304 &&
+      this.status &&
+      this.status != 304 &&
+      this.url
+    ) {
       return;
     }
 
     this.url = response.url.split("#")[0];
-    
+
     this.status = response.status;
     this.statusText = response.statusText || getStatusText(this.status);
 
@@ -124,12 +126,16 @@ export class RequestResponseInfo
       this.responseHeadersText = response.headersText;
     }
 
-    this.fromServiceWorker = !!response.fromServiceWorker; 
+    this.fromServiceWorker = !!response.fromServiceWorker;
 
     if (response.securityDetails) {
-      const issuer : string = response.securityDetails.issuer || "";
-      const ctc : string = response.securityDetails.certificateTransparencyCompliance === "compliant" ? "1" : "0";
-      this.extraOpts.cert = {issuer, ctc};
+      const issuer: string = response.securityDetails.issuer || "";
+      const ctc: string =
+        response.securityDetails.certificateTransparencyCompliance ===
+        "compliant"
+          ? "1"
+          : "0";
+      this.extraOpts.cert = { issuer, ctc };
     }
   }
 
@@ -161,7 +167,6 @@ export class RequestResponseInfo
     this.responseHeaders = Object.fromEntries(response.headers);
     this.status = response.status;
     this.statusText = response.statusText || getStatusText(this.status);
-
   }
 
   // TODO: Fix this the next time the file is edited.
@@ -175,7 +180,10 @@ export class RequestResponseInfo
 
     if (this.responseHeaders) {
       for (const header of Object.keys(this.responseHeaders)) {
-        headers += `${header}: ${this.responseHeaders[header].replace(/\n/g, ", ")}\r\n`;
+        headers += `${header}: ${this.responseHeaders[header].replace(
+          /\n/g,
+          ", ",
+        )}\r\n`;
       }
     }
     headers += "\r\n";
@@ -191,10 +199,18 @@ export class RequestResponseInfo
   }
 
   getResponseHeadersDict(length = 0) {
-    return this._getHeadersDict(this.responseHeaders, this.responseHeadersList, length);
+    return this._getHeadersDict(
+      this.responseHeaders,
+      this.responseHeadersList,
+      length,
+    );
   }
 
-  _getHeadersDict(headersDict?: Record<string, string>, headersList?: {name: string, value: string}[], actualContentLength = 0) {
+  _getHeadersDict(
+    headersDict?: Record<string, string>,
+    headersList?: { name: string; value: string }[],
+    actualContentLength = 0,
+  ) {
     if (!headersDict && headersList) {
       headersDict = {};
 
