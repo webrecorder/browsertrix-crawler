@@ -423,7 +423,7 @@ class ArgParser {
 
       "customBehaviors": {
         describe: "injects a custom behavior file or set of behavior files in a directory",
-        //type: ["string"]
+        type: "array"
       },
 
       "debugAccessRedis": {

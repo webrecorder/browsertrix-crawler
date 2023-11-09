@@ -138,9 +138,7 @@ export class RedisCrawlState
   constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
 
-    //this.maxRetryPending = 1;
 
-    //this._lastSize = 0;
 
     this.uid = uid;
     this.key = key;
