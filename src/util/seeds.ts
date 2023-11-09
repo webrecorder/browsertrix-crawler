@@ -1,10 +1,34 @@
 import { logger } from "./logger.js";
 import { MAX_DEPTH } from "./constants.js";
 
+type ScopeType =
+  | "prefix"
+  | "host"
+  | "domain"
+  | "page"
+  | "page-spa"
+  | "any"
+  | "custom"; 
 
 export class ScopedSeed
 {
-  constructor({url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} = {}) {
+  url: string;
+  scopeType: ScopeType;
+  include: RegExp[];
+  exclude: RegExp[] = [];
+  allowHash = false;
+  depth = -1;
+  sitemap?: string | null;
+  extraHops = 0;
+
+  maxExtraHops = 0;
+  maxDepth = 0;
+
+
+  constructor(
+    {url, scopeType, include, exclude = [], allowHash = false, depth = -1, sitemap = false, extraHops = 0} :
+                {url: string, scopeType: ScopeType, include: string[], exclude?: string[], allowHash?: boolean, depth?: number, sitemap?: string | boolean | null, extraHops?: number}
+  ) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");
@@ -19,8 +43,9 @@ export class ScopedSeed
     }
 
     if (this.scopeType !== "custom") {
-      [include, allowHash] = this.scopeFromType(this.scopeType, parsedUrl);
-      this.include = [...include, ...this.include];
+      const [includeNew, allowHashNew] = this.scopeFromType(this.scopeType, parsedUrl);
+      this.include = [...includeNew, ...this.include];
+      allowHash = allowHashNew;
     }
 
     // for page scope, the depth is set to extraHops, as no other
@@ -35,7 +60,10 @@ export class ScopedSeed
     this.maxDepth = depth < 0 ? MAX_DEPTH : depth;
   }
 
-  parseRx(value) {
+  //parseRx(value? : union[string[], string, RegExp[]]) -> RegExp[] {
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  parseRx(value : any) {
     if (value === null || value === undefined || value === "") {
       return [];
     } else if (!(value instanceof Array)) {
@@ -45,7 +73,7 @@ export class ScopedSeed
     }
   }
 
-  addExclusion(value) {
+  addExclusion(value: string | RegExp) {
     if (!value) {
       return;
     }
@@ -55,7 +83,7 @@ export class ScopedSeed
     this.exclude.push(value);
   }
 
-  removeExclusion(value) {
+  removeExclusion(value: string) {
     for (let i = 0; i < this.exclude.length; i++) {
       if (this.exclude[i].toString() == value.toString()) {
         this.exclude.splice(i, 1);
@@ -64,7 +92,7 @@ export class ScopedSeed
     }
   }
 
-  parseUrl(url, logDetails = {}) {
+  parseUrl(url: string, logDetails = {}) {
     let parsedUrl = null;
     try {
       parsedUrl = new URL(url.trim());
@@ -81,18 +109,21 @@ export class ScopedSeed
     return parsedUrl;
   }
 
-  resolveSiteMap(sitemap) {
+  resolveSiteMap(sitemap: boolean | string | null) : string | null {
     if (sitemap === true) {
       const url = new URL(this.url);
       url.pathname = "/sitemap.xml";
       return url.href;
+    } else if (typeof(sitemap) === "string") {
+      const url = new URL(sitemap, this.url);
+      return url.href;
     }
 
-    return sitemap;
+    return null;
   }
 
-  scopeFromType(scopeType, parsedUrl) {
-    let include;
+  scopeFromType(scopeType: ScopeType, parsedUrl: URL) : [RegExp[], boolean] {
+    let include : RegExp[] = [];
     let allowHash = false;
 
     switch (scopeType) {
@@ -132,26 +163,26 @@ export class ScopedSeed
     return [include, allowHash];
   }
 
-  isAtMaxDepth(depth) {
+  isAtMaxDepth(depth: number) {
     return depth >= this.maxDepth;
   }
 
-  isIncluded(url, depth, extraHops = 0, logDetails = {}) {
+  isIncluded(url: string, depth: number, extraHops = 0, logDetails = {}) {
     if (depth > this.maxDepth) {
       return false;
     }
 
-    url = this.parseUrl(url, logDetails);
-    if (!url) {
+    const urlParsed = this.parseUrl(url, logDetails);
+    if (!urlParsed) {
       return false;
     }
 
     if (!this.allowHash) {
       // remove hashtag
-      url.hash = "";
+      urlParsed.hash = "";
     }
 
-    url = url.href;
+    url = urlParsed.href;
 
     if (url === this.url) {
       return true;
@@ -194,11 +225,11 @@ export class ScopedSeed
   }
 }
 
-export function rxEscape(string) {
+export function rxEscape(string: string) {
   return string.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 }
 
-export function urlRxEscape(url, parsedUrl) {
+export function urlRxEscape(url: string, parsedUrl: URL) {
   return rxEscape(url).replace(parsedUrl.protocol, "https?:");
 }
 

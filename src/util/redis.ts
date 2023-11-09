@@ -1,4 +1,4 @@
-import Redis from "ioredis";
+import { Redis } from "ioredis";
 import { logger } from "./logger.js";
 
 const error = console.error;
@@ -15,7 +15,7 @@ console.error = function (...args) {
     args[0].indexOf("[ioredis] Unhandled error event") === 0
   ) {
 
-    let now = Date.now();
+    const now = Date.now();
 
     if ((now - lastLogTime) > REDIS_ERROR_LOG_INTERVAL_SECS) {
       if (lastLogTime && exitOnError) {
@@ -29,7 +29,7 @@ console.error = function (...args) {
   error.call(console, ...args);
 };
 
-export async function initRedis(url) {
+export async function initRedis(url: string) {
   const redis = new Redis(url, {lazyConnect: true});
   await redis.connect();
   return redis;

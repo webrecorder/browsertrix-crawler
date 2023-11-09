@@ -6,9 +6,14 @@ import { logger } from "./logger.js";
 // ===========================================================================
 export class HealthChecker
 {
-  constructor(port, errorThreshold) {
+  port: number;
+  errorThreshold: number;
+  healthServer: http.Server;
+
+  errorCount = 0;
+
+  constructor(port: number, errorThreshold: number) {
     this.port = port;
-    this.errorCount = 0;
     this.errorThreshold = errorThreshold;
 
     this.healthServer = http.createServer((...args) => this.healthCheck(...args));
@@ -16,8 +21,8 @@ export class HealthChecker
     this.healthServer.listen(port);
   }
 
-  async healthCheck(req, res) {
-    const pathname = url.parse(req.url).pathname;
+  async healthCheck(req: http.IncomingMessage, res: http.ServerResponse) {
+    const pathname = req.url ? url.parse(req.url).pathname : "";
     switch (pathname) {
     case "/healthz":
       if (this.errorCount < this.errorThreshold) {

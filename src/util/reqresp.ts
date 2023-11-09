@@ -1,4 +1,7 @@
+// @ts-expect-error TODO fill in why error is expected
 import { getStatusText } from "@webrecorder/wabac/src/utils.js";
+
+import { Protocol } from "puppeteer-core";
 
 const CONTENT_LENGTH = "content-length";
 const CONTENT_TYPE = "content-type";
@@ -8,53 +11,63 @@ const EXCLUDE_HEADERS = ["content-encoding", "transfer-encoding"];
 // ===========================================================================
 export class RequestResponseInfo
 {
-  constructor(requestId) {
-    this._created = new Date();
-    
+  _created: Date = new Date();
+
+  requestId: string;
+
+  ts?: string;
+
+  method?: string;
+  url!: string;
+  protocol?: string = "HTTP/1.1";
+
+  // request data
+  requestHeaders?: Record<string, string>;
+  requestHeadersText?: string;
+
+  postData?: string;
+  hasPostData: boolean = false;
+
+  // response data
+  status: number = 0;
+  statusText?: string;
+
+  responseHeaders?: Record<string, string>;
+  responseHeadersList?: {name: string, value: string}[];
+  responseHeadersText?: string;
+
+  payload?: Uint8Array;
+
+  // misc
+  fromServiceWorker: boolean = false;
+
+  frameId?: string;
+
+  fetch: boolean = false;
+
+  resourceType?: string;
+
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  extraOpts: Record<string, any> = {};
+
+  // stats
+  readSize: number = 0;
+  expectedSize: number = 0;
+
+  // set to true to indicate async loading in progress
+  asyncLoading: boolean = false;
+
+  // set to add truncated message
+  truncated?: string;
+
+  constructor(requestId: string) {
     this.requestId = requestId;
-
-    this.ts = null;
-
-    // request data
-    this.method = null;
-    this.url = null;
-    this.protocol = "HTTP/1.1";
-
-    this.requestHeaders = null;
-    this.requestHeadersText = null;
-
-    this.postData = null;
-    this.hasPostData = false;
-
-    // response data
-    this.status = 0;
-    this.statusText = null;
-
-    this.responseHeaders = null;
-    this.responseHeadersList = null;
-    this.responseHeadersText = null;
-
-    this.payload = null;
-
-    this.fromServiceWorker = false;
-
-    this.fetch = false;
-
-    this.resourceType = null;
-
-    this.extraOpts = {};
-
-    this.readSize = 0;
-    this.expectedSize = 0;
-
-    // set to true to indicate async loading in progress
-    this.asyncLoading = false;
-
-    // set to add truncated message
-    this.truncated = null;
   }
 
-  fillRequest(params) {
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fillRequest(params: Record<string, any>) {
     this.url = params.request.url;
     this.method = params.request.method;
     if (!this.requestHeaders) {
@@ -69,7 +82,9 @@ export class RequestResponseInfo
 
   }
 
-  fillFetchRequestPaused(params) {
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fillFetchRequestPaused(params: Record<string, any>) {
     this.fillRequest(params);
 
     this.status = params.responseStatusCode;
@@ -83,7 +98,7 @@ export class RequestResponseInfo
     this.frameId = params.frameId;
   }
 
-  fillResponse(response) {
+  fillResponse(response: Protocol.Network.Response) {
     // if initial fetch was a 200, but now replacing with 304, don't!
     if (response.status == 304 && this.status && this.status != 304 && this.url) {
       return;
@@ -112,8 +127,8 @@ export class RequestResponseInfo
     this.fromServiceWorker = !!response.fromServiceWorker; 
 
     if (response.securityDetails) {
-      const issuer = response.securityDetails.issuer || "";
-      const ctc = response.securityDetails.certificateTransparencyCompliance === "compliant" ? "1" : "0";
+      const issuer : string = response.securityDetails.issuer || "";
+      const ctc : string = response.securityDetails.certificateTransparencyCompliance === "compliant" ? "1" : "0";
       this.extraOpts.cert = {issuer, ctc};
     }
   }
@@ -124,14 +139,15 @@ export class RequestResponseInfo
     }
     try {
       const headers = new Headers(this.responseHeaders);
-      const redirUrl = new URL(headers.get("location"), this.url).href;
+      const location = headers.get("location") || "";
+      const redirUrl = new URL(location, this.url).href;
       return this.url === redirUrl;
     } catch (e) {
       return false;
     }
   }
 
-  fillResponseReceivedExtraInfo(params) {
+  fillResponseReceivedExtraInfo(params: Record<string, string>) {
     // this.responseHeaders = params.headers;
     // if (params.headersText) {
     //   this.responseHeadersText = params.headersText;
@@ -139,22 +155,28 @@ export class RequestResponseInfo
     this.extraOpts.ipType = params.resourceIPAddressSpace;
   }
 
-  fillFetchResponse(response) {
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fillFetchResponse(response: Record<string, any>) {
     this.responseHeaders = Object.fromEntries(response.headers);
     this.status = response.status;
     this.statusText = response.statusText || getStatusText(this.status);
 
   }
 
-  fillRequestExtraInfo(params) {
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fillRequestExtraInfo(params: Record<string, any>) {
     this.requestHeaders = params.headers;
   }
 
   getResponseHeadersText() {
     let headers = `${this.protocol} ${this.status} ${this.statusText}\r\n`;
 
-    for (const header of Object.keys(this.responseHeaders)) {
-      headers += `${header}: ${this.responseHeaders[header].replace(/\n/g, ", ")}\r\n`;
+    if (this.responseHeaders) {
+      for (const header of Object.keys(this.responseHeaders)) {
+        headers += `${header}: ${this.responseHeaders[header].replace(/\n/g, ", ")}\r\n`;
+      }
     }
     headers += "\r\n";
     return headers;
@@ -165,14 +187,14 @@ export class RequestResponseInfo
   }
 
   getRequestHeadersDict() {
-    return this._getHeadersDict(this.requestHeaders, null);
+    return this._getHeadersDict(this.requestHeaders);
   }
 
-  getResponseHeadersDict(length) {
+  getResponseHeadersDict(length = 0) {
     return this._getHeadersDict(this.responseHeaders, this.responseHeadersList, length);
   }
 
-  _getHeadersDict(headersDict, headersList, actualContentLength) {
+  _getHeadersDict(headersDict?: Record<string, string>, headersList?: {name: string, value: string}[], actualContentLength = 0) {
     if (!headersDict && headersList) {
       headersDict = {};
 

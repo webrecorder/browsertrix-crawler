@@ -2,11 +2,18 @@ import sharp from "sharp";
 
 import { WARCResourceWriter } from "./warcresourcewriter.js";
 import { logger, errJSON } from "./logger.js";
+import { Browser } from "./browser.js";
 
 
 // ============================================================================
 
-export const screenshotTypes = {
+type ScreenShotType = {
+  type: string;
+  omitBackground: boolean;
+  fullPage: boolean;
+}
+
+export const screenshotTypes : Record<string, ScreenShotType> = {
   "view": {
     type: "png",
     omitBackground: true,
@@ -24,10 +31,15 @@ export const screenshotTypes = {
   }
 };
 
-
 export class Screenshots extends WARCResourceWriter {
+  browser: Browser;
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  page: any;
 
-  constructor(opts) {
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(opts: any) {
     super({...opts, warcName: "screenshots.warc.gz"});
     this.browser = opts.browser;
     this.page = opts.page;

@@ -1,16 +1,21 @@
 import { WARCResourceWriter } from "./warcresourcewriter.js";
 import { logger } from "./logger.js";
-
+import { CDPSession, Protocol } from "puppeteer-core";
 
 // ============================================================================
-export class BaseTextExtract extends WARCResourceWriter {
-  constructor(cdp, opts) {
+export abstract class BaseTextExtract extends WARCResourceWriter {
+  cdp: CDPSession;
+  lastText: string | null = null;
+  text: string | null = null;
+
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(cdp: CDPSession, opts: any) {
     super({...opts, warcName: "text.warc.gz"});
     this.cdp = cdp;
-    this.lastText = null;
   }
 
-  async extractAndStoreText(resourceType, ignoreIfMatchesLast = false, saveToWarc = false) {
+  async extractAndStoreText(resourceType: string, ignoreIfMatchesLast = false, saveToWarc = false) {
     try {
       const text = await this.doGetText();
 
@@ -26,26 +31,26 @@ export class BaseTextExtract extends WARCResourceWriter {
 
       this.lastText = text;
       return {changed: true, text};
-    } catch (e) {
+    } // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    catch (e: any) {
       logger.debug("Error extracting text", e, "text");
       return {changed: false, text: null};
     }
   }
 
-  async doGetText() {
-    throw new Error("unimplemented");
-  }
+  abstract doGetText() : Promise<string>;
 }
 
 
 // ============================================================================
 export class TextExtractViaSnapshot extends BaseTextExtract {
-  async doGetText() {
+  async doGetText() : Promise<string> {
     const result = await this.cdp.send("DOMSnapshot.captureSnapshot", {computedStyles: []});
     return this.parseTextFromDOMSnapshot(result);
   }
 
-  parseTextFromDOMSnapshot(result) {
+  parseTextFromDOMSnapshot(result: Protocol.DOMSnapshot.CaptureSnapshotResponse) : string {
     const TEXT_NODE = 3;
     const ELEMENT_NODE = 1;
 
@@ -53,13 +58,13 @@ export class TextExtractViaSnapshot extends BaseTextExtract {
 
     const {strings, documents} = result;
 
-    const accum = [];
+    const accum : string[] = [];
 
     for (const doc of documents) {
-      const nodeValues = doc.nodes.nodeValue;
-      const nodeNames = doc.nodes.nodeName;
-      const nodeTypes = doc.nodes.nodeType;
-      const parentIndex = doc.nodes.parentIndex;
+      const nodeValues = doc.nodes.nodeValue || [];
+      const nodeNames = doc.nodes.nodeName || [];
+      const nodeTypes = doc.nodes.nodeType || [];
+      const parentIndex = doc.nodes.parentIndex || [];
 
       for (let i = 0; i < nodeValues.length; i++) {
         if (nodeValues[i] === -1) {
@@ -74,28 +79,28 @@ export class TextExtractViaSnapshot extends BaseTextExtract {
             if (!SKIPPED_NODES.includes(name)) {
               const value = strings[nodeValues[i]].trim();
               if (value) {
-                accum.push(value);
+                accum.push(value as string);
               }
             }
           }
         }
       }
-
-      return accum.join("\n");
     }
+
+    return accum.join("\n");
   }
 }
 
 
 // ============================================================================
 export class TextExtractViaDocument extends BaseTextExtract {
-  async doGetText() {
+  async doGetText() : Promise<string> {
     const result = await this.cdp.send("DOM.getDocument", {"depth": -1, "pierce": true});
     return this.parseTextFromDOM(result);
   }
 
-  async parseTextFromDom(dom) {
-    const accum = [];
+  parseTextFromDOM(dom: Protocol.DOM.GetDocumentResponse) : string {
+    const accum : string[] = [];
     const metadata = {};
 
     this.parseText(dom.root, metadata, accum);
@@ -103,9 +108,9 @@ export class TextExtractViaDocument extends BaseTextExtract {
     return accum.join("\n");
   }
 
-  async parseText(node, metadata, accum) {
+  parseText(node: Protocol.DOM.Node, metadata: Record<string, string> | null, accum: string[]) {
     const SKIPPED_NODES = ["head", "script", "style", "header", "footer", "banner-div", "noscript"];
-    const EMPTY_LIST = [];
+    const EMPTY_LIST : Protocol.DOM.Node[] = [];
     const TEXT = "#text";
     const TITLE = "title";
 
@@ -123,9 +128,9 @@ export class TextExtractViaDocument extends BaseTextExtract {
         accum.push(value);
       }
     } else if (name === TITLE) {
-      const title = [];
+      const title : string[] = [];
 
-      for (let child of children) {
+      for (const child of children) {
         this.parseText(child, null, title);
       }
 
@@ -135,7 +140,7 @@ export class TextExtractViaDocument extends BaseTextExtract {
         accum.push(title.join(" "));
       }
     } else {
-      for (let child of children) {
+      for (const child of children) {
         this.parseText(child, metadata, accum);
       }
 

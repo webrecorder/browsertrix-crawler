@@ -1,10 +1,11 @@
-import child_process from "child_process";
+import child_process, { ChildProcess, StdioOptions } from "child_process";
 import path from "path";
-import fs from "fs";
+import fs, { WriteStream } from "fs";
 import os from "os";
-import fsp from "fs/promises";
+import fsp, { FileHandle } from "fs/promises";
 
-import { RedisCrawlState, LoadState, QueueState } from "./util/state.js";
+import { RedisCrawlState, LoadState, QueueState, PageState, WorkerId } from "./util/state.js";
+
 import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
 
@@ -12,13 +13,13 @@ import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
-import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization } from "./util/storage.js";
-import { ScreenCaster, WSTransport, RedisPubSubTransport } from "./util/screencaster.js";
+import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization, S3StorageSync } from "./util/storage.js";
+import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { logger, errJSON } from "./util/logger.js";
-import { runWorkers } from "./util/worker.js";
+import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectAllFileSources } from "./util/file_reader.js";
 
@@ -32,32 +33,120 @@ import { OriginOverride } from "./util/originoverride.js";
 // to ignore HTTPS error for HEAD check
 import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
+import { CDPSession, Frame, HTTPRequest, Page } from "puppeteer-core";
 
-const HTTPS_AGENT = HTTPSAgent({
+const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
 });
 
-const HTTP_AGENT = HTTPAgent();
+const HTTP_AGENT = new HTTPAgent();
 
-const behaviors = fs.readFileSync(new URL("./node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
+const behaviors = fs.readFileSync(new URL("../node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
 
 const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
 
 const POST_CRAWL_STATES = ["generate-wacz", "uploading-wacz", "generate-cdx", "generate-warc"];
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LogDetails = Record<string, any>;
+
+type PageEntry = {
+  id: string;
+  url: string;
+  title?: string;
+  loadState?: number;
+  mime?: string;
+  seed?: boolean;
+  text?: string;
+  favIconUrl?: string;
+};
+
 
 // ============================================================================
 export class Crawler {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  origConfig: any;
+
+  collDir: string;
+  logDir: string;
+  logFilename: string;
+
+  headers: Record<string, string> = {};
+
+  crawlState!: RedisCrawlState;
+
+  pagesFH?: FileHandle | null = null;
+  logFH!: WriteStream;
+
+  crawlId: string;
+
+  startTime: number;
+
+  limitHit = false;
+  pageLimit: number;
+
+  saveStateFiles: string[] = [];
+  lastSaveTime: number;
+
+  maxPageTime: number;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  emulateDevice: any = {};
+
+  captureBasePrefix = "";
+
+  infoString!: string;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  gotoOpts: Record<string, any>;
+
+  pagesDir: string;
+  pagesFile: string;
+
+  blockRules: BlockRules | null;
+  adBlockRules: AdBlockRules | null;
+
+  healthChecker: HealthChecker | null = null;
+  originOverride: OriginOverride | null = null;
+
+  screencaster: ScreenCaster | null = null;
+
+  interrupted = false;
+  finalExit = false;
+  uploadAndDeleteLocal = false;
+  done = false;
+
+  customBehaviors = "";
+  behaviorLastLine?: string;
+
+  browser: Browser;
+  storage: S3StorageSync | null = null;
+
+  maxHeapUsed = 0;
+  maxHeapTotal = 0;
+
+  // eslint-disable-next-line no-use-before-define
+  driver!: (opts: { page: Page; data: PageState; crawler: Crawler }) => NonNullable<unknown>;
+
   constructor() {
     const res = parseArgs();
     this.params = res.parsed;
     this.origConfig = res.origConfig;
 
     // root collections dir
-    this.collDir = path.join(this.params.cwd, "collections", this.params.collection);
+    this.collDir = path.join(
+      this.params.cwd,
+      "collections",
+      this.params.collection
+    );
     this.logDir = path.join(this.collDir, "logs");
-    this.logFilename = path.join(this.logDir, `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`);
+    this.logFilename = path.join(
+      this.logDir,
+      `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`
+    );
 
     const debugLogging = this.params.logging.includes("debug");
     logger.setDebugLogging(debugLogging);
@@ -74,7 +163,6 @@ export class Crawler {
     logger.debug("Writing log to: " + this.logFilename, {}, "init");
 
     this.headers = {};
-    this.crawlState = null;
 
     // pages file
     this.pagesFH = null;
@@ -89,7 +177,9 @@ export class Crawler {
 
     // resolve maxPageLimit and ensure pageLimit is no greater than maxPageLimit
     if (this.params.maxPageLimit) {
-      this.pageLimit = this.pageLimit ? Math.min(this.pageLimit, this.params.maxPageLimit) : this.params.maxPageLimit;
+      this.pageLimit = this.pageLimit
+        ? Math.min(this.pageLimit, this.params.maxPageLimit)
+        : this.params.maxPageLimit;
     }
 
     this.saveStateFiles = [];
@@ -97,18 +187,22 @@ export class Crawler {
 
     // sum of page load + behavior timeouts + 2 x fetch + cloudflare + link extraction timeouts + extra page delay
     // if exceeded, will interrupt and move on to next page (likely behaviors or some other operation is stuck)
-    this.maxPageTime = this.params.pageLoadTimeout + this.params.behaviorTimeout +
-                       FETCH_TIMEOUT_SECS*2 + PAGE_OP_TIMEOUT_SECS*2 + this.params.pageExtraDelay;
+    this.maxPageTime =
+      this.params.pageLoadTimeout +
+      this.params.behaviorTimeout +
+      FETCH_TIMEOUT_SECS * 2 +
+      PAGE_OP_TIMEOUT_SECS * 2 +
+      this.params.pageExtraDelay;
 
     this.emulateDevice = this.params.emulateDevice || {};
 
     //this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
     //this.capturePrefix = "";//process.env.NO_PROXY ? "" : this.captureBasePrefix + "/id_/";
-    this.captureBasePrefix = null;
+    //this.captureBasePrefix = "";
 
     this.gotoOpts = {
       waitUntil: this.params.waitUntil,
-      timeout: this.params.pageLoadTimeout * 1000
+      timeout: this.params.pageLoadTimeout * 1000,
     };
 
     // pages directory
@@ -129,7 +223,6 @@ export class Crawler {
     this.done = false;
 
     this.customBehaviors = "";
-    this.behaviorLastLine = null;
 
     this.browser = new Browser();
   }
@@ -158,7 +251,9 @@ export class Crawler {
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
 
     if (!redisUrl.startsWith("redis://")) {
-      logger.fatal("stateStoreUrl must start with redis:// -- Only redis-based store currently supported");
+      logger.fatal(
+        "stateStoreUrl must start with redis:// -- Only redis-based store currently supported"
+      );
     }
 
     let redis;
@@ -174,17 +269,30 @@ export class Crawler {
       }
     }
 
-    logger.debug(`Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`, {}, "state");
+    logger.debug(
+      `Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`,
+      {},
+      "state"
+    );
 
     logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
 
-    this.crawlState = new RedisCrawlState(redis, this.params.crawlId, this.maxPageTime, os.hostname());
+    this.crawlState = new RedisCrawlState(
+      redis,
+      this.params.crawlId,
+      this.maxPageTime,
+      os.hostname()
+    );
 
     // clear any pending URLs from this instance
     await this.crawlState.clearOwnPendingLocks();
 
     if (this.params.saveState === "always" && this.params.saveStateInterval) {
-      logger.debug(`Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`, {}, "state");
+      logger.debug(
+        `Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`,
+        {},
+        "state"
+      );
     }
 
     if (this.params.logErrorsToRedis) {
@@ -200,11 +308,16 @@ export class Crawler {
 
     if (this.params.screencastPort) {
       transport = new WSTransport(this.params.screencastPort);
-      logger.debug(`Screencast server started on: ${this.params.screencastPort}`, {}, "screencast");
-    } else if (this.params.redisStoreUrl && this.params.screencastRedis) {
-      transport = new RedisPubSubTransport(this.params.redisStoreUrl, this.crawlId);
-      logger.debug("Screencast enabled via redis pubsub", {}, "screencast");
+      logger.debug(
+        `Screencast server started on: ${this.params.screencastPort}`,
+        {},
+        "screencast"
+      );
     }
+    // } else if (this.params.redisStoreUrl && this.params.screencastRedis) {
+    //   transport = new RedisPubSubTransport(this.params.redisStoreUrl, this.crawlId);
+    //   logger.debug("Screencast enabled via redis pubsub", {}, "screencast");
+    // }
 
     if (!transport) {
       return null;
@@ -214,26 +327,28 @@ export class Crawler {
   }
 
   launchRedis() {
-    let redisStdio;
+    let redisStdio: StdioOptions;
 
     if (this.params.logging.includes("redis")) {
       const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
       redisStdio = [process.stdin, redisStderr, redisStderr];
-
     } else {
       redisStdio = "ignore";
     }
 
-    let redisArgs = [];
+    let redisArgs: string[] = [];
     if (this.params.debugAccessRedis) {
       redisArgs = ["--protected-mode", "no"];
     }
 
-    return child_process.spawn("redis-server", redisArgs,{cwd: "/tmp/", stdio: redisStdio});
+    return child_process.spawn("redis-server", redisArgs, {
+      cwd: "/tmp/",
+      stdio: redisStdio,
+    });
   }
 
   async bootstrap() {
-    const subprocesses = [];
+    const subprocesses: ChildProcess[] = [];
 
     subprocesses.push(this.launchRedis());
 
@@ -243,7 +358,7 @@ export class Crawler {
     //  logger.info("wb-manager init failed, collection likely already exists");
     //}
 
-    fs.mkdirSync(this.logDir, {recursive: true});
+    fs.mkdirSync(this.logDir, { recursive: true });
     this.logFH = fs.createWriteStream(this.logFilename);
     logger.setExternalLogStream(this.logFH);
 
@@ -253,23 +368,26 @@ export class Crawler {
     logger.info("Seeds", this.params.scopedSeeds);
 
     if (this.params.profile) {
-      logger.info("With Browser Profile", {url: this.params.profile});
+      logger.info("With Browser Profile", { url: this.params.profile });
     }
 
     if (this.params.overwrite) {
       logger.debug(`Clearing ${this.collDir} before starting`);
       try {
         fs.rmSync(this.collDir, { recursive: true, force: true });
-      } catch(e) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (e: any) {
         logger.error(`Unable to clear ${this.collDir}`, e);
       }
     }
 
     if (this.params.customBehaviors) {
-      this.customBehaviors = this.loadCustomBehaviors(this.params.customBehaviors);
+      this.customBehaviors = this.loadCustomBehaviors(
+        this.params.customBehaviors
+      );
     }
 
-    this.headers = {"User-Agent": this.configureUA()};
+    this.headers = { "User-Agent": this.configureUA() };
 
     process.on("exit", () => {
       for (const proc of subprocesses) {
@@ -277,19 +395,22 @@ export class Crawler {
       }
     });
 
-    child_process.spawn("socat", ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"]);
+    child_process.spawn("socat", [
+      "tcp-listen:9222,reuseaddr,fork",
+      "tcp:localhost:9221",
+    ]);
 
     if (!this.params.headless && !process.env.NO_XVFB) {
       child_process.spawn("Xvfb", [
-        process.env.DISPLAY,
+        process.env.DISPLAY || "",
         "-listen",
         "tcp",
         "-screen",
         "0",
-        process.env.GEOMETRY,
+        process.env.GEOMETRY || "",
         "-ac",
         "+extension",
-        "RANDR"
+        "RANDR",
       ]);
     }
   }
@@ -324,40 +445,47 @@ export class Crawler {
           exitCode = 11;
         }
       }
-    } catch(e) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
       logger.error("Crawl failed", e);
       exitCode = 9;
       status = "failing";
       if (await this.crawlState.incFailCount()) {
         status = "failed";
       }
-
     } finally {
       await this.setStatusAndExit(exitCode, status);
     }
   }
 
-  _behaviorLog({data, type}, pageUrl, workerid) {
+  _behaviorLog(
+    { data, type }: { data: string; type: string },
+    pageUrl: string,
+    workerid: WorkerId
+  ) {
     let behaviorLine;
     let message;
     let details;
 
-    const logDetails = {page: pageUrl, workerid};
+    const logDetails = { page: pageUrl, workerid };
 
-    if (typeof(data) === "string") {
+    if (typeof data === "string") {
       message = data;
       details = logDetails;
     } else {
       message = type === "info" ? "Behavior log" : "Behavior debug";
-      details = typeof(data) === "object" ? {...data, ...logDetails} : logDetails;
+      details =
+        typeof data === "object"
+          ? { ...(data as object), ...logDetails }
+          : logDetails;
     }
 
     switch (type) {
     case "info":
       behaviorLine = JSON.stringify(data);
-      if (behaviorLine != this._behaviorLastLine) {
+      if (behaviorLine !== this.behaviorLastLine) {
         logger.info(message, details, "behaviorScript");
-        this._behaviorLastLine = behaviorLine;
+        this.behaviorLastLine = behaviorLine;
       }
       break;
 
@@ -371,18 +499,39 @@ export class Crawler {
     }
   }
 
-  isInScope({seedId, url, depth, extraHops} = {}, logDetails = {}) {
+  isInScope(
+    {
+      seedId,
+      url,
+      depth,
+      extraHops,
+    }: { seedId: number; url: string; depth: number; extraHops: number },
+    logDetails = {}
+  ) {
     const seed = this.params.scopedSeeds[seedId];
 
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  async setupPage({page, cdp, workerid, callbacks}) {
-    await this.browser.setupPage({page, cdp});
+  async setupPage({
+    page,
+    cdp,
+    workerid,
+    callbacks,
+  }: {
+    page: Page;
+    cdp: CDPSession;
+    workerid: WorkerId;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    callbacks: any;
+  }) {
+    await this.browser.setupPage({ page, cdp });
 
-    if ((this.adBlockRules && this.params.blockAds) ||
-        this.blockRules || this.originOverride) {
-
+    if (
+      (this.adBlockRules && this.params.blockAds) ||
+      this.blockRules ||
+      this.originOverride
+    ) {
       await page.setRequestInterception(true);
 
       if (this.adBlockRules && this.params.blockAds) {
@@ -401,24 +550,39 @@ export class Crawler {
     if (this.params.logging.includes("jserrors")) {
       page.on("console", (msg) => {
         if (msg.type() === "error") {
-          logger.warn(msg.text(), {"location": msg.location(), "page": page.url(), workerid}, "jsError");
+          logger.warn(
+            msg.text(),
+            { location: msg.location(), page: page.url(), workerid },
+            "jsError"
+          );
         }
       });
 
       page.on("pageerror", (e) => {
-        logger.warn("Page Error", {...errJSON(e), "page": page.url(), workerid}, "jsError");
+        logger.warn(
+          "Page Error",
+          { ...errJSON(e), page: page.url(), workerid },
+          "jsError"
+        );
       });
     }
 
     if (this.screencaster) {
-      logger.debug("Start Screencast", {workerid}, "screencast");
+      logger.debug("Start Screencast", { workerid }, "screencast");
       await this.screencaster.screencastPage(page, cdp, workerid);
     }
 
-    await page.exposeFunction(ADD_LINK_FUNC, (url) => callbacks.addLink && callbacks.addLink(url));
+    await page.exposeFunction(
+      ADD_LINK_FUNC,
+      (url: string) => callbacks.addLink && callbacks.addLink(url)
+    );
 
     if (this.params.behaviorOpts) {
-      await page.exposeFunction(BEHAVIOR_LOG_FUNC, (logdata) => this._behaviorLog(logdata, page.url(), workerid));
+      await page.exposeFunction(
+        BEHAVIOR_LOG_FUNC,
+        (logdata: { data: string; type: string }) =>
+          this._behaviorLog(logdata, page.url(), workerid)
+      );
       await this.browser.addInitScript(page, behaviors);
 
       const initScript = `
@@ -431,7 +595,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  loadCustomBehaviors(filename) {
+  loadCustomBehaviors(filename: string) {
     let str = "";
 
     for (const source of collectAllFileSources(filename, ".js")) {
@@ -441,13 +605,14 @@ self.__bx_behaviors.selectMainBehavior();
     return str;
   }
 
-  async getFavicon(page, logDetails) {
+  async getFavicon(page: Page, logDetails: LogDetails): Promise<string> {
     try {
       const resp = await fetch("http://127.0.0.1:9221/json");
       if (resp.status === 200) {
         const browserJson = await resp.json();
         for (const jsons of browserJson) {
-          if (jsons.id === page.target()._targetId) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (jsons.id === (page.target() as any)._targetId) {
             return jsons.faviconUrl;
           }
         }
@@ -455,18 +620,22 @@ self.__bx_behaviors.selectMainBehavior();
     } catch (e) {
       // ignore
     }
-    logger.warn("Failed to fetch favicon from browser /json endpoint", logDetails);
+    logger.warn(
+      "Failed to fetch favicon from browser /json endpoint",
+      logDetails
+    );
+    return "";
   }
 
-  async crawlPage(opts) {
+  async crawlPage(opts: WorkerState) {
     await this.writeStats();
 
-    const {page, cdp, data, workerid, callbacks, directFetchCapture} = opts;
+    const { page, cdp, data, workerid, callbacks, directFetchCapture } = opts;
     data.callbacks = callbacks;
 
-    const {url} = data;
+    const { url } = data;
 
-    const logDetails = {page: url, workerid};
+    const logDetails = { page: url, workerid };
     data.logDetails = logDetails;
     data.workerid = workerid;
 
@@ -481,7 +650,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (!data.isHTMLPage && directFetchCapture) {
       try {
-        const {fetched, mime} = await timedRun(
+        const { fetched, mime } = await timedRun(
           directFetchCapture(url),
           FETCH_TIMEOUT_SECS,
           "Direct fetch capture attempt timed out",
@@ -494,7 +663,11 @@ self.__bx_behaviors.selectMainBehavior();
           if (mime) {
             data.mime = mime;
           }
-          logger.info("Direct fetch successful", {url, ...logDetails}, "fetch");
+          logger.info(
+            "Direct fetch successful",
+            { url, ...logDetails },
+            "fetch"
+          );
           return true;
         }
       } catch (e) {
@@ -503,7 +676,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     // run custom driver here
-    await this.driver({page, data, crawler: this});
+    await this.driver({ page, data, crawler: this });
 
     data.title = await page.title();
     data.favicon = await this.getFavicon(page, logDetails);
@@ -514,7 +687,12 @@ self.__bx_behaviors.selectMainBehavior();
       if (!data.isHTMLPage) {
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
-      const screenshots = new Screenshots({browser: this.browser, page, url, directory: archiveDir});
+      const screenshots = new Screenshots({
+        browser: this.browser,
+        page,
+        url,
+        directory: archiveDir,
+      });
       if (this.params.screenshot.includes("view")) {
         await screenshots.take();
       }
@@ -529,8 +707,15 @@ self.__bx_behaviors.selectMainBehavior();
     let textextract = null;
 
     if (data.isHTMLPage) {
-      textextract = new TextExtractViaSnapshot(cdp, {url, directory: archiveDir});
-      const {changed, text} = await textextract.extractAndStoreText("text", false, this.params.text.includes("to-warc"));
+      textextract = new TextExtractViaSnapshot(cdp, {
+        url,
+        directory: archiveDir,
+      });
+      const { changed, text } = await textextract.extractAndStoreText(
+        "text",
+        false,
+        this.params.text.includes("to-warc")
+      );
 
       if (changed && text && this.params.text.includes("to-pages")) {
         data.text = text;
@@ -541,7 +726,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.behaviorOpts) {
       if (!data.isHTMLPage) {
-        logger.debug("Skipping behaviors for non-HTML page", logDetails, "behavior");
+        logger.debug(
+          "Skipping behaviors for non-HTML page",
+          logDetails,
+          "behavior"
+        );
       } else if (data.skipBehaviors) {
         logger.info("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
@@ -566,14 +755,17 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.pageExtraDelay) {
-      logger.info(`Waiting ${this.params.pageExtraDelay} seconds before moving on to next page`, logDetails);
+      logger.info(
+        `Waiting ${this.params.pageExtraDelay} seconds before moving on to next page`,
+        logDetails
+      );
       await sleep(this.params.pageExtraDelay);
     }
 
     return true;
   }
 
-  async pageFinished(data) {
+  async pageFinished(data: PageState) {
     await this.writePage(data);
 
     // if page loaded, considered page finished successfully
@@ -581,7 +773,7 @@ self.__bx_behaviors.selectMainBehavior();
     const { loadState, logDetails } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
-      logger.info("Page Finished", {loadState, ...logDetails}, "pageStatus");
+      logger.info("Page Finished", { loadState, ...logDetails }, "pageStatus");
 
       await this.crawlState.markFinished(data.url);
 
@@ -589,7 +781,11 @@ self.__bx_behaviors.selectMainBehavior();
         this.healthChecker.resetErrors();
       }
     } else {
-      logger.warn("Page Load Failed", {loadState, ...logDetails}, "pageStatus");
+      logger.warn(
+        "Page Load Failed",
+        { loadState, ...logDetails },
+        "pageStatus"
+      );
 
       await this.crawlState.markFailed(data.url);
 
@@ -603,51 +799,84 @@ self.__bx_behaviors.selectMainBehavior();
     await this.checkLimits();
   }
 
-  async teardownPage({workerid}) {
+  async teardownPage({ workerid }: WorkerOpts) {
     if (this.screencaster) {
       await this.screencaster.stopById(workerid);
     }
   }
 
-  async workerIdle(workerid) {
+  async workerIdle(workerid: WorkerId) {
     if (this.screencaster) {
       //logger.debug("End Screencast", {workerid}, "screencast");
       await this.screencaster.stopById(workerid, true);
     }
   }
 
-  async runBehaviors(page, cdp, frames, logDetails) {
+  async runBehaviors(
+    page: Page,
+    cdp: CDPSession,
+    frames: Frame[],
+    logDetails: LogDetails
+  ) {
     try {
       frames = frames || page.frames();
 
-      logger.info("Running behaviors", {frames: frames.length, frameUrls: frames.map(frame => frame.url()), ...logDetails}, "behavior");
+      logger.info(
+        "Running behaviors",
+        {
+          frames: frames.length,
+          frameUrls: frames.map((frame) => frame.url()),
+          ...logDetails,
+        },
+        "behavior"
+      );
 
       const results = await Promise.allSettled(
-        frames.map(frame => this.browser.evaluateWithCLI(page, frame, cdp, `
+        frames.map((frame) =>
+          this.browser.evaluateWithCLI(
+            page,
+            frame,
+            cdp,
+            `
           if (!self.__bx_behaviors) {
             console.error("__bx_behaviors missing, can't run behaviors");
           } else {
             self.__bx_behaviors.run();
-          }`
-        , logDetails, "behavior"))
+          }`,
+            logDetails,
+            "behavior"
+          )
+        )
       );
 
-      for (const {status, reason} in results) {
+      for (const res of results) {
+        const { status, reason }: { status: string; reason?: string } = res;
         if (status === "rejected") {
-          logger.warn("Behavior run partially failed", {reason, ...logDetails}, "behavior");
+          logger.warn(
+            "Behavior run partially failed",
+            { reason, ...logDetails },
+            "behavior"
+          );
         }
       }
 
-      logger.info("Behaviors finished", {finished: results.length, ...logDetails}, "behavior");
+      logger.info(
+        "Behaviors finished",
+        { finished: results.length, ...logDetails },
+        "behavior"
+      );
       return true;
-
     } catch (e) {
-      logger.warn("Behavior run failed", {...errJSON(e), ...logDetails}, "behavior");
+      logger.warn(
+        "Behavior run failed",
+        { ...errJSON(e), ...logDetails },
+        "behavior"
+      );
       return false;
     }
   }
 
-  async shouldIncludeFrame(frame, logDetails) {
+  async shouldIncludeFrame(frame: Frame, logDetails: LogDetails) {
     if (!frame.parentFrame()) {
       return frame;
     }
@@ -656,10 +885,16 @@ self.__bx_behaviors.selectMainBehavior();
 
     // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
     // if there's no tag or an iframe tag, then assume its a regular frame
-    const tagName = await frame.evaluate("self && self.frameElement && self.frameElement.tagName");
+    const tagName = await frame.evaluate(
+      "self && self.frameElement && self.frameElement.tagName"
+    );
 
     if (tagName && tagName !== "IFRAME" && tagName !== "FRAME") {
-      logger.debug("Skipping processing non-frame object", {tagName, frameUrl, ...logDetails}, "behavior");
+      logger.debug(
+        "Skipping processing non-frame object",
+        { tagName, frameUrl, ...logDetails },
+        "behavior"
+      );
       return null;
     }
 
@@ -668,35 +903,53 @@ self.__bx_behaviors.selectMainBehavior();
     if (frameUrl === "about:blank") {
       res = false;
     } else {
-      res = !this.adBlockRules.isAdUrl(frameUrl);
+      res = this.adBlockRules && !this.adBlockRules.isAdUrl(frameUrl);
     }
 
     if (!res) {
-      logger.debug("Skipping processing frame", {frameUrl, ...logDetails}, "behavior");
+      logger.debug(
+        "Skipping processing frame",
+        { frameUrl, ...logDetails },
+        "behavior"
+      );
     }
 
     return res ? frame : null;
   }
 
   async getInfoString() {
-    const packageFileJSON = JSON.parse(await fsp.readFile("../app/package.json"));
-    const warcioPackageJSON = JSON.parse(await fsp.readFile("/app/node_modules/warcio/package.json"));
+    const packageFileJSON = JSON.parse(
+      await fsp.readFile(new URL("../package.json", import.meta.url), {
+        encoding: "utf-8",
+      })
+    );
+    const warcioPackageJSON = JSON.parse(
+      await fsp.readFile(
+        new URL("../node_modules/warcio/package.json", import.meta.url),
+        { encoding: "utf-8" }
+      )
+    );
 
     return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version})`;
   }
 
-  async createWARCInfo(filename) {
+  async createWARCInfo(filename: string) {
     const warcVersion = "WARC/1.0";
     const type = "warcinfo";
 
     const info = {
-      "software": this.infoString,
-      "format": "WARC File Format 1.0"
+      software: this.infoString,
+      format: "WARC File Format 1.0",
     };
 
-    const warcInfo = {...info, ...this.params.warcInfo, };
-    const record = await warcio.WARCRecord.createWARCInfo({filename, type, warcVersion}, warcInfo);
-    const buffer = await warcio.WARCSerializer.serialize(record, {gzip: true});
+    const warcInfo = { ...info, ...this.params.warcInfo };
+    const record = await warcio.WARCRecord.createWARCInfo(
+      { filename, type, warcVersion },
+      warcInfo
+    );
+    const buffer = await warcio.WARCSerializer.serialize(record, {
+      gzip: true,
+    });
     return buffer;
   }
 
@@ -710,7 +963,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.sizeLimit) {
       if (size >= this.params.sizeLimit) {
-        logger.info(`Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`);
+        logger.info(
+          `Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`
+        );
         interrupt = true;
       }
     }
@@ -718,7 +973,9 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.timeLimit) {
       const elapsed = secondsElapsed(this.startTime);
       if (elapsed >= this.params.timeLimit) {
-        logger.info(`Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`);
+        logger.info(
+          `Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`
+        );
         interrupt = true;
       }
     }
@@ -734,7 +991,9 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.failOnFailedLimit) {
       const numFailed = this.crawlState.numFailed();
       if (numFailed >= this.params.failOnFailedLimit) {
-        logger.fatal(`Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`);
+        logger.fatal(
+          `Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`
+        );
       }
     }
 
@@ -753,12 +1012,12 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async checkCanceled() {
-    if (this.crawlState && await this.crawlState.isCrawlCanceled()) {
+    if (this.crawlState && (await this.crawlState.isCrawlCanceled())) {
       await this.setStatusAndExit(0, "canceled");
     }
   }
 
-  async setStatusAndExit(exitCode, status) {
+  async setStatusAndExit(exitCode: number, status: string) {
     logger.info(`Exiting, Crawl status: ${status}`);
 
     await this.closeLog();
@@ -799,13 +1058,17 @@ self.__bx_behaviors.selectMainBehavior();
 
   async crawl() {
     if (this.params.healthCheckPort) {
-      this.healthChecker = new HealthChecker(this.params.healthCheckPort, this.params.workers);
+      this.healthChecker = new HealthChecker(
+        this.params.healthCheckPort,
+        this.params.workers
+      );
     }
 
     try {
       const driverUrl = new URL(this.params.driver, import.meta.url);
-      this.driver = (await import(driverUrl)).default;
-    } catch(e) {
+      this.driver = (await import(driverUrl.href)).default;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
       logger.warn(`Error importing driver ${this.params.driver}`, e);
       return;
     }
@@ -841,7 +1104,9 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (POST_CRAWL_STATES.includes(initState)) {
-      logger.info("crawl already finished, running post-crawl tasks", {state: initState});
+      logger.info("crawl already finished, running post-crawl tasks", {
+        state: initState,
+      });
       await this.postCrawl();
       return;
     } else if (await this.crawlState.isCrawlStopped()) {
@@ -857,15 +1122,26 @@ self.__bx_behaviors.selectMainBehavior();
     await this.crawlState.setStatus("running");
 
     if (this.params.state) {
-      await this.crawlState.load(this.params.state, this.params.scopedSeeds, true);
+      await this.crawlState.load(
+        this.params.state,
+        this.params.scopedSeeds,
+        true
+      );
     }
 
     await this.initPages();
 
-    this.adBlockRules = new AdBlockRules(this.captureBasePrefix, this.params.adBlockMessage);
+    this.adBlockRules = new AdBlockRules(
+      this.captureBasePrefix,
+      this.params.adBlockMessage
+    );
 
     if (this.params.blockRules && this.params.blockRules.length) {
-      this.blockRules = new BlockRules(this.params.blockRules, this.captureBasePrefix, this.params.blockMessage);
+      this.blockRules = new BlockRules(
+        this.params.blockRules,
+        this.captureBasePrefix,
+        this.params.blockMessage
+      );
     }
 
     this.screencaster = this.initScreenCaster();
@@ -876,7 +1152,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     for (let i = 0; i < this.params.scopedSeeds.length; i++) {
       const seed = this.params.scopedSeeds[i];
-      if (!await this.queueUrl(i, seed.url, 0, 0)) {
+      if (!(await this.queueUrl(i, seed.url, 0, 0))) {
         if (this.limitHit) {
           break;
         }
@@ -894,14 +1170,19 @@ self.__bx_behaviors.selectMainBehavior();
       chromeOptions: {
         proxy: false,
         userAgent: this.emulateDevice.userAgent,
-        extraArgs: this.extraChromeArgs()
+        extraArgs: this.extraChromeArgs(),
       },
-      ondisconnect: (err) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ondisconnect: (err: any) => {
         this.interrupted = true;
-        logger.error("Browser disconnected (crashed?), interrupting crawl", err, "browser");
-      }
-    });
-
+        logger.error(
+          "Browser disconnected (crashed?), interrupting crawl",
+          err,
+          "browser"
+        );
+      },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
     // --------------
     // Run Crawl Here!
@@ -919,7 +1200,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.writeStats();
 
-
     // if crawl has been stopped, mark as final exit for post-crawl tasks
     if (await this.crawlState.isCrawlStopped()) {
       this.finalExit = true;
@@ -935,36 +1215,48 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.generateCDX) {
       logger.info("Generating CDX");
-      await fsp.mkdir(path.join(this.collDir, "indexes"), {recursive: true});
+      await fsp.mkdir(path.join(this.collDir, "indexes"), { recursive: true });
       await this.crawlState.setStatus("generate-cdx");
 
       const warcList = await fsp.readdir(path.join(this.collDir, "archive"));
-      const warcListFull = warcList.map((filename) => path.join(this.collDir, "archive", filename));
+      const warcListFull = warcList.map((filename) =>
+        path.join(this.collDir, "archive", filename)
+      );
 
       //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
       const params = [
         "-o",
         path.join(this.collDir, "indexes", "index.cdxj"),
-        ...warcListFull
+        ...warcListFull,
       ];
-      const indexResult = await this.awaitProcess(child_process.spawn("cdxj-indexer", params, {cwd: this.params.cwd}));
+      const indexResult = await this.awaitProcess(
+        child_process.spawn("cdxj-indexer", params, { cwd: this.params.cwd })
+      );
       if (indexResult === 0) {
         logger.debug("Indexing complete, CDX successfully created");
       } else {
-        logger.error("Error indexing and generating CDX", {"status code": indexResult});
+        logger.error("Error indexing and generating CDX", {
+          "status code": indexResult,
+        });
       }
     }
 
     logger.info("Crawling done");
 
-    if (this.params.generateWACZ && (!this.interrupted || this.finalExit || this.uploadAndDeleteLocal)) {
+    if (
+      this.params.generateWACZ &&
+      (!this.interrupted || this.finalExit || this.uploadAndDeleteLocal)
+    ) {
       const uploaded = await this.generateWACZ();
 
       if (uploaded && this.uploadAndDeleteLocal) {
-        logger.info(`Uploaded WACZ, deleting local data to free up space: ${this.collDir}`);
+        logger.info(
+          `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`
+        );
         try {
           fs.rmSync(this.collDir, { recursive: true, force: true });
-        } catch(e) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (e: any) {
           logger.warn(`Unable to clear ${this.collDir} before exit`, e);
         }
       }
@@ -980,14 +1272,14 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async closeLog() {
+  async closeLog(): Promise<void> {
     // close file-based log
     logger.setExternalLogStream(null);
     if (!this.logFH) {
       return;
     }
     try {
-      await new Promise(resolve => this.logFH.close(() => resolve()));
+      await new Promise<void>((resolve) => this.logFH.close(() => resolve()));
     } catch (e) {
       // ignore
     }
@@ -1008,7 +1300,7 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info(`Num WARC Files: ${warcFileList.length}`);
     if (!warcFileList.length) {
       // if finished, just return
-      if (isFinished || await this.crawlState.isCrawlCanceled()) {
+      if (isFinished || (await this.crawlState.isCrawlCanceled())) {
         return;
       }
       // if stopped, won't get anymore data
@@ -1031,9 +1323,12 @@ self.__bx_behaviors.selectMainBehavior();
     const createArgs = [
       "create",
       "--split-seeds",
-      "-o", waczPath,
-      "--pages", this.pagesFile,
-      "--log-directory", this.logDir
+      "-o",
+      waczPath,
+      "--pages",
+      this.pagesFile,
+      "--log-directory",
+      this.logDir,
     ];
 
     if (process.env.WACZ_SIGN_URL) {
@@ -1057,13 +1352,17 @@ self.__bx_behaviors.selectMainBehavior();
 
     createArgs.push("-f");
 
-    warcFileList.forEach((val, index) => createArgs.push(path.join(archiveDir, val))); // eslint-disable-line  no-unused-vars
+    warcFileList.forEach((val) =>
+      createArgs.push(path.join(archiveDir, val))
+    );  
 
     // create WACZ
-    const waczResult = await this.awaitProcess(child_process.spawn("wacz" , createArgs));
+    const waczResult = await this.awaitProcess(
+      child_process.spawn("wacz", createArgs)
+    );
 
     if (waczResult !== 0) {
-      logger.error("Error creating WACZ", {"status code": waczResult});
+      logger.error("Error creating WACZ", { "status code": waczResult });
       logger.fatal("Unable to write WACZ successfully");
     }
 
@@ -1094,15 +1393,15 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  awaitProcess(proc) {
-    let stdout = [];
-    let stderr = [];
+  awaitProcess(proc: ChildProcess) {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
 
-    proc.stdout.on("data", (data) => {
+    proc.stdout!.on("data", (data) => {
       stdout.push(data.toString());
     });
 
-    proc.stderr.on("data", (data) => {
+    proc.stderr!.on("data", (data) => {
       stderr.push(data.toString());
     });
 
@@ -1124,7 +1423,15 @@ self.__bx_behaviors.selectMainBehavior();
     const { heapUsed, heapTotal } = memUsage;
     this.maxHeapUsed = Math.max(this.maxHeapUsed || 0, heapUsed);
     this.maxHeapTotal = Math.max(this.maxHeapTotal || 0, heapTotal);
-    logger.debug("Memory", {maxHeapUsed: this.maxHeapUsed, maxHeapTotal: this.maxHeapTotal, ...memUsage}, "memory");
+    logger.debug(
+      "Memory",
+      {
+        maxHeapUsed: this.maxHeapUsed,
+        maxHeapTotal: this.maxHeapTotal,
+        ...memUsage,
+      },
+      "memory"
+    );
   }
 
   async writeStats() {
@@ -1137,14 +1444,14 @@ self.__bx_behaviors.selectMainBehavior();
     const done = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
     const total = realSize + pendingList.length + done;
-    const limit = {max: this.pageLimit || 0, hit: this.limitHit};
+    const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
-      "crawled": done,
-      "total": total,
-      "pending": pendingList.length,
-      "failed": failed,
-      "limit": limit,
-      "pendingPages": pendingList.map(x => JSON.stringify(x))
+      crawled: done,
+      total: total,
+      pending: pendingList.length,
+      failed: failed,
+      limit: limit,
+      pendingPages: pendingList.map((x) => JSON.stringify(x)),
     };
 
     logger.info("Crawl statistics", stats, "crawlStatus");
@@ -1152,25 +1459,33 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.statsFilename) {
       try {
-        await fsp.writeFile(this.params.statsFilename, JSON.stringify(stats, null, 2));
-      } catch (err) {
+        await fsp.writeFile(
+          this.params.statsFilename,
+          JSON.stringify(stats, null, 2)
+        );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (err: any) {
         logger.warn("Stats output failed", err);
       }
     }
   }
 
-  async loadPage(page, data, selectorOptsList = DEFAULT_SELECTORS) {
-    const {url, seedId, depth} = data;
+  async loadPage(
+    page: Page,
+    data: PageState,
+    selectorOptsList = DEFAULT_SELECTORS
+  ) {
+    const { url, seedId, depth } = data;
 
     const logDetails = data.logDetails;
 
-    const failCrawlOnError = ((depth === 0) && this.params.failOnFailedSeed);
+    const failCrawlOnError = depth === 0 && this.params.failOnFailedSeed;
 
     let ignoreAbort = false;
 
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
     // if so, don't report as an error
-    page.once("requestfailed", (req) => {
+    page.once("requestfailed", (req: HTTPRequest) => {
       ignoreAbort = shouldIgnoreAbort(req);
     });
 
@@ -1182,20 +1497,35 @@ self.__bx_behaviors.selectMainBehavior();
       });
     }
 
-    const gotoOpts = isHTMLPage ? this.gotoOpts : {waitUntil: "domcontentloaded"};
+    const gotoOpts = isHTMLPage
+      ? this.gotoOpts
+      : { waitUntil: "domcontentloaded" };
 
     logger.info("Awaiting page load", logDetails);
 
     try {
       const resp = await page.goto(url, gotoOpts);
 
+      if (!resp) {
+        throw new Error("page response missing");
+      }
+
       // Handle 4xx or 5xx response as a page load error
       const statusCode = resp.status();
-      if (statusCode.toString().startsWith("4") || statusCode.toString().startsWith("5")) {
+      if (
+        statusCode.toString().startsWith("4") ||
+        statusCode.toString().startsWith("5")
+      ) {
         if (failCrawlOnError) {
-          logger.fatal("Seed Page Load Error, failing crawl", {statusCode, ...logDetails});
+          logger.fatal("Seed Page Load Error, failing crawl", {
+            statusCode,
+            ...logDetails,
+          });
         } else {
-          logger.error("Non-200 Status Code, skipping page", {statusCode, ...logDetails});
+          logger.error("Non-200 Status Code, skipping page", {
+            statusCode,
+            ...logDetails,
+          });
           throw new Error("logged");
         }
       }
@@ -1203,21 +1533,33 @@ self.__bx_behaviors.selectMainBehavior();
       const contentType = resp.headers()["content-type"];
 
       isHTMLPage = this.isHTMLContentType(contentType);
-
-    } catch (e) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
       const msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         // if timeout error, and at least got to content loaded, continue on
-        if (e.name === "TimeoutError" && data.loadState == LoadState.CONTENT_LOADED) {
-          logger.warn("Page Loading Slowly, skipping behaviors", {msg, ...logDetails});
+        if (
+          e.name === "TimeoutError" &&
+          data.loadState == LoadState.CONTENT_LOADED
+        ) {
+          logger.warn("Page Loading Slowly, skipping behaviors", {
+            msg,
+            ...logDetails,
+          });
           data.skipBehaviors = true;
         } else if (failCrawlOnError) {
           // if fail on error, immediately fail here
-          logger.fatal("Page Load Timeout, failing crawl", {msg, ...logDetails});
+          logger.fatal("Page Load Timeout, failing crawl", {
+            msg,
+            ...logDetails,
+          });
         } else {
           // log if not already log and rethrow
           if (msg !== "logged") {
-            logger.error("Page Load Timeout, skipping page", {msg, ...logDetails});
+            logger.error("Page Load Timeout, skipping page", {
+              msg,
+              ...logDetails,
+            });
             e.message = "logged";
           }
           throw e;
@@ -1230,16 +1572,24 @@ self.__bx_behaviors.selectMainBehavior();
     data.isHTMLPage = isHTMLPage;
 
     if (isHTMLPage) {
-      let frames = await page.frames();
-      frames = await Promise.allSettled(frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)));
+      const frames = await page.frames();
 
-      data.filteredFrames = frames.filter((x) => {
-        if (x.status === "fulfilled") {
-          return !!x.value;
-        }
-        logger.warn("Error in iframe check", {reason: x.reason, ...logDetails});
-        return false;
-      }).map(x => x.value);
+      const filteredFrames = await Promise.allSettled(
+        frames.map((frame) => this.shouldIncludeFrame(frame, logDetails))
+      );
+
+      data.filteredFrames = filteredFrames
+        .filter((x: PromiseSettledResult<Frame | null>) => {
+          if (x.status === "fulfilled") {
+            return !!x.value;
+          }
+          logger.warn("Error in iframe check", {
+            reason: x.reason,
+            ...logDetails,
+          });
+          return false;
+        })
+        .map((x) => (x as PromiseFulfilledResult<Frame>).value);
 
       //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
@@ -1268,7 +1618,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.extractLinks(page, data, selectorOptsList, logDetails);
   }
 
-  async netIdle(page, details) {
+  async netIdle(page: Page, details: LogDetails) {
     if (!this.params.netIdleWait) {
       return;
     }
@@ -1277,40 +1627,57 @@ self.__bx_behaviors.selectMainBehavior();
     await sleep(0.5);
 
     try {
-      await this.browser.waitForNetworkIdle(page, {timeout: this.params.netIdleWait * 1000});
+      await this.browser.waitForNetworkIdle(page, {
+        timeout: this.params.netIdleWait * 1000,
+      });
     } catch (e) {
       logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
     }
   }
 
-  async extractLinks(page, data, selectors = DEFAULT_SELECTORS, logDetails) {
-    const {seedId, depth, extraHops = 0, filteredFrames, callbacks} = data;
+  async extractLinks(
+    page: Page,
+    data: PageState,
+    selectors = DEFAULT_SELECTORS,
+    logDetails: LogDetails
+  ) {
+    const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
-    let links = [];
+    let links: string[] = [];
     const promiseList = [];
 
-    callbacks.addLink = (url) => {
+    callbacks.addLink = (url: string) => {
       links.push(url);
       if (links.length == 500) {
-        promiseList.push(this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails));
+        promiseList.push(
+          this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails)
+        );
         links = [];
       }
     };
 
-    const loadLinks = (options) => {
+    const loadLinks = (options: {
+      selector: string;
+      extract: string;
+      isAttribute: boolean;
+      addLinkFunc: string;
+    }) => {
       const { selector, extract, isAttribute, addLinkFunc } = options;
-      const urls = new Set();
+      const urls = new Set<string>();
 
-      const getAttr = elem => urls.add(elem.getAttribute(extract));
-      const getProp = elem => urls.add(elem[extract]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const getAttr = (elem: any) => urls.add(elem.getAttribute(extract));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const getProp = (elem: any) => urls.add(elem[extract]);
 
       const getter = isAttribute ? getAttr : getProp;
 
       document.querySelectorAll(selector).forEach(getter);
 
-      const func = window[addLinkFunc];
-      urls.forEach(url => func.call(this, url));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const func = (window as any)[addLinkFunc] as (url: string) => NonNullable<unknown>;
+      urls.forEach((url) => func.call(this, url));
 
       return true;
     };
@@ -1318,35 +1685,60 @@ self.__bx_behaviors.selectMainBehavior();
     const frames = filteredFrames || page.frames();
 
     try {
-      for (const {selector = "a[href]", extract = "href", isAttribute = false} of selectors) {
+      for (const {
+        selector = "a[href]",
+        extract = "href",
+        isAttribute = false,
+      } of selectors) {
         const promiseResults = await Promise.allSettled(
-          frames.map(frame => timedRun(
-            frame.evaluate(loadLinks, {selector, extract, isAttribute, addLinkFunc: ADD_LINK_FUNC}),
-            PAGE_OP_TIMEOUT_SECS,
-            "Link extraction timed out",
-            logDetails,
-          ))
+          frames.map((frame) =>
+            timedRun(
+              frame.evaluate(loadLinks, {
+                selector,
+                extract,
+                isAttribute,
+                addLinkFunc: ADD_LINK_FUNC,
+              }),
+              PAGE_OP_TIMEOUT_SECS,
+              "Link extraction timed out",
+              logDetails
+            )
+          )
         );
 
         for (let i = 0; i < promiseResults.length; i++) {
-          const {status, reason} = promiseResults[i];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { status, reason } = promiseResults[i] as any;
           if (status === "rejected") {
-            logger.warn("Link Extraction failed in frame", {reason, frameUrl: frames[i].url, ...logDetails});
+            logger.warn("Link Extraction failed in frame", {
+              reason,
+              frameUrl: frames[i].url,
+              ...logDetails,
+            });
           }
         }
       }
-    } catch (e) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
       logger.warn("Link Extraction failed", e);
     }
 
     if (links.length) {
-      promiseList.push(this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails));
+      promiseList.push(
+        this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails)
+      );
     }
 
     await Promise.allSettled(promiseList);
   }
 
-  async queueInScopeUrls(seedId, urls, depth, extraHops = 0, logDetails = {}) {
+  async queueInScopeUrls(
+    seedId: number,
+    urls: string[],
+    depth: number,
+    extraHops = 0,
+    logDetails: LogDetails = {}
+  ) {
     try {
       depth += 1;
 
@@ -1354,36 +1746,51 @@ self.__bx_behaviors.selectMainBehavior();
       const newExtraHops = extraHops + 1;
 
       for (const possibleUrl of urls) {
-        const res = this.isInScope({url: possibleUrl, extraHops: newExtraHops, depth, seedId}, logDetails);
+        const res = this.isInScope(
+          { url: possibleUrl, extraHops: newExtraHops, depth, seedId },
+          logDetails
+        );
 
         if (!res) {
           continue;
         }
 
-        const {url, isOOS} = res;
+        const { url, isOOS } = res;
 
         if (url) {
-          await this.queueUrl(seedId, url, depth, isOOS ? newExtraHops : extraHops, logDetails);
+          await this.queueUrl(
+            seedId,
+            url,
+            depth,
+            isOOS ? newExtraHops : extraHops,
+            logDetails
+          );
         }
       }
-    } catch (e) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
       logger.error("Queuing Error", e);
     }
   }
 
-  async checkCF(page, logDetails) {
+  async checkCF(page: Page, logDetails: LogDetails) {
     try {
       logger.debug("Check CF Blocking", logDetails);
 
-      while (await timedRun(
-        page.$("div.cf-browser-verification.cf-im-under-attack"),
-        PAGE_OP_TIMEOUT_SECS,
-        "Cloudflare check timed out",
-        logDetails,
-        "general",
-        true
-      )) {
-        logger.debug("Cloudflare Check Detected, waiting for reload...", logDetails);
+      while (
+        await timedRun(
+          page.$("div.cf-browser-verification.cf-im-under-attack"),
+          PAGE_OP_TIMEOUT_SECS,
+          "Cloudflare check timed out",
+          logDetails,
+          "general",
+          true
+        )
+      ) {
+        logger.debug(
+          "Cloudflare Check Detected, waiting for reload...",
+          logDetails
+        );
         await sleep(5.5);
       }
     } catch (e) {
@@ -1391,25 +1798,42 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async queueUrl(seedId, url, depth, extraHops, logDetails = {}) {
+  async queueUrl(
+    seedId: number,
+    url: string,
+    depth: number,
+    extraHops: number,
+    logDetails: LogDetails = {}
+  ) {
     if (this.limitHit) {
       return false;
     }
 
-    const result = await this.crawlState.addToQueue({url, seedId, depth, extraHops}, this.pageLimit);
+    const result = await this.crawlState.addToQueue(
+      { url, seedId, depth, extraHops },
+      this.pageLimit
+    );
 
     switch (result) {
     case QueueState.ADDED:
-      logger.debug("Queued new page url", {url, ...logDetails}, "links");
+      logger.debug("Queued new page url", { url, ...logDetails }, "links");
       return true;
 
     case QueueState.LIMIT_HIT:
-      logger.debug("Not queued page url, at page limit", {url, ...logDetails}, "links");
+      logger.debug(
+        "Not queued page url, at page limit",
+        { url, ...logDetails },
+        "links"
+      );
       this.limitHit = true;
       return false;
 
     case QueueState.DUPE_URL:
-      logger.debug("Not queued page url, already seen", {url, ...logDetails}, "links");
+      logger.debug(
+        "Not queued page url, already seen",
+        { url, ...logDetails },
+        "links"
+      );
       return false;
     }
 
@@ -1421,7 +1845,7 @@ self.__bx_behaviors.selectMainBehavior();
       let createNew = false;
 
       // create pages dir if doesn't exist and write pages.jsonl header
-      if (fs.existsSync(this.pagesDir) != true){
+      if (fs.existsSync(this.pagesDir) != true) {
         await fsp.mkdir(this.pagesDir);
         createNew = true;
       }
@@ -1429,7 +1853,11 @@ self.__bx_behaviors.selectMainBehavior();
       this.pagesFH = await fsp.open(this.pagesFile, "a");
 
       if (createNew) {
-        const header = {"format": "json-pages-1.0", "id": "pages", "title": "All Pages"};
+        const header: Record<string, string> = {
+          format: "json-pages-1.0",
+          id: "pages",
+          title: "All Pages",
+        };
         header["hasText"] = this.params.text.includes("to-pages");
         if (this.params.text.length) {
           logger.debug("Text Extraction: " + this.params.text.join(","));
@@ -1439,14 +1867,23 @@ self.__bx_behaviors.selectMainBehavior();
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
       }
-
-    } catch(err) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
       logger.error("pages/pages.jsonl creation failed", err);
     }
   }
 
-  async writePage({pageid, url, depth, title, text, loadState, mime, favicon}) {
-    const row = {id: pageid, url, title, loadState};
+  async writePage({
+    pageid,
+    url,
+    depth,
+    title,
+    text,
+    loadState,
+    mime,
+    favicon,
+  }: PageState) {
+    const row: PageEntry = { id: pageid!, url, title, loadState };
 
     if (mime) {
       row.mime = mime;
@@ -1466,38 +1903,42 @@ self.__bx_behaviors.selectMainBehavior();
 
     const processedRow = JSON.stringify(row) + "\n";
     try {
-      await this.pagesFH.writeFile(processedRow);
-    } catch (err) {
+      await this.pagesFH!.writeFile(processedRow);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
       logger.warn("pages/pages.jsonl append failed", err);
     }
   }
 
-  resolveAgent(urlParsed) {
+  resolveAgent(urlParsed: URL) {
     return urlParsed.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT;
   }
 
-  async isHTML(url, logDetails) {
+  async isHTML(url: string, logDetails: LogDetails) {
     try {
       const resp = await fetch(url, {
         method: "HEAD",
         headers: this.headers,
-        agent: this.resolveAgent
-      });
+        agent: this.resolveAgent,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
       if (resp.status !== 200) {
-        logger.debug("HEAD response code != 200, loading in browser", {status: resp.status, ...logDetails});
+        logger.debug("HEAD response code != 200, loading in browser", {
+          status: resp.status,
+          ...logDetails,
+        });
         return true;
       }
 
       return this.isHTMLContentType(resp.headers.get("Content-Type"));
-
-    } catch(e) {
+    } catch (e) {
       // can't confirm not html, so try in browser
-      logger.debug("HEAD request failed", {...errJSON(e), ...logDetails});
+      logger.debug("HEAD request failed", { ...errJSON(e), ...logDetails });
       return true;
     }
   }
 
-  isHTMLContentType(contentType) {
+  isHTMLContentType(contentType: string | null) {
     // just load if no content-type
     if (!contentType) {
       return true;
@@ -1512,29 +1953,39 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async parseSitemap(url, seedId, sitemapFromDate) {
+  async parseSitemap(url: string, seedId: number, sitemapFromDate: number) {
     // handle sitemap last modified date if passed
-    let lastmodFromTimestamp = null;
+    let lastmodFromTimestamp = undefined;
     const dateObj = new Date(sitemapFromDate);
     if (isNaN(dateObj.getTime())) {
-      logger.info("Fetching full sitemap (fromDate not specified/valid)", {url, sitemapFromDate}, "sitemap");
+      logger.info(
+        "Fetching full sitemap (fromDate not specified/valid)",
+        { url, sitemapFromDate },
+        "sitemap"
+      );
     } else {
       lastmodFromTimestamp = dateObj.getTime();
-      logger.info("Fetching and filtering sitemap by date", {url, sitemapFromDate}, "sitemap");
+      logger.info(
+        "Fetching and filtering sitemap by date",
+        { url, sitemapFromDate },
+        "sitemap"
+      );
     }
 
-    const sitemapper = new Sitemapper({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sitemapper = new (Sitemapper as any)({
       url,
       timeout: 15000,
       requestHeaders: this.headers,
-      lastmod: lastmodFromTimestamp
+      lastmod: lastmodFromTimestamp,
     });
 
     try {
       const { sites } = await sitemapper.fetch();
-      logger.info("Sitemap Urls Found", {urls: sites.length}, "sitemap");
+      logger.info("Sitemap Urls Found", { urls: sites.length }, "sitemap");
       await this.queueInScopeUrls(seedId, sites, 0);
-    } catch(e) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
       logger.warn("Error fetching sites from sitemap", e, "sitemap");
     }
   }
@@ -1554,7 +2005,7 @@ self.__bx_behaviors.selectMainBehavior();
     for (let i = 0; i < warcLists.length; i++) {
       const fileName = path.join(this.collDir, "archive", warcLists[i]);
       const fileSize = await getFileSize(fileName);
-      fileSizeObjects.push({"fileSize": fileSize, "fileName": fileName});
+      fileSizeObjects.push({ fileSize: fileSize, fileName: fileName });
       fileSizeObjects.sort((a, b) => b.fileSize - a.fileSize);
     }
 
@@ -1571,7 +2022,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     // Iterate through the sorted file size array.
     for (let j = 0; j < fileSizeObjects.length; j++) {
-
       // if need to rollover to new warc
       let doRollover = false;
 
@@ -1583,9 +2033,10 @@ self.__bx_behaviors.selectMainBehavior();
         const currentCombinedWarcSize = await getFileSize(combinedWarcFullPath);
 
         //  If adding the current warc to the existing combined file creates a file smaller than the rollover size add the data to the combinedWarc
-        const proposedWarcSize = fileSizeObjects[j].fileSize + currentCombinedWarcSize;
+        const proposedWarcSize =
+          fileSizeObjects[j].fileSize + currentCombinedWarcSize;
 
-        doRollover = (proposedWarcSize >= this.params.rolloverSize);
+        doRollover = proposedWarcSize >= this.params.rolloverSize;
       }
 
       if (doRollover) {
@@ -1605,7 +2056,7 @@ self.__bx_behaviors.selectMainBehavior();
           fh.end();
         }
 
-        fh = fs.createWriteStream(combinedWarcFullPath, {flags: "a"});
+        fh = fs.createWriteStream(combinedWarcFullPath, { flags: "a" });
 
         generatedCombinedWarcs.push(combinedWarcName);
 
@@ -1617,11 +2068,13 @@ self.__bx_behaviors.selectMainBehavior();
 
       const reader = fs.createReadStream(fileSizeObjects[j].fileName);
 
-      const p = new Promise((resolve) => {
+      const p = new Promise<void>((resolve) => {
         reader.on("end", () => resolve());
       });
 
-      reader.pipe(fh, {end: false});
+      if (fh) {
+        reader.pipe(fh, { end: false });
+      }
 
       await p;
     }
@@ -1656,18 +2109,20 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (!done) {
       // if not done, save state only after specified interval has elapsed
-      if (secondsElapsed(this.lastSaveTime, now) < this.params.saveStateInterval) {
+      if (
+        secondsElapsed(this.lastSaveTime, now) < this.params.saveStateInterval
+      ) {
         return;
       }
     }
 
     this.lastSaveTime = now.getTime();
 
-    const ts = now.toISOString().slice(0,19).replace(/[T:-]/g, "");
+    const ts = now.toISOString().slice(0, 19).replace(/[T:-]/g, "");
 
     const crawlDir = path.join(this.collDir, "crawls");
 
-    await fsp.mkdir(crawlDir, {recursive: true});
+    await fsp.mkdir(crawlDir, { recursive: true });
 
     const filenameOnly = `crawl-${ts}-${this.params.crawlId}.yaml`;
 
@@ -1678,11 +2133,12 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.origConfig) {
       this.origConfig.state = state;
     }
-    const res = yaml.dump(this.origConfig, {lineWidth: -1});
+    const res = yaml.dump(this.origConfig, { lineWidth: -1 });
     try {
       logger.info(`Saving crawl state to: ${filename}`);
       await fsp.writeFile(filename, res);
-    } catch (e) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
       logger.error(`Failed to write save state file: ${filename}`, e);
       return;
     }
@@ -1693,7 +2149,7 @@ self.__bx_behaviors.selectMainBehavior();
       const oldFilename = this.saveStateFiles.shift();
       logger.info(`Removing old save-state: ${oldFilename}`);
       try {
-        await fsp.unlink(oldFilename);
+        await fsp.unlink(oldFilename || "");
       } catch (e) {
         logger.error(`Failed to delete old save state file: ${oldFilename}`);
       }
@@ -1707,10 +2163,11 @@ self.__bx_behaviors.selectMainBehavior();
   }
 }
 
-function shouldIgnoreAbort(req) {
+function shouldIgnoreAbort(req: HTTPRequest) {
   try {
-    const failure = req.failure() && req.failure().errorText;
-    if (failure !== "net::ERR_ABORTED" || req.resourceType() !== "document") {
+    const failure = req.failure();
+    const failureText = failure && failure.errorText || "";
+    if (failureText !== "net::ERR_ABORTED" || req.resourceType() !== "document") {
       return false;
     }
 
@@ -1728,5 +2185,7 @@ function shouldIgnoreAbort(req) {
   } catch (e) {
     return false;
   }
+
+  return false;
 }
 

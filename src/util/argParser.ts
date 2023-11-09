@@ -4,7 +4,7 @@ import os from "os";
 
 import yaml from "js-yaml";
 import { KnownDevices as devices } from "puppeteer-core";
-import yargs from "yargs";
+import yargs, { Options } from "yargs";
 import { hideBin } from "yargs/helpers";
 
 import { BEHAVIOR_LOG_FUNC, WAIT_UNTIL_OPTS, EXTRACT_TEXT_TYPES } from "./constants.js";
@@ -16,8 +16,8 @@ import { logger } from "./logger.js";
 
 // ============================================================================
 class ArgParser {
-  get cliOpts() {
-    const coerce = array => {
+  get cliOpts() : { [key: string]: Options } {
+    const coerce = (array : string[]) => {
       return array.flatMap(v => v.split(",")).filter(x => !!x);
     };
 
@@ -305,7 +305,7 @@ class ArgParser {
       "warcInfo": {
         alias: ["warcinfo"],
         describe: "Optional fields added to the warcinfo record in combined WARCs",
-        type: "object"
+        //type: "object"
       },
 
       "redisStoreUrl": {
@@ -423,7 +423,7 @@ class ArgParser {
 
       "customBehaviors": {
         describe: "injects a custom behavior file or set of behavior files in a directory",
-        type: ["string"]
+        type: "string"
       },
 
       "debugAccessRedis": {
@@ -433,8 +433,8 @@ class ArgParser {
     };
   }
 
-  parseArgs(argv) {
-    argv = argv || process.argv;
+  parseArgs(argvParams?: string[]) {
+    let argv = argvParams || process.argv;
 
     if (process.env.CRAWL_ARGS) {
       argv = argv.concat(this.splitCrawlArgsQuoteSafe(process.env.CRAWL_ARGS));
@@ -445,11 +445,12 @@ class ArgParser {
     const parsed = yargs(hideBin(argv))
       .usage("crawler [options]")
       .option(this.cliOpts)
-      .config("config", "Path to YAML config file", (configPath) => {
+      .config("config", "Path to YAML config file", (configPath : string | number) => {
         if (configPath === "/crawls/stdin") {
           configPath = process.stdin.fd;
         }
-        origConfig = yaml.load(fs.readFileSync(configPath, "utf8"));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        origConfig = yaml.load(fs.readFileSync(configPath, "utf8")) as any;
         return origConfig;
       })
       .check((argv) => this.validateArgs(argv))
@@ -458,13 +459,15 @@ class ArgParser {
     return {parsed, origConfig};
   }
 
-  splitCrawlArgsQuoteSafe(crawlArgs) {
+  splitCrawlArgsQuoteSafe(crawlArgs: string) : string[] {
     // Split process.env.CRAWL_ARGS on spaces but retaining spaces within double quotes
     const regex = /"[^"]+"|[^\s]+/g;
-    return crawlArgs.match(regex).map(e => e.replace(/"(.+)"/, "$1"));
+    const res = crawlArgs.match(regex);
+    return res ? res.map(e => e.replace(/"(.+)"/, "$1")) : [];
   }
 
-  validateArgs(argv) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  validateArgs(argv: Record<string, any>) {
     argv.crawlId = argv.crawlId || process.env.CRAWL_ID || os.hostname;
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
 
@@ -474,15 +477,16 @@ class ArgParser {
     }
 
     // background behaviors to apply
-    const behaviorOpts = {};
-    argv.behaviors.forEach((x) => behaviorOpts[x] = true);
+    const behaviorOpts : {[key: string]: string | boolean} = {};
+    argv.behaviors.forEach((x: string) => behaviorOpts[x] = true);
     behaviorOpts.log = BEHAVIOR_LOG_FUNC;
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 
     argv.text = argv.text || [];
 
     if (argv.mobileDevice) {
-      argv.emulateDevice = devices[argv.mobileDevice.replace("-", " ")];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      argv.emulateDevice = (devices as Record<string, any>)[argv.mobileDevice.replace("-", " ")];
       if (!argv.emulateDevice) {
         logger.fatal("Unknown device: " + argv.mobileDevice);
       }
@@ -556,6 +560,6 @@ class ArgParser {
   }
 }
 
-export function parseArgs(argv) {
+export function parseArgs(argv?: string[]) {
   return new ArgParser().parseArgs(argv);
 }

@@ -6,6 +6,8 @@ import { logger, errJSON } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
 import { Recorder } from "./recorder.js";
 import { rxEscape } from "./seeds.js";
+import { CDPSession, Page } from "puppeteer-core";
+import { PageState, WorkerId } from "./state.js";
 
 const MAX_REUSE = 5;
 
@@ -14,7 +16,9 @@ const TEARDOWN_TIMEOUT = 10;
 const FINISHED_TIMEOUT = 60;
 
 // ===========================================================================
-export function runWorkers(crawler, numWorkers, maxPageTime, collDir) {
+// TODO: Fix this the next time the file is edited.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function runWorkers(crawler: any, numWorkers: number, maxPageTime: number, collDir: string) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
   const workers = [];
@@ -29,13 +33,13 @@ export function runWorkers(crawler, numWorkers, maxPageTime, collDir) {
     const rx = new RegExp(rxEscape(process.env.CRAWL_ID) + "\\-([\\d]+)$");
     const m = os.hostname().match(rx);
     if (m) {
-      offset = m[1] * numWorkers;
+      offset = Number(m[1]) * numWorkers;
       logger.info("Starting workerid index at " + offset, "worker");
     }
   }
 
   for (let i = 0; i < numWorkers; i++) {
-    workers.push(new PageWorker(i + offset, crawler, maxPageTime, collDir));
+    workers.push(new PageWorker((i + offset), crawler, maxPageTime, collDir));
   }
 
   return Promise.allSettled(workers.map((worker) => worker.run()));
@@ -43,25 +47,58 @@ export function runWorkers(crawler, numWorkers, maxPageTime, collDir) {
 
 
 // ===========================================================================
+// TODO: Fix this the next time the file is edited.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WorkerOpts = Record<string, any> & {
+  page: Page;
+  cdp: CDPSession;
+  workerid: WorkerId;
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  callbacks: Record<string, Function>;
+  directFetchCapture?: ((url: string) => Promise<{fetched: boolean, mime: string}>) | null;
+};
+
+// ===========================================================================
+export type WorkerState = WorkerOpts & {
+  data: PageState
+};
+
+// ===========================================================================
 export class PageWorker
 {
-  constructor(id, crawler, maxPageTime, collDir) {
+  id: WorkerId;
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  crawler: any;
+  maxPageTime: number;
+
+  reuseCount = 0;
+  page?: Page | null;
+  cdp?: CDPSession | null;
+
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  callbacks?: Record<string, Function>;
+
+  opts?: WorkerOpts;
+
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  logDetails: Record<string, any> = {};
+
+  crashed = false;
+  markCrashed?: (reason: string) => void;
+  crashBreak?: Promise<void>;
+
+  recorder: Recorder;
+
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(id: WorkerId, crawler: any, maxPageTime: number, collDir: string) {
     this.id = id;
     this.crawler = crawler;
     this.maxPageTime = maxPageTime;
 
-    this.reuseCount = 0;
-    this.page = null;
-    this.cdp = null; 
-    this.callbacks = null;
-
-    this.opts = null;
-
     this.logDetails = {workerid: this.id};
-
-    this.crashed = false;
-    this.markCrashed = null;
-    this.crashBreak = null;
 
     this.recorder = new Recorder({workerid: id, collDir, crawler: this.crawler});
 
@@ -108,9 +145,9 @@ export class PageWorker
     }
   }
 
-  isSameOrigin(url) {
+  isSameOrigin(url: string) {
     try {
-      const currURL = new URL(this.page.url());
+      const currURL = new URL(this.page ? this.page.url() : "");
       const newURL = new URL(url);
       return currURL.origin === newURL.origin;
     } catch (e) {
@@ -118,8 +155,8 @@ export class PageWorker
     }
   }
 
-  async initPage(url) {
-    if (!this.crashed && this.page && ++this.reuseCount <= MAX_REUSE && this.isSameOrigin(url)) {
+  async initPage(url: string) : Promise<WorkerOpts> {
+    if (!this.crashed && this.page && this.opts && ++this.reuseCount <= MAX_REUSE && this.isSameOrigin(url)) {
       logger.debug("Reusing page", {reuseCount: this.reuseCount, ...this.logDetails}, "worker");
       return this.opts;
     } else if (this.page) {
@@ -151,10 +188,10 @@ export class PageWorker
         this.page = page;
         this.cdp = cdp;
         this.callbacks = {};
-        const directFetchCapture = this.recorder ? (x) => this.recorder.directFetchCapture(x) : null;
+        const directFetchCapture = this.recorder ? (x: string) => this.recorder.directFetchCapture(x) : null;
         this.opts = {
-          page: this.page,
-          cdp: this.cdp,
+          page,
+          cdp,
           workerid,
           callbacks: this.callbacks,
           directFetchCapture,
@@ -168,15 +205,19 @@ export class PageWorker
         this.crashed = false;
         this.crashBreak = new Promise((resolve, reject) => this.markCrashed = reject);
 
-        this.logDetails = {page: this.page.url(), workerid};
+        this.logDetails = {page: page.url(), workerid};
 
         // more serious page crash, mark as failed
-        this.page.on("error", (err) => {
+        // TODO: Fix this the next time the file is edited.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        page.on("error", (err: any) => {
           // ensure we're still on this page, otherwise ignore!
           if (this.page === page) {
             logger.error("Page Crashed", {...errJSON(err), ...this.logDetails}, "worker");
             this.crashed = true;
-            this.markCrashed("crashed");
+            if (this.markCrashed) {
+              this.markCrashed("crashed");
+            }
           }
         });
 
@@ -204,9 +245,11 @@ export class PageWorker
         }
       }
     }
+
+    throw new Error("no page available, shouldn't get here");
   }
 
-  async crawlPage(opts) {
+  async crawlPage(opts: WorkerState) {
     const res = await this.crawler.crawlPage(opts);
     if (this.recorder) {
       await this.recorder.finishPage();
@@ -214,7 +257,7 @@ export class PageWorker
     return res;
   }
 
-  async timedCrawlPage(opts) {
+  async timedCrawlPage(opts: WorkerState) {
     const workerid = this.id;
     const { data } = opts;
     const { url } = data;
@@ -244,7 +287,7 @@ export class PageWorker
       ]);
 
     } catch (e) {
-      if (e.message !== "logged" && !this.crashed) {
+      if (e instanceof Error && e.message !== "logged" && !this.crashed) {
         logger.error("Worker Exception", {...errJSON(e), ...this.logDetails}, "worker");
       }
     } finally {
@@ -317,7 +360,7 @@ export class PageWorker
           await sleep(0.5);
         } else {
           // if no pending and queue size is still empty, we're done!
-          if (!await crawlState.queueSize()) {
+          if (!(await crawlState.queueSize())) {
             break;
           }
         }

@@ -1,60 +1,144 @@
+import { Redis, Result, Callback } from "ioredis";
+
 import { logger } from "./logger.js";
 
 import { MAX_DEPTH } from "./constants.js";
+import { ScopedSeed } from "./seeds.js";
+import { Frame } from "puppeteer-core";
 
 
 // ============================================================================
-export const LoadState = {
-  FAILED: 0,
-  CONTENT_LOADED: 1,
-  FULL_PAGE_LOADED: 2,
-  EXTRACTION_DONE: 3,
-  BEHAVIORS_DONE: 4,
-};
+export enum LoadState {
+  FAILED = 0,
+  CONTENT_LOADED = 1,
+  FULL_PAGE_LOADED = 2,
+  EXTRACTION_DONE = 3,
+  BEHAVIORS_DONE = 4,
+}
 
 
 // ============================================================================
-export const QueueState = {
-  ADDED: 0,
-  LIMIT_HIT: 1,
-  DUPE_URL: 2,
-};
+export enum QueueState {
+  ADDED = 0,
+  LIMIT_HIT = 1,
+  DUPE_URL = 2,
+}
+
+
+// ============================================================================
+export type WorkerId = number;
 
 
 // ============================================================================
 export class PageState
 {
-  constructor(redisData) {
+  url: string;
+  seedId: number;
+  depth: number;
+  extraHops: number;
+
+  workerid!: WorkerId;
+
+  pageid?: string;
+  title?: string;
+  mime?: string;
+
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  callbacks: any;
+
+  isHTMLPage?: boolean;
+  text?: string;
+  favicon?: string;
+
+  skipBehaviors = false;
+  filteredFrames: Frame[] = [];
+  loadState : LoadState = LoadState.FAILED;
+
+  logDetails = {};
+
+  constructor(redisData: {url: string, seedId: number, depth: number, extraHops: number}) {
     this.url = redisData.url;
     this.seedId = redisData.seedId;
     this.depth = redisData.depth;
     this.extraHops = redisData.extraHops;
-
-    this.workerid = null;
-    this.pageid = null;
-    this.title = null;
-
-    this.isHTMLPage = null;
-    this.text = null;
-
-    this.skipBehaviors = false;
-    this.filteredFrames = [];
-
-    this.loadState = LoadState.FAILED;
-    this.logDetails = {};
   }
 }
 
+// ============================================================================
+declare module "ioredis" {
+  interface RedisCommander<Context> {
+    addqueue(
+      pkey: string,
+      qkey: string,
+      skey: string,
+      url: string,
+      score: number,
+      data: string,
+      limit: number,
+    ): Result<number, Context>;
+
+    getnext(
+      qkey: string,
+      pkey: string,
+    ): Result<string, Context>;
+
+    markstarted(
+      pkey: string,
+      pkeyUrl: string,
+      url: string,
+      started: string,
+      maxPageTime: number,
+      uid: string,
+    ): Result<void, Context>;
+
+    movefailed(
+      pkey: string,
+      fkey: string,
+      url: string,
+      value: string,
+      state: string,
+    ): Result<void, Context>;
+
+    unlockpending(
+      pkeyUrl: string,
+      uid: string,
+      callback?: Callback<string>
+    ): Result<void, Context>;
+
+    requeue(
+      pkey: string,
+      qkey: string,
+      pkeyUrl: string,
+      url: string,
+      maxRetryPending: number,
+    ): Result<number, Context>;
+
+  }
+}
 
 // ============================================================================
 export class RedisCrawlState
 {
-  constructor(redis, key, maxPageTime, uid) {
+  redis: Redis;
+  maxRetryPending = 1;
+  _lastSize = 0;
+
+  uid: string;
+  key: string;
+  maxPageTime: number;
+
+  qkey: string;
+  pkey: string;
+  skey: string;
+  dkey: string;
+  fkey: string;
+  ekey: string;
+  
+  constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
 
-    this.maxRetryPending = 1;
 
-    this._lastSize = 0;
 
     this.uid = uid;
     this.key = key;
@@ -73,7 +157,7 @@ export class RedisCrawlState
     this._initLuaCommands(this.redis);
   }
 
-  _initLuaCommands(redis) {
+  _initLuaCommands(redis: Redis) {
     redis.defineCommand("addqueue", {
       numberOfKeys: 3,
       lua: `
@@ -184,58 +268,58 @@ return 0;
     return new Date().toISOString();
   }
 
-  async markStarted(url) {
+  async markStarted(url: string) {
     const started = this._timestamp();
 
     return await this.redis.markstarted(this.pkey, this.pkey + ":" + url, url, started, this.maxPageTime, this.uid);
   }
 
-  async markFinished(url) {
+  async markFinished(url: string) {
     await this.redis.hdel(this.pkey, url);
 
     return await this.redis.incr(this.dkey);
   }
 
-  async markFailed(url) {
+  async markFailed(url: string) {
     await this.redis.movefailed(this.pkey, this.fkey, url, "1", "failed");
 
     return await this.redis.incr(this.dkey);
   }
 
-  async markExcluded(url) {
+  async markExcluded(url: string) {
     await this.redis.hdel(this.pkey, url);
 
     await this.redis.srem(this.skey, url);
   }
 
-  recheckScope(data, seeds) {
+  recheckScope(data: {url: string, depth: number, extraHops: number, seedId: number}, seeds: ScopedSeed[]) {
     const seed = seeds[data.seedId];
 
     return seed.isIncluded(data.url, data.depth, data.extraHops);
   }
 
   async isFinished() {
-    return (await this.queueSize() == 0) && (await this.numDone() > 0);
+    return ((await this.queueSize()) == 0) && ((await this.numDone()) > 0);
   }
 
-  async setStatus(status_) {
+  async setStatus(status_: string) {
     await this.redis.hset(`${this.key}:status`, this.uid, status_);
   }
 
-  async getStatus() {
-    return await this.redis.hget(`${this.key}:status`, this.uid);
+  async getStatus() : Promise<string> {
+    return (await this.redis.hget(`${this.key}:status`, this.uid)) || "";
   }
 
-  async setArchiveSize(size) {
+  async setArchiveSize(size: number) {
     return await this.redis.hset(`${this.key}:size`, this.uid, size);
   }
 
   async isCrawlStopped() {
-    if (await this.redis.get(`${this.key}:stopping`) === "1") {
+    if ((await this.redis.get(`${this.key}:stopping`)) === "1") {
       return true;
     }
 
-    if (await this.redis.hget(`${this.key}:stopone`, this.uid) === "1") {
+    if ((await this.redis.hget(`${this.key}:stopone`, this.uid)) === "1") {
       return true;
     }
 
@@ -243,7 +327,7 @@ return 0;
   }
 
   async isCrawlCanceled() {
-    return await this.redis.get(`${this.key}:canceled`) === "1";
+    return (await this.redis.get(`${this.key}:canceled`)) === "1";
   }
 
   // note: not currently called in crawler, but could be
@@ -252,7 +336,7 @@ return 0;
     await this.redis.set(`${this.key}:stopping`, "1");
   }
 
-  async processMessage(seeds) {
+  async processMessage(seeds: ScopedSeed[]) {
     while (true) {
       const result = await this.redis.lpop(`${this.uid}:msg`);
       if (!result) {
@@ -285,18 +369,20 @@ return 0;
           }
           break;
         }
-      } catch (e) {
+      } // TODO: Fix this the next time the file is edited.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      catch (e: any) {
         logger.warn("Error processing message", e, "redisMessage");
       }
     }
   }
 
-  isStrMatch(s) {
+  isStrMatch(s: string) {
     // if matches original string, then consider not a regex
     return s.replace(/\\/g, "").replace(/[\\^$*+?.()|[\]{}]/g, "\\$&") === s;
   }
 
-  filterQueue(regexStr) {
+  filterQueue(regexStr: string) {
     const regex = new RegExp(regexStr);
 
     let matcher = undefined;
@@ -325,7 +411,7 @@ return 0;
       stream.resume();
     });
 
-    return new Promise(resolve => {
+    return new Promise<void>(resolve => {
       stream.on("end", () => {
         resolve();
       });
@@ -341,9 +427,12 @@ return 0;
     return (res >= 3);
   }
 
-  async addToQueue({url, seedId, depth = 0, extraHops = 0} = {}, limit = 0) {
+  //async addToQueue({url : string, seedId, depth = 0, extraHops = 0} = {}, limit = 0) {
+  async addToQueue({url, seedId, depth = 0, extraHops = 0} : {url: string, seedId: number, depth?: number, extraHops?: number}, limit = 0) {
     const added = this._timestamp();
-    const data = {added, url, seedId, depth};
+    // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data : any = {added, url, seedId, depth};
     if (extraHops) {
       data.extraHops = extraHops;
     }
@@ -375,8 +464,8 @@ return 0;
     return new PageState(data);
   }
 
-  async has(url) {
-    return !!await this.redis.sismember(this.skey, url);
+  async has(url: string) {
+    return !!(await this.redis.sismember(this.skey, url));
   }
 
   async serialize() {
@@ -390,25 +479,25 @@ return 0;
     return {done, queued, pending, failed, errors};
   }
 
-  _getScore(data) {
+  _getScore(data: {depth: number, extraHops: number}) {
     return (data.depth || 0) + (data.extraHops || 0) * MAX_DEPTH;
   }
 
-  async _iterSortedKey(key, inc = 100) {
-    const results = [];
+  async _iterSortedKey(key: string, inc = 100) {
+    const results : string[] = [];
 
     const len = await this.redis.zcard(key);
 
     for (let i = 0; i < len; i += inc) {
-      const someResults = await this.redis.zrangebyscore(key, 0, "inf", "limit", i, inc);
+      const someResults = await this.redis.zrangebyscore(key, 0, "inf", "LIMIT", i, inc);
       results.push(...someResults);
     }
 
     return results;
   }
 
-  async _iterListKeys(key, inc = 100) {
-    const results = [];
+  async _iterListKeys(key: string, inc = 100) {
+    const results : string[] = [];
 
     const len = await this.redis.llen(key);
 
@@ -419,8 +508,10 @@ return 0;
     return results;
   }
 
-  async load(state, seeds, checkScope) {
-    const seen = [];
+  // TODO: Fix this the next time the file is edited.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async load(state: Record<string, any>, seeds: ScopedSeed[], checkScope: boolean) {
+    const seen : string[] = [];
 
     // need to delete existing keys, if exist to fully reset state
     await this.redis.del(this.qkey);
@@ -486,7 +577,7 @@ return 0;
 
   async numDone() {
     const done = await this.redis.get(this.dkey);
-    return parseInt(done);
+    return parseInt(done || "0");
   }
 
   async numSeen() {
@@ -524,7 +615,9 @@ return 0;
       for (const url of pendingUrls) {
         await this.redis.unlockpending(this.pkey + ":" + url, this.uid);
       }
-    } catch (e) {
+    } // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    catch (e: any) {
       logger.error("Redis Del Pending Failed", e, "state");
     }
   }
@@ -551,15 +644,15 @@ return 0;
     return this._lastSize;
   }
 
-  async addIfNoDupe(key, value) {
-    return await this.redis.sadd(key, value) === 1;
+  async addIfNoDupe(key: string, value: string) {
+    return (await this.redis.sadd(key, value)) === 1;
   }
 
-  async removeDupe(key, value) {
+  async removeDupe(key: string, value: string) {
     return await this.redis.srem(key, value);
   }
 
-  async logError(error) {
+  async logError(error: string) {
     return await this.redis.lpush(this.ekey, error);
   }
 }

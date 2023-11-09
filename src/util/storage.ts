@@ -5,20 +5,40 @@ import util from "util";
 
 import os from "os";
 import { createHash } from "crypto";
+
 import crc32 from "crc/crc32";
 
-import Minio from "minio";
+import * as Minio from "minio";
 
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 
+// @ts-expect-error TODO fill in why error is expected
 import getFolderSize from "get-folder-size";
 
 
 // ===========================================================================
 export class S3StorageSync
 {
-  constructor(urlOrData, {webhookUrl, userId, crawlId} = {}) {
+  fullPrefix: string;
+  client: Minio.Client;
+
+  bucketName: string;
+  objectPrefix: string;
+  resources: object[] = [];
+
+  userId: string;
+  crawlId: string;
+  webhookUrl?: string;
+
+  // TODO: Fix this the next time the file is edited.
+   
+  constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    urlOrData: string | any,
+    {webhookUrl, userId, crawlId} : 
+        {webhookUrl?: string, userId: string, crawlId: string}
+  ) {
     let url;
     let accessKey;
     let secretKey;
@@ -47,8 +67,6 @@ export class S3StorageSync
       partSize: 100*1024*1024
     });
 
-    this.client.enableSHA256 = true;
-
     this.bucketName = url.pathname.slice(1).split("/")[0];
 
     this.objectPrefix = url.pathname.slice(this.bucketName.length + 2);
@@ -60,12 +78,12 @@ export class S3StorageSync
     this.webhookUrl = webhookUrl;
   }
 
-  async uploadFile(srcFilename, targetFilename) {
+  async uploadFile(srcFilename: string, targetFilename: string) {
     const fileUploadInfo = {
       "bucket": this.bucketName,
       "crawlId": this.crawlId,
       "prefix": this.objectPrefix,
-      "targetFilename": this.targetFilename
+      targetFilename
     };
     logger.info("S3 file upload information", fileUploadInfo, "s3Upload");
 
@@ -80,13 +98,13 @@ export class S3StorageSync
     return {path, size, hash, crc32, bytes: size};
   }
 
-  async downloadFile(srcFilename, destFilename) {
+  async downloadFile(srcFilename: string, destFilename: string) {
     await this.client.fGetObject(this.bucketName, this.objectPrefix + srcFilename, destFilename);
   }
 
-  async uploadCollWACZ(srcFilename, targetFilename, completed = true) {
+  async uploadCollWACZ(srcFilename: string, targetFilename: string, completed = true) {
     const resource = await this.uploadFile(srcFilename, targetFilename);
-    logger.info("WACZ S3 file upload resource", {...targetFilename, resource}, "s3Upload");
+    logger.info("WACZ S3 file upload resource", {targetFilename, resource}, "s3Upload");
 
     if (this.webhookUrl) {
       const body = {
@@ -130,8 +148,8 @@ export function initStorage() {
 
   const opts = {
     crawlId: process.env.CRAWL_ID || os.hostname(),
-    webhookUrl: process.env.WEBHOOK_URL,
-    userId: process.env.STORE_USER,
+    webhookUrl: process.env.WEBHOOK_URL || "",
+    userId: process.env.STORE_USER || "",
   };
 
   logger.info("Initing Storage...");
@@ -139,12 +157,12 @@ export function initStorage() {
 }
 
 
-export async function getFileSize(filename) {
+export async function getFileSize(filename: string) {
   const stats = await fsp.stat(filename);
   return stats.size;
 }
 
-export async function getDirSize(dir) {
+export async function getDirSize(dir: string) {
   const { size, errors } = await getFolderSize(dir);
   if (errors && errors.length) {
     logger.warn("Size check errors", {errors}, "sizecheck");
@@ -152,8 +170,10 @@ export async function getDirSize(dir) {
   return size;
 }
 
-export async function checkDiskUtilization(params, archiveDirSize, dfOutput=null) {
-  const diskUsage = await getDiskUsage("/crawls", dfOutput);
+// TODO: Fix this the next time the file is edited.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function checkDiskUtilization(params: Record<string, any>, archiveDirSize: number, dfOutput=null) {
+  const diskUsage : Record<string, string> = await getDiskUsage("/crawls", dfOutput);
   const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
 
   // Check that disk usage isn't already above threshold
@@ -199,19 +219,21 @@ export async function checkDiskUtilization(params, archiveDirSize, dfOutput=null
   };
 }
 
-export async function getDFOutput(path) {
+export async function getDFOutput(path: string) {
   const exec = util.promisify(child_process.exec);
   const res = await exec(`df ${path}`);
   return res.stdout;
 }
 
 export async function getDiskUsage(path="/crawls", dfOutput = null) {
-  const result = dfOutput || await getDFOutput(path);
+  const result = dfOutput || (await getDFOutput(path));
   const lines = result.split("\n");
   const keys = lines[0].split(/\s+/ig);
   const rows = lines.slice(1).map(line => {
     const values = line.split(/\s+/ig);
-    return keys.reduce((o, k, index) => {
+    // TODO: Fix this the next time the file is edited.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return keys.reduce((o: Record<string, any>, k, index) => {
       o[k] = values[index];
       return o;
     }, {});
@@ -219,14 +241,14 @@ export async function getDiskUsage(path="/crawls", dfOutput = null) {
   return rows[0];
 }
 
-export function calculatePercentageUsed(used, total) {
+export function calculatePercentageUsed(used: number, total: number) {
   return Math.round((used/total) * 100);
 }
 
-function checksumFile(hashName, path) {
+function checksumFile(hashName: string, path: string) : Promise<{hash: string, crc32: number}>{
   return new Promise((resolve, reject) => {
     const hash = createHash(hashName);
-    let crc = null;
+    let crc : number = 0;
 
     const stream = fs.createReadStream(path);
     stream.on("error", err => reject(err));
@@ -238,7 +260,7 @@ function checksumFile(hashName, path) {
   });
 }
 
-export function interpolateFilename(filename, crawlId) {
+export function interpolateFilename(filename: string, crawlId: string) {
   filename = filename.replace("@ts", new Date().toISOString().replace(/[:TZz.-]/g, ""));
   filename = filename.replace("@hostname", os.hostname());
   filename = filename.replace("@hostsuffix", os.hostname().slice(-14));
