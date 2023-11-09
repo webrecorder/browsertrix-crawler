@@ -25,7 +25,7 @@ import { RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
 
-const MAX_BROWSER_DEFAULT_FETCH_SIZE = 2_500_000;
+const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_BROWSER_TEXT_FETCH_SIZE = 25_000_000;
 
 const MAX_NETWORK_LOAD_SIZE = 200_000_000;
