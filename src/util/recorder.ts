@@ -20,6 +20,7 @@ import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
 import { RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
+import { Crawler } from "../crawler.js";
 
 const MAX_BROWSER_FETCH_SIZE = 2_000_000;
 const MAX_NETWORK_LOAD_SIZE = 200_000_000;
@@ -43,9 +44,8 @@ export class Recorder
 {
   workerid: WorkerId;
   collDir: string;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  crawler: any;
+
+  crawler: Crawler;
 
   crawlState: RedisCrawlState;
 
@@ -74,13 +74,14 @@ export class Recorder
 
   writer: WARCWriter;
 
+  pageUrl!: string;
   pageid!: string;
 
   // TODO: Fix this the next time the file is edited.
    
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    {workerid, collDir, crawler} : {workerid: WorkerId, collDir: string, crawler: any}
+    {workerid, collDir, crawler} : {workerid: WorkerId, collDir: string, crawler: Crawler}
   ) {
     this.workerid = workerid;
     this.crawler = crawler;
@@ -354,7 +355,12 @@ export class Recorder
 
     let streamingConsume = false;
 
-    if (contentLen < 0 || contentLen > MAX_BROWSER_FETCH_SIZE) {
+    const contentType = this._getContentType(responseHeaders);
+
+    // stream async response if size is unknown or greater then browser fetch size, 
+    // may potentially not serve in the browser, depending on size.
+    // except for HTML pages, since need to always load response in browser
+    if (contentType !== "text/html" && (contentLen < 0 || contentLen > MAX_BROWSER_FETCH_SIZE)) {
       const opts = {tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId, cdp};
 
       // fetching using response stream, await here and then either call fulFill, or if not started, return false
@@ -397,7 +403,7 @@ export class Recorder
       }
     }
 
-    const rewritten = await this.rewriteResponse(reqresp);
+    const rewritten = await this.rewriteResponse(reqresp, contentType);
 
     // if in service worker, serialize here
     // as won't be getting a loadingFinished message
@@ -439,6 +445,7 @@ export class Recorder
 
   startPage({pageid, url} : {pageid: string, url: string}) {
     this.pageid = pageid;
+    this.pageUrl = url;
     this.logDetails = {page: url, workerid: this.workerid};
     if (this.pendingRequests && this.pendingRequests.size) {
       logger.debug("Interrupting timed out requests, moving to next page", this.logDetails, "recorder");
@@ -527,8 +534,8 @@ export class Recorder
     return false;
   }
 
-  async rewriteResponse(reqresp: RequestResponseInfo) {
-    const { url, responseHeadersList, extraOpts, payload } = reqresp;
+  async rewriteResponse(reqresp: RequestResponseInfo, contentType: string | null) {
+    const { url, extraOpts, payload } = reqresp;
 
     if (!payload || !payload.length) {
       return false;
@@ -537,9 +544,7 @@ export class Recorder
     let newString = null;
     let string = null;
 
-    const ct = this._getContentType(responseHeadersList);
-
-    switch (ct) {
+    switch (contentType) {
     case "application/x-mpegURL":
     case "application/vnd.apple.mpegurl":
       string = payload.toString();

@@ -65,29 +65,16 @@ export class RequestResponseInfo
     this.requestId = requestId;
   }
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  fillRequest(params: Record<string, any>) {
+  fillFetchRequestPaused(params: Protocol.Fetch.RequestPausedEvent) {
     this.url = params.request.url;
     this.method = params.request.method;
     if (!this.requestHeaders) {
       this.requestHeaders = params.request.headers;
     }
     this.postData = params.request.postData;
-    this.hasPostData = params.request.hasPostData;
+    this.hasPostData = params.request.hasPostData || false;
 
-    if (params.type) {
-      this.resourceType = params.type;
-    }
-
-  }
-
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  fillFetchRequestPaused(params: Record<string, any>) {
-    this.fillRequest(params);
-
-    this.status = params.responseStatusCode;
+    this.status = params.responseStatusCode || 0;
     this.statusText = params.responseStatusText || getStatusText(this.status);
 
     this.responseHeadersList = params.responseHeaders;
@@ -147,7 +134,7 @@ export class RequestResponseInfo
     }
   }
 
-  fillResponseReceivedExtraInfo(params: Record<string, string>) {
+  fillResponseReceivedExtraInfo(params: Protocol.Network.ResponseReceivedExtraInfoEvent) {
     // this.responseHeaders = params.headers;
     // if (params.headersText) {
     //   this.responseHeadersText = params.headersText;
@@ -155,18 +142,14 @@ export class RequestResponseInfo
     this.extraOpts.ipType = params.resourceIPAddressSpace;
   }
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  fillFetchResponse(response: Record<string, any>) {
+  fillFetchResponse(response: Response) {
     this.responseHeaders = Object.fromEntries(response.headers);
     this.status = response.status;
     this.statusText = response.statusText || getStatusText(this.status);
 
   }
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  fillRequestExtraInfo(params: Record<string, any>) {
+  fillRequestExtraInfo(params: Protocol.Network.RequestWillBeSentExtraInfoEvent) {
     this.requestHeaders = params.headers;
   }
 
