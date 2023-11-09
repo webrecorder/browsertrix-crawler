@@ -133,8 +133,6 @@ export class RedisCrawlState {
   constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
 
-
-
     this.uid = uid;
     this.key = key;
     this.maxPageTime = maxPageTime;

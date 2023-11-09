@@ -512,7 +512,7 @@ class ArgParser {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           origConfig = yaml.load(fs.readFileSync(configPath, "utf8")) as any;
           return origConfig;
-        }
+        },
       )
       .check((argv) => this.validateArgs(argv)).argv;
 
@@ -534,7 +534,7 @@ class ArgParser {
     // Check that the collection name is valid.
     if (argv.collection.search(/^[\w][\w-]*$/) === -1) {
       logger.fatal(
-        `\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`
+        `\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`,
       );
     }
 
