@@ -25,7 +25,9 @@ import { RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
 
-const MAX_BROWSER_FETCH_SIZE = 2_000_000;
+const MAX_BROWSER_FETCH_SIZE = 2_500_000;
+const MAX_BROWSER_HTML_FETCH_SIZE = 15_000_000;
+
 const MAX_NETWORK_LOAD_SIZE = 200_000_000;
 
 const ASYNC_FETCH_DUPE_KEY = "s:fetchdupe";
@@ -466,19 +468,15 @@ export class Recorder {
 
     const contentType = this._getContentType(responseHeaders);
 
-    // stream async response if size is unknown or greater then browser fetch size, 
-    // may potentially not serve in the browser, depending on size.
-    // except for HTML pages, since need to always load response in browser
-    if (contentType !== "text/html" && (contentLen < 0 || contentLen > MAX_BROWSER_FETCH_SIZE)) {
-      const opts = {tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId, cdp};
+    // set max fetch size higher for HTML responses for current page
+    const matchFetchSize = contentType === "text/html" && this.pageUrl === url ? MAX_BROWSER_HTML_FETCH_SIZE : MAX_BROWSER_FETCH_SIZE;
+
+    if (contentLen < 0 || contentLen > matchFetchSize) {
+      const opts = {tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId, cdp, requestId, matchFetchSize};
 
       // fetching using response stream, await here and then either call fulFill, or if not started, return false
       if (contentLen < 0) {
-        const fetcher = new ResponseStreamAsyncFetcher({
-          ...opts,
-          requestId,
-          cdp,
-        });
+        const fetcher = new ResponseStreamAsyncFetcher(opts);
         const res = await fetcher.load();
         switch (res) {
           case "dupe":
@@ -931,28 +929,17 @@ class AsyncFetcher {
   filter?: (resp: Response) => boolean;
   ignoreDupe = false;
 
+  maxFetchSize: number;
+
   recorder: Recorder;
 
   tempdir: string;
   filename: string;
 
-  constructor({
-    tempdir,
-    reqresp,
-    expectedSize = -1,
-    recorder,
-    networkId,
-    filter = undefined,
-    ignoreDupe = false,
-  }: {
-    tempdir: string;
-    reqresp: RequestResponseInfo;
-    expectedSize?: number;
-    recorder: Recorder;
-    networkId: string;
-    filter?: (resp: Response) => boolean;
-    ignoreDupe?: boolean;
-  }) {
+  constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId, filter = undefined, ignoreDupe = false,
+              maxFetchSize = MAX_BROWSER_FETCH_SIZE} :
+              {tempdir: string, reqresp: RequestResponseInfo, expectedSize?: number, recorder: Recorder, 
+              networkId: string, filter?: (resp: Response) => boolean, ignoreDupe?: boolean, maxFetchSize?: number }) {
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
     this.reqresp.asyncLoading = true;
@@ -964,10 +951,9 @@ class AsyncFetcher {
     this.recorder = recorder;
 
     this.tempdir = tempdir;
-    this.filename = path.join(
-      this.tempdir,
-      `${timestampNow()}-${uuidv4()}.data`,
-    );
+    this.filename = path.join(this.tempdir, `${timestampNow()}-${uuidv4()}.data`);
+
+    this.maxFetchSize = maxFetchSize;
   }
 
   async load() {
@@ -996,10 +982,7 @@ class AsyncFetcher {
       const responseRecord = createResponse(reqresp, pageid, body);
       const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
-      const serializer = new WARCSerializer(responseRecord, {
-        gzip,
-        maxMemSize: MAX_BROWSER_FETCH_SIZE,
-      });
+      const serializer = new WARCSerializer(responseRecord, {gzip, maxMemSize: this.maxFetchSize});
 
       try {
         let readSize = await serializer.digestRecord();
