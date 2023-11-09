@@ -25,8 +25,8 @@ import { RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
 
-const MAX_BROWSER_FETCH_SIZE = 2_500_000;
-const MAX_BROWSER_HTML_FETCH_SIZE = 15_000_000;
+const MAX_BROWSER_DEFAULT_FETCH_SIZE = 2_500_000;
+const MAX_BROWSER_TEXT_FETCH_SIZE = 25_000_000;
 
 const MAX_NETWORK_LOAD_SIZE = 200_000_000;
 
@@ -469,7 +469,7 @@ export class Recorder {
     const contentType = this._getContentType(responseHeaders);
 
     // set max fetch size higher for HTML responses for current page
-    const matchFetchSize = contentType === "text/html" && this.pageUrl === url ? MAX_BROWSER_HTML_FETCH_SIZE : MAX_BROWSER_FETCH_SIZE;
+    const matchFetchSize = this.allowLargeContent(contentType) && this.pageUrl === url ? MAX_BROWSER_TEXT_FETCH_SIZE : MAX_BROWSER_DEFAULT_FETCH_SIZE;
 
     if (contentLen < 0 || contentLen > matchFetchSize) {
       const opts = {tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId, cdp, requestId, matchFetchSize};
@@ -772,9 +772,19 @@ export class Recorder {
     //return Buffer.from(newString).toString("base64");
   }
 
-  _getContentType(
-    headers?: Protocol.Fetch.HeaderEntry[] | { name: string; value: string }[],
-  ) {
+  allowLargeContent(contentType: string | null) {
+    const allowLargeCTs = [
+      "text/html",
+      "application/json",
+      "text/javascript",
+      "application/javascript",
+      "application/x-javascript"
+    ];
+
+    return allowLargeCTs.includes(contentType || "");
+  }
+
+  _getContentType(headers? : Protocol.Fetch.HeaderEntry[] | {name: string, value: string}[]) {
     if (!headers) {
       return null;
     }
@@ -937,7 +947,7 @@ class AsyncFetcher {
   filename: string;
 
   constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId, filter = undefined, ignoreDupe = false,
-              maxFetchSize = MAX_BROWSER_FETCH_SIZE} :
+              maxFetchSize = MAX_BROWSER_DEFAULT_FETCH_SIZE} :
               {tempdir: string, reqresp: RequestResponseInfo, expectedSize?: number, recorder: Recorder, 
               networkId: string, filter?: (resp: Response) => boolean, ignoreDupe?: boolean, maxFetchSize?: number }) {
     this.reqresp = reqresp;
