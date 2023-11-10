@@ -469,10 +469,9 @@ export class Recorder {
     const contentType = this._getContentType(responseHeaders);
 
     // set max fetch size higher for HTML responses for current page
-    const matchFetchSize =
-      this.allowLargeContent(contentType) && this.pageUrl === url
-        ? MAX_BROWSER_TEXT_FETCH_SIZE
-        : MAX_BROWSER_DEFAULT_FETCH_SIZE;
+    const matchFetchSize = this.allowLargeContent(contentType)
+      ? MAX_BROWSER_TEXT_FETCH_SIZE
+      : MAX_BROWSER_DEFAULT_FETCH_SIZE;
 
     if (contentLen < 0 || contentLen > matchFetchSize) {
       const opts = {
