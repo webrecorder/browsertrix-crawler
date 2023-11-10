@@ -23,8 +23,11 @@ import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
 import { RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
+import { Crawler } from "../crawler.js";
 
-const MAX_BROWSER_FETCH_SIZE = 2_000_000;
+const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
+const MAX_BROWSER_TEXT_FETCH_SIZE = 25_000_000;
+
 const MAX_NETWORK_LOAD_SIZE = 200_000_000;
 
 const ASYNC_FETCH_DUPE_KEY = "s:fetchdupe";
@@ -44,9 +47,8 @@ function logNetwork(msg: string, data: any) {
 export class Recorder {
   workerid: WorkerId;
   collDir: string;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  crawler: any;
+
+  crawler: Crawler;
 
   crawlState: RedisCrawlState;
 
@@ -75,6 +77,7 @@ export class Recorder {
 
   writer: WARCWriter;
 
+  pageUrl!: string;
   pageid!: string;
 
   constructor({
@@ -85,8 +88,8 @@ export class Recorder {
     workerid: WorkerId;
     collDir: string;
     // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    crawler: any;
+
+    crawler: Crawler;
   }) {
     this.workerid = workerid;
     this.crawler = crawler;
@@ -463,7 +466,14 @@ export class Recorder {
 
     let streamingConsume = false;
 
-    if (contentLen < 0 || contentLen > MAX_BROWSER_FETCH_SIZE) {
+    const contentType = this._getContentType(responseHeaders);
+
+    // set max fetch size higher for HTML responses for current page
+    const matchFetchSize = this.allowLargeContent(contentType)
+      ? MAX_BROWSER_TEXT_FETCH_SIZE
+      : MAX_BROWSER_DEFAULT_FETCH_SIZE;
+
+    if (contentLen < 0 || contentLen > matchFetchSize) {
       const opts = {
         tempdir: this.tempdir,
         reqresp,
@@ -471,15 +481,13 @@ export class Recorder {
         recorder: this,
         networkId,
         cdp,
+        requestId,
+        matchFetchSize,
       };
 
       // fetching using response stream, await here and then either call fulFill, or if not started, return false
       if (contentLen < 0) {
-        const fetcher = new ResponseStreamAsyncFetcher({
-          ...opts,
-          requestId,
-          cdp,
-        });
+        const fetcher = new ResponseStreamAsyncFetcher(opts);
         const res = await fetcher.load();
         switch (res) {
           case "dupe":
@@ -533,7 +541,7 @@ export class Recorder {
       }
     }
 
-    const rewritten = await this.rewriteResponse(reqresp);
+    const rewritten = await this.rewriteResponse(reqresp, contentType);
 
     // if in service worker, serialize here
     // as won't be getting a loadingFinished message
@@ -590,6 +598,7 @@ export class Recorder {
 
   startPage({ pageid, url }: { pageid: string; url: string }) {
     this.pageid = pageid;
+    this.pageUrl = url;
     this.logDetails = { page: url, workerid: this.workerid };
     if (this.pendingRequests && this.pendingRequests.size) {
       logger.debug(
@@ -700,8 +709,11 @@ export class Recorder {
     return false;
   }
 
-  async rewriteResponse(reqresp: RequestResponseInfo) {
-    const { url, responseHeadersList, extraOpts, payload } = reqresp;
+  async rewriteResponse(
+    reqresp: RequestResponseInfo,
+    contentType: string | null,
+  ) {
+    const { url, extraOpts, payload } = reqresp;
 
     if (!payload || !payload.length) {
       return false;
@@ -710,9 +722,7 @@ export class Recorder {
     let newString = null;
     let string = null;
 
-    const ct = this._getContentType(responseHeadersList);
-
-    switch (ct) {
+    switch (contentType) {
       case "application/x-mpegURL":
       case "application/vnd.apple.mpegurl":
         string = payload.toString();
@@ -757,6 +767,18 @@ export class Recorder {
     }
 
     //return Buffer.from(newString).toString("base64");
+  }
+
+  allowLargeContent(contentType: string | null) {
+    const allowLargeCTs = [
+      "text/html",
+      "application/json",
+      "text/javascript",
+      "application/javascript",
+      "application/x-javascript",
+    ];
+
+    return allowLargeCTs.includes(contentType || "");
   }
 
   _getContentType(
@@ -916,6 +938,8 @@ class AsyncFetcher {
   filter?: (resp: Response) => boolean;
   ignoreDupe = false;
 
+  maxFetchSize: number;
+
   recorder: Recorder;
 
   tempdir: string;
@@ -929,6 +953,7 @@ class AsyncFetcher {
     networkId,
     filter = undefined,
     ignoreDupe = false,
+    maxFetchSize = MAX_BROWSER_DEFAULT_FETCH_SIZE,
   }: {
     tempdir: string;
     reqresp: RequestResponseInfo;
@@ -937,6 +962,7 @@ class AsyncFetcher {
     networkId: string;
     filter?: (resp: Response) => boolean;
     ignoreDupe?: boolean;
+    maxFetchSize?: number;
   }) {
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
@@ -953,6 +979,8 @@ class AsyncFetcher {
       this.tempdir,
       `${timestampNow()}-${uuidv4()}.data`,
     );
+
+    this.maxFetchSize = maxFetchSize;
   }
 
   async load() {
@@ -983,7 +1011,7 @@ class AsyncFetcher {
 
       const serializer = new WARCSerializer(responseRecord, {
         gzip,
-        maxMemSize: MAX_BROWSER_FETCH_SIZE,
+        maxMemSize: this.maxFetchSize,
       });
 
       try {
