@@ -88,7 +88,7 @@ export class Recorder {
     workerid: WorkerId;
     collDir: string;
     // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     crawler: Crawler;
   }) {
     this.workerid = workerid;
@@ -469,10 +469,22 @@ export class Recorder {
     const contentType = this._getContentType(responseHeaders);
 
     // set max fetch size higher for HTML responses for current page
-    const matchFetchSize = this.allowLargeContent(contentType) && this.pageUrl === url ? MAX_BROWSER_TEXT_FETCH_SIZE : MAX_BROWSER_DEFAULT_FETCH_SIZE;
+    const matchFetchSize =
+      this.allowLargeContent(contentType) && this.pageUrl === url
+        ? MAX_BROWSER_TEXT_FETCH_SIZE
+        : MAX_BROWSER_DEFAULT_FETCH_SIZE;
 
     if (contentLen < 0 || contentLen > matchFetchSize) {
-      const opts = {tempdir: this.tempdir, reqresp, expectedSize: contentLen, recorder: this, networkId, cdp, requestId, matchFetchSize};
+      const opts = {
+        tempdir: this.tempdir,
+        reqresp,
+        expectedSize: contentLen,
+        recorder: this,
+        networkId,
+        cdp,
+        requestId,
+        matchFetchSize,
+      };
 
       // fetching using response stream, await here and then either call fulFill, or if not started, return false
       if (contentLen < 0) {
@@ -698,7 +710,10 @@ export class Recorder {
     return false;
   }
 
-  async rewriteResponse(reqresp: RequestResponseInfo, contentType: string | null) {
+  async rewriteResponse(
+    reqresp: RequestResponseInfo,
+    contentType: string | null,
+  ) {
     const { url, extraOpts, payload } = reqresp;
 
     if (!payload || !payload.length) {
@@ -709,25 +724,8 @@ export class Recorder {
     let string = null;
 
     switch (contentType) {
-    case "application/x-mpegURL":
-    case "application/vnd.apple.mpegurl":
-      string = payload.toString();
-      newString = rewriteHLS(string, {save: extraOpts});
-      break;
-
-    case "application/dash+xml":
-      string = payload.toString();
-      newString = rewriteDASH(string, {save: extraOpts});
-      break;
-
-    case "text/html":
-    case "application/json":
-    case "text/javascript":
-    case "application/javascript":
-    case "application/x-javascript": {
-      const rw = baseDSRules.getRewriter(url);
-
-      if (rw !== baseDSRules.defaultRewriter) {
+      case "application/x-mpegURL":
+      case "application/vnd.apple.mpegurl":
         string = payload.toString();
         newString = rewriteHLS(string, { save: extraOpts });
         break;
@@ -778,13 +776,15 @@ export class Recorder {
       "application/json",
       "text/javascript",
       "application/javascript",
-      "application/x-javascript"
+      "application/x-javascript",
     ];
 
     return allowLargeCTs.includes(contentType || "");
   }
 
-  _getContentType(headers? : Protocol.Fetch.HeaderEntry[] | {name: string, value: string}[]) {
+  _getContentType(
+    headers?: Protocol.Fetch.HeaderEntry[] | { name: string; value: string }[],
+  ) {
     if (!headers) {
       return null;
     }
@@ -946,10 +946,25 @@ class AsyncFetcher {
   tempdir: string;
   filename: string;
 
-  constructor({tempdir, reqresp, expectedSize = -1, recorder, networkId, filter = undefined, ignoreDupe = false,
-              maxFetchSize = MAX_BROWSER_DEFAULT_FETCH_SIZE} :
-              {tempdir: string, reqresp: RequestResponseInfo, expectedSize?: number, recorder: Recorder, 
-              networkId: string, filter?: (resp: Response) => boolean, ignoreDupe?: boolean, maxFetchSize?: number }) {
+  constructor({
+    tempdir,
+    reqresp,
+    expectedSize = -1,
+    recorder,
+    networkId,
+    filter = undefined,
+    ignoreDupe = false,
+    maxFetchSize = MAX_BROWSER_DEFAULT_FETCH_SIZE,
+  }: {
+    tempdir: string;
+    reqresp: RequestResponseInfo;
+    expectedSize?: number;
+    recorder: Recorder;
+    networkId: string;
+    filter?: (resp: Response) => boolean;
+    ignoreDupe?: boolean;
+    maxFetchSize?: number;
+  }) {
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
     this.reqresp.asyncLoading = true;
@@ -961,7 +976,10 @@ class AsyncFetcher {
     this.recorder = recorder;
 
     this.tempdir = tempdir;
-    this.filename = path.join(this.tempdir, `${timestampNow()}-${uuidv4()}.data`);
+    this.filename = path.join(
+      this.tempdir,
+      `${timestampNow()}-${uuidv4()}.data`,
+    );
 
     this.maxFetchSize = maxFetchSize;
   }
@@ -992,7 +1010,10 @@ class AsyncFetcher {
       const responseRecord = createResponse(reqresp, pageid, body);
       const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
-      const serializer = new WARCSerializer(responseRecord, {gzip, maxMemSize: this.maxFetchSize});
+      const serializer = new WARCSerializer(responseRecord, {
+        gzip,
+        maxMemSize: this.maxFetchSize,
+      });
 
       try {
         let readSize = await serializer.digestRecord();
