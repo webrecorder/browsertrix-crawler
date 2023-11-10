@@ -4,7 +4,13 @@ import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp, { FileHandle } from "fs/promises";
 
-import { RedisCrawlState, LoadState, QueueState, PageState, WorkerId } from "./util/state.js";
+import {
+  RedisCrawlState,
+  LoadState,
+  QueueState,
+  PageState,
+  WorkerId,
+} from "./util/state.js";
 
 import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
@@ -13,7 +19,14 @@ import * as warcio from "warcio";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
-import { initStorage, getFileSize, getDirSize, interpolateFilename, checkDiskUtilization, S3StorageSync } from "./util/storage.js";
+import {
+  initStorage,
+  getFileSize,
+  getDirSize,
+  interpolateFilename,
+  checkDiskUtilization,
+  S3StorageSync,
+} from "./util/storage.js";
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
@@ -25,7 +38,12 @@ import { collectAllFileSources } from "./util/file_reader.js";
 
 import { Browser } from "./util/browser.js";
 
-import { ADD_LINK_FUNC, BEHAVIOR_LOG_FUNC, HTML_TYPES, DEFAULT_SELECTORS } from "./util/constants.js";
+import {
+  ADD_LINK_FUNC,
+  BEHAVIOR_LOG_FUNC,
+  HTML_TYPES,
+  DEFAULT_SELECTORS,
+} from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
 import { OriginOverride } from "./util/originoverride.js";
@@ -41,12 +59,23 @@ const HTTPS_AGENT = new HTTPSAgent({
 
 const HTTP_AGENT = new HTTPAgent();
 
-const behaviors = fs.readFileSync(new URL("../node_modules/browsertrix-behaviors/dist/behaviors.js", import.meta.url), {encoding: "utf8"});
+const behaviors = fs.readFileSync(
+  new URL(
+    "../node_modules/browsertrix-behaviors/dist/behaviors.js",
+    import.meta.url,
+  ),
+  { encoding: "utf8" },
+);
 
 const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
 
-const POST_CRAWL_STATES = ["generate-wacz", "uploading-wacz", "generate-cdx", "generate-warc"];
+const POST_CRAWL_STATES = [
+  "generate-wacz",
+  "uploading-wacz",
+  "generate-cdx",
+  "generate-warc",
+];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LogDetails = Record<string, any>;
@@ -61,7 +90,6 @@ type PageEntry = {
   text?: string;
   favIconUrl?: string;
 };
-
 
 // ============================================================================
 export class Crawler {
@@ -128,8 +156,12 @@ export class Crawler {
   maxHeapUsed = 0;
   maxHeapTotal = 0;
 
-  // eslint-disable-next-line no-use-before-define
-  driver!: (opts: { page: Page; data: PageState; crawler: Crawler }) => NonNullable<unknown>;
+  driver!: (opts: {
+    page: Page;
+    data: PageState;
+    // eslint-disable-next-line no-use-before-define
+    crawler: Crawler;
+  }) => NonNullable<unknown>;
 
   constructor() {
     const res = parseArgs();
@@ -140,12 +172,12 @@ export class Crawler {
     this.collDir = path.join(
       this.params.cwd,
       "collections",
-      this.params.collection
+      this.params.collection,
     );
     this.logDir = path.join(this.collDir, "logs");
     this.logFilename = path.join(
       this.logDir,
-      `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`
+      `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`,
     );
 
     const debugLogging = this.params.logging.includes("debug");
@@ -252,7 +284,7 @@ export class Crawler {
 
     if (!redisUrl.startsWith("redis://")) {
       logger.fatal(
-        "stateStoreUrl must start with redis:// -- Only redis-based store currently supported"
+        "stateStoreUrl must start with redis:// -- Only redis-based store currently supported",
       );
     }
 
@@ -272,7 +304,7 @@ export class Crawler {
     logger.debug(
       `Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`,
       {},
-      "state"
+      "state",
     );
 
     logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
@@ -281,7 +313,7 @@ export class Crawler {
       redis,
       this.params.crawlId,
       this.maxPageTime,
-      os.hostname()
+      os.hostname(),
     );
 
     // clear any pending URLs from this instance
@@ -291,7 +323,7 @@ export class Crawler {
       logger.debug(
         `Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`,
         {},
-        "state"
+        "state",
       );
     }
 
@@ -311,7 +343,7 @@ export class Crawler {
       logger.debug(
         `Screencast server started on: ${this.params.screencastPort}`,
         {},
-        "screencast"
+        "screencast",
       );
     }
     // } else if (this.params.redisStoreUrl && this.params.screencastRedis) {
@@ -375,7 +407,7 @@ export class Crawler {
       logger.debug(`Clearing ${this.collDir} before starting`);
       try {
         fs.rmSync(this.collDir, { recursive: true, force: true });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
         logger.error(`Unable to clear ${this.collDir}`, e);
       }
@@ -383,7 +415,7 @@ export class Crawler {
 
     if (this.params.customBehaviors) {
       this.customBehaviors = this.loadCustomBehaviors(
-        this.params.customBehaviors
+        this.params.customBehaviors,
       );
     }
 
@@ -445,7 +477,7 @@ export class Crawler {
           exitCode = 11;
         }
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.error("Crawl failed", e);
       exitCode = 9;
@@ -461,7 +493,7 @@ export class Crawler {
   _behaviorLog(
     { data, type }: { data: string; type: string },
     pageUrl: string,
-    workerid: WorkerId
+    workerid: WorkerId,
   ) {
     let behaviorLine;
     let message;
@@ -481,21 +513,21 @@ export class Crawler {
     }
 
     switch (type) {
-    case "info":
-      behaviorLine = JSON.stringify(data);
-      if (behaviorLine !== this.behaviorLastLine) {
-        logger.info(message, details, "behaviorScript");
-        this.behaviorLastLine = behaviorLine;
-      }
-      break;
+      case "info":
+        behaviorLine = JSON.stringify(data);
+        if (behaviorLine !== this.behaviorLastLine) {
+          logger.info(message, details, "behaviorScript");
+          this.behaviorLastLine = behaviorLine;
+        }
+        break;
 
-    case "error":
-      logger.error(message, details, "behaviorScript");
-      break;
+      case "error":
+        logger.error(message, details, "behaviorScript");
+        break;
 
-    case "debug":
-    default:
-      logger.debug(message, details, "behaviorScript");
+      case "debug":
+      default:
+        logger.debug(message, details, "behaviorScript");
     }
   }
 
@@ -506,7 +538,7 @@ export class Crawler {
       depth,
       extraHops,
     }: { seedId: number; url: string; depth: number; extraHops: number },
-    logDetails = {}
+    logDetails = {},
   ) {
     const seed = this.params.scopedSeeds[seedId];
 
@@ -553,7 +585,7 @@ export class Crawler {
           logger.warn(
             msg.text(),
             { location: msg.location(), page: page.url(), workerid },
-            "jsError"
+            "jsError",
           );
         }
       });
@@ -562,7 +594,7 @@ export class Crawler {
         logger.warn(
           "Page Error",
           { ...errJSON(e), page: page.url(), workerid },
-          "jsError"
+          "jsError",
         );
       });
     }
@@ -574,14 +606,14 @@ export class Crawler {
 
     await page.exposeFunction(
       ADD_LINK_FUNC,
-      (url: string) => callbacks.addLink && callbacks.addLink(url)
+      (url: string) => callbacks.addLink && callbacks.addLink(url),
     );
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(
         BEHAVIOR_LOG_FUNC,
         (logdata: { data: string; type: string }) =>
-          this._behaviorLog(logdata, page.url(), workerid)
+          this._behaviorLog(logdata, page.url(), workerid),
       );
       await this.browser.addInitScript(page, behaviors);
 
@@ -622,7 +654,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
     logger.warn(
       "Failed to fetch favicon from browser /json endpoint",
-      logDetails
+      logDetails,
     );
     return "";
   }
@@ -645,7 +677,7 @@ self.__bx_behaviors.selectMainBehavior();
       "HEAD request to determine if URL is HTML page timed out",
       logDetails,
       "fetch",
-      true
+      true,
     );
 
     if (!data.isHTMLPage && directFetchCapture) {
@@ -656,7 +688,7 @@ self.__bx_behaviors.selectMainBehavior();
           "Direct fetch capture attempt timed out",
           logDetails,
           "fetch",
-          true
+          true,
         );
         if (fetched) {
           data.loadState = LoadState.FULL_PAGE_LOADED;
@@ -666,7 +698,7 @@ self.__bx_behaviors.selectMainBehavior();
           logger.info(
             "Direct fetch successful",
             { url, ...logDetails },
-            "fetch"
+            "fetch",
           );
           return true;
         }
@@ -714,7 +746,7 @@ self.__bx_behaviors.selectMainBehavior();
       const { changed, text } = await textextract.extractAndStoreText(
         "text",
         false,
-        this.params.text.includes("to-warc")
+        this.params.text.includes("to-warc"),
       );
 
       if (changed && text && this.params.text.includes("to-pages")) {
@@ -729,7 +761,7 @@ self.__bx_behaviors.selectMainBehavior();
         logger.debug(
           "Skipping behaviors for non-HTML page",
           logDetails,
-          "behavior"
+          "behavior",
         );
       } else if (data.skipBehaviors) {
         logger.info("Skipping behaviors for slow page", logDetails, "behavior");
@@ -739,7 +771,7 @@ self.__bx_behaviors.selectMainBehavior();
           this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
-          "behavior"
+          "behavior",
         );
 
         await this.netIdle(page, logDetails);
@@ -757,7 +789,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.pageExtraDelay) {
       logger.info(
         `Waiting ${this.params.pageExtraDelay} seconds before moving on to next page`,
-        logDetails
+        logDetails,
       );
       await sleep(this.params.pageExtraDelay);
     }
@@ -784,7 +816,7 @@ self.__bx_behaviors.selectMainBehavior();
       logger.warn(
         "Page Load Failed",
         { loadState, ...logDetails },
-        "pageStatus"
+        "pageStatus",
       );
 
       await this.crawlState.markFailed(data.url);
@@ -816,7 +848,7 @@ self.__bx_behaviors.selectMainBehavior();
     page: Page,
     cdp: CDPSession,
     frames: Frame[],
-    logDetails: LogDetails
+    logDetails: LogDetails,
   ) {
     try {
       frames = frames || page.frames();
@@ -828,7 +860,7 @@ self.__bx_behaviors.selectMainBehavior();
           frameUrls: frames.map((frame) => frame.url()),
           ...logDetails,
         },
-        "behavior"
+        "behavior",
       );
 
       const results = await Promise.allSettled(
@@ -844,9 +876,9 @@ self.__bx_behaviors.selectMainBehavior();
             self.__bx_behaviors.run();
           }`,
             logDetails,
-            "behavior"
-          )
-        )
+            "behavior",
+          ),
+        ),
       );
 
       for (const res of results) {
@@ -855,7 +887,7 @@ self.__bx_behaviors.selectMainBehavior();
           logger.warn(
             "Behavior run partially failed",
             { reason, ...logDetails },
-            "behavior"
+            "behavior",
           );
         }
       }
@@ -863,14 +895,14 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info(
         "Behaviors finished",
         { finished: results.length, ...logDetails },
-        "behavior"
+        "behavior",
       );
       return true;
     } catch (e) {
       logger.warn(
         "Behavior run failed",
         { ...errJSON(e), ...logDetails },
-        "behavior"
+        "behavior",
       );
       return false;
     }
@@ -886,14 +918,14 @@ self.__bx_behaviors.selectMainBehavior();
     // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
     // if there's no tag or an iframe tag, then assume its a regular frame
     const tagName = await frame.evaluate(
-      "self && self.frameElement && self.frameElement.tagName"
+      "self && self.frameElement && self.frameElement.tagName",
     );
 
     if (tagName && tagName !== "IFRAME" && tagName !== "FRAME") {
       logger.debug(
         "Skipping processing non-frame object",
         { tagName, frameUrl, ...logDetails },
-        "behavior"
+        "behavior",
       );
       return null;
     }
@@ -910,7 +942,7 @@ self.__bx_behaviors.selectMainBehavior();
       logger.debug(
         "Skipping processing frame",
         { frameUrl, ...logDetails },
-        "behavior"
+        "behavior",
       );
     }
 
@@ -921,13 +953,13 @@ self.__bx_behaviors.selectMainBehavior();
     const packageFileJSON = JSON.parse(
       await fsp.readFile(new URL("../package.json", import.meta.url), {
         encoding: "utf-8",
-      })
+      }),
     );
     const warcioPackageJSON = JSON.parse(
       await fsp.readFile(
         new URL("../node_modules/warcio/package.json", import.meta.url),
-        { encoding: "utf-8" }
-      )
+        { encoding: "utf-8" },
+      ),
     );
 
     return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version})`;
@@ -945,7 +977,7 @@ self.__bx_behaviors.selectMainBehavior();
     const warcInfo = { ...info, ...this.params.warcInfo };
     const record = await warcio.WARCRecord.createWARCInfo(
       { filename, type, warcVersion },
-      warcInfo
+      warcInfo,
     );
     const buffer = await warcio.WARCSerializer.serialize(record, {
       gzip: true,
@@ -964,7 +996,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.sizeLimit) {
       if (size >= this.params.sizeLimit) {
         logger.info(
-          `Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`
+          `Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`,
         );
         interrupt = true;
       }
@@ -974,7 +1006,7 @@ self.__bx_behaviors.selectMainBehavior();
       const elapsed = secondsElapsed(this.startTime);
       if (elapsed >= this.params.timeLimit) {
         logger.info(
-          `Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`
+          `Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`,
         );
         interrupt = true;
       }
@@ -992,7 +1024,7 @@ self.__bx_behaviors.selectMainBehavior();
       const numFailed = this.crawlState.numFailed();
       if (numFailed >= this.params.failOnFailedLimit) {
         logger.fatal(
-          `Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`
+          `Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`,
         );
       }
     }
@@ -1060,14 +1092,14 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.healthCheckPort) {
       this.healthChecker = new HealthChecker(
         this.params.healthCheckPort,
-        this.params.workers
+        this.params.workers,
       );
     }
 
     try {
       const driverUrl = new URL(this.params.driver, import.meta.url);
       this.driver = (await import(driverUrl.href)).default;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.warn(`Error importing driver ${this.params.driver}`, e);
       return;
@@ -1125,7 +1157,7 @@ self.__bx_behaviors.selectMainBehavior();
       await this.crawlState.load(
         this.params.state,
         this.params.scopedSeeds,
-        true
+        true,
       );
     }
 
@@ -1133,14 +1165,14 @@ self.__bx_behaviors.selectMainBehavior();
 
     this.adBlockRules = new AdBlockRules(
       this.captureBasePrefix,
-      this.params.adBlockMessage
+      this.params.adBlockMessage,
     );
 
     if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(
         this.params.blockRules,
         this.captureBasePrefix,
-        this.params.blockMessage
+        this.params.blockMessage,
       );
     }
 
@@ -1178,10 +1210,10 @@ self.__bx_behaviors.selectMainBehavior();
         logger.error(
           "Browser disconnected (crashed?), interrupting crawl",
           err,
-          "browser"
+          "browser",
         );
       },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     // --------------
@@ -1220,7 +1252,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       const warcList = await fsp.readdir(path.join(this.collDir, "archive"));
       const warcListFull = warcList.map((filename) =>
-        path.join(this.collDir, "archive", filename)
+        path.join(this.collDir, "archive", filename),
       );
 
       //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
@@ -1230,7 +1262,7 @@ self.__bx_behaviors.selectMainBehavior();
         ...warcListFull,
       ];
       const indexResult = await this.awaitProcess(
-        child_process.spawn("cdxj-indexer", params, { cwd: this.params.cwd })
+        child_process.spawn("cdxj-indexer", params, { cwd: this.params.cwd }),
       );
       if (indexResult === 0) {
         logger.debug("Indexing complete, CDX successfully created");
@@ -1251,11 +1283,11 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (uploaded && this.uploadAndDeleteLocal) {
         logger.info(
-          `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`
+          `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
         );
         try {
           fs.rmSync(this.collDir, { recursive: true, force: true });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
           logger.warn(`Unable to clear ${this.collDir} before exit`, e);
         }
@@ -1352,13 +1384,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     createArgs.push("-f");
 
-    warcFileList.forEach((val) =>
-      createArgs.push(path.join(archiveDir, val))
-    );  
+    warcFileList.forEach((val) => createArgs.push(path.join(archiveDir, val)));
 
     // create WACZ
     const waczResult = await this.awaitProcess(
-      child_process.spawn("wacz", createArgs)
+      child_process.spawn("wacz", createArgs),
     );
 
     if (waczResult !== 0) {
@@ -1430,7 +1460,7 @@ self.__bx_behaviors.selectMainBehavior();
         maxHeapTotal: this.maxHeapTotal,
         ...memUsage,
       },
-      "memory"
+      "memory",
     );
   }
 
@@ -1461,9 +1491,9 @@ self.__bx_behaviors.selectMainBehavior();
       try {
         await fsp.writeFile(
           this.params.statsFilename,
-          JSON.stringify(stats, null, 2)
+          JSON.stringify(stats, null, 2),
         );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         logger.warn("Stats output failed", err);
       }
@@ -1473,7 +1503,7 @@ self.__bx_behaviors.selectMainBehavior();
   async loadPage(
     page: Page,
     data: PageState,
-    selectorOptsList = DEFAULT_SELECTORS
+    selectorOptsList = DEFAULT_SELECTORS,
   ) {
     const { url, seedId, depth } = data;
 
@@ -1533,7 +1563,7 @@ self.__bx_behaviors.selectMainBehavior();
       const contentType = resp.headers()["content-type"];
 
       isHTMLPage = this.isHTMLContentType(contentType);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       const msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
@@ -1575,7 +1605,7 @@ self.__bx_behaviors.selectMainBehavior();
       const frames = await page.frames();
 
       const filteredFrames = await Promise.allSettled(
-        frames.map((frame) => this.shouldIncludeFrame(frame, logDetails))
+        frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)),
       );
 
       data.filteredFrames = filteredFrames
@@ -1640,7 +1670,7 @@ self.__bx_behaviors.selectMainBehavior();
     page: Page,
     data: PageState,
     selectors = DEFAULT_SELECTORS,
-    logDetails: LogDetails
+    logDetails: LogDetails,
   ) {
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
@@ -1651,7 +1681,7 @@ self.__bx_behaviors.selectMainBehavior();
       links.push(url);
       if (links.length == 500) {
         promiseList.push(
-          this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails)
+          this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
         );
         links = [];
       }
@@ -1676,7 +1706,9 @@ self.__bx_behaviors.selectMainBehavior();
       document.querySelectorAll(selector).forEach(getter);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const func = (window as any)[addLinkFunc] as (url: string) => NonNullable<unknown>;
+      const func = (window as any)[addLinkFunc] as (
+        url: string,
+      ) => NonNullable<unknown>;
       urls.forEach((url) => func.call(this, url));
 
       return true;
@@ -1701,9 +1733,9 @@ self.__bx_behaviors.selectMainBehavior();
               }),
               PAGE_OP_TIMEOUT_SECS,
               "Link extraction timed out",
-              logDetails
-            )
-          )
+              logDetails,
+            ),
+          ),
         );
 
         for (let i = 0; i < promiseResults.length; i++) {
@@ -1718,14 +1750,14 @@ self.__bx_behaviors.selectMainBehavior();
           }
         }
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.warn("Link Extraction failed", e);
     }
 
     if (links.length) {
       promiseList.push(
-        this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails)
+        this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
       );
     }
 
@@ -1737,7 +1769,7 @@ self.__bx_behaviors.selectMainBehavior();
     urls: string[],
     depth: number,
     extraHops = 0,
-    logDetails: LogDetails = {}
+    logDetails: LogDetails = {},
   ) {
     try {
       depth += 1;
@@ -1748,7 +1780,7 @@ self.__bx_behaviors.selectMainBehavior();
       for (const possibleUrl of urls) {
         const res = this.isInScope(
           { url: possibleUrl, extraHops: newExtraHops, depth, seedId },
-          logDetails
+          logDetails,
         );
 
         if (!res) {
@@ -1763,11 +1795,11 @@ self.__bx_behaviors.selectMainBehavior();
             url,
             depth,
             isOOS ? newExtraHops : extraHops,
-            logDetails
+            logDetails,
           );
         }
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.error("Queuing Error", e);
     }
@@ -1784,12 +1816,12 @@ self.__bx_behaviors.selectMainBehavior();
           "Cloudflare check timed out",
           logDetails,
           "general",
-          true
+          true,
         )
       ) {
         logger.debug(
           "Cloudflare Check Detected, waiting for reload...",
-          logDetails
+          logDetails,
         );
         await sleep(5.5);
       }
@@ -1803,7 +1835,7 @@ self.__bx_behaviors.selectMainBehavior();
     url: string,
     depth: number,
     extraHops: number,
-    logDetails: LogDetails = {}
+    logDetails: LogDetails = {},
   ) {
     if (this.limitHit) {
       return false;
@@ -1811,30 +1843,30 @@ self.__bx_behaviors.selectMainBehavior();
 
     const result = await this.crawlState.addToQueue(
       { url, seedId, depth, extraHops },
-      this.pageLimit
+      this.pageLimit,
     );
 
     switch (result) {
-    case QueueState.ADDED:
-      logger.debug("Queued new page url", { url, ...logDetails }, "links");
-      return true;
+      case QueueState.ADDED:
+        logger.debug("Queued new page url", { url, ...logDetails }, "links");
+        return true;
 
-    case QueueState.LIMIT_HIT:
-      logger.debug(
-        "Not queued page url, at page limit",
-        { url, ...logDetails },
-        "links"
-      );
-      this.limitHit = true;
-      return false;
+      case QueueState.LIMIT_HIT:
+        logger.debug(
+          "Not queued page url, at page limit",
+          { url, ...logDetails },
+          "links",
+        );
+        this.limitHit = true;
+        return false;
 
-    case QueueState.DUPE_URL:
-      logger.debug(
-        "Not queued page url, already seen",
-        { url, ...logDetails },
-        "links"
-      );
-      return false;
+      case QueueState.DUPE_URL:
+        logger.debug(
+          "Not queued page url, already seen",
+          { url, ...logDetails },
+          "links",
+        );
+        return false;
     }
 
     return false;
@@ -1867,7 +1899,7 @@ self.__bx_behaviors.selectMainBehavior();
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       logger.error("pages/pages.jsonl creation failed", err);
     }
@@ -1904,7 +1936,7 @@ self.__bx_behaviors.selectMainBehavior();
     const processedRow = JSON.stringify(row) + "\n";
     try {
       await this.pagesFH!.writeFile(processedRow);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       logger.warn("pages/pages.jsonl append failed", err);
     }
@@ -1920,7 +1952,7 @@ self.__bx_behaviors.selectMainBehavior();
         method: "HEAD",
         headers: this.headers,
         agent: this.resolveAgent,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
       if (resp.status !== 200) {
         logger.debug("HEAD response code != 200, loading in browser", {
@@ -1961,14 +1993,14 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info(
         "Fetching full sitemap (fromDate not specified/valid)",
         { url, sitemapFromDate },
-        "sitemap"
+        "sitemap",
       );
     } else {
       lastmodFromTimestamp = dateObj.getTime();
       logger.info(
         "Fetching and filtering sitemap by date",
         { url, sitemapFromDate },
-        "sitemap"
+        "sitemap",
       );
     }
 
@@ -1984,7 +2016,7 @@ self.__bx_behaviors.selectMainBehavior();
       const { sites } = await sitemapper.fetch();
       logger.info("Sitemap Urls Found", { urls: sites.length }, "sitemap");
       await this.queueInScopeUrls(seedId, sites, 0);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.warn("Error fetching sites from sitemap", e, "sitemap");
     }
@@ -2088,21 +2120,21 @@ self.__bx_behaviors.selectMainBehavior();
 
   async serializeConfig(done = false) {
     switch (this.params.saveState) {
-    case "never":
-      return;
-
-    case "partial":
-      if (!done) {
+      case "never":
         return;
-      }
-      if (await this.crawlState.isFinished()) {
-        return;
-      }
-      break;
 
-    case "always":
-    default:
-      break;
+      case "partial":
+        if (!done) {
+          return;
+        }
+        if (await this.crawlState.isFinished()) {
+          return;
+        }
+        break;
+
+      case "always":
+      default:
+        break;
     }
 
     const now = new Date();
@@ -2137,7 +2169,7 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       logger.info(`Saving crawl state to: ${filename}`);
       await fsp.writeFile(filename, res);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.error(`Failed to write save state file: ${filename}`, e);
       return;
@@ -2166,8 +2198,11 @@ self.__bx_behaviors.selectMainBehavior();
 function shouldIgnoreAbort(req: HTTPRequest) {
   try {
     const failure = req.failure();
-    const failureText = failure && failure.errorText || "";
-    if (failureText !== "net::ERR_ABORTED" || req.resourceType() !== "document") {
+    const failureText = (failure && failure.errorText) || "";
+    if (
+      failureText !== "net::ERR_ABORTED" ||
+      req.resourceType() !== "document"
+    ) {
       return false;
     }
 
@@ -2178,8 +2213,10 @@ function shouldIgnoreAbort(req: HTTPRequest) {
       return false;
     }
 
-    if (headers["content-disposition"] || 
-       (headers["content-type"] && !headers["content-type"].startsWith("text/"))) {
+    if (
+      headers["content-disposition"] ||
+      (headers["content-type"] && !headers["content-type"].startsWith("text/"))
+    ) {
       return true;
     }
   } catch (e) {
@@ -2188,4 +2225,3 @@ function shouldIgnoreAbort(req: HTTPRequest) {
 
   return false;
 }
-
