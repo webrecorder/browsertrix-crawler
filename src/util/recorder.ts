@@ -1056,13 +1056,17 @@ class AsyncFetcher {
           serializer,
         ),
       );
-    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
+      await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url!);
+      if (e.message === "response-filtered-out") {
+        throw e;
+      }
       logger.error(
         "Streaming Fetch Error",
         { url, networkId, filename, ...errJSON(e), ...logDetails },
         "recorder",
       );
-      await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url!);
     } finally {
       recorder.removeReqResp(networkId);
     }
@@ -1094,7 +1098,7 @@ class AsyncFetcher {
 
     if (this.filter && !this.filter(resp) && abort) {
       abort.abort();
-      throw new Error("invalid response, ignoring fetch");
+      throw new Error("response-filtered-out");
     }
 
     if (
@@ -1109,9 +1113,7 @@ class AsyncFetcher {
       reqresp.payload = new Uint8Array();
       return;
     } else if (!resp.body) {
-      logger.error("Empty body, stopping fetch", { url }, "recorder");
-      await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url!);
-      return;
+      throw new Error("fetch body missing, fetch aborted");
     }
 
     reqresp.fillFetchResponse(resp);
