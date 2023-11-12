@@ -45,9 +45,7 @@ export abstract class BaseTextExtract extends WARCResourceWriter {
 
       this.lastText = text;
       return { changed: true, text };
-      // TODO: Fix this the next time the file is edited.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (e) {
       logger.debug("Error extracting text", e, "text");
       return { changed: false, text: null };
     }

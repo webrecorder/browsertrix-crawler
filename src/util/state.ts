@@ -371,10 +371,8 @@ return 0;
             }
             break;
         }
-        // TODO: Fix this the next time the file is edited.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (e: any) {
-        logger.warn("Error processing message", e, "redisMessage");
+      } catch (e) {
+        logger.warn("Error processing message", e, "redis");
       }
     }
   }
@@ -473,7 +471,7 @@ return 0;
     try {
       data = JSON.parse(json);
     } catch (e) {
-      logger.error("Invalid queued json", json);
+      logger.error("Invalid queued json", json, "redis");
       return null;
     }
 
@@ -648,9 +646,7 @@ return 0;
       for (const url of pendingUrls) {
         await this.redis.unlockpending(this.pkey + ":" + url, this.uid);
       }
-      // TODO: Fix this the next time the file is edited.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (e) {
       logger.error("Redis Del Pending Failed", e, "state");
     }
   }
@@ -668,11 +664,11 @@ return 0;
       );
       switch (res) {
         case 1:
-          logger.info(`Requeued: ${url}`);
+          logger.info(`Requeued: ${url}`, {}, "state");
           break;
 
         case 2:
-          logger.info(`Not requeuing anymore: ${url}`);
+          logger.info(`Not requeuing anymore: ${url}`, {}, "state");
           break;
       }
     }

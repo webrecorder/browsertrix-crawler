@@ -1,4 +1,4 @@
-import { logger } from "./logger.js";
+import { LogContext, logger } from "./logger.js";
 
 export function sleep(seconds: number) {
   return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
@@ -12,7 +12,7 @@ export function timedRun(
   seconds: number,
   message = "Promise timed out",
   logDetails = {},
-  context = "general",
+  context: LogContext = "general",
   isWarn = false,
 ) {
   // return Promise return value or log error if timeout is reached first

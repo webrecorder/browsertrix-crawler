@@ -15,7 +15,7 @@ import {
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
-import { logger } from "./logger.js";
+import { LOG_CONTEXT_TYPES, logger } from "./logger.js";
 
 // ============================================================================
 class ArgParser {
@@ -217,9 +217,11 @@ class ArgParser {
       },
 
       context: {
+        alias: "logContext",
         describe: "Comma-separated list of contexts to include in logs",
         type: "array",
         default: [],
+        choices: LOG_CONTEXT_TYPES,
         coerce,
       },
 

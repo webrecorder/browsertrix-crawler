@@ -85,7 +85,7 @@ export class S3StorageSync {
       prefix: this.objectPrefix,
       targetFilename,
     };
-    logger.info("S3 file upload information", fileUploadInfo, "s3Upload");
+    logger.info("S3 file upload information", fileUploadInfo, "storage");
 
     await this.client.fPutObject(
       this.bucketName,
@@ -119,7 +119,7 @@ export class S3StorageSync {
     logger.info(
       "WACZ S3 file upload resource",
       { targetFilename, resource },
-      "s3Upload",
+      "storage",
     );
 
     if (this.webhookUrl) {
@@ -149,6 +149,8 @@ export class S3StorageSync {
         if (parts.length !== 5) {
           logger.fatal(
             "redis webhook url must be in format: redis://<host>:<port>/<db>/<key>",
+            {},
+            "redis",
           );
         }
         const redis = await initRedis(parts.slice(0, 4).join("/"));
@@ -189,7 +191,7 @@ export async function getFileSize(filename: string) {
 export async function getDirSize(dir: string) {
   const { size, errors } = await getFolderSize(dir);
   if (errors && errors.length) {
-    logger.warn("Size check errors", { errors }, "sizecheck");
+    logger.warn("Size check errors", { errors }, "storage");
   }
   return size;
 }
