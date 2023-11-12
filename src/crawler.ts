@@ -10,6 +10,7 @@ import {
   QueueState,
   PageState,
   WorkerId,
+  PageCallbacks,
 } from "./util/state.js";
 
 import Sitemapper from "sitemapper";
@@ -554,8 +555,7 @@ export class Crawler {
     page: Page;
     cdp: CDPSession;
     workerid: WorkerId;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    callbacks: any;
+    callbacks: PageCallbacks;
   }) {
     await this.browser.setupPage({ page, cdp });
 

@@ -8,6 +8,7 @@ import { Recorder } from "./recorder.js";
 import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
 import { PageState, WorkerId } from "./state.js";
+import { Crawler } from "../crawler.js";
 
 const MAX_REUSE = 5;
 
@@ -17,9 +18,7 @@ const FINISHED_TIMEOUT = 60;
 
 // ===========================================================================
 export function runWorkers(
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  crawler: any,
+  crawler: Crawler,
   numWorkers: number,
   maxPageTime: number,
   collDir: string,

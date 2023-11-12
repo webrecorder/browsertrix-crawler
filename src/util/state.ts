@@ -26,6 +26,20 @@ export enum QueueState {
 export type WorkerId = number;
 
 // ============================================================================
+export type QueueEntry = {
+  added?: string;
+  url: string;
+  seedId: number;
+  depth: number;
+  extraHops: number;
+};
+
+// ============================================================================
+export type PageCallbacks = {
+  addLink?: (url: string) => void;
+};
+
+// ============================================================================
 export class PageState {
   url: string;
   seedId: number;
@@ -38,9 +52,7 @@ export class PageState {
   title?: string;
   mime?: string;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  callbacks: any;
+  callbacks: PageCallbacks = {};
 
   isHTMLPage?: boolean;
   text?: string;
@@ -52,16 +64,11 @@ export class PageState {
 
   logDetails = {};
 
-  constructor(redisData: {
-    url: string;
-    seedId: number;
-    depth: number;
-    extraHops: number;
-  }) {
+  constructor(redisData: QueueEntry) {
     this.url = redisData.url;
     this.seedId = redisData.seedId;
     this.depth = redisData.depth;
-    this.extraHops = redisData.extraHops;
+    this.extraHops = redisData.extraHops || 0;
   }
 }
 
@@ -291,10 +298,7 @@ return 0;
     await this.redis.srem(this.skey, url);
   }
 
-  recheckScope(
-    data: { url: string; depth: number; extraHops: number; seedId: number },
-    seeds: ScopedSeed[],
-  ) {
+  recheckScope(data: QueueEntry, seeds: ScopedSeed[]) {
     const seed = seeds[data.seedId];
 
     return seed.isIncluded(data.url, data.depth, data.extraHops);
@@ -435,21 +439,11 @@ return 0;
 
   //async addToQueue({url : string, seedId, depth = 0, extraHops = 0} = {}, limit = 0) {
   async addToQueue(
-    {
-      url,
-      seedId,
-      depth = 0,
-      extraHops = 0,
-    }: { url: string; seedId: number; depth?: number; extraHops?: number },
+    { url, seedId, depth = 0, extraHops = 0 }: QueueEntry,
     limit = 0,
   ) {
     const added = this._timestamp();
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = { added, url, seedId, depth };
-    if (extraHops) {
-      data.extraHops = extraHops;
-    }
+    const data: QueueEntry = { added, url, seedId, depth, extraHops };
 
     // return codes
     // 0 - url queued successfully
@@ -501,7 +495,7 @@ return 0;
     return { done, queued, pending, failed, errors };
   }
 
-  _getScore(data: { depth: number; extraHops: number }) {
+  _getScore(data: QueueEntry) {
     return (data.depth || 0) + (data.extraHops || 0) * MAX_DEPTH;
   }
 
