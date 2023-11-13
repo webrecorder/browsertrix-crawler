@@ -703,7 +703,12 @@ self.__bx_behaviors.selectMainBehavior();
           return true;
         }
       } catch (e) {
-        // ignore failed direct fetch attempt, do browser-based capture
+        // filtered out direct fetch
+        logger.debug(
+          "Direct fetch response not accepted, continuing with browser fetch",
+          logDetails,
+          "fetch",
+        );
       }
     }
 
