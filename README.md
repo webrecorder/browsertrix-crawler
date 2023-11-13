@@ -381,7 +381,7 @@ that will take precedence over the `--extraHops`.
 
 #### Scope Rule Examples
 
-For example, the following seed will start on `https://example.com/startpage.html` and crawl all pages on the `https://example.com/` domain. With the .* regular expression, any character after will be exclude except pages that match the regexes `example.com/skip.*` or `example.com/search.*`. It will also match characters before if placed on the other end of the string, this means that example.com/skip/postfeed will also be excluded.
+The seed below will start on `https://example.com/startpage.html` and crawl all pages on the `https://example.com/` domain. With the .* regular expression, any character after will be excluded except pages that match the regexes `example.com/skip.*` or `example.com/search.*`. It will also match characters before .* if placed on the other end of the string, this means that example.com/skip/postfeed will also be excluded.
 
 ```
 seeds:
@@ -394,7 +394,7 @@ seeds:
 
 ```
 
-In the following example, the scope include regexes will crawl all page URLs that match `example.com/(crawl-this|crawl-that)` since the | indicates an "or". URLs that match skip$ will be excluded but skip-me wouldn't. For example, `https://example.com/crawl-this/page.html` and `https://example.com/crawl-this/pages/skipme/not` would be crawled, but `https://example.com/crawl-this/pages/skip` would not be.
+In the following example, the scope includes regexes that will crawl all page URLs that match `example.com/(crawl-this|crawl-that)` since the | indicates an "or". URLs that match skip$ will be excluded but skip-me wouldn't. For example, `https://example.com/crawl-this/page.html` and `https://example.com/crawl-this/pages/skipme/not` would be crawled, but `https://example.com/crawl-this/pages/skip` would not be.
 
 ```
 seeds:
@@ -411,7 +411,7 @@ seeds:
   - url: https://the.example.com/startpage.html
     scopeType: "host"
     exclude:
-      - .*.example.com/search/[A-Za-z0-9]+ID=[0-9]+
+      - *.example.com/search/[A-Za-z0-9]+ID=[0-9]+
 ```
 
 The `include`, `exclude`, `scopeType` and `depth` settings can be configured per seed, or globally, for the entire crawl.
@@ -420,7 +420,9 @@ The per-seed settings override the per-crawl settings, if any.
 
 The test suite [tests/scopes.test.js](tests/scopes.test.js) for additional examples of configuring scope inclusion and exclusion rules.
 
-It's important to note that the include and exclude rules will always have regular expressions in effect. This means that for your rules to match, you may have to escape special characters like ?
+It's important to note that the include and exclude rules will always have regular expressions in effect. This means that for your rules to match, you may have to escape special characters that commonly appear in urls like "?", "+", or ".". You just have to place a \ before the character. For example youtube.com/watch\?rdwz7QiG0lk
+
+Browsertrix-Crawler currently doesn't show in the logs if an url was excluded. It's suggested to search for the url you wish to exclude in the log files or access the archive to see if the url was excluded.
 
 ### Page Resource Block Rules
 
