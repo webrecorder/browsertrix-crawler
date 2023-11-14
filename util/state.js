@@ -496,7 +496,7 @@ return 0;
     const res = await this.redis.hlen(this.pkey);
 
     // reset pendings
-    if (res > 0 && !this._lastSize) {
+    if (res > 0 && !(await this.queueSize())) {
       await this.resetPendings();
     }
 
@@ -546,8 +546,7 @@ return 0;
   }
 
   async queueSize() {
-    this._lastSize = await this.redis.zcard(this.qkey);
-    return this._lastSize;
+    return await this.redis.zcard(this.qkey);
   }
 
   async logError(error) {
