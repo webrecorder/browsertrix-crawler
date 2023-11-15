@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import PQueue from "p-queue";
 
-import { logger, errJSON } from "./logger.js";
+import { logger, formatErr } from "./logger.js";
 import { sleep, timestampNow } from "./timing.js";
 import { RequestResponseInfo } from "./reqresp.js";
 
@@ -379,7 +379,7 @@ export class Recorder {
     } catch (e) {
       logger.error(
         "Error handling response, probably skipping URL",
-        { url, ...errJSON(e), ...this.logDetails },
+        { url, ...formatErr(e), ...this.logDetails },
         "recorder",
       );
     }
@@ -390,7 +390,7 @@ export class Recorder {
       } catch (e) {
         logger.debug(
           "continueResponse failed",
-          { requestId, networkId, url, ...errJSON(e), ...this.logDetails },
+          { requestId, networkId, url, ...formatErr(e), ...this.logDetails },
           "recorder",
         );
       }
@@ -534,7 +534,7 @@ export class Recorder {
       } catch (e) {
         logger.warn(
           "Failed to load response body",
-          { url, networkId, ...errJSON(e), ...this.logDetails },
+          { url, networkId, ...formatErr(e), ...this.logDetails },
           "recorder",
         );
         return false;
@@ -1023,7 +1023,7 @@ class AsyncFetcher {
       } catch (e) {
         logger.error(
           "Error reading + digesting payload",
-          { url, filename, ...errJSON(e), ...logDetails },
+          { url, filename, ...formatErr(e), ...logDetails },
           "recorder",
         );
       }
@@ -1092,7 +1092,7 @@ class AsyncFetcher {
       }
       logger.error(
         "Streaming Fetch Error",
-        { url, networkId, filename, ...errJSON(e), ...logDetails },
+        { url, networkId, filename, ...formatErr(e), ...logDetails },
         "recorder",
       );
     } finally {
@@ -1162,7 +1162,7 @@ class AsyncFetcher {
     } catch (e) {
       logger.warn(
         "takeReader interrupted",
-        { ...errJSON(e), url: this.reqresp.url, ...this.recorder.logDetails },
+        { ...formatErr(e), url: this.reqresp.url, ...this.recorder.logDetails },
         "recorder",
       );
       this.reqresp.truncated = "disconnect";
@@ -1186,7 +1186,7 @@ class AsyncFetcher {
     } catch (e) {
       logger.warn(
         "takeStream interrupted",
-        { ...errJSON(e), url: this.reqresp.url, ...this.recorder.logDetails },
+        { ...formatErr(e), url: this.reqresp.url, ...this.recorder.logDetails },
         "recorder",
       );
       this.reqresp.truncated = "disconnect";
@@ -1249,7 +1249,7 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
     } catch (e) {
       logger.debug(
         "Network.loadNetworkResource failed, attempting node fetch",
-        { url, ...errJSON(e), ...this.recorder.logDetails },
+        { url, ...formatErr(e), ...this.recorder.logDetails },
         "recorder",
       );
       return await super._doFetch();

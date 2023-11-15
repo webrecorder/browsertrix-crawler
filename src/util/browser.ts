@@ -6,7 +6,7 @@ import { Readable } from "node:stream";
 import os from "os";
 import path from "path";
 
-import { logger } from "./logger.js";
+import { LogContext, logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
 import puppeteer, {
@@ -123,7 +123,7 @@ export class Browser {
       logger.info(
         `Downloading ${profileFilename} to ${targetFilename}`,
         {},
-        "browserProfile",
+        "browser",
       );
 
       const resp = await fetch(profileFilename);
@@ -237,7 +237,7 @@ export class Browser {
     cdpContextId: number,
     funcString: string,
     logData: Record<string, string>,
-    contextName: string,
+    contextName: LogContext,
   ) {
     const frameUrl = frame.url();
     // TODO: Fix this the next time the file is edited.
@@ -468,7 +468,7 @@ export class Browser {
     funcString: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     logData: Record<string, any>,
-    contextName: string,
+    contextName: LogContext,
   ) {
     // TODO: Fix this the next time the file is edited.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -10,15 +10,46 @@ Object.defineProperty(RegExp.prototype, "toJSON", {
 });
 
 // ===========================================================================
-// TODO: Fix this the next time the file is edited.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function errJSON(e: any) {
+export function formatErr(e: unknown): Record<string, any> {
   if (e instanceof Error) {
-    return { type: "exception", message: e.message, stack: e.stack };
+    return { type: "exception", message: e.message, stack: e.stack || "" };
+  } else if (typeof e === "object") {
+    return e || {};
   } else {
-    return { message: e.toString() };
+    return { message: (e as object).toString() };
   }
 }
+
+// ===========================================================================
+export const LOG_CONTEXT_TYPES = [
+  "general",
+  "worker",
+  "recorder",
+  "writer",
+  "state",
+  "redis",
+  "storage",
+  "text",
+  "exclusion",
+  "screenshots",
+  "screencast",
+  "originOverride",
+  "healthcheck",
+  "browser",
+  "blocking",
+  "behavior",
+  "behaviorScript",
+  "jsError",
+  "fetch",
+  "pageStatus",
+  "memoryStatus",
+  "crawlStatus",
+  "links",
+  "sitemap",
+] as const;
+
+export type LogContext = (typeof LOG_CONTEXT_TYPES)[number];
 
 // ===========================================================================
 class Logger {
@@ -58,20 +89,14 @@ class Logger {
     this.crawlState = crawlState;
   }
 
-  // TODO: Fix this the next time the file is edited.
-
   logAsJSON(
     message: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    data: Record<string, string> | Error | any,
+    dataUnknown: unknown,
     context: string,
     logLevel = "info",
   ) {
-    if (data instanceof Error) {
-      data = errJSON(data);
-    } else if (typeof data !== "object") {
-      data = { message: data.toString() };
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: Record<string, any> = formatErr(dataUnknown);
 
     if (this.logLevels.length) {
       if (this.logLevels.indexOf(logLevel) < 0) {
@@ -90,7 +115,7 @@ class Logger {
       logLevel: logLevel,
       context: context,
       message: message,
-      details: data ? data : {},
+      details: data,
     };
     const string = JSON.stringify(dataToLog);
     console.log(string);
@@ -108,25 +133,30 @@ class Logger {
     }
   }
 
-  info(message: string, data = {}, context = "general") {
+  info(message: string, data: unknown = {}, context: LogContext = "general") {
     this.logAsJSON(message, data, context);
   }
 
-  error(message: string, data = {}, context = "general") {
+  error(message: string, data: unknown = {}, context: LogContext = "general") {
     this.logAsJSON(message, data, context, "error");
   }
 
-  warn(message: string, data = {}, context = "general") {
+  warn(message: string, data: unknown = {}, context: LogContext = "general") {
     this.logAsJSON(message, data, context, "warn");
   }
 
-  debug(message: string, data = {}, context = "general") {
+  debug(message: string, data: unknown = {}, context: LogContext = "general") {
     if (this.debugLogging) {
       this.logAsJSON(message, data, context, "debug");
     }
   }
 
-  fatal(message: string, data = {}, context = "general", exitCode = 0) {
+  fatal(
+    message: string,
+    data = {},
+    context: LogContext = "general",
+    exitCode = 0,
+  ) {
     exitCode = exitCode || this.fatalExitCode;
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
 

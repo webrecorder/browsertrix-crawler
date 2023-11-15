@@ -32,7 +32,7 @@ import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
-import { logger, errJSON } from "./util/logger.js";
+import { logger, formatErr } from "./util/logger.js";
 import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectAllFileSources } from "./util/file_reader.js";
@@ -193,7 +193,7 @@ export class Crawler {
       logger.setDefaultFatalExitCode(0);
     }
 
-    logger.debug("Writing log to: " + this.logFilename, {}, "init");
+    logger.debug("Writing log to: " + this.logFilename, {}, "general");
 
     this.headers = {};
 
@@ -408,8 +408,7 @@ export class Crawler {
       logger.debug(`Clearing ${this.collDir} before starting`);
       try {
         fs.rmSync(this.collDir, { recursive: true, force: true });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (e: any) {
+      } catch (e) {
         logger.error(`Unable to clear ${this.collDir}`, e);
       }
     }
@@ -478,8 +477,7 @@ export class Crawler {
           exitCode = 11;
         }
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (e) {
       logger.error("Crawl failed", e);
       exitCode = 9;
       status = "failing";
@@ -593,7 +591,7 @@ export class Crawler {
       page.on("pageerror", (e) => {
         logger.warn(
           "Page Error",
-          { ...errJSON(e), page: page.url(), workerid },
+          { ...formatErr(e), page: page.url(), workerid },
           "jsError",
         );
       });
@@ -906,7 +904,7 @@ self.__bx_behaviors.selectMainBehavior();
     } catch (e) {
       logger.warn(
         "Behavior run failed",
-        { ...errJSON(e), ...logDetails },
+        { ...formatErr(e), ...logDetails },
         "behavior",
       );
       return false;
@@ -1104,8 +1102,7 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       const driverUrl = new URL(this.params.driver, import.meta.url);
       this.driver = (await import(driverUrl.href)).default;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (e) {
       logger.warn(`Error importing driver ${this.params.driver}`, e);
       return;
     }
@@ -1292,8 +1289,7 @@ self.__bx_behaviors.selectMainBehavior();
         );
         try {
           fs.rmSync(this.collDir, { recursive: true, force: true });
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (e: any) {
+        } catch (e) {
           logger.warn(`Unable to clear ${this.collDir} before exit`, e);
         }
       }
@@ -1465,7 +1461,7 @@ self.__bx_behaviors.selectMainBehavior();
         maxHeapTotal: this.maxHeapTotal,
         ...memUsage,
       },
-      "memory",
+      "memoryStatus",
     );
   }
 
@@ -1498,8 +1494,7 @@ self.__bx_behaviors.selectMainBehavior();
           this.params.statsFilename,
           JSON.stringify(stats, null, 2),
         );
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
+      } catch (err) {
         logger.warn("Stats output failed", err);
       }
     }
@@ -1568,8 +1563,10 @@ self.__bx_behaviors.selectMainBehavior();
       const contentType = resp.headers()["content-type"];
 
       isHTMLPage = this.isHTMLContentType(contentType);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (e) {
+      if (!(e instanceof Error)) {
+        throw e;
+      }
       const msg = e.message || "";
       if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
         // if timeout error, and at least got to content loaded, continue on
@@ -1755,9 +1752,8 @@ self.__bx_behaviors.selectMainBehavior();
           }
         }
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      logger.warn("Link Extraction failed", e);
+    } catch (e) {
+      logger.warn("Link Extraction failed", e, "links");
     }
 
     if (links.length) {
@@ -1804,9 +1800,8 @@ self.__bx_behaviors.selectMainBehavior();
           );
         }
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      logger.error("Queuing Error", e);
+    } catch (e) {
+      logger.error("Queuing Error", e, "links");
     }
   }
 
@@ -1904,8 +1899,7 @@ self.__bx_behaviors.selectMainBehavior();
         const header_formatted = JSON.stringify(header).concat("\n");
         await this.pagesFH.writeFile(header_formatted);
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err) {
       logger.error("pages/pages.jsonl creation failed", err);
     }
   }
@@ -1941,8 +1935,7 @@ self.__bx_behaviors.selectMainBehavior();
     const processedRow = JSON.stringify(row) + "\n";
     try {
       await this.pagesFH!.writeFile(processedRow);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    } catch (err) {
       logger.warn("pages/pages.jsonl append failed", err);
     }
   }
@@ -1970,7 +1963,7 @@ self.__bx_behaviors.selectMainBehavior();
       return this.isHTMLContentType(resp.headers.get("Content-Type"));
     } catch (e) {
       // can't confirm not html, so try in browser
-      logger.debug("HEAD request failed", { ...errJSON(e), ...logDetails });
+      logger.debug("HEAD request failed", { ...formatErr(e), ...logDetails });
       return true;
     }
   }
@@ -2021,8 +2014,7 @@ self.__bx_behaviors.selectMainBehavior();
       const { sites } = await sitemapper.fetch();
       logger.info("Sitemap Urls Found", { urls: sites.length }, "sitemap");
       await this.queueInScopeUrls(seedId, sites, 0);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (e) {
       logger.warn("Error fetching sites from sitemap", e, "sitemap");
     }
   }
@@ -2174,8 +2166,7 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       logger.info(`Saving crawl state to: ${filename}`);
       await fsp.writeFile(filename, res);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
+    } catch (e) {
       logger.error(`Failed to write save state file: ${filename}`, e);
       return;
     }
