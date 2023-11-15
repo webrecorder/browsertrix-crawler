@@ -89,8 +89,6 @@ export class Recorder {
   }: {
     workerid: WorkerId;
     collDir: string;
-    // TODO: Fix this the next time the file is edited.
-
     crawler: Crawler;
   }) {
     this.workerid = workerid;
@@ -111,13 +109,17 @@ export class Recorder {
     fs.mkdirSync(this.archivesDir, { recursive: true });
     fs.mkdirSync(this.tempCdxDir, { recursive: true });
 
+    const prefix = crawler.params.warcPrefix || "rec";
     const crawlId = process.env.CRAWL_ID || os.hostname();
-    const filename = `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`;
+    const filenameTemplate = `${prefix}-${crawlId}-$ts-${this.workerid}.warc${
+      this.gzip ? ".gz" : ""
+    }`;
 
     this.writer = new WARCWriter({
       archivesDir: this.archivesDir,
       tempCdxDir: this.tempCdxDir,
-      filename,
+      filenameTemplate,
+      rolloverSize: crawler.params.rolloverSize,
       gzip: this.gzip,
       logDetails: this.logDetails,
     });

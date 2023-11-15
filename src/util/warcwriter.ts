@@ -6,18 +6,24 @@ import { CDXIndexer } from "warcio";
 import { WARCSerializer } from "warcio/node";
 import { logger, formatErr } from "./logger.js";
 import type { IndexerOffsetLength, WARCRecord } from "warcio";
+import { timestampNow } from "./timing.js";
+
+const DEFAULT_ROLLOVER_SIZE = 1_000_000_000;
 
 // =================================================================
 export class WARCWriter implements IndexerOffsetLength {
   archivesDir: string;
   tempCdxDir: string;
-  filename: string;
+  filenameTemplate: string;
+  filename?: string;
   gzip: boolean;
   logDetails: Record<string, string>;
 
   offset = 0;
   recordLength = 0;
   done = false;
+
+  rolloverSize: number;
 
   indexer?: CDXIndexer;
 
@@ -27,21 +33,29 @@ export class WARCWriter implements IndexerOffsetLength {
   constructor({
     archivesDir,
     tempCdxDir,
-    filename,
+    filenameTemplate,
+    rolloverSize = DEFAULT_ROLLOVER_SIZE,
     gzip,
     logDetails,
   }: {
     archivesDir: string;
     tempCdxDir: string;
-    filename: string;
+    filenameTemplate: string;
+    rolloverSize?: number;
     gzip: boolean;
     logDetails: Record<string, string>;
   }) {
     this.archivesDir = archivesDir;
     this.tempCdxDir = tempCdxDir;
-    this.filename = filename;
-    this.gzip = gzip;
     this.logDetails = logDetails;
+    this.gzip = gzip;
+    this.rolloverSize = rolloverSize;
+
+    this.filenameTemplate = filenameTemplate;
+  }
+
+  _initNewFile() {
+    const filename = this.filenameTemplate.replace("$ts", timestampNow());
 
     this.offset = 0;
     this.recordLength = 0;
@@ -49,9 +63,24 @@ export class WARCWriter implements IndexerOffsetLength {
     if (this.tempCdxDir) {
       this.indexer = new CDXIndexer({ format: "cdxj" });
     }
+
+    return filename;
   }
 
   private async initFH() {
+    if (this.offset >= this.rolloverSize) {
+      logger.info(
+        `Rollover size exceeded ${this.offset} >= ${this.rolloverSize}, create new WARC`,
+        this.logDetails,
+        "writer",
+      );
+      this.filename = this._initNewFile();
+      this.fh = null;
+      this.cdxFH = null;
+    } else if (!this.filename) {
+      this.filename = this._initNewFile();
+    }
+
     if (!this.fh) {
       this.fh = fs.createWriteStream(
         path.join(this.archivesDir, this.filename),
@@ -127,7 +156,7 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   _writeCDX(record: WARCRecord | null) {
-    if (this.indexer) {
+    if (this.indexer && this.filename) {
       const cdx = this.indexer.indexRecord(record, this, this.filename);
 
       if (this.indexer && this.cdxFH && cdx) {

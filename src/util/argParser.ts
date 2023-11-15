@@ -489,6 +489,13 @@ class ArgParser {
           "if set, runs internal redis without protected mode to allow external access (for debugging)",
         type: "boolean",
       },
+
+      warcPrefix: {
+        describe:
+          "prefix for WARC files generated, including WARCs added to WACZ",
+        type: "string",
+        default: "rec",
+      },
     };
   }
 
