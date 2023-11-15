@@ -31,7 +31,7 @@ import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
-import { logger, errJSON } from "./util/logger.js";
+import { logger, formatErr } from "./util/logger.js";
 import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectAllFileSources } from "./util/file_reader.js";
@@ -591,7 +591,7 @@ export class Crawler {
       page.on("pageerror", (e) => {
         logger.warn(
           "Page Error",
-          { ...errJSON(e), page: page.url(), workerid },
+          { ...formatErr(e), page: page.url(), workerid },
           "jsError",
         );
       });
@@ -899,7 +899,7 @@ self.__bx_behaviors.selectMainBehavior();
     } catch (e) {
       logger.warn(
         "Behavior run failed",
-        { ...errJSON(e), ...logDetails },
+        { ...formatErr(e), ...logDetails },
         "behavior",
       );
       return false;
@@ -1958,7 +1958,7 @@ self.__bx_behaviors.selectMainBehavior();
       return this.isHTMLContentType(resp.headers.get("Content-Type"));
     } catch (e) {
       // can't confirm not html, so try in browser
-      logger.debug("HEAD request failed", { ...errJSON(e), ...logDetails });
+      logger.debug("HEAD request failed", { ...formatErr(e), ...logDetails });
       return true;
     }
   }

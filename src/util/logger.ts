@@ -11,7 +11,7 @@ Object.defineProperty(RegExp.prototype, "toJSON", {
 
 // ===========================================================================
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function errJSON(e: unknown): Record<string, any> {
+export function formatErr(e: unknown): Record<string, any> {
   if (e instanceof Error) {
     return { type: "exception", message: e.message, stack: e.stack || "" };
   } else if (typeof e === "object") {
@@ -34,7 +34,7 @@ export const LOG_CONTEXT_TYPES = [
   "exclusion",
   "screenshots",
   "screencast",
-  "originoverride",
+  "originOverride",
   "healthcheck",
   "browser",
   "blocking",
@@ -96,7 +96,7 @@ class Logger {
     logLevel = "info",
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: Record<string, any> = errJSON(dataUnknown);
+    const data: Record<string, any> = formatErr(dataUnknown);
 
     if (this.logLevels.length) {
       if (this.logLevels.indexOf(logLevel) < 0) {

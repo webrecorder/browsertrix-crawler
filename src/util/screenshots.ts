@@ -1,7 +1,7 @@
 import sharp from "sharp";
 
 import { WARCResourceWriter } from "./warcresourcewriter.js";
-import { logger, errJSON } from "./logger.js";
+import { logger, formatErr } from "./logger.js";
 import { Browser } from "./browser.js";
 
 // ============================================================================
@@ -65,7 +65,7 @@ export class Screenshots extends WARCResourceWriter {
     } catch (e) {
       logger.error(
         "Taking screenshot failed",
-        { page: this.url, type: screenshotType, ...errJSON(e) },
+        { page: this.url, type: screenshotType, ...formatErr(e) },
         "screenshots",
       );
     }
@@ -96,7 +96,7 @@ export class Screenshots extends WARCResourceWriter {
     } catch (e) {
       logger.error(
         "Taking screenshot failed",
-        { page: this.url, type: screenshotType, ...errJSON(e) },
+        { page: this.url, type: screenshotType, ...formatErr(e) },
         "screenshots",
       );
     }

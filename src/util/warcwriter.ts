@@ -4,7 +4,7 @@ import path from "path";
 
 import { CDXIndexer } from "warcio";
 import { WARCSerializer } from "warcio/node";
-import { logger, errJSON } from "./logger.js";
+import { logger, formatErr } from "./logger.js";
 import type { IndexerOffsetLength, WARCRecord } from "warcio";
 
 // =================================================================
@@ -107,7 +107,7 @@ export class WARCWriter implements IndexerOffsetLength {
       } catch (e) {
         logger.error(
           "Error writing to WARC, corruption possible",
-          { ...errJSON(e), url, ...this.logDetails },
+          { ...formatErr(e), url, ...this.logDetails },
           "writer",
         );
       }

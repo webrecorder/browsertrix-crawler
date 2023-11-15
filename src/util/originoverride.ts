@@ -1,5 +1,5 @@
 import { HTTPRequest, Page } from "puppeteer-core";
-import { errJSON, logger } from "./logger.js";
+import { formatErr, logger } from "./logger.js";
 import { Browser } from "./browser.js";
 
 export class OriginOverride {
@@ -52,15 +52,15 @@ export class OriginOverride {
         logger.debug(
           "Origin overridden",
           { orig: url, dest: newUrl, status, body: body.length },
-          "originoverride",
+          "originOverride",
         );
 
         request.respond({ body, headers: respHeaders, status }, -1);
       } catch (e) {
         logger.warn(
           "Error overriding origin",
-          { ...errJSON(e), url: page.url() },
-          "originoverride",
+          { ...formatErr(e), url: page.url() },
+          "originOverride",
         );
         request.continue({}, -1);
       }

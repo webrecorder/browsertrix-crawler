@@ -1,6 +1,6 @@
 import fs from "fs";
 
-import { logger, errJSON } from "./logger.js";
+import { logger, formatErr } from "./logger.js";
 import { HTTPRequest, Page } from "puppeteer-core";
 import { Browser } from "./browser.js";
 
@@ -97,7 +97,7 @@ export class BlockRules {
       } catch (e) {
         logger.warn(
           "Error handling request",
-          { ...errJSON(e), ...logDetails },
+          { ...formatErr(e), ...logDetails },
           "blocking",
         );
       }
@@ -122,7 +122,7 @@ export class BlockRules {
     } catch (e) {
       logger.debug(
         `Block: (${blockState}) Failed On: ${url}`,
-        { ...errJSON(e), ...logDetails },
+        { ...formatErr(e), ...logDetails },
         "blocking",
       );
     }
@@ -276,7 +276,7 @@ export class BlockRules {
     } catch (e) {
       logger.debug(
         "Error determining text match",
-        { ...errJSON(e), ...logDetails },
+        { ...formatErr(e), ...logDetails },
         "blocking",
       );
     }

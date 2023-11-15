@@ -2,7 +2,7 @@ import os from "os";
 
 import { v4 as uuidv4 } from "uuid";
 
-import { logger, errJSON } from "./logger.js";
+import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
 import { Recorder } from "./recorder.js";
 import { rxEscape } from "./seeds.js";
@@ -247,7 +247,7 @@ export class PageWorker {
           if (this.page === page) {
             logger.error(
               "Page Crashed",
-              { ...errJSON(err), ...this.logDetails },
+              { ...formatErr(err), ...this.logDetails },
               "worker",
             );
             this.crashed = true;
@@ -263,7 +263,7 @@ export class PageWorker {
       } catch (err) {
         logger.warn(
           "Error getting new page",
-          { workerid: this.id, ...errJSON(err) },
+          { workerid: this.id, ...formatErr(err) },
           "worker",
         );
         retry++;
@@ -332,7 +332,7 @@ export class PageWorker {
       if (e instanceof Error && e.message !== "logged" && !this.crashed) {
         logger.error(
           "Worker Exception",
-          { ...errJSON(e), ...this.logDetails },
+          { ...formatErr(e), ...this.logDetails },
           "worker",
         );
       }
@@ -360,7 +360,7 @@ export class PageWorker {
     } catch (e) {
       logger.error(
         "Worker error, exiting",
-        { ...errJSON(e), workerid: this.id },
+        { ...formatErr(e), workerid: this.id },
         "worker",
       );
     } finally {
