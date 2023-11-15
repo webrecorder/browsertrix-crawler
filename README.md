@@ -35,7 +35,7 @@ the following commands. Replace `[URL]` with the web site you'd like to crawl.
 
 Here's how you can use some of the command-line options to configure the crawl:
 
-- To include automated text extraction for full text search, add the `--text` flag.
+- To include automated text extraction for full text search to pages.jsonl, add the `--text` flag. To write extracted text to WARCs instead of or in addition to pages.jsonl, see Text Extraction below.
 
 - To limit the crawl to a maximum number of pages, add `--pageLimit P` where P is the number of pages that will be crawled.
 
@@ -68,15 +68,13 @@ Options:
                                             llel           [number] [default: 1]
       --crawlId, --id                       A user provided ID for this crawl or
                                              crawl configuration (can also be se
-                                            t via CRAWL_ID env var)
-                                              [string] [default: "7760c6c5f6ca"]
-      --newContext                          Deprecated as of 0.8.0, any values p
-                                            assed will be ignored
-                                                        [string] [default: null]
+                                            t via CRAWL_ID env var, defaults to
+                                            hostname)                   [string]
       --waitUntil                           Puppeteer page.goto() condition to w
                                             ait for before continuing, can be mu
                                             ltiple separated by ','
-                                                  [default: "load,networkidle2"]
+   [array] [choices: "load", "domcontentloaded", "networkidle0", "networkidle2"]
+                                              [default: ["load","networkidle2"]]
       --depth                               The depth of the crawl for all seeds
                                                           [number] [default: -1]
       --extraHops                           Number of extra 'hops' to follow, be
@@ -137,15 +135,16 @@ Options:
       --logging                             Logging options for crawler, can inc
                                             lude: stats (enabled by default), js
                                             errors, pywb, debug
-                                                     [string] [default: "stats"]
+                                                    [array] [default: ["stats"]]
       --logLevel                            Comma-separated list of log levels t
                                             o include in logs
-                                                          [string] [default: ""]
+                                                           [array] [default: []]
       --context                             Comma-separated list of contexts to
-                                            include in logs
-                                                          [string] [default: ""]
-      --text                                If set, extract text to the pages.js
-                                            onl file  [boolean] [default: false]
+                                            include in logs[array] [default: []]
+      --text                                Extract initial (default) or final t
+                                            ext to pages.jsonl or WARC resource
+                                            record(s)
+                       [array] [choices: "to-pages", "to-warc", "final-to-warc"]
       --cwd                                 Crawl working directory for captures
                                              (pywb root). If not set, defaults t
                                             o process.cwd()
@@ -171,7 +170,7 @@ Options:
                                             o crawl working directory)
       --behaviors                           Which background behaviors to enable
                                              on each page
-                [string] [default: "autoplay,autofetch,autoscroll,siteSpecific"]
+         [array] [default: ["autoplay","autofetch","autoscroll","siteSpecific"]]
       --behaviorTimeout                     If >0, timeout (in seconds) for in-p
                                             age behavior will run on each page.
                                             If 0, a behavior can run until finis
@@ -188,7 +187,7 @@ Options:
       --screenshot                          Screenshot options for crawler, can
                                             include: view, thumbnail, fullPage (
                                             comma-separated list)
-                                                          [string] [default: ""]
+                [array] [choices: "view", "thumbnail", "fullPage"] [default: []]
       --screencastPort                      If set to a non-zero value, starts a
                                             n HTTP server with screencast access
                                             ible on this port
@@ -236,6 +235,7 @@ Options:
       --restartsOnError                     if set, assume will be restarted if
                                             interrupted, don't run post-crawl pr
                                             ocesses on interrupt
+                                                      [boolean] [default: false]
       --netIdleWait                         if set, wait for network idle after
                                             page load and after behaviors are do
                                             ne (in seconds). if -1 (default), de
@@ -259,8 +259,15 @@ Options:
       --failOnFailedSeed                    If set, crawler will fail with exit
                                             code 1 if any seed fails
                                                       [boolean] [default: false]
+      --failOnFailedLimit                   If set, save state and exit if numbe
+                                            r of failed pages exceeds this value
+                                                           [number] [default: 0]
+      --customBehaviors                     injects a custom behavior file or se
+                                            t of behavior files in a directory
+      --debugAccessRedis                    if set, runs internal redis without
+                                            protected mode to allow external acc
+                                            ess (for debugging)        [boolean]
       --config                              Path to YAML config file
-
 ```
 </details>
 
@@ -528,13 +535,27 @@ With version 0.8.0, Browsertrix Crawler includes the ability to take screenshots
 
 Three screenshot options are available:
 
-- `--view`: Takes a png screenshot of the initially visible viewport (1920x1080)
-- `--fullPage`: Takes a png screenshot of the full page
-- `--thumbnail`: Takes a jpeg thumbnail of the initially visible viewport (1920x1080)
+- `--screenshot view`: Takes a png screenshot of the initially visible viewport (1920x1080)
+- `--screenshot fullPage`: Takes a png screenshot of the full page
+- `--screenshot thumbnail`: Takes a jpeg thumbnail of the initially visible viewport (1920x1080)
 
-These can be combined using a comma-separated list passed to the `--screenshot` option, e.g.: `--screenshot thumbnail,view,fullPage`.
+These can be combined using a comma-separated list passed to the `--screenshot` option, e.g.: `--screenshot thumbnail,view,fullPage` or passed in
+separately `--screenshot thumbnail --screenshot view --screenshot fullPage`.
 
 Screenshots are written into a `screenshots.warc.gz` WARC file in the `archives/` directory. If the `--generateWACZ` command line option is used, the screenshots WARC is written into the `archive` directory of the WACZ file and indexed alongside the other WARCs.
+
+### Text Extraction
+
+Browsertrix Crawler supports text extraction via the `--text` flag.
+
+With version 0.12.0, the `--text` flag accepts one or more of the following extraction options:
+
+- `--text to-pages` - Extract initial text and add it to the text field in pages.jsonl
+- `--text to-warc` - Extract initial page text and add it to a `urn:text:<url>` WARC resource record
+- `--text final-to-warc` - Extract the final page text after all behaviors have run and add it to a `urn:textFinal:<url>` WARC resource record
+
+The options can be separate or combined into a comma separate list, eg. `--text to-warc,final-to-warc` or `--text to-warc --text final-to-warc`
+are equivalent. For backwards compatibility, `--text` alone is equivalent to `--text to-pages`.
 
 ### Watching the crawl -- Screencasting
 
