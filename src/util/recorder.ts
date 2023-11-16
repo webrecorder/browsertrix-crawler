@@ -102,7 +102,7 @@ export class Recorder {
     this.collDir = collDir;
 
     this.archivesDir = path.join(this.collDir, "archive");
-    this.tempdir = path.join(this.collDir, "tmp-dl");
+    this.tempdir = path.join(os.tmpdir(), "tmp-dl");
     this.tempCdxDir = path.join(this.collDir, "tmp-cdx");
 
     fs.mkdirSync(this.tempdir, { recursive: true });
