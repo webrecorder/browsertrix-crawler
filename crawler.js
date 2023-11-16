@@ -898,8 +898,14 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.writeStats();
 
-    // extra wait for all resources to land into WARCs
-    await this.awaitPendingClear();
+    // extra wait with timeout for all resources to land into WARCs
+    await timedRun(
+      this.awaitPendingClear(),
+      this.maxPageTime * this.params.workers,
+      "Waiting for pending resources timed out",
+      {timeout: this.maxPageTime * this.params.workers},
+      "general"
+    );
 
     // if crawl has been stopped, mark as final exit for post-crawl tasks
     if (await this.crawlState.isCrawlStopped()) {
