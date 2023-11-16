@@ -17,6 +17,7 @@ export class WARCWriter implements IndexerOffsetLength {
 
   offset = 0;
   recordLength = 0;
+  done = false;
 
   indexer?: CDXIndexer;
 
@@ -50,7 +51,7 @@ export class WARCWriter implements IndexerOffsetLength {
     }
   }
 
-  async initFH() {
+  private async initFH() {
     if (!this.fh) {
       this.fh = fs.createWriteStream(
         path.join(this.archivesDir, this.filename),
@@ -68,6 +69,15 @@ export class WARCWriter implements IndexerOffsetLength {
     requestRecord: WARCRecord,
     responseSerializer: WARCSerializer | undefined = undefined,
   ) {
+    if (this.done) {
+      logger.warn(
+        "Writer closed, not writing records",
+        this.logDetails,
+        "writer",
+      );
+      return;
+    }
+
     const opts = { gzip: this.gzip };
 
     if (!responseSerializer) {
@@ -140,6 +150,8 @@ export class WARCWriter implements IndexerOffsetLength {
       await streamFinish(this.cdxFH);
       this.cdxFH = null;
     }
+
+    this.done = true;
   }
 }
 
