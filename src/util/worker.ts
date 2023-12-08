@@ -17,7 +17,7 @@ const TEARDOWN_TIMEOUT = 10;
 const FINISHED_TIMEOUT = 60;
 
 // ===========================================================================
-export function runWorkers(
+export async function runWorkers(
   crawler: Crawler,
   numWorkers: number,
   maxPageTime: number,
@@ -46,7 +46,11 @@ export function runWorkers(
     workers.push(new PageWorker(i + offset, crawler, maxPageTime, collDir));
   }
 
-  return Promise.allSettled(workers.map((worker) => worker.run()));
+  await Promise.allSettled(workers.map((worker) => worker.run()));
+
+  await crawler.browser.close();
+
+  await Promise.allSettled(workers.map((worker) => worker.finalize()));
 }
 
 // ===========================================================================
@@ -362,10 +366,12 @@ export class PageWorker {
         { ...formatErr(e), workerid: this.id },
         "worker",
       );
-    } finally {
-      if (this.recorder) {
-        await this.recorder.onDone();
-      }
+    }
+  }
+
+  async finalize() {
+    if (this.recorder) {
+      await this.recorder.onDone(this.maxPageTime);
     }
   }
 

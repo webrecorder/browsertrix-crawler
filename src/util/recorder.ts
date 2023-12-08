@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import PQueue from "p-queue";
 
 import { logger, formatErr } from "./logger.js";
-import { sleep, timestampNow } from "./timing.js";
+import { sleep, timedRun, timestampNow } from "./timing.js";
 import { RequestResponseInfo } from "./reqresp.js";
 
 // @ts-expect-error TODO fill in why error is expected
@@ -29,6 +29,8 @@ const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_BROWSER_TEXT_FETCH_SIZE = 25_000_000;
 
 const MAX_NETWORK_LOAD_SIZE = 200_000_000;
+
+const TAKE_STREAM_BUFF_SIZE = 1024 * 64;
 
 const ASYNC_FETCH_DUPE_KEY = "s:fetchdupe";
 
@@ -87,8 +89,6 @@ export class Recorder {
   }: {
     workerid: WorkerId;
     collDir: string;
-    // TODO: Fix this the next time the file is edited.
-
     crawler: Crawler;
   }) {
     this.workerid = workerid;
@@ -102,20 +102,24 @@ export class Recorder {
     this.collDir = collDir;
 
     this.archivesDir = path.join(this.collDir, "archive");
-    this.tempdir = path.join(this.collDir, "tmp-dl");
+    this.tempdir = path.join(os.tmpdir(), "tmp-dl");
     this.tempCdxDir = path.join(this.collDir, "tmp-cdx");
 
     fs.mkdirSync(this.tempdir, { recursive: true });
     fs.mkdirSync(this.archivesDir, { recursive: true });
     fs.mkdirSync(this.tempCdxDir, { recursive: true });
 
+    const prefix = crawler.params.warcPrefix || "rec";
     const crawlId = process.env.CRAWL_ID || os.hostname();
-    const filename = `rec-${crawlId}-${timestampNow()}-${this.workerid}.warc`;
+    const filenameTemplate = `${prefix}-${crawlId}-$ts-${this.workerid}.warc${
+      this.gzip ? ".gz" : ""
+    }`;
 
     this.writer = new WARCWriter({
       archivesDir: this.archivesDir,
       tempCdxDir: this.tempCdxDir,
-      filename,
+      filenameTemplate,
+      rolloverSize: crawler.params.rolloverSize,
       gzip: this.gzip,
       logDetails: this.logDetails,
     });
@@ -658,11 +662,21 @@ export class Recorder {
     // Any page-specific handling before page is closed.
   }
 
-  async onDone() {
+  async onDone(timeout: number) {
     await this.crawlState.setStatus("pending-wait");
 
-    logger.debug("Finishing Fetcher Queue", this.logDetails, "recorder");
-    await this.fetcherQ.onIdle();
+    const finishFetch = async () => {
+      logger.debug("Finishing Fetcher Queue", this.logDetails, "recorder");
+      await this.fetcherQ.onIdle();
+    };
+
+    await timedRun(
+      finishFetch(),
+      timeout,
+      "Finishing Fetch Timed Out",
+      this.logDetails,
+      "recorder",
+    );
 
     logger.debug("Finishing WARC writing", this.logDetails, "recorder");
     await this.warcQ.onIdle();
@@ -1020,6 +1034,17 @@ class AsyncFetcher {
           readSize -= serializer.httpHeadersBuff.length;
         }
         reqresp.readSize = readSize;
+        // set truncated field and recompute header buff
+        if (reqresp.truncated) {
+          responseRecord.warcHeaders.headers.set(
+            "WARC-Truncated",
+            reqresp.truncated,
+          );
+          // todo: keep this internal in warcio after adding new header
+          serializer.warcHeadersBuff = encoder.encode(
+            responseRecord.warcHeaders.toString(),
+          );
+        }
       } catch (e) {
         logger.error(
           "Error reading + digesting payload",
@@ -1150,6 +1175,7 @@ class AsyncFetcher {
   }
 
   async *takeReader(reader: ReadableStreamDefaultReader<Uint8Array>) {
+    let size = 0;
     try {
       while (true) {
         const { value, done } = await reader.read();
@@ -1157,12 +1183,18 @@ class AsyncFetcher {
           break;
         }
 
+        size += value.length;
         yield value;
       }
     } catch (e) {
       logger.warn(
         "takeReader interrupted",
-        { ...formatErr(e), url: this.reqresp.url, ...this.recorder.logDetails },
+        {
+          size,
+          url: this.reqresp.url,
+          ...formatErr(e),
+          ...this.recorder.logDetails,
+        },
         "recorder",
       );
       this.reqresp.truncated = "disconnect";
@@ -1170,13 +1202,16 @@ class AsyncFetcher {
   }
 
   async *takeStreamIter(cdp: CDPSession, stream: Protocol.IO.StreamHandle) {
+    let size = 0;
     try {
       while (true) {
         const { data, base64Encoded, eof } = await cdp.send("IO.read", {
           handle: stream,
+          size: TAKE_STREAM_BUFF_SIZE,
         });
         const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
 
+        size += buff.length;
         yield buff;
 
         if (eof) {
@@ -1186,7 +1221,12 @@ class AsyncFetcher {
     } catch (e) {
       logger.warn(
         "takeStream interrupted",
-        { ...formatErr(e), url: this.reqresp.url, ...this.recorder.logDetails },
+        {
+          size,
+          url: this.reqresp.url,
+          ...formatErr(e),
+          ...this.recorder.logDetails,
+        },
         "recorder",
       );
       this.reqresp.truncated = "disconnect";
@@ -1314,10 +1354,6 @@ function createResponse(
   const warcHeaders: Record<string, string> = {
     "WARC-Page-ID": pageid,
   };
-
-  if (reqresp.truncated) {
-    warcHeaders["WARC-Truncated"] = reqresp.truncated;
-  }
 
   if (!contentIter) {
     contentIter = [reqresp.payload] as Iterable<Uint8Array>;

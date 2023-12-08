@@ -1225,8 +1225,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.serializeConfig(true);
 
-    await this.browser.close();
-
     if (this.pagesFH) {
       await this.pagesFH.sync();
       await this.pagesFH.close();
