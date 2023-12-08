@@ -5,7 +5,7 @@ import md5 from "md5";
 
 test("ensure basic crawl run with docker run passes", async () => {
   child_process.execSync(
-    'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://www.example.com/ --generateWACZ  --text --collection wr-net --combineWARC --rolloverSize 10000 --workers 2 --title "test title" --description "test description"',
+    'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com/ --generateWACZ  --text --collection wr-net --combineWARC --rolloverSize 10000 --workers 2 --title "test title" --description "test description" --warcPrefix custom-prefix',
   );
 
   child_process.execSync(
@@ -15,6 +15,20 @@ test("ensure basic crawl run with docker run passes", async () => {
   child_process.execSync(
     "unzip test-crawls/collections/wr-net/wr-net.wacz -d test-crawls/collections/wr-net/wacz",
   );
+});
+
+test("check that individual WARCs have correct prefix and are under rollover size", () => {
+  const archiveWarcLists = fs.readdirSync(
+    "test-crawls/collections/wr-net/archive",
+  );
+
+  archiveWarcLists.forEach((filename) => {
+    expect(filename.startsWith("custom-prefix-")).toEqual(true);
+    const size = fs.statSync(
+      path.join("test-crawls/collections/wr-net/archive", filename),
+    ).size;
+    expect(size < 10000).toEqual(true);
+  });
 });
 
 test("check that a combined warc file exists in the archive folder", () => {
