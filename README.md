@@ -401,7 +401,7 @@ seeds:
 
 ```
 
-In the following example, the scope includes regexes that will crawl all page URLs that match `example.com/(crawl-this|crawl-that)` since the | indicates an "or". URLs that match skip$ will be excluded but skip-me wouldn't. For example, `https://example.com/crawl-this/page.html` and `https://example.com/crawl-this/pages/skipme/not` would be crawled, but `https://example.com/crawl-this/pages/skip` would not be.
+In the following example, the scope includes regexes that will crawl all page URLs that match `example.com/(crawl-this|crawl-that)` since the | indicates an "or". URLs that match `skip$` will be excluded but `skip-me` wouldn't. For example, `https://example.com/crawl-this/page.html` and `https://example.com/crawl-this/pages/skipme/not` would be crawled, but `https://example.com/crawl-this/pages/skip` would not be.
 
 ```
 seeds:
