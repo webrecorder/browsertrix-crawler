@@ -34,3 +34,18 @@ test("test custom behaviors", async () => {
     ) > 0,
   ).toBe(true);
 });
+
+test("test invalid behavior exit", async () => {
+  let status = 0;
+
+  try {
+    child_process.execSync(
+      "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/invalid-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --url https://example.org/ --url https://webrecorder.net/ --customBehaviors /custom-behaviors/invalid-export.js --scopeType page",
+    );
+  } catch (e) {
+    status = e.status;
+  }
+
+  // logger fatal exit code
+  expect(status).toBe(17);
+});

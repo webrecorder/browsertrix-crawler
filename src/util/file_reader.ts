@@ -7,7 +7,7 @@ export function collectAllFileSources(
   fileOrDir: string,
   ext?: string,
   depth = 0,
-): string[] {
+): { path: string; contents: string }[] {
   const resolvedPath = path.resolve(fileOrDir);
 
   if (depth >= MAX_DEPTH) {
@@ -21,15 +21,23 @@ export function collectAllFileSources(
 
   if (stat.isFile() && (ext === null || path.extname(resolvedPath) === ext)) {
     const contents = fs.readFileSync(resolvedPath);
-    return [`/* src: ${resolvedPath} */\n\n${contents}`];
+    return [
+      {
+        path: resolvedPath,
+        contents: `/* src: ${resolvedPath} */\n\n${contents}`,
+      },
+    ];
   }
 
   if (stat.isDirectory()) {
     const files = fs.readdirSync(resolvedPath);
-    return files.reduce((acc: string[], next: string) => {
-      const nextPath = path.join(fileOrDir, next);
-      return [...acc, ...collectAllFileSources(nextPath, ext, depth + 1)];
-    }, []);
+    return files.reduce(
+      (acc: { path: string; contents: string }[], next: string) => {
+        const nextPath = path.join(fileOrDir, next);
+        return [...acc, ...collectAllFileSources(nextPath, ext, depth + 1)];
+      },
+      [],
+    );
   }
 
   if (depth === 0) {

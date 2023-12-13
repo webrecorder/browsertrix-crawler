@@ -305,6 +305,19 @@ export class Browser {
     return page.evaluateOnNewDocument(script);
   }
 
+  async checkScript(cdp: CDPSession, filename: string, script: string) {
+    const { exceptionDetails } = await cdp.send("Runtime.evaluate", {
+      expression: script,
+    });
+    if (exceptionDetails) {
+      logger.fatal(
+        "Custom behavior load error, aborting",
+        { filename, ...exceptionDetails },
+        "behavior",
+      );
+    }
+  }
+
   async _init(
     launchOpts: PuppeteerLaunchOptions,
     // eslint-disable-next-line @typescript-eslint/ban-types
