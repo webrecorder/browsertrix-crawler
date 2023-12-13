@@ -411,7 +411,7 @@ seeds:
       - skip$
 ```
 
-It's possible to do more complex regular expressions. It will only target characters and numbers after search until the word ID= shows, and any numbers after the word ID will be matched. This means that https://example.com/search/6vH8R4TmID=5819 won't be crawled, but https://example.com/search/ID=5819, https://example.com/search/6vH8R4Tm and https://example.com/search/2o3Jq89cID=5ag8h19 will be crawled
+For a more complex regular expression, one might only target characters and numbers after `search` until the string `ID=` shows, and any numbers after the string `ID` will be matched. This means that https://example.com/search/6vH8R4TmID=5819 won't be crawled, but https://example.com/search/ID=5819, https://example.com/search/6vH8R4Tm, and https://example.com/search/2o3Jq89cID=5ag8h19 will be crawled
 
 ```
 seeds:
