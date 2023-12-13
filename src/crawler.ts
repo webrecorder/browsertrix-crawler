@@ -149,6 +149,7 @@ export class Crawler {
   done = false;
 
   customBehaviors = "";
+  behaviorsChecked = false;
   behaviorLastLine?: string;
 
   browser: Browser;
@@ -620,6 +621,10 @@ self.__bx_behaviors.init(${this.params.behaviorOpts}, false);
 ${this.customBehaviors}
 self.__bx_behaviors.selectMainBehavior();
 `;
+      if (!this.behaviorsChecked && this.customBehaviors) {
+        await this.checkBehaviorScripts(cdp);
+        this.behaviorsChecked = true;
+      }
 
       await this.browser.addInitScript(page, initScript);
     }
@@ -628,11 +633,23 @@ self.__bx_behaviors.selectMainBehavior();
   loadCustomBehaviors(filename: string) {
     let str = "";
 
-    for (const source of collectAllFileSources(filename, ".js")) {
-      str += `self.__bx_behaviors.load(${source});\n`;
+    for (const { contents } of collectAllFileSources(filename, ".js")) {
+      str += `self.__bx_behaviors.load(${contents});\n`;
     }
 
     return str;
+  }
+
+  async checkBehaviorScripts(cdp: CDPSession) {
+    const filename = this.params.customBehaviors;
+
+    if (!filename) {
+      return;
+    }
+
+    for (const { path, contents } of collectAllFileSources(filename, ".js")) {
+      await this.browser.checkScript(cdp, path, contents);
+    }
   }
 
   async getFavicon(page: Page, logDetails: LogDetails): Promise<string> {
