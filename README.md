@@ -388,7 +388,7 @@ that will take precedence over the `--extraHops`.
 
 #### Scope Rule Examples
 
-The seed below will start on `https://example.com/startpage.html` and crawl all pages on the `https://example.com/` domain. With the .* regular expression, any character after will be excluded except pages that match the regexes `example.com/skip.*` or `example.com/search.*`. It will also match characters before .* if placed on the other end of the string, this means that example.com/skip/postfeed will also be excluded.
+The seed below will start on `https://example.com/startpage.html` and crawl all pages on the `https://example.com/` domain. With the `.*` regular expression, any character after will be excluded except pages that match the regexes `example.com/skip.*` or `example.com/search.*`. It will also match characters before `.*` if placed on the other end of the string, this means that example.com/skip/postfeed will also be excluded.
 
 ```
 seeds:
