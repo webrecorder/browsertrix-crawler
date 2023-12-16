@@ -427,7 +427,7 @@ The per-seed settings override the per-crawl settings, if any.
 
 The test suite [tests/scopes.test.js](tests/scopes.test.js) for additional examples of configuring scope inclusion and exclusion rules.
 
-It's important to note that the include and exclude rules will always have regular expressions in effect. For rules to match, you may have to escape special characters that commonly appear in urls like `?`, `+`, or `.`. by placing a `\` before the character. For example: `youtube.com/watch\?rdwz7QiG0lk`
+It's important to note that the include and exclude rules will always have regular expressions in effect. For rules to match, you may have to escape special characters that commonly appear in urls like `?`, `+`, or `.` by placing a `\` before the character. For example: `youtube.com/watch\?rdwz7QiG0lk`
 
 Browsertrix-Crawler currently doesn't show in the logs if an url was excluded. It's suggested to search for the url you wish to exclude in the log files or access the archive to see if the url was excluded.
 
