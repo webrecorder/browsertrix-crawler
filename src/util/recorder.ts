@@ -24,6 +24,7 @@ import { WARCWriter } from "./warcwriter.js";
 import { RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
+import { WARCResourceWriter } from "./warcresourcewriter.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_BROWSER_TEXT_FETCH_SIZE = 25_000_000;
@@ -46,6 +47,12 @@ function logNetwork(msg: string, data: any) {
 }
 
 // =================================================================
+export type PageInfoRecord = {
+  pageid: string;
+  urls: Record<string, number>;
+};
+
+// =================================================================
 export class Recorder {
   workerid: WorkerId;
   collDir: string;
@@ -59,6 +66,7 @@ export class Recorder {
 
   pendingRequests!: Map<string, RequestResponseInfo>;
   skipIds!: Set<string>;
+  pageInfo!: PageInfoRecord;
 
   swSessionId?: string | null;
   swFrameIds = new Set<string>();
@@ -614,6 +622,25 @@ export class Recorder {
     this.pendingRequests = new Map();
     this.skipIds = new Set();
     this.skipping = false;
+    this.pageInfo = { pageid, urls: {} };
+  }
+
+  addPageRecord(reqresp: RequestResponseInfo) {
+    this.pageInfo.urls[reqresp.getCanonURL()] = reqresp.status;
+  }
+
+  async writePageInfoRecord() {
+    const text = JSON.stringify(this.pageInfo, null, 2);
+
+    const resourceRecord = await WARCResourceWriter.createResourceRecord(
+      new TextEncoder().encode(text),
+      "pageinfo",
+      "application/json",
+      this.pageUrl,
+      new Date(),
+    );
+
+    this.warcQ.add(() => this.writer.writeSingleRecord(resourceRecord));
   }
 
   async finishPage() {
@@ -656,6 +683,8 @@ export class Recorder {
       await sleep(5.0);
       numPending = this.pendingRequests.size;
     }
+
+    await this.writePageInfoRecord();
   }
 
   async onClosePage() {
@@ -897,6 +926,8 @@ export class Recorder {
       return;
     }
 
+    this.addPageRecord(reqresp);
+
     const responseRecord = createResponse(reqresp, this.pageid);
     const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
 
@@ -1101,6 +1132,8 @@ class AsyncFetcher {
           JSON.stringify(reqresp.extraOpts),
         );
       }
+
+      recorder.addPageRecord(reqresp);
 
       recorder.warcQ.add(() =>
         recorder.writer.writeRecordPair(

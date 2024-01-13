@@ -2,10 +2,17 @@
 import { getStatusText } from "@webrecorder/wabac/src/utils.js";
 
 import { Protocol } from "puppeteer-core";
+import { postToGetUrl } from "warcio";
 
 const CONTENT_LENGTH = "content-length";
 const CONTENT_TYPE = "content-type";
 const EXCLUDE_HEADERS = ["content-encoding", "transfer-encoding"];
+
+// max URL length for post/put payload-converted URLs
+const MAX_URL_LENGTH = 4096;
+
+// max length for single query arg for post/put converted URLs
+const MAX_ARG_LEN = 512;
 
 // ===========================================================================
 export class RequestResponseInfo {
@@ -261,5 +268,37 @@ export class RequestResponseInfo {
     }
 
     return true;
+  }
+
+  getCanonURL(): string {
+    if (!this.method || this.method === "GET") {
+      return this.url;
+    }
+
+    const convData = {
+      url: this.url,
+      headers: new Headers(this.requestHeaders),
+      method: this.method,
+      postData: this.postData || "",
+    };
+
+    if (postToGetUrl(convData)) {
+      //this.requestBody = convData.requestBody;
+      // truncate to avoid extra long URLs
+      try {
+        const url = new URL(convData.url);
+        for (const [key, value] of url.searchParams.entries()) {
+          if (value && value.length > MAX_ARG_LEN) {
+            url.searchParams.set(key, value.slice(0, MAX_ARG_LEN));
+          }
+        }
+        convData.url = url.href;
+      } catch (e) {
+        //ignore
+      }
+      return convData.url.slice(0, MAX_URL_LENGTH);
+    }
+
+    return this.url;
   }
 }
