@@ -33,26 +33,38 @@ export class WARCResourceWriter {
     resourceType: string,
     contentType: string,
   ) {
-    const warcRecord = await this.wrap(contents, resourceType, contentType);
+    const warcRecord = await WARCResourceWriter.createResourceRecord(
+      contents,
+      resourceType,
+      contentType,
+      this.url,
+      this.date,
+    );
     const warcRecordBuffer = await warcio.WARCSerializer.serialize(warcRecord, {
       gzip: true,
     });
     fs.appendFileSync(this.warcName, warcRecordBuffer);
   }
 
-  async wrap(buffer: Uint8Array, resourceType: string, contentType: string) {
+  static async createResourceRecord(
+    buffer: Uint8Array,
+    resourceType: string,
+    contentType: string,
+    url: string,
+    date: Date,
+  ) {
     const warcVersion = "WARC/1.1";
     const warcRecordType = "resource";
     const warcHeaders = { "Content-Type": contentType };
     async function* content() {
       yield buffer;
     }
-    const resourceUrl = `urn:${resourceType}:${this.url}`;
+    const resourceUrl = `urn:${resourceType}:${url}`;
 
     return warcio.WARCRecord.create(
       {
         url: resourceUrl,
-        date: this.date.toISOString(),
+        date: date.toISOString(),
         type: warcRecordType,
         warcVersion,
         warcHeaders,

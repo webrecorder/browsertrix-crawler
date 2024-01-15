@@ -135,6 +135,15 @@ export class WARCWriter implements IndexerOffsetLength {
     this._writeCDX(requestRecord);
   }
 
+  async writeSingleRecord(record: WARCRecord) {
+    const opts = { gzip: this.gzip };
+
+    const requestSerializer = new WARCSerializer(record, opts);
+    this.recordLength = await this._writeRecord(record, requestSerializer);
+
+    this._writeCDX(record);
+  }
+
   async _writeRecord(record: WARCRecord, serializer: WARCSerializer) {
     let total = 0;
     const url = record.warcTargetURI;
