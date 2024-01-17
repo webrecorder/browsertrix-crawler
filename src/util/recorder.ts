@@ -912,8 +912,14 @@ export class Recorder {
   }
 
   async serializeToWARC(reqresp: RequestResponseInfo) {
-    if (!reqresp.payload) {
-      logNetwork("Not writing, no payload", { url: reqresp.url });
+    if (reqresp.shouldSkip()) {
+      const { url, method, status, payload } = reqresp;
+      logNetwork("Skipping request/response", {
+        url,
+        method,
+        status,
+        payloadLength: payload && payload.length,
+      });
       return;
     }
 
