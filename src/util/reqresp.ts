@@ -270,6 +270,19 @@ export class RequestResponseInfo {
     return true;
   }
 
+  shouldSkipSave() {
+    // skip OPTIONS/HEAD responses, and 304 or 206 responses
+    if (
+      !this.payload ||
+      (this.method && ["OPTIONS", "HEAD"].includes(this.method)) ||
+      [206, 304].includes(this.status)
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
   getCanonURL(): string {
     if (!this.method || this.method === "GET") {
       return this.url;
