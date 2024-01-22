@@ -1,7 +1,38 @@
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 
 const MAX_DEPTH = 2;
+
+export async function determineFileSource(fileOrUrl, ext = null, logger) {
+  if (typeof(fileOrUrl) === "string") {
+    if (fileOrUrl.startsWith("http")) {
+      return await collectOnlineFileSource(fileOrUrl, logger);
+    } else {
+      return collectAllFileSources(fileOrUrl, ext);
+    }
+  } else if (typeof(fileOrUrl) === "object") {
+    const returnArray = [];
+    for (const f of fileOrUrl) {
+      returnArray.concat(await determineFileSource(f, ext, logger));
+    }
+    return returnArray;
+  }
+}
+
+export async function collectOnlineFileSource(url, logger) {
+  const filename = crypto.randomBytes(4).toString("hex") + ".js";
+  await fetch(url)
+    .then(res => res.text())
+    .then(file => {return fs.promises.writeFile("/app/behaviors/" + filename, file);})
+    .then(() => {
+      logger.info("File downloaded to /app/behaviors/" + filename);
+    })
+    .catch(err => {
+      logger.error(err);
+    });
+  return collectAllFileSources("/app/behaviors", ".js");
+}
 
 export function collectAllFileSources(fileOrDir, ext = null, depth = 0) {
   const resolvedPath = path.resolve(fileOrDir);
