@@ -58,7 +58,7 @@ async function initReplayPage(crawler: Crawler, page: Page) {
   });
 
   if (!inited) {
-    loadPageList(crawler, page, frame);
+    await loadPageList(crawler, page, frame);
     inited = true;
   }
 }
@@ -76,15 +76,10 @@ async function loadPageList(crawler: Crawler, page: Page, frame: Frame) {
     });
 
     if (res.error) {
-      console.log("ERROR", res);
       await sleep(5);
     } else {
       break;
     }
-  }
-
-  if (!res.pages) {
-    console.log("RES", res);
   }
 
   const scopedSeeds = [];
@@ -116,14 +111,11 @@ async function loadPageList(crawler: Crawler, page: Page, frame: Frame) {
     });
 
     if (res.error) {
-      console.log("ERROR", res);
       await sleep(5);
     } else {
       break;
     }
   }
-
-  console.log("textIndex", textIndex);
 
   for (const page of textIndex.split("\n")) {
     let pageData: ReplayPage;
@@ -192,10 +184,10 @@ async function loadReplayPage(page: Page, url: string, ts: number) {
     timestamp,
   );
 
-  await sleep(5);
+  await sleep(10);
 
-  console.log("Frames");
-  for (const frame of page.frames()) {
-    console.log(`${frame.name()} - ${frame.url()}`);
-  }
+  // console.log("Frames");
+  // for (const frame of page.frames()) {
+  //   console.log(`${frame.name()} - ${frame.url()}`);
+  // }
 }
