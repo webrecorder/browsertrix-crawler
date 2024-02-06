@@ -32,6 +32,7 @@ export type QueueEntry = {
   seedId: number;
   depth: number;
   extraHops: number;
+  ts?: number;
 };
 
 // ============================================================================
@@ -58,6 +59,7 @@ export class PageState {
   isHTMLPage?: boolean;
   text?: string;
   favicon?: string;
+  ts: number;
 
   skipBehaviors = false;
   filteredFrames: Frame[] = [];
@@ -70,6 +72,7 @@ export class PageState {
     this.seedId = redisData.seedId;
     this.depth = redisData.depth;
     this.extraHops = redisData.extraHops || 0;
+    this.ts = redisData.ts || 0;
   }
 }
 
@@ -440,11 +443,15 @@ return 0;
 
   //async addToQueue({url : string, seedId, depth = 0, extraHops = 0} = {}, limit = 0) {
   async addToQueue(
-    { url, seedId, depth = 0, extraHops = 0 }: QueueEntry,
+    { url, seedId, depth = 0, extraHops = 0, ts = 0 }: QueueEntry,
     limit = 0,
   ) {
     const added = this._timestamp();
     const data: QueueEntry = { added, url, seedId, depth, extraHops };
+
+    if (ts) {
+      data.ts = ts;
+    }
 
     // return codes
     // 0 - url queued successfully

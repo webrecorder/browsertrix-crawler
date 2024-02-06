@@ -24,6 +24,7 @@ export class WARCResourceWriter {
   }) {
     this.url = url;
     this.directory = directory;
+    fs.mkdirSync(directory, { recursive: true });
     this.warcName = path.join(this.directory, warcName);
     this.date = date ? date : new Date();
   }

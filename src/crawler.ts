@@ -170,6 +170,7 @@ export class Crawler {
   maxHeapTotal = 0;
 
   driver!: CrawlDriver;
+  replaySource?: string;
 
   constructor() {
     const res = parseArgs();
@@ -451,6 +452,12 @@ export class Crawler {
         "+extension",
         "RANDR",
       ]);
+    }
+
+    if (this.params.replaySource) {
+      this.replaySource = this.params.replaySource;
+      this.params.behaviorOpts = null;
+      this.params.driver = "./replayDriver.js";
     }
   }
 
@@ -762,6 +769,7 @@ self.__bx_behaviors.selectMainBehavior();
       textextract = new TextExtractViaSnapshot(cdp, {
         url,
         directory: archiveDir,
+        skipDocs: this.replaySource ? 2 : 0,
       });
       const { changed, text } = await textextract.extractAndStoreText(
         "text",
@@ -1240,7 +1248,14 @@ self.__bx_behaviors.selectMainBehavior();
 
     // --------------
     // Run Crawl Here!
-    await runWorkers(this, this.params.workers, this.maxPageTime, this.collDir);
+    await runWorkers(
+      this,
+      this.params.workers,
+      this.maxPageTime,
+      this.collDir,
+      true,
+      !!this.replaySource,
+    );
     // --------------
 
     await this.serializeConfig(true);
@@ -1854,13 +1869,14 @@ self.__bx_behaviors.selectMainBehavior();
     depth: number,
     extraHops: number,
     logDetails: LogDetails = {},
+    ts: number = 0,
   ) {
     if (this.limitHit) {
       return false;
     }
 
     const result = await this.crawlState.addToQueue(
-      { url, seedId, depth, extraHops },
+      { url, seedId, depth, extraHops, ts },
       this.pageLimit,
     );
 

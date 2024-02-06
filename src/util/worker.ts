@@ -22,6 +22,8 @@ export async function runWorkers(
   numWorkers: number,
   maxPageTime: number,
   collDir: string,
+  noRecord = false,
+  alwaysReuse = false,
 ) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
@@ -43,7 +45,16 @@ export async function runWorkers(
   }
 
   for (let i = 0; i < numWorkers; i++) {
-    workers.push(new PageWorker(i + offset, crawler, maxPageTime, collDir));
+    workers.push(
+      new PageWorker(
+        i + offset,
+        crawler,
+        maxPageTime,
+        collDir,
+        noRecord,
+        alwaysReuse,
+      ),
+    );
   }
 
   await Promise.allSettled(workers.map((worker) => worker.run()));
@@ -81,6 +92,7 @@ export class PageWorker {
   maxPageTime: number;
 
   reuseCount = 0;
+  alwaysReuse: boolean;
   page?: Page | null;
   cdp?: CDPSession | null;
 
@@ -97,7 +109,7 @@ export class PageWorker {
   markCrashed?: (reason: string) => void;
   crashBreak?: Promise<void>;
 
-  recorder: Recorder;
+  recorder?: Recorder;
 
   constructor(
     id: WorkerId,
@@ -106,20 +118,25 @@ export class PageWorker {
     crawler: any,
     maxPageTime: number,
     collDir: string,
+    noRecord = false,
+    alwaysReuse = false,
   ) {
     this.id = id;
     this.crawler = crawler;
     this.maxPageTime = maxPageTime;
+    this.alwaysReuse = alwaysReuse;
 
     this.logDetails = { workerid: this.id };
 
-    this.recorder = new Recorder({
-      workerid: id,
-      collDir,
-      crawler: this.crawler,
-    });
+    if (!noRecord) {
+      this.recorder = new Recorder({
+        workerid: id,
+        collDir,
+        crawler: this.crawler,
+      });
 
-    this.crawler.browser.recorders.push(this.recorder);
+      this.crawler.browser.recorders.push(this.recorder);
+    }
   }
 
   async closePage() {
@@ -177,19 +194,18 @@ export class PageWorker {
   }
 
   async initPage(url: string): Promise<WorkerOpts> {
-    if (
-      !this.crashed &&
-      this.page &&
-      this.opts &&
-      ++this.reuseCount <= MAX_REUSE &&
-      this.isSameOrigin(url)
-    ) {
+    let reuse = !this.crashed && !!this.opts && !!this.page;
+    if (!this.alwaysReuse) {
+      ++this.reuseCount;
+      reuse = this.reuseCount <= MAX_REUSE && this.isSameOrigin(url);
+    }
+    if (reuse) {
       logger.debug(
         "Reusing page",
         { reuseCount: this.reuseCount, ...this.logDetails },
         "worker",
       );
-      return this.opts;
+      return this.opts!;
     } else if (this.page) {
       await this.closePage();
     }
@@ -220,7 +236,7 @@ export class PageWorker {
         this.cdp = cdp;
         this.callbacks = {};
         const directFetchCapture = this.recorder
-          ? (x: string) => this.recorder.directFetchCapture(x)
+          ? (x: string) => this.recorder!.directFetchCapture(x)
           : null;
         this.opts = {
           page,

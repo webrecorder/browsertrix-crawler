@@ -502,6 +502,12 @@ class ArgParser {
         type: "string",
         default: "rec",
       },
+
+      replaySource: {
+        describe:
+          "if specified, run crawl over replay source (WACZ or multi WACZ)",
+        type: "string",
+      },
     };
   }
 
