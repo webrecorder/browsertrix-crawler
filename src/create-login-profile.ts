@@ -174,6 +174,7 @@ async function main() {
         "--test-type",
       ],
     },
+    recording: false,
   });
 
   if (params.interactive) {

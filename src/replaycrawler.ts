@@ -1,10 +1,11 @@
-import { Frame, Page } from "puppeteer-core";
+import { Frame, Page, Protocol } from "puppeteer-core";
 import { Crawler } from "./crawler.js";
 import { ReplayServer } from "./util/replayserver.js";
 import { sleep } from "./util/timing.js";
 import { ScopedSeed } from "./util/seeds.js";
 import { logger } from "./util/logger.js";
 import { WorkerOpts } from "./util/worker.js";
+import { PageInfoRecord, Recorder } from "./util/recorder.js";
 
 type ReplayPage = {
   url: string;
@@ -12,35 +13,44 @@ type ReplayPage = {
   id: string;
 };
 
-export default class ReplayDriver {
-  replayServer: ReplayServer;
-  pagesLoaded = false;
-  lastPage: Page | null = null;
+type PageInfoWithUrl = PageInfoRecord & {
+  url: string;
+  timestamp: string;
+};
 
-  constructor(crawler: Crawler) {
-    if (!crawler.replaySource) {
+export class ReplayCrawler extends Crawler {
+  replayServer: ReplayServer;
+  replaySource: string;
+
+  pagesLoaded = false;
+
+  pageInfos: Map<Page, PageInfoWithUrl>;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(args: Record<string, any>) {
+    super(args);
+    this.recording = false;
+    if (!this.params.replaySource) {
       throw new Error("Missing replay source");
     }
-    this.replayServer = new ReplayServer(crawler.replaySource);
+    this.replaySource = this.params.replaySource;
+    this.replayServer = new ReplayServer(this.replaySource);
+
+    this.pageInfos = new Map<Page, PageInfoWithUrl>();
   }
 
-  async setupPage(opts: WorkerOpts, crawler: Crawler) {
-    const { page } = opts;
+  async setupPage(opts: WorkerOpts) {
+    await super.setupPage(opts);
+    const { page, cdp } = opts;
 
-    console.log("SETUP PAGE");
-
-    await this.initReplayPage(crawler, page);
-  }
-
-  async initReplayPage(crawler: Crawler, page: Page) {
-    if (!crawler.replaySource) {
+    if (!this.replaySource) {
       throw new Error("Missing replay source");
     }
 
     await page.goto(this.replayServer.homePage);
 
     while (page.frames().length < 2) {
-      console.log("Frames: " + page.frames().length);
+      //console.log("Frames: " + page.frames().length);
       await sleep(5);
     }
 
@@ -52,12 +62,18 @@ export default class ReplayDriver {
     });
 
     if (!this.pagesLoaded) {
-      await this.loadPageList(crawler, page, frame);
+      await this.loadPageList(frame);
       this.pagesLoaded = true;
     }
+
+    await cdp.send("Network.enable");
+
+    cdp.on("Network.responseReceived", async (params) =>
+      this.handlePageResponse(params, page),
+    );
   }
 
-  async loadPageList(crawler: Crawler, page: Page, frame: Frame) {
+  async loadPageList(frame: Frame) {
     let res;
 
     while (true) {
@@ -86,16 +102,9 @@ export default class ReplayDriver {
       );
 
       if (
-        !(await crawler.queueUrl(
-          scopedSeeds.length - 1,
-          page.url,
-          0,
-          0,
-          {},
-          ts,
-        ))
+        !(await this.queueUrl(scopedSeeds.length - 1, page.url, 0, 0, {}, ts))
       ) {
-        if (crawler.limitHit) {
+        if (this.limitHit) {
           break;
         }
       }
@@ -137,26 +146,59 @@ export default class ReplayDriver {
         new ScopedSeed({ url, scopeType: "page", depth: 1, include: [] }),
       );
 
-      if (
-        !(await crawler.queueUrl(scopedSeeds.length - 1, url, 0, 0, {}, ts))
-      ) {
-        if (crawler.limitHit) {
+      if (!(await this.queueUrl(scopedSeeds.length - 1, url, 0, 0, {}, ts))) {
+        if (this.limitHit) {
           break;
         }
       }
     }
 
-    crawler.params.scopedSeeds = scopedSeeds;
+    this.params.scopedSeeds = scopedSeeds;
 
     // await loadReplayPage(page, pages[0].url, pages[0].ts);
   }
 
-  async crawlPage(opts: WorkerOpts /*, crawler: Crawler*/) {
-    const { page, data } = opts;
-    await this.loadReplayPage(page, data.url, data.ts);
+  async handlePageResponse(
+    params: Protocol.Network.ResponseReceivedEvent,
+    page: Page,
+  ) {
+    const { response } = params;
+    const { url, status } = response;
+    if (!url || !url.startsWith("http://localhost:9990/replay/w/replay/")) {
+      return;
+    }
+
+    const inx = url.indexOf("_/");
+    if (inx <= 0) {
+      return;
+    }
+
+    let replayUrl = url.slice(inx + 2);
+
+    //const pageUrl = this.pagesToUrl.get(page);
+    const pageInfo = this.pageInfos.get(page);
+
+    if (!pageInfo) {
+      return;
+    }
+
+    if (replayUrl.startsWith("//")) {
+      try {
+        replayUrl = new URL(replayUrl, pageInfo.url).href;
+      } catch (e) {
+        //
+      }
+    }
+
+    if (replayUrl.startsWith("http")) {
+      pageInfo.urls[replayUrl] = status;
+    }
   }
 
-  async loadReplayPage(page: Page, url: string, ts: number) {
+  async crawlPage(opts: WorkerOpts): Promise<void> {
+    const { page, data } = opts;
+    const { url, ts, pageid } = data;
+
     if (!ts) {
       return;
     }
@@ -166,6 +208,9 @@ export default class ReplayDriver {
       : "";
 
     logger.info("Loading Replay", { url, timestamp }, "replay");
+
+    const pageInfo = { pageid, urls: {}, url, timestamp };
+    this.pageInfos.set(page, pageInfo);
 
     await page.evaluate(
       (url, ts) => {
@@ -199,10 +244,29 @@ export default class ReplayDriver {
     // for (const frame of page.frames()) {
     //   console.log(`${frame.name()} - ${frame.url()}`);
     // }
+
+    data.isHTMLPage = true;
+
+    await this.doPostLoadActions(opts);
+
+    this.processPageInfo(page);
   }
 
-  async teardownPage(/*opts: WorkerOpts, crawler: Crawler*/) {
-    // handle any operations for when a page is closed here
-    console.log("TEARDOWN PAGE");
+  async teardownPage(opts: WorkerOpts) {
+    const { page } = opts;
+    this.processPageInfo(page);
+    await super.teardownPage(opts);
+  }
+
+  processPageInfo(page: Page) {
+    const pageInfo = this.pageInfos.get(page);
+    if (pageInfo) {
+      console.log(pageInfo);
+      this.pageInfos.delete(page);
+    }
+  }
+
+  createRecorder(): Recorder | null {
+    return null;
   }
 }

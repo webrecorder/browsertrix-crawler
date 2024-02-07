@@ -31,6 +31,8 @@ type LaunchOpts = {
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ondisconnect?: ((err: any) => NonNullable<unknown>) | null;
+
+  recording: boolean;
 };
 
 // ==================================================================
@@ -59,6 +61,7 @@ export class Browser {
     headless = false,
     emulateDevice = {},
     ondisconnect = null,
+    recording = true,
   }: LaunchOpts) {
     if (this.isLaunched()) {
       return;
@@ -96,7 +99,7 @@ export class Browser {
       userDataDir: this.profileDir,
     };
 
-    await this._init(launchOpts, ondisconnect);
+    await this._init(launchOpts, ondisconnect, recording);
   }
 
   async setupPage({ page }: { page: Page; cdp: CDPSession }) {
@@ -322,6 +325,7 @@ export class Browser {
     launchOpts: PuppeteerLaunchOptions,
     // eslint-disable-next-line @typescript-eslint/ban-types
     ondisconnect: Function | null = null,
+    recording: boolean,
   ) {
     this.browser = await puppeteer.launch(launchOpts);
 
@@ -329,7 +333,9 @@ export class Browser {
 
     this.firstCDP = await target.createCDPSession();
 
-    await this.serviceWorkerFetch();
+    if (recording) {
+      await this.serviceWorkerFetch();
+    }
 
     if (ondisconnect) {
       this.browser.on("disconnected", (err) => ondisconnect(err));

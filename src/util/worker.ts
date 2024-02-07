@@ -21,8 +21,6 @@ export async function runWorkers(
   crawler: Crawler,
   numWorkers: number,
   maxPageTime: number,
-  collDir: string,
-  noRecord = false,
   alwaysReuse = false,
 ) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
@@ -45,16 +43,7 @@ export async function runWorkers(
   }
 
   for (let i = 0; i < numWorkers; i++) {
-    workers.push(
-      new PageWorker(
-        i + offset,
-        crawler,
-        maxPageTime,
-        collDir,
-        noRecord,
-        alwaysReuse,
-      ),
-    );
+    workers.push(new PageWorker(i + offset, crawler, maxPageTime, alwaysReuse));
   }
 
   await Promise.allSettled(workers.map((worker) => worker.run()));
@@ -86,9 +75,7 @@ export type WorkerState = WorkerOpts & {
 // ===========================================================================
 export class PageWorker {
   id: WorkerId;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  crawler: any;
+  crawler: Crawler;
   maxPageTime: number;
 
   reuseCount = 0;
@@ -109,16 +96,12 @@ export class PageWorker {
   markCrashed?: (reason: string) => void;
   crashBreak?: Promise<void>;
 
-  recorder?: Recorder;
+  recorder: Recorder | null;
 
   constructor(
     id: WorkerId,
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    crawler: any,
+    crawler: Crawler,
     maxPageTime: number,
-    collDir: string,
-    noRecord = false,
     alwaysReuse = false,
   ) {
     this.id = id;
@@ -128,15 +111,7 @@ export class PageWorker {
 
     this.logDetails = { workerid: this.id };
 
-    if (!noRecord) {
-      this.recorder = new Recorder({
-        workerid: id,
-        collDir,
-        crawler: this.crawler,
-      });
-
-      this.crawler.browser.recorders.push(this.recorder);
-    }
+    this.recorder = this.crawler.createRecorder(this.id);
   }
 
   async closePage() {
@@ -148,7 +123,7 @@ export class PageWorker {
       await this.recorder.onClosePage();
     }
 
-    if (!this.crashed) {
+    if (!this.crashed && this.opts) {
       try {
         await timedRun(
           this.crawler.teardownPage(this.opts),

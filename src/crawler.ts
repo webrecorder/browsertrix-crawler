@@ -10,6 +10,7 @@ import {
   QueueState,
   PageState,
   WorkerId,
+  PageCallbacks,
 } from "./util/state.js";
 
 import Sitemapper from "sitemapper";
@@ -29,7 +30,6 @@ import {
 } from "./util/storage.js";
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
-import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { logger, formatErr } from "./util/logger.js";
 import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
@@ -52,6 +52,7 @@ import { OriginOverride } from "./util/originoverride.js";
 import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
 import { CDPSession, Frame, HTTPRequest, Page } from "puppeteer-core";
+import { Recorder } from "./util/recorder.js";
 
 const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
@@ -90,17 +91,6 @@ type PageEntry = {
   text?: string;
   favIconUrl?: string;
   ts?: string;
-};
-
-type CrawlDriver = {
-  // eslint-disable-next-line no-use-before-define
-  setupPage: (opts: WorkerOpts, crawler: Crawler) => void;
-
-  // eslint-disable-next-line no-use-before-define
-  crawlPage: (opts: WorkerOpts, crawler: Crawler) => void;
-
-  // eslint-disable-next-line no-use-before-define
-  teardownPage: (opts: WorkerOpts, crawler: Crawler) => void;
 };
 
 // ============================================================================
@@ -169,13 +159,19 @@ export class Crawler {
   maxHeapUsed = 0;
   maxHeapTotal = 0;
 
-  driver!: CrawlDriver;
-  replaySource?: string;
+  driver!: (opts: {
+    page: Page;
+    data: PageState;
+    // eslint-disable-next-line no-use-before-define
+    crawler: Crawler;
+  }) => NonNullable<unknown>;
 
-  constructor() {
-    const res = parseArgs();
-    this.params = res.parsed;
-    this.origConfig = res.origConfig;
+  recording = true;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(args: Record<string, any>) {
+    this.params = args.parsed;
+    this.origConfig = args.origConfig;
 
     // root collections dir
     this.collDir = path.join(
@@ -453,12 +449,6 @@ export class Crawler {
         "RANDR",
       ]);
     }
-
-    if (this.params.replaySource) {
-      this.replaySource = this.params.replaySource;
-      this.params.behaviorOpts = null;
-      this.params.driver = "./replayDriver.js";
-    }
   }
 
   extraChromeArgs() {
@@ -558,9 +548,17 @@ export class Crawler {
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  async setupPage(opts: WorkerOpts) {
-    const { page, cdp, workerid, callbacks } = opts;
-
+  async setupPage({
+    page,
+    cdp,
+    workerid,
+    callbacks,
+  }: {
+    page: Page;
+    cdp: CDPSession;
+    workerid: WorkerId;
+    callbacks: PageCallbacks;
+  }) {
     await this.browser.setupPage({ page, cdp });
 
     if (
@@ -633,8 +631,6 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.browser.addInitScript(page, initScript);
     }
-
-    await this.driver.setupPage(opts, this);
   }
 
   loadCustomBehaviors(filename: string) {
@@ -681,10 +677,10 @@ self.__bx_behaviors.selectMainBehavior();
     return "";
   }
 
-  async crawlPage(opts: WorkerState) {
+  async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
-    const { page, cdp, data, workerid, callbacks, directFetchCapture } = opts;
+    const { page, data, workerid, callbacks, directFetchCapture } = opts;
     data.callbacks = callbacks;
 
     const { url } = data;
@@ -722,7 +718,7 @@ self.__bx_behaviors.selectMainBehavior();
             { url, ...logDetails },
             "fetch",
           );
-          return true;
+          return;
         }
       } catch (e) {
         // filtered out direct fetch
@@ -735,11 +731,27 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     // run custom driver here
-    await this.driver.crawlPage(opts, this);
+    await this.driver({ page, data, crawler: this });
 
     data.title = await page.title();
     data.favicon = await this.getFavicon(page, logDetails);
 
+    await this.doPostLoadActions(opts);
+
+    if (this.params.pageExtraDelay) {
+      logger.info(
+        `Waiting ${this.params.pageExtraDelay} seconds before moving on to next page`,
+        logDetails,
+      );
+      await sleep(this.params.pageExtraDelay);
+    }
+  }
+
+  async doPostLoadActions(opts: WorkerOpts) {
+    const { page, cdp, data, workerid } = opts;
+    const { url } = data;
+
+    const logDetails = { page: url, workerid };
     const archiveDir = path.join(this.collDir, "archive");
 
     if (this.params.screenshot) {
@@ -769,7 +781,6 @@ self.__bx_behaviors.selectMainBehavior();
       textextract = new TextExtractViaSnapshot(cdp, {
         url,
         directory: archiveDir,
-        skipDocs: this.replaySource ? 2 : 0,
       });
       const { changed, text } = await textextract.extractAndStoreText(
         "text",
@@ -813,16 +824,6 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
     }
-
-    if (this.params.pageExtraDelay) {
-      logger.info(
-        `Waiting ${this.params.pageExtraDelay} seconds before moving on to next page`,
-        logDetails,
-      );
-      await sleep(this.params.pageExtraDelay);
-    }
-
-    return true;
   }
 
   async pageFinished(data: PageState) {
@@ -859,12 +860,10 @@ self.__bx_behaviors.selectMainBehavior();
     await this.checkLimits();
   }
 
-  async teardownPage(opts: WorkerOpts) {
+  async teardownPage({ workerid }: WorkerOpts) {
     if (this.screencaster) {
-      const { workerid } = opts;
       await this.screencaster.stopById(workerid);
     }
-    await this.driver.teardownPage(opts, this);
   }
 
   async workerIdle(workerid: WorkerId) {
@@ -1128,8 +1127,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     try {
       const driverUrl = new URL(this.params.driver, import.meta.url);
-      const Cls = (await import(driverUrl.href)).default;
-      this.driver = new Cls(this);
+      this.driver = (await import(driverUrl.href)).default;
     } catch (e) {
       logger.warn(`Error importing driver ${this.params.driver}`, e);
       return;
@@ -1243,19 +1241,14 @@ self.__bx_behaviors.selectMainBehavior();
           "browser",
         );
       },
+
+      recording: this.recording,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     // --------------
     // Run Crawl Here!
-    await runWorkers(
-      this,
-      this.params.workers,
-      this.maxPageTime,
-      this.collDir,
-      true,
-      false,
-    );
+    await runWorkers(this, this.params.workers, this.maxPageTime);
     // --------------
 
     await this.serializeConfig(true);
@@ -1869,7 +1862,7 @@ self.__bx_behaviors.selectMainBehavior();
     depth: number,
     extraHops: number,
     logDetails: LogDetails = {},
-    ts: number = 0,
+    ts = 0,
   ) {
     if (this.limitHit) {
       return false;
@@ -2231,6 +2224,21 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.storage.uploadFile(filename, targetFilename);
     }
+  }
+
+  createRecorder(id: number): Recorder | null {
+    if (!this.recording) {
+      return null;
+    }
+
+    const res = new Recorder({
+      workerid: id,
+      collDir: this.collDir,
+      crawler: this,
+    });
+
+    this.browser.recorders.push(res);
+    return res;
   }
 }
 
