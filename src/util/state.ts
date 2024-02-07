@@ -135,6 +135,7 @@ export class RedisCrawlState {
   dkey: string;
   fkey: string;
   ekey: string;
+  pageskey: string;
 
   constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
@@ -152,6 +153,8 @@ export class RedisCrawlState {
     this.fkey = this.key + ":f";
     // crawler errors
     this.ekey = this.key + ":e";
+    // pages
+    this.pageskey = this.key + ":pages";
 
     this._initLuaCommands(this.redis);
   }
@@ -681,5 +684,9 @@ return 0;
 
   async logError(error: string) {
     return await this.redis.lpush(this.ekey, error);
+  }
+
+  async writeToPagesQueue(value: string) {
+    return await this.redis.lpush(this.pageskey, value);
   }
 }

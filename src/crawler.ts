@@ -90,6 +90,7 @@ type PageEntry = {
   seed?: boolean;
   text?: string;
   favIconUrl?: string;
+  ts?: string;
 };
 
 // ============================================================================
@@ -1930,6 +1931,10 @@ self.__bx_behaviors.selectMainBehavior();
     favicon,
   }: PageState) {
     const row: PageEntry = { id: pageid!, url, title, loadState };
+
+    if (this.params.writePagesToRedis) {
+      await this.crawlState.writeToPagesQueue(JSON.stringify(row));
+    }
 
     if (mime) {
       row.mime = mime;
