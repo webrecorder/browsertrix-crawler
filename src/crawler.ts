@@ -10,7 +10,6 @@ import {
   QueueState,
   PageState,
   WorkerId,
-  PageCallbacks,
 } from "./util/state.js";
 
 import Sitemapper from "sitemapper";
@@ -92,6 +91,17 @@ type PageEntry = {
   favIconUrl?: string;
 };
 
+type CrawlDriver = {
+  // eslint-disable-next-line no-use-before-define
+  setupPage: (opts: WorkerOpts, crawler: Crawler) => void;
+
+  // eslint-disable-next-line no-use-before-define
+  crawlPage: (opts: WorkerOpts, crawler: Crawler) => void;
+
+  // eslint-disable-next-line no-use-before-define
+  teardownPage: (opts: WorkerOpts, crawler: Crawler) => void;
+};
+
 // ============================================================================
 export class Crawler {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -158,12 +168,7 @@ export class Crawler {
   maxHeapUsed = 0;
   maxHeapTotal = 0;
 
-  driver!: (opts: {
-    page: Page;
-    data: PageState;
-    // eslint-disable-next-line no-use-before-define
-    crawler: Crawler;
-  }) => NonNullable<unknown>;
+  driver!: CrawlDriver;
 
   constructor() {
     const res = parseArgs();
@@ -545,17 +550,9 @@ export class Crawler {
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  async setupPage({
-    page,
-    cdp,
-    workerid,
-    callbacks,
-  }: {
-    page: Page;
-    cdp: CDPSession;
-    workerid: WorkerId;
-    callbacks: PageCallbacks;
-  }) {
+  async setupPage(opts: WorkerOpts) {
+    const { page, cdp, workerid, callbacks } = opts;
+
     await this.browser.setupPage({ page, cdp });
 
     if (
@@ -628,6 +625,8 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.browser.addInitScript(page, initScript);
     }
+
+    await this.driver.setupPage(opts, this);
   }
 
   loadCustomBehaviors(filename: string) {
@@ -728,7 +727,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     // run custom driver here
-    await this.driver({ page, data, crawler: this });
+    await this.driver.crawlPage(opts, this);
 
     data.title = await page.title();
     data.favicon = await this.getFavicon(page, logDetails);
@@ -851,10 +850,12 @@ self.__bx_behaviors.selectMainBehavior();
     await this.checkLimits();
   }
 
-  async teardownPage({ workerid }: WorkerOpts) {
+  async teardownPage(opts: WorkerOpts) {
     if (this.screencaster) {
+      const { workerid } = opts;
       await this.screencaster.stopById(workerid);
     }
+    await this.driver.teardownPage(opts, this);
   }
 
   async workerIdle(workerid: WorkerId) {
@@ -1118,7 +1119,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     try {
       const driverUrl = new URL(this.params.driver, import.meta.url);
-      this.driver = (await import(driverUrl.href)).default;
+      const Cls = (await import(driverUrl.href)).default;
+      this.driver = new Cls();
     } catch (e) {
       logger.warn(`Error importing driver ${this.params.driver}`, e);
       return;
