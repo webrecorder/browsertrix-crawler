@@ -1129,7 +1129,7 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       const driverUrl = new URL(this.params.driver, import.meta.url);
       const Cls = (await import(driverUrl.href)).default;
-      this.driver = new Cls();
+      this.driver = new Cls(this);
     } catch (e) {
       logger.warn(`Error importing driver ${this.params.driver}`, e);
       return;
@@ -1254,7 +1254,7 @@ self.__bx_behaviors.selectMainBehavior();
       this.maxPageTime,
       this.collDir,
       true,
-      !!this.replaySource,
+      false,
     );
     // --------------
 
