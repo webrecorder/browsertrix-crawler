@@ -2,26 +2,22 @@ import fs from "fs";
 import path from "path";
 import * as warcio from "warcio";
 
+// ===========================================================================
+export type WARCResourceWriterOpts = {
+  url: string;
+  directory: string;
+  date?: Date;
+  warcName: string;
+};
+
+// ===========================================================================
 export class WARCResourceWriter {
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  page: any;
   url: string;
   directory: string;
   warcName: string;
   date: Date;
 
-  constructor({
-    url,
-    directory,
-    date,
-    warcName,
-  }: {
-    url: string;
-    directory: string;
-    date: Date;
-    warcName: string;
-  }) {
+  constructor({ url, directory, date, warcName }: WARCResourceWriterOpts) {
     this.url = url;
     this.directory = directory;
     fs.mkdirSync(directory, { recursive: true });

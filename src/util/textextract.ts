@@ -3,15 +3,20 @@ import { logger } from "./logger.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 
 // ============================================================================
+type TextExtractOpts = {
+  url: string;
+  directory: string;
+  skipDocs: number;
+};
+
+// ============================================================================
 export abstract class BaseTextExtract extends WARCResourceWriter {
   cdp: CDPSession;
   lastText: string | null = null;
   text: string | null = null;
   skipDocs: number = 0;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(cdp: CDPSession, opts: any) {
+  constructor(cdp: CDPSession, opts: TextExtractOpts) {
     super({ ...opts, warcName: "text.warc.gz" });
     this.cdp = cdp;
     this.skipDocs = opts.skipDocs || 0;
@@ -85,7 +90,7 @@ export class TextExtractViaSnapshot extends BaseTextExtract {
 
     const accum: string[] = [];
 
-    for (const doc of documents.slice(2)) {
+    for (const doc of documents.slice(this.skipDocs)) {
       const nodeValues = doc.nodes.nodeValue || [];
       const nodeNames = doc.nodes.nodeName || [];
       const nodeTypes = doc.nodes.nodeType || [];

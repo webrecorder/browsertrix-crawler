@@ -51,6 +51,9 @@ export class ReplayCrawler extends Crawler {
     this.pageInfos = new Map<Page, PageInfoWithUrl>();
 
     this.maxPages = this.params.limit;
+
+    // skip text from first two frames, as they are RWP boilerplate
+    this.skipTextDocs = 2;
   }
 
   async setupPage(opts: WorkerOpts) {

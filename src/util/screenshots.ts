@@ -3,13 +3,15 @@ import sharp from "sharp";
 import { WARCResourceWriter } from "./warcresourcewriter.js";
 import { logger, formatErr } from "./logger.js";
 import { Browser } from "./browser.js";
+import { Page } from "puppeteer-core";
 
 // ============================================================================
 
 type ScreenShotType = {
-  type: string;
+  type: "png" | "jpeg";
   omitBackground: boolean;
   fullPage: boolean;
+  encoding: "binary";
 };
 
 export const screenshotTypes: Record<string, ScreenShotType> = {
@@ -17,28 +19,34 @@ export const screenshotTypes: Record<string, ScreenShotType> = {
     type: "png",
     omitBackground: true,
     fullPage: false,
+    encoding: "binary",
   },
   thumbnail: {
     type: "jpeg",
     omitBackground: true,
     fullPage: false,
+    encoding: "binary",
   },
   fullPage: {
     type: "png",
     omitBackground: true,
     fullPage: true,
+    encoding: "binary",
   },
+};
+
+export type ScreenshotOpts = {
+  browser: Browser;
+  page: Page;
+  url: string;
+  directory: string;
 };
 
 export class Screenshots extends WARCResourceWriter {
   browser: Browser;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  page: any;
+  page: Page;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(opts: any) {
+  constructor(opts: ScreenshotOpts) {
     super({ ...opts, warcName: "screenshots.warc.gz" });
     this.browser = opts.browser;
     this.page = opts.page;

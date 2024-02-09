@@ -146,6 +146,8 @@ export class Crawler {
 
   screencaster: ScreenCaster | null = null;
 
+  skipTextDocs = 0;
+
   interrupted = false;
   finalExit = false;
   uploadAndDeleteLocal = false;
@@ -785,6 +787,7 @@ self.__bx_behaviors.selectMainBehavior();
       textextract = new TextExtractViaSnapshot(cdp, {
         url,
         directory: this.archivesDir,
+        skipDocs: this.skipTextDocs,
       });
       const { changed, text } = await textextract.extractAndStoreText(
         "text",
