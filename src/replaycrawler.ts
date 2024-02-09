@@ -1,4 +1,4 @@
-import { Frame, Page, Protocol } from "puppeteer-core";
+import { Page, Protocol } from "puppeteer-core";
 import { Crawler } from "./crawler.js";
 import { ReplayServer } from "./util/replayserver.js";
 import { sleep } from "./util/timing.js";
@@ -6,6 +6,15 @@ import { ScopedSeed } from "./util/seeds.js";
 import { logger } from "./util/logger.js";
 import { WorkerOpts } from "./util/worker.js";
 import { PageInfoRecord, Recorder } from "./util/recorder.js";
+
+// @ts-expect-error wabac.js
+import { ZipRangeReader } from "@webrecorder/wabac/src/wacz/ziprangereader.js";
+// @ts-expect-error wabac.js
+import { createLoader } from "@webrecorder/wabac/src/blockloaders.js";
+import { AsyncIterReader } from "warcio";
+import { WARCResourceWriter } from "./util/warcresourcewriter.js";
+
+//import { openAsBlob } from "node:fs";
 
 type ReplayPage = {
   url: string;
@@ -18,13 +27,16 @@ type PageInfoWithUrl = PageInfoRecord & {
   timestamp: string;
 };
 
+// ============================================================================
 export class ReplayCrawler extends Crawler {
   replayServer: ReplayServer;
   replaySource: string;
 
-  pagesLoaded = false;
-
   pageInfos: Map<Page, PageInfoWithUrl>;
+
+  timeoutId?: NodeJS.Timeout;
+
+  maxPages: number = 0;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(args: Record<string, any>) {
@@ -37,6 +49,8 @@ export class ReplayCrawler extends Crawler {
     this.replayServer = new ReplayServer(this.replaySource);
 
     this.pageInfos = new Map<Page, PageInfoWithUrl>();
+
+    this.maxPages = this.params.limit;
   }
 
   async setupPage(opts: WorkerOpts) {
@@ -46,6 +60,12 @@ export class ReplayCrawler extends Crawler {
     if (!this.replaySource) {
       throw new Error("Missing replay source");
     }
+
+    await cdp.send("Network.enable");
+
+    cdp.on("Network.responseReceived", async (params) =>
+      this.handlePageResourceResponse(params, page),
+    );
 
     await page.goto(this.replayServer.homePage);
 
@@ -60,111 +80,115 @@ export class ReplayCrawler extends Crawler {
     await frame.evaluate(() => {
       return navigator.serviceWorker.ready;
     });
+  }
 
-    if (!this.pagesLoaded) {
-      await this.loadPageList(frame);
-      this.pagesLoaded = true;
+  protected async _addInitialSeeds() {
+    this.params.scopedSeeds = [];
+
+    await this.loadPages(this.replaySource);
+  }
+
+  async loadPages(url: string) {
+    if (url.endsWith(".wacz")) {
+      await this.loadPagesForWACZ(url);
+    } else if (url.endsWith(".json")) {
+      const resp = await fetch(url);
+      const json = await resp.json();
+
+      for (const entry of json.resources) {
+        if (entry.path) {
+          await this.loadPages(entry.path);
+        }
+      }
+    } else {
+      logger.warn("Unknown replay source", { url }, "replay");
+    }
+  }
+
+  async loadPagesForWACZ(url: string) {
+    const loader = new WACZLoader(url);
+    await loader.init();
+
+    const pagesReader = await loader.loadFile("pages/pages.jsonl");
+
+    if (pagesReader) {
+      for await (const buff of pagesReader.iterLines()) {
+        await this.addPage(buff);
+        if (this.maxPages && this.params.scopedSeeds.length >= this.maxPages) {
+          return;
+        }
+      }
     }
 
-    await cdp.send("Network.enable");
+    const extraPagesReader = await loader.loadFile("pages/extraPages.jsonl");
 
-    cdp.on("Network.responseReceived", async (params) =>
-      this.handlePageResponse(params, page),
+    if (extraPagesReader) {
+      for await (const buff of extraPagesReader.iterLines()) {
+        await this.addPage(buff);
+        if (this.maxPages && this.params.scopedSeeds.length >= this.maxPages) {
+          return;
+        }
+      }
+    }
+  }
+
+  async addPage(page: string) {
+    let pageData: ReplayPage;
+
+    if (!page.length) {
+      return;
+    }
+
+    try {
+      pageData = JSON.parse(page);
+    } catch (e) {
+      console.log(page, e);
+      return;
+    }
+
+    const { url, ts } = pageData;
+    if (!url) {
+      return;
+    }
+
+    const scopedSeeds = this.params.scopedSeeds;
+
+    scopedSeeds.push(
+      new ScopedSeed({ url, scopeType: "page", depth: 1, include: [] }),
     );
+
+    if (!(await this.queueUrl(scopedSeeds.length - 1, url, 0, 0, {}, ts))) {
+      if (this.limitHit) {
+        return;
+      }
+    }
   }
 
-  async loadPageList(frame: Frame) {
-    let res;
-
-    while (true) {
-      res = await frame.evaluate(async () => {
-        const res = await fetch(
-          "http://localhost:9990/replay/w/api/c/replay?all=1",
-        );
-        const json = res.json();
-        return json;
-      });
-
-      if (res.error) {
-        console.log("ERR SLEEPING");
-        await sleep(5);
-      } else {
-        break;
-      }
-    }
-
-    const scopedSeeds = [];
-
-    for (const page of res.pages) {
-      const { url, ts } = page;
-      scopedSeeds.push(
-        new ScopedSeed({ url, scopeType: "page", depth: 1, include: [] }),
-      );
-
-      if (
-        !(await this.queueUrl(scopedSeeds.length - 1, page.url, 0, 0, {}, ts))
-      ) {
-        if (this.limitHit) {
-          break;
-        }
-      }
-    }
-
-    let textIndex: string;
-
-    while (true) {
-      textIndex = await frame.evaluate(async () => {
-        const res = await fetch(
-          "http://localhost:9990/replay/w/api/c/replay/textIndex",
-        );
-        const text = res.text();
-        return text;
-      });
-
-      if (res.error) {
-        await sleep(5);
-      } else {
-        break;
-      }
-    }
-
-    for (const page of textIndex.split("\n")) {
-      let pageData: ReplayPage;
-
-      try {
-        pageData = JSON.parse(page);
-      } catch (e) {
-        continue;
-      }
-
-      const { url, ts } = pageData;
-      if (!url) {
-        continue;
-      }
-
-      scopedSeeds.push(
-        new ScopedSeed({ url, scopeType: "page", depth: 1, include: [] }),
-      );
-
-      if (!(await this.queueUrl(scopedSeeds.length - 1, url, 0, 0, {}, ts))) {
-        if (this.limitHit) {
-          break;
-        }
-      }
-    }
-
-    this.params.scopedSeeds = scopedSeeds;
-
-    // await loadReplayPage(page, pages[0].url, pages[0].ts);
-  }
-
-  async handlePageResponse(
+  async handlePageResourceResponse(
     params: Protocol.Network.ResponseReceivedEvent,
     page: Page,
   ) {
     const { response } = params;
     const { url, status } = response;
-    if (!url || !url.startsWith("http://localhost:9990/replay/w/replay/")) {
+    if (!url.startsWith("http://localhost:9990/replay/w/replay/")) {
+      if (url.startsWith("http://localhost:9990/replay/?source=")) {
+        const { mimeType, fromServiceWorker } = response;
+        if (
+          !fromServiceWorker &&
+          mimeType === "application/json" &&
+          page.frames().length > 1
+        ) {
+          const frame = page.frames()[1];
+          this.timeoutId = setTimeout(() => {
+            logger.warn("Reloading RWP Frame, not inited", { url }, "replay");
+            frame.evaluate("window.location.reload();");
+          }, 10000);
+        } else if (fromServiceWorker && mimeType !== "application/json") {
+          if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+          }
+        }
+      }
       return;
     }
 
@@ -175,7 +199,6 @@ export class ReplayCrawler extends Crawler {
 
     let replayUrl = url.slice(inx + 2);
 
-    //const pageUrl = this.pagesToUrl.get(page);
     const pageInfo = this.pageInfos.get(page);
 
     if (!pageInfo) {
@@ -249,24 +272,72 @@ export class ReplayCrawler extends Crawler {
 
     await this.doPostLoadActions(opts);
 
-    this.processPageInfo(page);
+    await this.processPageInfo(page);
   }
 
   async teardownPage(opts: WorkerOpts) {
     const { page } = opts;
-    this.processPageInfo(page);
+    await this.processPageInfo(page);
     await super.teardownPage(opts);
   }
 
-  processPageInfo(page: Page) {
+  async processPageInfo(page: Page) {
     const pageInfo = this.pageInfos.get(page);
     if (pageInfo) {
-      console.log(pageInfo);
+      if (!pageInfo.urls[pageInfo.url]) {
+        logger.warn(
+          "Replay resource: missing top-level page",
+          { url: pageInfo.url },
+          "replay",
+        );
+      }
+      const writer = new WARCResourceWriter({
+        url: pageInfo.url,
+        directory: this.archivesDir,
+        date: new Date(),
+        warcName: "info.warc.gz",
+      });
+      await writer.writeBufferToWARC(
+        new TextEncoder().encode(JSON.stringify(pageInfo, null, 2)),
+        "pageinfo",
+        "application/json",
+      );
       this.pageInfos.delete(page);
     }
   }
 
   createRecorder(): Recorder | null {
     return null;
+  }
+}
+
+class WACZLoader {
+  url: string;
+  zipreader: ZipRangeReader;
+
+  constructor(url: string) {
+    this.url = url;
+    this.zipreader = null;
+  }
+
+  async init() {
+    // if (!this.url.startsWith("http://") && !this.url.startsWith("https://")) {
+    //   const blob = await openAsBlob(this.url);
+    //   this.url = URL.createObjectURL(blob);
+    // }
+
+    const loader = await createLoader({ url: this.url });
+
+    this.zipreader = new ZipRangeReader(loader);
+  }
+
+  async loadFile(fileInZip: string) {
+    const { reader } = await this.zipreader.loadFile(fileInZip);
+
+    if (!reader.iterLines) {
+      return new AsyncIterReader(reader);
+    }
+
+    return reader;
   }
 }

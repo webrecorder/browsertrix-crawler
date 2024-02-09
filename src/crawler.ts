@@ -136,6 +136,8 @@ export class Crawler {
   pagesDir: string;
   pagesFile: string;
 
+  archivesDir: string;
+
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
 
@@ -247,6 +249,9 @@ export class Crawler {
 
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
+
+    // archives dir
+    this.archivesDir = path.join(this.collDir, "archive");
 
     this.blockRules = null;
     this.adBlockRules = null;
@@ -752,7 +757,6 @@ self.__bx_behaviors.selectMainBehavior();
     const { url } = data;
 
     const logDetails = { page: url, workerid };
-    const archiveDir = path.join(this.collDir, "archive");
 
     if (this.params.screenshot) {
       if (!data.isHTMLPage) {
@@ -762,7 +766,7 @@ self.__bx_behaviors.selectMainBehavior();
         browser: this.browser,
         page,
         url,
-        directory: archiveDir,
+        directory: this.archivesDir,
       });
       if (this.params.screenshot.includes("view")) {
         await screenshots.take();
@@ -780,7 +784,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (data.isHTMLPage) {
       textextract = new TextExtractViaSnapshot(cdp, {
         url,
-        directory: archiveDir,
+        directory: this.archivesDir,
       });
       const { changed, text } = await textextract.extractAndStoreText(
         "text",
@@ -1017,8 +1021,7 @@ self.__bx_behaviors.selectMainBehavior();
   async checkLimits() {
     let interrupt = false;
 
-    const dir = path.join(this.collDir, "archive");
-    const size = await getDirSize(dir);
+    const size = await getDirSize(this.archivesDir);
 
     await this.crawlState.setArchiveSize(size);
 
@@ -1210,18 +1213,7 @@ self.__bx_behaviors.selectMainBehavior();
       this.originOverride = new OriginOverride(this.params.originOverride);
     }
 
-    for (let i = 0; i < this.params.scopedSeeds.length; i++) {
-      const seed = this.params.scopedSeeds[i];
-      if (!(await this.queueUrl(i, seed.url, 0, 0))) {
-        if (this.limitHit) {
-          break;
-        }
-      }
-
-      if (seed.sitemap) {
-        await this.parseSitemap(seed.sitemap, i, this.params.sitemapFromDate);
-      }
-    }
+    await this._addInitialSeeds();
 
     await this.browser.launch({
       profileUrl: this.params.profile,
@@ -1268,6 +1260,21 @@ self.__bx_behaviors.selectMainBehavior();
     await this.postCrawl();
   }
 
+  protected async _addInitialSeeds() {
+    for (let i = 0; i < this.params.scopedSeeds.length; i++) {
+      const seed = this.params.scopedSeeds[i];
+      if (!(await this.queueUrl(i, seed.url, 0, 0))) {
+        if (this.limitHit) {
+          break;
+        }
+      }
+
+      if (seed.sitemap) {
+        await this.parseSitemap(seed.sitemap, i, this.params.sitemapFromDate);
+      }
+    }
+  }
+
   async postCrawl() {
     if (this.params.combineWARC) {
       await this.combineWARC();
@@ -1278,9 +1285,9 @@ self.__bx_behaviors.selectMainBehavior();
       await fsp.mkdir(path.join(this.collDir, "indexes"), { recursive: true });
       await this.crawlState.setStatus("generate-cdx");
 
-      const warcList = await fsp.readdir(path.join(this.collDir, "archive"));
+      const warcList = await fsp.readdir(this.archivesDir);
       const warcListFull = warcList.map((filename) =>
-        path.join(this.collDir, "archive", filename),
+        path.join(this.archivesDir, filename),
       );
 
       //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
@@ -1348,10 +1355,8 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info("Generating WACZ");
     await this.crawlState.setStatus("generate-wacz");
 
-    const archiveDir = path.join(this.collDir, "archive");
-
     // Get a list of the warcs inside
-    const warcFileList = await fsp.readdir(archiveDir);
+    const warcFileList = await fsp.readdir(this.archivesDir);
 
     // is finished (>0 pages and all pages written)
     const isFinished = await this.crawlState.isFinished();
@@ -1411,7 +1416,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     createArgs.push("-f");
 
-    warcFileList.forEach((val) => createArgs.push(path.join(archiveDir, val)));
+    warcFileList.forEach((val) =>
+      createArgs.push(path.join(this.archivesDir, val)),
+    );
 
     // create WACZ
     const waczResult = await this.awaitProcess(
@@ -2060,7 +2067,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.crawlState.setStatus("generate-warc");
 
     // Get the list of created Warcs
-    const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));
+    const warcLists = await fsp.readdir(this.archivesDir);
 
     logger.debug(`Combining ${warcLists.length} WARCs...`);
 
@@ -2068,7 +2075,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
     for (let i = 0; i < warcLists.length; i++) {
-      const fileName = path.join(this.collDir, "archive", warcLists[i]);
+      const fileName = path.join(this.archivesDir, warcLists[i]);
       const fileSize = await getFileSize(fileName);
       fileSizeObjects.push({ fileSize: fileSize, fileName: fileName });
       fileSizeObjects.sort((a, b) => b.fileSize - a.fileSize);
