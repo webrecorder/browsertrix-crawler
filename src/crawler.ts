@@ -1929,15 +1929,20 @@ self.__bx_behaviors.selectMainBehavior();
     loadState,
     mime,
     favicon,
+    ts,
   }: PageState) {
     const row: PageEntry = { id: pageid!, url, title, loadState };
 
-    if (this.params.writePagesToRedis) {
-      await this.crawlState.writeToPagesQueue(JSON.stringify(row));
+    if (ts) {
+      row.ts = ts.toISOString();
     }
 
     if (mime) {
       row.mime = mime;
+    }
+
+    if (this.params.writePagesToRedis) {
+      await this.crawlState.writeToPagesQueue(JSON.stringify(row));
     }
 
     if (depth === 0) {

@@ -298,7 +298,7 @@ export class PageWorker {
   async crawlPage(opts: WorkerState) {
     const res = await this.crawler.crawlPage(opts);
     if (this.recorder) {
-      await this.recorder.finishPage();
+      opts.data.ts = await this.recorder.finishPage();
     }
     return res;
   }

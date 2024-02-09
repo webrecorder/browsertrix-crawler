@@ -51,6 +51,7 @@ export class PageState {
   pageid?: string;
   title?: string;
   mime?: string;
+  ts?: Date;
 
   callbacks: PageCallbacks = {};
 
