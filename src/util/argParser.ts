@@ -511,7 +511,7 @@ class ArgParser {
     };
   }
 
-  parseArgs(argvParams?: string[]) {
+  parseArgs(argvParams?: string[], isQA = false) {
     let argv = argvParams || process.argv;
 
     if (process.env.CRAWL_ARGS) {
@@ -535,7 +535,7 @@ class ArgParser {
           return origConfig;
         },
       )
-      .check((argv) => this.validateArgs(argv)).argv;
+      .check((argv) => this.validateArgs(argv, isQA)).argv;
 
     return { parsed, origConfig };
   }
@@ -548,7 +548,7 @@ class ArgParser {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  validateArgs(argv: Record<string, any>) {
+  validateArgs(argv: Record<string, any>, isQA: boolean) {
     argv.crawlId = argv.crawlId || process.env.CRAWL_ID || os.hostname;
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
 
@@ -603,33 +603,39 @@ class ArgParser {
       //logger.debug(`Set netIdleWait to ${argv.netIdleWait} seconds`);
     }
 
-    const scopeOpts = {
-      scopeType: argv.scopeType,
-      sitemap: argv.sitemap,
-      include: argv.include,
-      exclude: argv.exclude,
-      depth: argv.depth,
-      extraHops: argv.extraHops,
-    };
-
     argv.scopedSeeds = [];
 
-    for (let seed of argv.seeds) {
-      if (typeof seed === "string") {
-        seed = { url: seed };
-      }
+    if (!isQA) {
+      const scopeOpts = {
+        scopeType: argv.scopeType,
+        sitemap: argv.sitemap,
+        include: argv.include,
+        exclude: argv.exclude,
+        depth: argv.depth,
+        extraHops: argv.extraHops,
+      };
 
-      try {
-        argv.scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...seed }));
-      } catch (e) {
-        if (argv.failOnFailedSeed) {
-          logger.fatal(`Invalid Seed "${seed.url}" specified, aborting crawl.`);
+      for (let seed of argv.seeds) {
+        if (typeof seed === "string") {
+          seed = { url: seed };
+        }
+
+        try {
+          argv.scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...seed }));
+        } catch (e) {
+          if (argv.failOnFailedSeed) {
+            logger.fatal(
+              `Invalid Seed "${seed.url}" specified, aborting crawl.`,
+            );
+          }
         }
       }
-    }
 
-    if (!argv.scopedSeeds.length) {
-      logger.fatal("No valid seeds specified, aborting crawl.");
+      if (!argv.scopedSeeds.length) {
+        logger.fatal("No valid seeds specified, aborting crawl.");
+      }
+    } else if (!argv.replaySource) {
+      logger.fatal("--replaySource required for QA mode!");
     }
 
     // Resolve statsFilename
@@ -645,6 +651,6 @@ class ArgParser {
   }
 }
 
-export function parseArgs(argv?: string[]) {
-  return new ArgParser().parseArgs(argv);
+export function parseArgs(argv?: string[], isQA = false) {
+  return new ArgParser().parseArgs(argv, isQA);
 }

@@ -3,7 +3,6 @@
 import { logger } from "./util/logger.js";
 import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
-import { parseArgs } from "./util/argParser.js";
 import { ReplayCrawler } from "./replaycrawler.js";
 
 let crawler: Crawler | null = null;
@@ -51,13 +50,10 @@ process.on("SIGABRT", async () => {
   forceTerm = true;
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const args = parseArgs() as any;
-
-if (args.parsed.replaySource) {
-  crawler = new ReplayCrawler(args);
+if (process.argv[1].endsWith("qa")) {
+  crawler = new ReplayCrawler();
 } else {
-  crawler = new Crawler(args);
+  crawler = new Crawler();
 }
 
 crawler.run();

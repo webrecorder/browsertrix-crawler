@@ -12,6 +12,7 @@ import { ZipRangeReader } from "@webrecorder/wabac/src/wacz/ziprangereader.js";
 import { createLoader } from "@webrecorder/wabac/src/blockloaders.js";
 import { AsyncIterReader } from "warcio";
 import { WARCResourceWriter } from "./util/warcresourcewriter.js";
+import { parseArgs } from "./util/argParser.js";
 
 //import { openAsBlob } from "node:fs";
 
@@ -30,9 +31,8 @@ export class ReplayCrawler extends Crawler {
 
   reloadTimeouts: WeakMap<Page, NodeJS.Timeout>;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(args: Record<string, any>) {
-    super(args);
+  constructor() {
+    super();
     this.recording = false;
     if (!this.params.replaySource) {
       throw new Error("Missing replay source");
@@ -48,6 +48,10 @@ export class ReplayCrawler extends Crawler {
     this.params.scopedSeeds = [];
 
     this.reloadTimeouts = new WeakMap<Page, NodeJS.Timeout>();
+  }
+
+  protected parseArgs() {
+    return parseArgs(process.argv, true);
   }
 
   async setupPage(opts: WorkerOpts) {

@@ -49,7 +49,9 @@ ADD html/ /app/html/
 
 RUN chmod u+x /app/dist/main.js /app/dist/create-login-profile.js
 
-RUN ln -s /app/dist/main.js /usr/bin/crawl; ln -s /app/dist/create-login-profile.js /usr/bin/create-login-profile
+RUN ln -s /app/dist/main.js /usr/bin/crawl; \
+    ln -s /app/dist/main.js /usr/bin/qa; \
+    ln -s /app/dist/create-login-profile.js /usr/bin/create-login-profile
 
 WORKDIR /crawls
 

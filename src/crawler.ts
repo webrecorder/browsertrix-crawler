@@ -13,6 +13,8 @@ import {
   PageCallbacks,
 } from "./util/state.js";
 
+import { parseArgs } from "./util/argParser.js";
+
 import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
 
@@ -172,8 +174,8 @@ export class Crawler {
 
   recording = true;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(args: Record<string, any>) {
+  constructor() {
+    const args = this.parseArgs();
     this.params = args.parsed;
     this.origConfig = args.origConfig;
 
@@ -269,6 +271,10 @@ export class Crawler {
     this.customBehaviors = "";
 
     this.browser = new Browser();
+  }
+
+  protected parseArgs() {
+    return parseArgs();
   }
 
   configureUA() {
@@ -1212,7 +1218,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     this.screencaster = this.initScreenCaster();
 
-    if (this.params.originOverride.length) {
+    if (this.params.originOverride && this.params.originOverride.length) {
       this.originOverride = new OriginOverride(this.params.originOverride);
     }
 
