@@ -2,7 +2,6 @@ import { Page, Protocol } from "puppeteer-core";
 import { Crawler } from "./crawler.js";
 import { ReplayServer } from "./util/replayserver.js";
 import { sleep } from "./util/timing.js";
-import { ScopedSeed } from "./util/seeds.js";
 import { logger } from "./util/logger.js";
 import { WorkerOpts } from "./util/worker.js";
 import { PageInfoRecord, Recorder } from "./util/recorder.js";
@@ -34,9 +33,7 @@ export class ReplayCrawler extends Crawler {
 
   pageInfos: Map<Page, PageInfoWithUrl>;
 
-  timeoutId?: NodeJS.Timeout;
-
-  maxPages: number = 0;
+  reloadTimeouts: WeakMap<Page, NodeJS.Timeout>;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(args: Record<string, any>) {
@@ -50,10 +47,12 @@ export class ReplayCrawler extends Crawler {
 
     this.pageInfos = new Map<Page, PageInfoWithUrl>();
 
-    this.maxPages = this.params.limit;
-
     // skip text from first two frames, as they are RWP boilerplate
     this.skipTextDocs = 2;
+
+    this.params.scopedSeeds = [];
+
+    this.reloadTimeouts = new WeakMap<Page, NodeJS.Timeout>();
   }
 
   async setupPage(opts: WorkerOpts) {
@@ -68,6 +67,10 @@ export class ReplayCrawler extends Crawler {
 
     cdp.on("Network.responseReceived", async (params) =>
       this.handlePageResourceResponse(params, page),
+    );
+
+    cdp.on("Network.requestWillBeSent", (params) =>
+      this.handleRequestWillBeSent(params, page),
     );
 
     await page.goto(this.replayServer.homePage);
@@ -86,9 +89,15 @@ export class ReplayCrawler extends Crawler {
   }
 
   protected async _addInitialSeeds() {
-    this.params.scopedSeeds = [];
+    // this.params.scopedSeeds = [
+    //   new ScopedSeed({url: "https://replay.example.com/", scopeType: "page", depth: 1, include: [] })
+    // ];
 
     await this.loadPages(this.replaySource);
+  }
+
+  isInScope() {
+    return true;
   }
 
   async loadPages(url: string) {
@@ -117,8 +126,8 @@ export class ReplayCrawler extends Crawler {
     if (pagesReader) {
       for await (const buff of pagesReader.iterLines()) {
         await this.addPage(buff);
-        if (this.maxPages && this.params.scopedSeeds.length >= this.maxPages) {
-          return;
+        if (this.limitHit) {
+          break;
         }
       }
     }
@@ -128,8 +137,8 @@ export class ReplayCrawler extends Crawler {
     if (extraPagesReader) {
       for await (const buff of extraPagesReader.iterLines()) {
         await this.addPage(buff);
-        if (this.maxPages && this.params.scopedSeeds.length >= this.maxPages) {
-          return;
+        if (this.limitHit) {
+          break;
         }
       }
     }
@@ -154,16 +163,18 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
-    const scopedSeeds = this.params.scopedSeeds;
+    await this.queueUrl(0, url, 1, 0, {}, ts);
+  }
 
-    scopedSeeds.push(
-      new ScopedSeed({ url, scopeType: "page", depth: 1, include: [] }),
-    );
-
-    if (!(await this.queueUrl(scopedSeeds.length - 1, url, 0, 0, {}, ts))) {
-      if (this.limitHit) {
-        return;
-      }
+  handleRequestWillBeSent(
+    params: Protocol.Network.RequestWillBeSentEvent,
+    page: Page,
+  ) {
+    // only handling redirect here, committing last response in redirect chain
+    const { redirectResponse } = params;
+    if (redirectResponse) {
+      const { url, status } = redirectResponse;
+      this.addPageResource(url, status, page);
     }
   }
 
@@ -182,19 +193,26 @@ export class ReplayCrawler extends Crawler {
           page.frames().length > 1
         ) {
           const frame = page.frames()[1];
-          this.timeoutId = setTimeout(() => {
+          const timeoutid = setTimeout(() => {
             logger.warn("Reloading RWP Frame, not inited", { url }, "replay");
             frame.evaluate("window.location.reload();");
           }, 10000);
+          this.reloadTimeouts.set(page, timeoutid);
         } else if (fromServiceWorker && mimeType !== "application/json") {
-          if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
+          const timeoutid = this.reloadTimeouts.get(page);
+          if (timeoutid) {
+            clearTimeout(timeoutid);
+            this.reloadTimeouts.delete(page);
           }
         }
       }
       return;
     }
 
+    this.addPageResource(url, status, page);
+  }
+
+  addPageResource(url: string, status: number, page: Page) {
     const inx = url.indexOf("_/");
     if (inx <= 0) {
       return;
