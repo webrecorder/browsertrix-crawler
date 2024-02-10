@@ -21,17 +21,12 @@ type ReplayPage = {
   id: string;
 };
 
-type PageInfoWithUrl = PageInfoRecord & {
-  url: string;
-  timestamp: string;
-};
-
 // ============================================================================
 export class ReplayCrawler extends Crawler {
   replayServer: ReplayServer;
   replaySource: string;
 
-  pageInfos: Map<Page, PageInfoWithUrl>;
+  pageInfos: Map<Page, PageInfoRecord>;
 
   reloadTimeouts: WeakMap<Page, NodeJS.Timeout>;
 
@@ -45,7 +40,7 @@ export class ReplayCrawler extends Crawler {
     this.replaySource = this.params.replaySource;
     this.replayServer = new ReplayServer(this.replaySource);
 
-    this.pageInfos = new Map<Page, PageInfoWithUrl>();
+    this.pageInfos = new Map<Page, PageInfoRecord>();
 
     // skip text from first two frames, as they are RWP boilerplate
     this.skipTextDocs = 2;
@@ -247,13 +242,15 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
-    const timestamp = ts
-      ? new Date(ts).toISOString().slice(0, 19).replace(/[T:-]/g, "")
+    const date = ts ? new Date(ts) : undefined;
+
+    const timestamp = date
+      ? date.toISOString().slice(0, 19).replace(/[T:-]/g, "")
       : "";
 
     logger.info("Loading Replay", { url, timestamp }, "replay");
 
-    const pageInfo = { pageid, urls: {}, url, timestamp };
+    const pageInfo = { pageid, urls: {}, url, ts: date };
     this.pageInfos.set(page, pageInfo);
 
     await page.evaluate(

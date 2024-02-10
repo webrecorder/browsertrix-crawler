@@ -59,7 +59,6 @@ export class PageState {
   isHTMLPage?: boolean;
   text?: string;
   favicon?: string;
-  ts: number;
 
   skipBehaviors = false;
   filteredFrames: Frame[] = [];
@@ -72,7 +71,9 @@ export class PageState {
     this.seedId = redisData.seedId;
     this.depth = redisData.depth;
     this.extraHops = redisData.extraHops || 0;
-    this.ts = redisData.ts || 0;
+    if (redisData.ts) {
+      this.ts = new Date(redisData.ts);
+    }
   }
 }
 
