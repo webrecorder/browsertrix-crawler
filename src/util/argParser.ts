@@ -464,6 +464,12 @@ class ArgParser {
         default: false,
       },
 
+      writePagesToRedis: {
+        describe: "If set, write page objects to redis",
+        type: "boolean",
+        default: false,
+      },
+
       failOnFailedSeed: {
         describe:
           "If set, crawler will fail with exit code 1 if any seed fails",

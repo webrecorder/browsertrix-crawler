@@ -16,11 +16,9 @@ const MAX_ARG_LEN = 512;
 
 // ===========================================================================
 export class RequestResponseInfo {
-  _created: Date = new Date();
+  ts: Date = new Date();
 
   requestId: string;
-
-  ts?: string;
 
   method?: string;
   url!: string;

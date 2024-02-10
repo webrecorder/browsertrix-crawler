@@ -50,6 +50,8 @@ function logNetwork(msg: string, data: any) {
 export type PageInfoRecord = {
   pageid: string;
   urls: Record<string, number>;
+  url: string;
+  ts?: Date;
 };
 
 // =================================================================
@@ -463,6 +465,10 @@ export class Recorder {
       return false;
     }
 
+    if (url === this.pageUrl) {
+      this.pageInfo.ts = reqresp.ts;
+    }
+
     reqresp.fillFetchRequestPaused(params);
 
     if (this.noResponseForStatus(responseStatusCode)) {
@@ -622,7 +628,7 @@ export class Recorder {
     this.pendingRequests = new Map();
     this.skipIds = new Set();
     this.skipping = false;
-    this.pageInfo = { pageid, urls: {} };
+    this.pageInfo = { pageid, urls: {}, url };
   }
 
   addPageRecord(reqresp: RequestResponseInfo) {
@@ -685,6 +691,8 @@ export class Recorder {
     }
 
     await this.writePageInfoRecord();
+
+    return this.pageInfo.ts;
   }
 
   async onClosePage() {
@@ -1384,7 +1392,7 @@ function createResponse(
   const url = reqresp.url;
   const warcVersion = "WARC/1.1";
   const statusline = `HTTP/1.1 ${reqresp.status} ${reqresp.statusText}`;
-  const date = new Date().toISOString();
+  const date = new Date(reqresp.ts).toISOString();
 
   const httpHeaders = reqresp.getResponseHeadersDict(
     reqresp.payload ? reqresp.payload.length : 0,

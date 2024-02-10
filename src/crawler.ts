@@ -90,6 +90,7 @@ type PageEntry = {
   seed?: boolean;
   text?: string;
   favIconUrl?: string;
+  ts?: string;
 };
 
 // ============================================================================
@@ -1928,11 +1929,20 @@ self.__bx_behaviors.selectMainBehavior();
     loadState,
     mime,
     favicon,
+    ts,
   }: PageState) {
     const row: PageEntry = { id: pageid!, url, title, loadState };
 
+    if (ts) {
+      row.ts = ts.toISOString();
+    }
+
     if (mime) {
       row.mime = mime;
+    }
+
+    if (this.params.writePagesToRedis) {
+      await this.crawlState.writeToPagesQueue(JSON.stringify(row));
     }
 
     if (depth === 0) {
