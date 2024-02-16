@@ -186,7 +186,12 @@ export class Recorder {
         requestId: params.requestId,
         ...this.logDetails,
       });
-      this.removeReqResp(params.requestId);
+      const reqresp = this.pendingReqResp(params.requestId, true);
+      if (reqresp) {
+        this.addPageRecord(reqresp);
+
+        this.removeReqResp(params.requestId);
+      }
     });
 
     cdp.on("Network.requestWillBeSentExtraInfo", (params) => {
@@ -251,6 +256,8 @@ export class Recorder {
     }
 
     reqresp.fillResponse(response);
+
+    this.addPageRecord(reqresp);
   }
 
   handleRequestExtraInfo(
