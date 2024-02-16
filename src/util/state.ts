@@ -58,6 +58,7 @@ export class PageState {
 
   isHTMLPage?: boolean;
   text?: string;
+  screenshotView?: Buffer;
   favicon?: string;
 
   skipBehaviors = false;

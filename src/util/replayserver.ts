@@ -51,7 +51,6 @@ export class ReplayServer {
         return;
 
       default:
-        //console.log("Unknown path: " + pathname);
         response.writeHead(404, { "Content-Type": "application/json" });
         response.end(JSON.stringify({ error: "not_found" }));
         return;

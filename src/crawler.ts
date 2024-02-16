@@ -155,6 +155,8 @@ export class Crawler {
   uploadAndDeleteLocal = false;
   done = false;
 
+  textInPages = false;
+
   customBehaviors = "";
   behaviorsChecked = false;
   behaviorLastLine?: string;
@@ -265,6 +267,8 @@ export class Crawler {
     this.interrupted = false;
     this.finalExit = false;
     this.uploadAndDeleteLocal = false;
+
+    this.textInPages = this.params.text.includes("to-pages");
 
     this.done = false;
 
@@ -760,7 +764,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async doPostLoadActions(opts: WorkerOpts) {
+  async doPostLoadActions(opts: WorkerOpts, saveOutput = false) {
     const { page, cdp, data, workerid } = opts;
     const { url } = data;
 
@@ -777,7 +781,7 @@ self.__bx_behaviors.selectMainBehavior();
         directory: this.archivesDir,
       });
       if (this.params.screenshot.includes("view")) {
-        await screenshots.take();
+        await screenshots.take("view", saveOutput ? data : null);
       }
       if (this.params.screenshot.includes("fullPage")) {
         await screenshots.takeFullPage();
@@ -795,13 +799,13 @@ self.__bx_behaviors.selectMainBehavior();
         directory: this.archivesDir,
         skipDocs: this.skipTextDocs,
       });
-      const { changed, text } = await textextract.extractAndStoreText(
+      const { text } = await textextract.extractAndStoreText(
         "text",
         false,
         this.params.text.includes("to-warc"),
       );
 
-      if (changed && text && this.params.text.includes("to-pages")) {
+      if (this.textInPages || saveOutput) {
         data.text = text;
       }
     }
@@ -1933,7 +1937,7 @@ self.__bx_behaviors.selectMainBehavior();
           id: "pages",
           title: "All Pages",
         };
-        header["hasText"] = this.params.text.includes("to-pages");
+        header["hasText"] = String(this.textInPages);
         if (this.params.text.length) {
           logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
@@ -1976,7 +1980,7 @@ self.__bx_behaviors.selectMainBehavior();
       row.seed = true;
     }
 
-    if (text !== null) {
+    if (text !== null && this.textInPages) {
       row.text = text;
     }
 

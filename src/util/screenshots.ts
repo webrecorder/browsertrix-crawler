@@ -4,17 +4,20 @@ import { WARCResourceWriter } from "./warcresourcewriter.js";
 import { logger, formatErr } from "./logger.js";
 import { Browser } from "./browser.js";
 import { Page } from "puppeteer-core";
+import { PageState } from "./state.js";
 
 // ============================================================================
 
-type ScreenShotType = {
+type ScreenShotDesc = {
   type: "png" | "jpeg";
   omitBackground: boolean;
   fullPage: boolean;
   encoding: "binary";
 };
 
-export const screenshotTypes: Record<string, ScreenShotType> = {
+type ScreeshotType = "view" | "thumbnail" | "fullPage";
+
+export const screenshotTypes: Record<string, ScreenShotDesc> = {
   view: {
     type: "png",
     omitBackground: true,
@@ -52,7 +55,10 @@ export class Screenshots extends WARCResourceWriter {
     this.page = opts.page;
   }
 
-  async take(screenshotType = "view") {
+  async take(
+    screenshotType: ScreeshotType = "view",
+    state: PageState | null = null,
+  ) {
     try {
       if (screenshotType !== "fullPage") {
         await this.browser.setViewport(this.page, {
@@ -62,6 +68,9 @@ export class Screenshots extends WARCResourceWriter {
       }
       const options = screenshotTypes[screenshotType];
       const screenshotBuffer = await this.page.screenshot(options);
+      if (state && screenshotType === "view") {
+        state.screenshotView = screenshotBuffer;
+      }
       await this.writeBufferToWARC(
         screenshotBuffer,
         screenshotType,

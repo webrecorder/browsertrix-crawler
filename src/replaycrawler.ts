@@ -4,15 +4,27 @@ import { ReplayServer } from "./util/replayserver.js";
 import { sleep } from "./util/timing.js";
 import { logger } from "./util/logger.js";
 import { WorkerOpts } from "./util/worker.js";
+import { PageState } from "./util/state.js";
 import { PageInfoRecord, Recorder } from "./util/recorder.js";
+
+import fsp from "fs/promises";
+import path from "path";
 
 // @ts-expect-error wabac.js
 import { ZipRangeReader } from "@webrecorder/wabac/src/wacz/ziprangereader.js";
 // @ts-expect-error wabac.js
 import { createLoader } from "@webrecorder/wabac/src/blockloaders.js";
+
 import { AsyncIterReader } from "warcio";
 import { WARCResourceWriter } from "./util/warcresourcewriter.js";
 import { parseArgs } from "./util/argParser.js";
+
+import { PNG } from "pngjs";
+import pixelmatch from "pixelmatch";
+
+import levenshtein from "js-levenshtein";
+
+const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
 
 //import { openAsBlob } from "node:fs";
 
@@ -183,7 +195,7 @@ export class ReplayCrawler extends Crawler {
   ) {
     const { response } = params;
     const { url, status } = response;
-    if (!url.startsWith("http://localhost:9990/replay/w/replay/")) {
+    if (!url.startsWith(REPLAY_PREFIX)) {
       if (url.startsWith("http://localhost:9990/replay/?source=")) {
         const { mimeType, fromServiceWorker } = response;
         if (
@@ -292,9 +304,189 @@ export class ReplayCrawler extends Crawler {
 
     data.isHTMLPage = true;
 
-    await this.doPostLoadActions(opts);
+    await this.doPostLoadActions(opts, true);
+
+    await this.compareScreenshots(page, data, url, date);
+
+    await this.compareText(page, data, url, date);
+
+    await this.compareResources(page, data, url, date);
 
     await this.processPageInfo(page);
+  }
+
+  async compareScreenshots(
+    page: Page,
+    state: PageState,
+    url: string,
+    date?: Date,
+  ) {
+    const origScreenshot = await this.fetchOrigBinary(
+      page,
+      "view",
+      url,
+      date ? date.toISOString().replace(/[^\d]/g, "") : "",
+    );
+    const { screenshotView } = state;
+
+    if (!origScreenshot || !screenshotView) {
+      logger.warn("Screenshot missing for comparison", { url }, "replay");
+      return;
+    }
+
+    const orig = PNG.sync.read(origScreenshot);
+    const replay = PNG.sync.read(screenshotView);
+
+    const { width, height } = replay;
+    const diff = new PNG({ width, height });
+
+    const res = pixelmatch(orig.data, orig.data, diff.data, width, height, {
+      threshold: 0.1,
+      alpha: 0,
+    });
+
+    const total = width * height;
+
+    const matchPercent = total - res / total;
+
+    logger.info(
+      "Screenshot Diff",
+      {
+        url,
+        diff: res,
+        matchPercent,
+      },
+      "replay",
+    );
+
+    if (res) {
+      await fsp.writeFile(
+        path.join(
+          this.collDir,
+          url.replace("https://", "").replace("http://", "").replace("/", "-") +
+            ".png",
+        ),
+        PNG.sync.write(diff),
+      );
+    }
+  }
+
+  async compareText(page: Page, state: PageState, url: string, date?: Date) {
+    const origText = await this.fetchOrigText(
+      page,
+      "text",
+      url,
+      date ? date.toISOString().replace(/[^\d]/g, "") : "",
+    );
+    const replayText = state.text;
+
+    if (!origText || !replayText) {
+      logger.warn(
+        "Text missing for comparison",
+        {
+          url,
+          origTextLen: origText?.length,
+          replayTextLen: replayText?.length,
+        },
+        "replay",
+      );
+      return;
+    }
+
+    const dist = levenshtein(origText, replayText);
+    const maxLen = Math.max(origText.length, replayText.length);
+    const matchPercent = (maxLen - dist) / maxLen;
+    logger.info("Levenshtein Dist", { url, dist, matchPercent, maxLen });
+  }
+
+  async compareResources(
+    page: Page,
+    data: PageState,
+    url: string,
+    date?: Date,
+  ) {
+    const origResources = await this.fetchOrigText(
+      page,
+      "pageinfo",
+      url,
+      date ? date.toISOString().replace(/[^\d]/g, "") : "",
+    );
+
+    let origResData: object | null;
+
+    try {
+      origResData = JSON.parse(origResources || "");
+    } catch (e) {
+      origResData = null;
+    }
+
+    const pageInfo = this.pageInfos.get(page);
+
+    if (!origResData) {
+      logger.warn("Original resources missing / invalid", { url }, "replay");
+      return;
+    }
+
+    if (!pageInfo) {
+      logger.warn("Replay resources missing / invalid", { url }, "replay");
+      return;
+    }
+
+    console.log(origResData);
+    console.log(pageInfo);
+  }
+
+  async fetchOrigBinary(page: Page, type: string, url: string, ts: string) {
+    const frame = page.frames()[1];
+    if (!frame) {
+      logger.warn("Replay frame missing", { url }, "replay");
+      return;
+    }
+
+    const replayUrl = REPLAY_PREFIX + `${ts}mp_/urn:${type}:${url}`;
+
+    const binaryString = await frame.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (response.status !== 200) {
+        return "";
+      }
+      const blob = await response.blob();
+      const result = new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsBinaryString(blob);
+      });
+      return result;
+    }, replayUrl);
+
+    return Buffer.from(binaryString as string, "binary");
+  }
+
+  async fetchOrigText(page: Page, type: string, url: string, ts: string) {
+    const frame = page.frames()[1];
+    if (!frame) {
+      logger.warn("Replay frame missing", { url }, "replay");
+      return;
+    }
+
+    const replayUrl = REPLAY_PREFIX + `${ts}mp_/urn:${type}:${url}`;
+
+    const text = await frame.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (response.status !== 200) {
+        return "";
+      }
+      return await response.text();
+    }, replayUrl);
+
+    return text;
   }
 
   async teardownPage(opts: WorkerOpts) {
