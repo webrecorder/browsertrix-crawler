@@ -86,7 +86,7 @@ function validateResourcesAbout(json) {
     "https://webrecorder.net/assets/wr-logo.svg": 200,
     "https://fonts.gstatic.com/s/sourcesanspro/v22/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2": 200,
     "https://fonts.gstatic.com/s/sourcesanspro/v22/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2": 200,
-    "https://webrecorder.net/assets/favicon.ico": 200,
-    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2Fabout&d=webrecorder.net": 202,
+    //"https://webrecorder.net/assets/favicon.ico": 200,
+    //"https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2Fabout&d=webrecorder.net": 202,
   });
 }
