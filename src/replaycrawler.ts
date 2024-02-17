@@ -258,7 +258,7 @@ export class ReplayCrawler extends Crawler {
       }
     }
 
-    if (replayUrl.startsWith("http")) {
+    if (replayUrl.startsWith("http://") || replayUrl.startsWith("https://")) {
       pageInfo.urls[replayUrl] = status;
     }
   }
@@ -314,6 +314,9 @@ export class ReplayCrawler extends Crawler {
       timestamp,
     );
 
+    // optionally reload
+    // await page.reload();
+
     await sleep(10);
 
     // console.log("Frames");
@@ -350,8 +353,17 @@ export class ReplayCrawler extends Crawler {
     );
     const { pageid, screenshotView } = state;
 
-    if (!origScreenshot || !screenshotView) {
-      logger.warn("Screenshot missing for comparison", { url }, "replay");
+    if (!origScreenshot || !origScreenshot.length) {
+      logger.warn("Orig screenshot missing for comparison", { url }, "replay");
+      return;
+    }
+
+    if (!screenshotView || !screenshotView.length) {
+      logger.warn(
+        "Replay screenshot missing for comparison",
+        { url },
+        "replay",
+      );
       return;
     }
 
@@ -478,19 +490,27 @@ export class ReplayCrawler extends Crawler {
     resourceCounts.replayGood = replayGood;
     resourceCounts.replayBad = replayBad;
 
-    if (crawlGood !== replayGood) {
-      console.log(origResData);
-    }
+    // if (crawlGood !== replayGood) {
+    //   console.log("*** ORIG");
+    //   console.log(origResData);
+    // }
 
-    //console.log(origResData);
-    console.log(pageInfo);
+    // //console.log(origResData);
+    // console.log("*** REPLAY");
+    // console.log(pageInfo);
   }
 
   countResources(info: PageInfoRecord) {
-    let good = 0,
-      bad = 0;
+    let good = 0;
+    let bad = 0;
 
-    for (const status of Object.values(info.urls)) {
+    for (const [url, status] of Object.entries(info.urls)) {
+      if (!url.startsWith("http")) {
+        continue;
+      }
+      if (url.indexOf("__wb_method") !== -1) {
+        continue;
+      }
       if (status >= 400) {
         bad++;
       } else {
@@ -612,6 +632,10 @@ class WACZLoader {
 
   async loadFile(fileInZip: string) {
     const { reader } = await this.zipreader.loadFile(fileInZip);
+
+    if (!reader) {
+      return null;
+    }
 
     if (!reader.iterLines) {
       return new AsyncIterReader(reader);
