@@ -472,7 +472,8 @@ export class Recorder {
       return false;
     }
 
-    if (url === this.pageUrl) {
+    if (url === this.pageUrl && !this.pageInfo.ts) {
+      logger.debug("Setting page timestamp", { ts: reqresp.ts, url });
       this.pageInfo.ts = reqresp.ts;
     }
 
@@ -639,7 +640,9 @@ export class Recorder {
   }
 
   addPageRecord(reqresp: RequestResponseInfo) {
-    this.pageInfo.urls[reqresp.getCanonURL()] = reqresp.status;
+    if (this.isValidUrl(this.pageInfo.url)) {
+      this.pageInfo.urls[reqresp.getCanonURL()] = reqresp.status;
+    }
   }
 
   async writePageInfoRecord() {
