@@ -303,12 +303,14 @@ export class PageWorker {
 
     this.logDetails = { page: url, workerid };
 
-    // set new page id
-    const pageid = uuidv4();
-    data.pageid = pageid;
+    if (!data.pageid) {
+      // set new page id
+      const pageid = uuidv4();
+      data.pageid = pageid;
+    }
 
     if (this.recorder) {
-      this.recorder.startPage({ pageid, url });
+      this.recorder.startPage({ pageid: data.pageid, url });
     }
 
     try {

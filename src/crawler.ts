@@ -1883,13 +1883,14 @@ self.__bx_behaviors.selectMainBehavior();
     extraHops: number,
     logDetails: LogDetails = {},
     ts = 0,
+    pageid?: string,
   ) {
     if (this.limitHit) {
       return false;
     }
 
     const result = await this.crawlState.addToQueue(
-      { url, seedId, depth, extraHops, ts },
+      { url, seedId, depth, extraHops, ts, pageid },
       this.pageLimit,
     );
 

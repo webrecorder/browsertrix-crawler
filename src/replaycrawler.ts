@@ -34,12 +34,25 @@ type ReplayPage = {
   id: string;
 };
 
+type ReplayPageInfoRecord = PageInfoRecord & {
+  comparison: {
+    screenshotMatch?: number;
+    textMatch?: number;
+    resourceCounts: {
+      crawlGood?: number;
+      crawlBad?: number;
+      replayGood?: number;
+      replayBad?: number;
+    };
+  };
+};
+
 // ============================================================================
 export class ReplayCrawler extends Crawler {
   replayServer: ReplayServer;
   replaySource: string;
 
-  pageInfos: Map<Page, PageInfoRecord>;
+  pageInfos: Map<Page, ReplayPageInfoRecord>;
 
   reloadTimeouts: WeakMap<Page, NodeJS.Timeout>;
 
@@ -52,7 +65,7 @@ export class ReplayCrawler extends Crawler {
     this.replaySource = this.params.replaySource;
     this.replayServer = new ReplayServer(this.replaySource);
 
-    this.pageInfos = new Map<Page, PageInfoRecord>();
+    this.pageInfos = new Map<Page, ReplayPageInfoRecord>();
 
     // skip text from first two frames, as they are RWP boilerplate
     this.skipTextDocs = 2;
@@ -266,7 +279,13 @@ export class ReplayCrawler extends Crawler {
 
     logger.info("Loading Replay", { url, timestamp }, "replay");
 
-    const pageInfo = { pageid, urls: {}, url, ts: date };
+    const pageInfo = {
+      pageid,
+      urls: {},
+      url,
+      ts: date,
+      comparison: { resourceCounts: {} },
+    };
     this.pageInfos.set(page, pageInfo);
 
     await page.evaluate(
@@ -347,7 +366,7 @@ export class ReplayCrawler extends Crawler {
 
     const total = width * height;
 
-    const matchPercent = total - res / total;
+    const matchPercent = (total - res) / total;
 
     logger.info(
       "Screenshot Diff",
@@ -368,6 +387,11 @@ export class ReplayCrawler extends Crawler {
         ),
         PNG.sync.write(diff),
       );
+    }
+
+    const pageInfo = this.pageInfos.get(page);
+    if (pageInfo) {
+      pageInfo.comparison.screenshotMatch = matchPercent;
     }
   }
 
@@ -397,6 +421,16 @@ export class ReplayCrawler extends Crawler {
     const maxLen = Math.max(origText.length, replayText.length);
     const matchPercent = (maxLen - dist) / maxLen;
     logger.info("Levenshtein Dist", { url, dist, matchPercent, maxLen });
+    // if (dist) {
+    //   console.log(origText);
+    //   console.log("------------")
+    //   console.log(replayText);
+    // }
+
+    const pageInfo = this.pageInfos.get(page);
+    if (pageInfo) {
+      pageInfo.comparison.textMatch = matchPercent;
+    }
   }
 
   async compareResources(
@@ -412,7 +446,7 @@ export class ReplayCrawler extends Crawler {
       date ? date.toISOString().replace(/[^\d]/g, "") : "",
     );
 
-    let origResData: object | null;
+    let origResData: PageInfoRecord | null;
 
     try {
       origResData = JSON.parse(origResources || "");
@@ -420,7 +454,7 @@ export class ReplayCrawler extends Crawler {
       origResData = null;
     }
 
-    const pageInfo = this.pageInfos.get(page);
+    const pageInfo: ReplayPageInfoRecord | undefined = this.pageInfos.get(page);
 
     if (!origResData) {
       logger.warn("Original resources missing / invalid", { url }, "replay");
@@ -432,8 +466,37 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
-    console.log(origResData);
+    if (origResData.ts) {
+      pageInfo.ts = origResData.ts;
+    }
+
+    const { resourceCounts } = pageInfo.comparison;
+
+    const { good: crawlGood, bad: crawlBad } = this.countResources(origResData);
+    const { good: replayGood, bad: replayBad } = this.countResources(pageInfo);
+
+    resourceCounts.crawlGood = crawlGood;
+    resourceCounts.crawlBad = crawlBad;
+    resourceCounts.replayGood = replayGood;
+    resourceCounts.replayBad = replayBad;
+
+    //console.log(origResData);
     console.log(pageInfo);
+  }
+
+  countResources(info: PageInfoRecord) {
+    let good = 0,
+      bad = 0;
+
+    for (const status of Object.values(info.urls)) {
+      if (status >= 400) {
+        bad++;
+      } else {
+        good++;
+      }
+    }
+
+    return { bad, good };
   }
 
   async fetchOrigBinary(page: Page, type: string, url: string, ts: string) {

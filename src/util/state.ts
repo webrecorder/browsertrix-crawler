@@ -33,6 +33,7 @@ export type QueueEntry = {
   depth: number;
   extraHops: number;
   ts?: number;
+  pageid?: string;
 };
 
 // ============================================================================
@@ -75,6 +76,7 @@ export class PageState {
     if (redisData.ts) {
       this.ts = new Date(redisData.ts);
     }
+    this.pageid = redisData.pageid;
   }
 }
 
