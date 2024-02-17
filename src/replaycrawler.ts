@@ -323,6 +323,8 @@ export class ReplayCrawler extends Crawler {
 
     data.isHTMLPage = true;
 
+    data.filteredFrames = page.frames().slice(2);
+
     await this.doPostLoadActions(opts, true);
 
     await this.compareScreenshots(page, data, url, date);
@@ -346,7 +348,7 @@ export class ReplayCrawler extends Crawler {
       url,
       date ? date.toISOString().replace(/[^\d]/g, "") : "",
     );
-    const { screenshotView } = state;
+    const { pageid, screenshotView } = state;
 
     if (!origScreenshot || !screenshotView) {
       logger.warn("Screenshot missing for comparison", { url }, "replay");
@@ -359,7 +361,7 @@ export class ReplayCrawler extends Crawler {
     const { width, height } = replay;
     const diff = new PNG({ width, height });
 
-    const res = pixelmatch(orig.data, orig.data, diff.data, width, height, {
+    const res = pixelmatch(orig.data, replay.data, diff.data, width, height, {
       threshold: 0.1,
       alpha: 0,
     });
@@ -380,11 +382,7 @@ export class ReplayCrawler extends Crawler {
 
     if (res) {
       await fsp.writeFile(
-        path.join(
-          this.collDir,
-          url.replace("https://", "").replace("http://", "").replace("/", "-") +
-            ".png",
-        ),
+        path.join(this.collDir, `${pageid || "unknown"}.png`),
         PNG.sync.write(diff),
       );
     }
@@ -479,6 +477,10 @@ export class ReplayCrawler extends Crawler {
     resourceCounts.crawlBad = crawlBad;
     resourceCounts.replayGood = replayGood;
     resourceCounts.replayBad = replayBad;
+
+    if (crawlGood !== replayGood) {
+      console.log(origResData);
+    }
 
     //console.log(origResData);
     console.log(pageInfo);
