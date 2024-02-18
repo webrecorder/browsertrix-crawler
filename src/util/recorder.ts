@@ -37,6 +37,8 @@ const ASYNC_FETCH_DUPE_KEY = "s:fetchdupe";
 
 const WRITE_DUPE_KEY = "s:writedupe";
 
+const MIME_EVENT_STREAM = "text/event-stream";
+
 const encoder = new TextEncoder();
 
 // =================================================================
@@ -249,6 +251,12 @@ export class Recorder {
 
   handleResponseReceived(params: Protocol.Network.ResponseReceivedEvent) {
     const { requestId, response } = params;
+
+    const { mimeType } = response;
+
+    if (mimeType === MIME_EVENT_STREAM) {
+      return;
+    }
 
     const reqresp = this.pendingReqResp(requestId);
     if (!reqresp) {
@@ -472,7 +480,8 @@ export class Recorder {
       return false;
     }
 
-    if (url === this.pageUrl) {
+    if (url === this.pageUrl && !this.pageInfo.ts) {
+      logger.debug("Setting page timestamp", { ts: reqresp.ts, url });
       this.pageInfo.ts = reqresp.ts;
     }
 
@@ -639,7 +648,9 @@ export class Recorder {
   }
 
   addPageRecord(reqresp: RequestResponseInfo) {
-    this.pageInfo.urls[reqresp.getCanonURL()] = reqresp.status;
+    if (this.isValidUrl(this.pageInfo.url)) {
+      this.pageInfo.urls[reqresp.getCanonURL()] = reqresp.status;
+    }
   }
 
   async writePageInfoRecord() {
@@ -758,8 +769,8 @@ export class Recorder {
     // skip eventsource, resourceType may not be set correctly
     if (
       headers &&
-      (headers["accept"] === "text/event-stream" ||
-        headers["Accept"] === "text/event-stream")
+      (headers["accept"] === MIME_EVENT_STREAM ||
+        headers["Accept"] === MIME_EVENT_STREAM)
     ) {
       return true;
     }
