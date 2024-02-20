@@ -24,6 +24,7 @@ import pixelmatch from "pixelmatch";
 
 import levenshtein from "js-levenshtein";
 import { MAX_URL_LENGTH } from "./util/reqresp.js";
+import { openAsBlob } from "fs";
 
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
 
@@ -51,7 +52,7 @@ type ReplayPageInfoRecord = PageInfoRecord & {
 // ============================================================================
 export class ReplayCrawler extends Crawler {
   replayServer: ReplayServer;
-  replaySource: string;
+  qaSource: string;
 
   pageInfos: Map<Page, ReplayPageInfoRecord>;
 
@@ -60,11 +61,11 @@ export class ReplayCrawler extends Crawler {
   constructor() {
     super();
     this.recording = false;
-    if (!this.params.replaySource) {
-      throw new Error("Missing replay source");
+    if (!this.params.qaSource) {
+      throw new Error("Missing QA source");
     }
-    this.replaySource = this.params.replaySource;
-    this.replayServer = new ReplayServer(this.replaySource);
+    this.qaSource = this.params.qaSource;
+    this.replayServer = new ReplayServer(this.qaSource);
 
     this.pageInfos = new Map<Page, ReplayPageInfoRecord>();
 
@@ -87,8 +88,8 @@ export class ReplayCrawler extends Crawler {
     await super.setupPage(opts);
     const { page, cdp } = opts;
 
-    if (!this.replaySource) {
-      throw new Error("Missing replay source");
+    if (!this.qaSource) {
+      throw new Error("Missing QA source");
     }
 
     await cdp.send("Network.enable");
@@ -121,7 +122,7 @@ export class ReplayCrawler extends Crawler {
     //   new ScopedSeed({url: "https://replay.example.com/", scopeType: "page", depth: 1, include: [] })
     // ];
 
-    await this.loadPages(this.replaySource);
+    await this.loadPages(this.qaSource);
   }
 
   isInScope() {
@@ -403,7 +404,7 @@ export class ReplayCrawler extends Crawler {
       "replay",
     );
 
-    if (res) {
+    if (res && this.params.qaDebugImageDiff) {
       const dir = path.join(this.collDir, pageid || "unknown");
       await fsp.mkdir(dir);
       await fsp.writeFile(path.join(dir, "crawl.png"), PNG.sync.write(crawl));
@@ -632,10 +633,10 @@ class WACZLoader {
   }
 
   async init() {
-    // if (!this.url.startsWith("http://") && !this.url.startsWith("https://")) {
-    //   const blob = await openAsBlob(this.url);
-    //   this.url = URL.createObjectURL(blob);
-    // }
+    if (!this.url.startsWith("http://") && !this.url.startsWith("https://")) {
+      const blob = await openAsBlob(this.url);
+      this.url = URL.createObjectURL(blob);
+    }
 
     const loader = await createLoader({ url: this.url });
 

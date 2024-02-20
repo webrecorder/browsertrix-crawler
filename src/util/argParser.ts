@@ -503,10 +503,15 @@ class ArgParser {
         default: "rec",
       },
 
-      replaySource: {
-        describe:
-          "if specified, run crawl over replay source (WACZ or multi WACZ)",
+      qaSource: {
+        describe: "Required for QA mode. Source (WACZ or multi WACZ) for QA",
         type: "string",
+      },
+
+      qaDebugImageDiff: {
+        describe:
+          "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
+        type: "boolean",
       },
     };
   }
@@ -634,8 +639,8 @@ class ArgParser {
       if (!argv.scopedSeeds.length) {
         logger.fatal("No valid seeds specified, aborting crawl.");
       }
-    } else if (!argv.replaySource) {
-      logger.fatal("--replaySource required for QA mode!");
+    } else if (!argv.qaSource) {
+      logger.fatal("--qaSource required for QA mode!");
     }
 
     // Resolve statsFilename
