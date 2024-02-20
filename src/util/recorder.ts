@@ -49,9 +49,16 @@ function logNetwork(msg: string, data: any) {
 }
 
 // =================================================================
+export type PageInfoValue = {
+  status: number;
+  mime?: string;
+  type?: string;
+};
+
+// =================================================================
 export type PageInfoRecord = {
   pageid: string;
-  urls: Record<string, number>;
+  urls: Record<string, PageInfoValue>;
   url: string;
   ts?: Date;
 };
@@ -190,7 +197,7 @@ export class Recorder {
       });
       const reqresp = this.pendingReqResp(params.requestId, true);
       if (reqresp) {
-        this.addPageRecord(reqresp);
+        reqresp.resourceType = params.this.addPageRecord(reqresp);
 
         this.removeReqResp(params.requestId);
       }
@@ -250,7 +257,7 @@ export class Recorder {
   }
 
   handleResponseReceived(params: Protocol.Network.ResponseReceivedEvent) {
-    const { requestId, response } = params;
+    const { requestId, response, type } = params;
 
     const { mimeType } = response;
 
@@ -263,7 +270,7 @@ export class Recorder {
       return;
     }
 
-    reqresp.fillResponse(response);
+    reqresp.fillResponse(response, type);
 
     this.addPageRecord(reqresp);
   }
@@ -280,7 +287,7 @@ export class Recorder {
   }
 
   handleRedirectResponse(params: Protocol.Network.RequestWillBeSentEvent) {
-    const { requestId, redirectResponse } = params;
+    const { requestId, redirectResponse, type } = params;
 
     // remove and serialize, but allow reusing requestId
     // as redirect chain may reuse same requestId for subsequent request
@@ -289,7 +296,7 @@ export class Recorder {
       return;
     }
 
-    reqresp.fillResponse(redirectResponse);
+    reqresp.fillResponse(redirectResponse, type);
 
     if (reqresp.isSelfRedirect()) {
       logger.warn(
@@ -312,6 +319,7 @@ export class Recorder {
     }
 
     const { url } = reqresp;
+    reqresp.resourceType = type;
 
     switch (errorText) {
       case "net::ERR_BLOCKED_BY_CLIENT":
@@ -648,8 +656,10 @@ export class Recorder {
   }
 
   addPageRecord(reqresp: RequestResponseInfo) {
-    if (this.isValidUrl(this.pageInfo.url)) {
-      this.pageInfo.urls[reqresp.getCanonURL()] = reqresp.status;
+    if (this.isValidUrl(reqresp.url)) {
+      const { status, resourceType: type } = reqresp;
+      const mime = reqresp.getMimeType();
+      this.pageInfo.urls[reqresp.getCanonURL()] = { status, mime, type };
     }
   }
 

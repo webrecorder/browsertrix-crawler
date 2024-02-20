@@ -9,7 +9,7 @@ const CONTENT_TYPE = "content-type";
 const EXCLUDE_HEADERS = ["content-encoding", "transfer-encoding"];
 
 // max URL length for post/put payload-converted URLs
-const MAX_URL_LENGTH = 4096;
+export const MAX_URL_LENGTH = 4096;
 
 // max length for single query arg for post/put converted URLs
 const MAX_ARG_LEN = 512;
@@ -23,6 +23,8 @@ export class RequestResponseInfo {
   method?: string;
   url!: string;
   protocol?: string = "HTTP/1.1";
+
+  mimeType?: string;
 
   // request data
   requestHeaders?: Record<string, string>;
@@ -88,7 +90,7 @@ export class RequestResponseInfo {
     this.frameId = params.frameId;
   }
 
-  fillResponse(response: Protocol.Network.Response) {
+  fillResponse(response: Protocol.Network.Response, type?: string) {
     // if initial fetch was a 200, but now replacing with 304, don't!
     if (
       response.status == 304 &&
@@ -105,6 +107,10 @@ export class RequestResponseInfo {
     this.statusText = response.statusText || getStatusText(this.status);
 
     this.protocol = response.protocol;
+
+    if (type) {
+      this.resourceType = type;
+    }
 
     if (response.requestHeaders) {
       this.requestHeaders = response.requestHeaders;
@@ -244,6 +250,21 @@ export class RequestResponseInfo {
     }
 
     return headersDict;
+  }
+
+  getMimeType() {
+    if (this.mimeType) {
+      return this.mimeType;
+    }
+
+    const headers = new Headers(this.getResponseHeadersDict());
+    const contentType = headers.get(CONTENT_TYPE);
+
+    if (!contentType) {
+      return;
+    }
+
+    return contentType.split(";")[0];
   }
 
   isValidBinary() {
