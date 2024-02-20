@@ -5,7 +5,7 @@ import { sleep } from "./util/timing.js";
 import { logger } from "./util/logger.js";
 import { WorkerOpts } from "./util/worker.js";
 import { PageState } from "./util/state.js";
-import { PageInfoRecord, Recorder } from "./util/recorder.js";
+import { PageInfoRecord, PageInfoValue, Recorder } from "./util/recorder.js";
 
 import fsp from "fs/promises";
 import path from "path";
@@ -23,6 +23,7 @@ import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
 
 import levenshtein from "js-levenshtein";
+import { MAX_URL_LENGTH } from "./util/reqresp.js";
 
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
 
@@ -71,6 +72,9 @@ export class ReplayCrawler extends Crawler {
     this.skipTextDocs = 2;
 
     this.params.scopedSeeds = [];
+
+    this.params.screenshot = ["view"];
+    this.params.text = ["to-warc"];
 
     this.reloadTimeouts = new WeakMap<Page, NodeJS.Timeout>();
   }
@@ -195,10 +199,10 @@ export class ReplayCrawler extends Crawler {
     page: Page,
   ) {
     // only handling redirect here, committing last response in redirect chain
-    const { redirectResponse } = params;
+    const { redirectResponse, type } = params;
     if (redirectResponse) {
-      const { url, status } = redirectResponse;
-      this.addPageResource(url, status, page);
+      const { url, status, mimeType } = redirectResponse;
+      this.addPageResource(url, page, { status, mime: mimeType, type });
     }
   }
 
@@ -233,16 +237,23 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
-    this.addPageResource(url, status, page);
+    const { type } = params;
+    const { mimeType } = response;
+
+    this.addPageResource(url, page, { status, mime: mimeType, type });
   }
 
-  addPageResource(url: string, status: number, page: Page) {
+  addPageResource(
+    url: string,
+    page: Page,
+    { status, mime, type }: PageInfoValue,
+  ) {
     const inx = url.indexOf("_/");
     if (inx <= 0) {
       return;
     }
 
-    let replayUrl = url.slice(inx + 2);
+    let replayUrl = url.slice(inx + 2, MAX_URL_LENGTH);
 
     const pageInfo = this.pageInfos.get(page);
 
@@ -259,7 +270,7 @@ export class ReplayCrawler extends Crawler {
     }
 
     if (replayUrl.startsWith("http://") || replayUrl.startsWith("https://")) {
-      pageInfo.urls[replayUrl] = status;
+      pageInfo.urls[replayUrl] = { status, mime, type };
     }
   }
 
@@ -367,13 +378,13 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
-    const orig = PNG.sync.read(origScreenshot);
+    const crawl = PNG.sync.read(origScreenshot);
     const replay = PNG.sync.read(screenshotView);
 
     const { width, height } = replay;
     const diff = new PNG({ width, height });
 
-    const res = pixelmatch(orig.data, replay.data, diff.data, width, height, {
+    const res = pixelmatch(crawl.data, replay.data, diff.data, width, height, {
       threshold: 0.1,
       alpha: 0,
     });
@@ -393,10 +404,11 @@ export class ReplayCrawler extends Crawler {
     );
 
     if (res) {
-      await fsp.writeFile(
-        path.join(this.collDir, `${pageid || "unknown"}.png`),
-        PNG.sync.write(diff),
-      );
+      const dir = path.join(this.collDir, pageid || "unknown");
+      await fsp.mkdir(dir);
+      await fsp.writeFile(path.join(dir, "crawl.png"), PNG.sync.write(crawl));
+      await fsp.writeFile(path.join(dir, "replay.png"), PNG.sync.write(replay));
+      await fsp.writeFile(path.join(dir, "diff.png"), PNG.sync.write(diff));
     }
 
     const pageInfo = this.pageInfos.get(page);
@@ -445,7 +457,7 @@ export class ReplayCrawler extends Crawler {
 
   async compareResources(
     page: Page,
-    data: PageState,
+    state: PageState,
     url: string,
     date?: Date,
   ) {
@@ -504,7 +516,7 @@ export class ReplayCrawler extends Crawler {
     let good = 0;
     let bad = 0;
 
-    for (const [url, status] of Object.entries(info.urls)) {
+    for (const [url, { status }] of Object.entries(info.urls)) {
       if (!url.startsWith("http")) {
         continue;
       }
