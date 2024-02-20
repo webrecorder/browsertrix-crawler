@@ -513,6 +513,11 @@ class ArgParser {
           "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
         type: "boolean",
       },
+
+      qaRedisKey: {
+        describe: "if specified, add QA comparison stats to this redis list",
+        type: "string",
+      },
     };
   }
 

@@ -603,6 +603,16 @@ export class ReplayCrawler extends Crawler {
           "replay",
         );
       }
+
+      if (this.params.qaRedisKey) {
+        const { url, comparison } = pageInfo;
+        const data = { url, comparison };
+        this.crawlState.writeToComparisonQueue(
+          this.params.qaRedisKey,
+          JSON.stringify(data),
+        );
+      }
+
       const writer = new WARCResourceWriter({
         url: pageInfo.url,
         directory: this.archivesDir,
