@@ -3,14 +3,18 @@ import fsp from "fs/promises";
 import http, { IncomingMessage, ServerResponse } from "http";
 import path from "path";
 
-const RWP_VERSION = "1.8.14";
-
 const replayHTML = fs.readFileSync(
   new URL("../../html/replay.html", import.meta.url),
   { encoding: "utf8" },
 );
 
-const swJS = `importScripts("https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/sw.js");`;
+const swJS = fs.readFileSync(new URL("../../html/rwp/sw.js", import.meta.url), {
+  encoding: "utf8",
+});
+
+const uiJS = fs.readFileSync(new URL("../../html/rwp/ui.js", import.meta.url), {
+  encoding: "utf8",
+});
 
 // ============================================================================
 const PORT = 9990;
@@ -68,11 +72,7 @@ export class ReplayServer {
     switch (pathname) {
       case "/":
         response.writeHead(200, { "Content-Type": "text/html" });
-        response.end(
-          replayHTML
-            .replace("$SOURCE", this.sourceUrl)
-            .replace("$RWP_VERSION", RWP_VERSION),
-        );
+        response.end(replayHTML.replace("$SOURCE", this.sourceUrl));
         return;
 
       case "/sw.js":
@@ -81,6 +81,11 @@ export class ReplayServer {
       case "/replay/sw.js?serveIndex=1":
         response.writeHead(200, { "Content-Type": "application/javascript" });
         response.end(swJS);
+        return;
+
+      case "/ui.js":
+        response.writeHead(200, { "Content-Type": "application/javascript" });
+        response.end(uiJS);
         return;
 
       case this.sourceUrl:
@@ -97,7 +102,7 @@ export class ReplayServer {
             "Content-Length": contentLength,
             "Content-Range": contentRange,
           });
-          console.log(request.method, contentRange, opts);
+          //console.log(request.method, contentRange, opts);
           if (request.method === "GET") {
             fs.createReadStream(this.origFileSource, opts).pipe(response);
           } else {
