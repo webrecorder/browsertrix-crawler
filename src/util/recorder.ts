@@ -61,6 +61,9 @@ export type PageInfoRecord = {
   urls: Record<string, PageInfoValue>;
   url: string;
   ts?: Date;
+  counts: {
+    jsErrors: number;
+  };
 };
 
 // =================================================================
@@ -156,6 +159,8 @@ export class Recorder {
       patterns: [{ urlPattern: "*", requestStage: "Response" }],
     });
 
+    await cdp.send("Console.enable");
+
     // Response
     cdp.on("Network.responseReceived", (params) => {
       // handling to fill in security details
@@ -247,6 +252,15 @@ export class Recorder {
         this.swUrls.clear();
         this.swFrameIds.clear();
         this.swSessionId = null;
+      }
+    });
+
+    cdp.on("Console.messageAdded", (params) => {
+      const { message } = params;
+      const { source, level } = message;
+      if (source === "console-api" && level === "error") {
+        this.pageInfo.counts.jsErrors++;
+        console.log(message);
       }
     });
 
@@ -653,7 +667,7 @@ export class Recorder {
     this.pendingRequests = new Map();
     this.skipIds = new Set();
     this.skipping = false;
-    this.pageInfo = { pageid, urls: {}, url };
+    this.pageInfo = { pageid, urls: {}, url, counts: { jsErrors: 0 } };
   }
 
   addPageRecord(reqresp: RequestResponseInfo) {
