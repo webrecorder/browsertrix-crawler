@@ -405,8 +405,8 @@ export class ReplayCrawler extends Crawler {
     );
 
     if (res && this.params.qaDebugImageDiff) {
-      const dir = path.join(this.collDir, pageid || "unknown");
-      await fsp.mkdir(dir);
+      const dir = path.join(this.collDir, "screenshots", pageid || "unknown");
+      await fsp.mkdir(dir, { recursive: true });
       await fsp.writeFile(path.join(dir, "crawl.png"), PNG.sync.write(crawl));
       await fsp.writeFile(path.join(dir, "replay.png"), PNG.sync.write(replay));
       await fsp.writeFile(path.join(dir, "diff.png"), PNG.sync.write(diff));
@@ -502,6 +502,8 @@ export class ReplayCrawler extends Crawler {
     resourceCounts.crawlBad = crawlBad;
     resourceCounts.replayGood = replayGood;
     resourceCounts.replayBad = replayBad;
+
+    logger.info("Resource counts", { url, ...resourceCounts }, "replay");
 
     // if (crawlGood !== replayGood) {
     //   console.log("*** ORIG");
