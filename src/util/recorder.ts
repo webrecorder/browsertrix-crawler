@@ -128,7 +128,8 @@ export class Recorder {
     fs.mkdirSync(this.archivesDir, { recursive: true });
     fs.mkdirSync(this.tempCdxDir, { recursive: true });
 
-    const prefix = crawler.params.warcPrefix || "rec";
+    const prefix =
+      process.env.WARC_PREFIX || crawler.params.warcPrefix || "rec";
     const crawlId = process.env.CRAWL_ID || os.hostname();
     const filenameTemplate = `${prefix}-${crawlId}-$ts-${this.workerid}.warc${
       this.gzip ? ".gz" : ""
