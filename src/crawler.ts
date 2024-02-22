@@ -159,6 +159,8 @@ export class Crawler {
   maxHeapUsed = 0;
   maxHeapTotal = 0;
 
+  warcPrefix: string;
+
   driver!: (opts: {
     page: Page;
     data: PageState;
@@ -260,6 +262,11 @@ export class Crawler {
     this.customBehaviors = "";
 
     this.browser = new Browser();
+
+    this.warcPrefix = process.env.WARC_PREFIX || this.params.warcPrefix;
+    if (this.warcPrefix) {
+      this.warcPrefix += "-";
+    }
   }
 
   configureUA() {
@@ -741,6 +748,7 @@ self.__bx_behaviors.selectMainBehavior();
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
       const screenshots = new Screenshots({
+        warcPrefix: this.warcPrefix,
         browser: this.browser,
         page,
         url,
@@ -761,6 +769,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (data.isHTMLPage) {
       textextract = new TextExtractViaSnapshot(cdp, {
+        warcPrefix: this.warcPrefix,
         url,
         directory: archiveDir,
       });
