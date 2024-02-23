@@ -260,7 +260,6 @@ export class Recorder {
       const { source, level } = message;
       if (source === "console-api" && level === "error") {
         this.pageInfo.counts.jsErrors++;
-        console.log(message);
       }
     });
 
