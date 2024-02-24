@@ -86,7 +86,7 @@ export class WARCWriter implements IndexerOffsetLength {
       this.filename = this._initNewFile();
     }
 
-    let fh: Writable | null = this.fh;
+    let fh = this.fh;
 
     if (!fh) {
       fh = fs.createWriteStream(path.join(this.archivesDir, this.filename));
