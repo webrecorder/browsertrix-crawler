@@ -1521,7 +1521,7 @@ self.__bx_behaviors.selectMainBehavior();
     data: PageState,
     selectorOptsList = DEFAULT_SELECTORS,
   ) {
-    const { url, seedId, depth } = data;
+    const { url, depth } = data;
 
     const logDetails = data.logDetails;
 
@@ -1556,11 +1556,27 @@ self.__bx_behaviors.selectMainBehavior();
         throw new Error("page response missing");
       }
 
+      const respUrl = resp.url();
+      const isChromeError = page.url().startsWith("chrome-error://");
+
+      if (respUrl !== url && depth === 0 && !isChromeError) {
+        const seed = this.params.scopedSeeds[data.seedId];
+        this.params.scopedSeeds.push(seed.newScopedSeed(respUrl));
+        data.seedId = this.params.scopedSeeds.length - 1;
+        logger.info("Seed page redirected, adding redirected seed", {
+          origUrl: url,
+          newUrl: respUrl,
+          seedId: data.seedId,
+        });
+      }
+
       // Handle 4xx or 5xx response as a page load error
       const statusCode = resp.status();
+      const statusString = statusCode.toString();
       if (
-        statusCode.toString().startsWith("4") ||
-        statusCode.toString().startsWith("5")
+        statusString.startsWith("4") ||
+        statusString.startsWith("5") ||
+        isChromeError
       ) {
         if (failCrawlOnError) {
           logger.fatal("Seed Page Load Error, failing crawl", {
@@ -1568,10 +1584,15 @@ self.__bx_behaviors.selectMainBehavior();
             ...logDetails,
           });
         } else {
-          logger.error("Non-200 Status Code, skipping page", {
-            statusCode,
-            ...logDetails,
-          });
+          logger.error(
+            isChromeError
+              ? "Page Crashed on Load"
+              : "Non-200 Status Code, skipping page",
+            {
+              statusCode,
+              ...logDetails,
+            },
+          );
           throw new Error("logged");
         }
       }
@@ -1648,6 +1669,8 @@ self.__bx_behaviors.selectMainBehavior();
       logger.debug("Skipping link extraction for non-HTML page", logDetails);
       return;
     }
+
+    const { seedId } = data;
 
     const seed = this.params.scopedSeeds[seedId];
 
