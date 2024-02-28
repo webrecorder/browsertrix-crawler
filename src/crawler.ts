@@ -1559,7 +1559,7 @@ self.__bx_behaviors.selectMainBehavior();
       const respUrl = resp.url();
       const isChromeError = page.url().startsWith("chrome-error://");
 
-      if (respUrl !== url && depth === 0 && !isChromeError) {
+      if (depth === 0 && !isChromeError && respUrl !== url) {
         const seed = this.params.scopedSeeds[data.seedId];
         this.params.scopedSeeds.push(seed.newScopedSeed(respUrl));
         data.seedId = this.params.scopedSeeds.length - 1;
