@@ -720,6 +720,7 @@ self.__bx_behaviors.selectMainBehavior();
           if (mime) {
             data.mime = mime;
           }
+          data.statusCode = 200;
           logger.info(
             "Direct fetch successful",
             { url, ...logDetails },
@@ -1971,7 +1972,7 @@ self.__bx_behaviors.selectMainBehavior();
       row.mime = mime;
     }
 
-    if (statusCode !== 200) {
+    if (statusCode && statusCode !== 200) {
       row.statusCode = statusCode;
     }
 
