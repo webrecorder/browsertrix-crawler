@@ -37,6 +37,7 @@ export type QueueEntry = {
 // ============================================================================
 export type PageCallbacks = {
   addLink?: (url: string) => void;
+  flushLinks?: () => Promise<void>;
 };
 
 // ============================================================================

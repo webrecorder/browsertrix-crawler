@@ -805,6 +805,10 @@ self.__bx_behaviors.selectMainBehavior();
           "behavior",
         );
 
+        if (data.callbacks.flushLinks) {
+          await data.callbacks.flushLinks();
+        }
+
         await this.netIdle(page, logDetails);
 
         if (res) {
@@ -1726,7 +1730,7 @@ self.__bx_behaviors.selectMainBehavior();
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
     let links: string[] = [];
-    const promiseList = [];
+    let promiseList: Promise<void>[] = [];
 
     callbacks.addLink = (url: string) => {
       links.push(url);
@@ -1735,6 +1739,20 @@ self.__bx_behaviors.selectMainBehavior();
           this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
         );
         links = [];
+      }
+    };
+
+    callbacks.flushLinks = async () => {
+      if (links.length) {
+        promiseList.push(
+          this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
+        );
+        links = [];
+      }
+
+      if (promiseList.length) {
+        await Promise.allSettled(promiseList);
+        promiseList = [];
       }
     };
 
@@ -1805,13 +1823,7 @@ self.__bx_behaviors.selectMainBehavior();
       logger.warn("Link Extraction failed", e, "links");
     }
 
-    if (links.length) {
-      promiseList.push(
-        this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
-      );
-    }
-
-    await Promise.allSettled(promiseList);
+    await callbacks.flushLinks();
   }
 
   async queueInScopeUrls(
