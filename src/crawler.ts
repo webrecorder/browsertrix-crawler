@@ -91,6 +91,7 @@ type PageEntry = {
   text?: string;
   favIconUrl?: string;
   ts?: string;
+  statusCode?: number;
 };
 
 // ============================================================================
@@ -786,6 +787,10 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     data.loadState = LoadState.EXTRACTION_DONE;
+
+    if (data.statusCode >= 400) {
+      return;
+    }
 
     if (this.params.behaviorOpts) {
       if (!data.isHTMLPage) {
@@ -1582,27 +1587,18 @@ self.__bx_behaviors.selectMainBehavior();
 
       // Handle 4xx or 5xx response as a page load error
       const statusCode = resp.status();
-      const statusString = statusCode.toString();
-      if (
-        statusString.startsWith("4") ||
-        statusString.startsWith("5") ||
-        isChromeError
-      ) {
+      data.statusCode = statusCode;
+      if (isChromeError) {
         if (failCrawlOnError) {
           logger.fatal("Seed Page Load Error, failing crawl", {
             statusCode,
             ...logDetails,
           });
         } else {
-          logger.error(
-            isChromeError
-              ? "Page Crashed on Load"
-              : "Non-200 Status Code, skipping page",
-            {
-              statusCode,
-              ...logDetails,
-            },
-          );
+          logger.error("Page Crashed on Load", {
+            statusCode,
+            ...logDetails,
+          });
           throw new Error("logged");
         }
       }
@@ -1963,6 +1959,7 @@ self.__bx_behaviors.selectMainBehavior();
     mime,
     favicon,
     ts,
+    statusCode,
   }: PageState) {
     const row: PageEntry = { id: pageid!, url, title, loadState };
 
@@ -1972,6 +1969,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (mime) {
       row.mime = mime;
+    }
+
+    if (statusCode !== 200) {
+      row.statusCode = statusCode;
     }
 
     if (this.params.writePagesToRedis) {
