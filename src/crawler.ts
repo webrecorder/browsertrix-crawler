@@ -266,9 +266,8 @@ export class Crawler {
     this.warcPrefix = process.env.WARC_PREFIX || this.params.warcPrefix || "";
 
     if (this.warcPrefix) {
-      this.warcPrefix += "-";
+      this.warcPrefix += "-" + this.crawlId + "-";
     }
-    this.warcPrefix += this.crawlId + "-";
   }
 
   configureUA() {
