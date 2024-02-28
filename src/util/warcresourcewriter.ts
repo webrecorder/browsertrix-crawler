@@ -15,16 +15,18 @@ export class WARCResourceWriter {
     url,
     directory,
     date,
+    warcPrefix,
     warcName,
   }: {
     url: string;
     directory: string;
     date: Date;
+    warcPrefix: string;
     warcName: string;
   }) {
     this.url = url;
     this.directory = directory;
-    this.warcName = path.join(this.directory, warcName);
+    this.warcName = path.join(this.directory, warcPrefix + warcName);
     this.date = date ? date : new Date();
   }
 
