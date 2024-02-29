@@ -43,6 +43,7 @@ export type ScreenshotOpts = {
   page: Page;
   url: string;
   directory: string;
+  warcPrefix: string;
 };
 
 export class Screenshots extends WARCResourceWriter {

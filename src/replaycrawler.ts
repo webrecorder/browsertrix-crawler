@@ -297,6 +297,7 @@ export class ReplayCrawler extends Crawler {
       url,
       ts: date,
       comparison: { resourceCounts: {} },
+      counts: { jsErrors: 0 },
     };
     this.pageInfos.set(page, pageInfo);
 
@@ -618,6 +619,7 @@ export class ReplayCrawler extends Crawler {
       const writer = new WARCResourceWriter({
         url: pageInfo.url,
         directory: this.archivesDir,
+        warcPrefix: this.warcPrefix,
         date: new Date(),
         warcName: "info.warc.gz",
       });

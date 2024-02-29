@@ -6,6 +6,7 @@ import { CDPSession, Protocol } from "puppeteer-core";
 type TextExtractOpts = {
   url: string;
   directory: string;
+  warcPrefix: string;
   skipDocs: number;
 };
 
