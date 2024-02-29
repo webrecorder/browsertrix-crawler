@@ -46,6 +46,8 @@ export class PageState {
   depth: number;
   extraHops: number;
 
+  status: number;
+
   workerid!: WorkerId;
 
   pageid?: string;
@@ -70,6 +72,7 @@ export class PageState {
     this.seedId = redisData.seedId;
     this.depth = redisData.depth;
     this.extraHops = redisData.extraHops || 0;
+    this.status = 0;
   }
 }
 

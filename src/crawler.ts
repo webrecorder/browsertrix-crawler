@@ -91,6 +91,7 @@ type PageEntry = {
   text?: string;
   favIconUrl?: string;
   ts?: string;
+  status?: number;
 };
 
 // ============================================================================
@@ -719,6 +720,7 @@ self.__bx_behaviors.selectMainBehavior();
           if (mime) {
             data.mime = mime;
           }
+          data.status = 200;
           logger.info(
             "Direct fetch successful",
             { url, ...logDetails },
@@ -786,6 +788,10 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     data.loadState = LoadState.EXTRACTION_DONE;
+
+    if (data.status >= 400) {
+      return;
+    }
 
     if (this.params.behaviorOpts) {
       if (!data.isHTMLPage) {
@@ -1581,28 +1587,19 @@ self.__bx_behaviors.selectMainBehavior();
       }
 
       // Handle 4xx or 5xx response as a page load error
-      const statusCode = resp.status();
-      const statusString = statusCode.toString();
-      if (
-        statusString.startsWith("4") ||
-        statusString.startsWith("5") ||
-        isChromeError
-      ) {
+      const status = resp.status();
+      data.status = status;
+      if (isChromeError) {
         if (failCrawlOnError) {
           logger.fatal("Seed Page Load Error, failing crawl", {
-            statusCode,
+            status,
             ...logDetails,
           });
         } else {
-          logger.error(
-            isChromeError
-              ? "Page Crashed on Load"
-              : "Non-200 Status Code, skipping page",
-            {
-              statusCode,
-              ...logDetails,
-            },
-          );
+          logger.error("Page Crashed on Load", {
+            status,
+            ...logDetails,
+          });
           throw new Error("logged");
         }
       }
@@ -1963,6 +1960,7 @@ self.__bx_behaviors.selectMainBehavior();
     mime,
     favicon,
     ts,
+    status,
   }: PageState) {
     const row: PageEntry = { id: pageid!, url, title, loadState };
 
@@ -1972,6 +1970,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (mime) {
       row.mime = mime;
+    }
+
+    if (status) {
+      row.status = status;
     }
 
     if (this.params.writePagesToRedis) {
