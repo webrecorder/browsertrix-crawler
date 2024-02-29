@@ -1722,17 +1722,8 @@ self.__bx_behaviors.selectMainBehavior();
   ) {
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
-    let links: string[] = [];
-    const promiseList = [];
-
-    callbacks.addLink = (url: string) => {
-      links.push(url);
-      if (links.length == 500) {
-        promiseList.push(
-          this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
-        );
-        links = [];
-      }
+    callbacks.addLink = async (url: string) => {
+      await this.queueInScopeUrls(seedId, [url], depth, extraHops, logDetails);
     };
 
     const loadLinks = (options: {
@@ -1801,14 +1792,6 @@ self.__bx_behaviors.selectMainBehavior();
     } catch (e) {
       logger.warn("Link Extraction failed", e, "links");
     }
-
-    if (links.length) {
-      promiseList.push(
-        this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
-      );
-    }
-
-    await Promise.allSettled(promiseList);
   }
 
   async queueInScopeUrls(
