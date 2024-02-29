@@ -27,8 +27,8 @@ export class WARCWriter implements IndexerOffsetLength {
 
   indexer?: CDXIndexer;
 
-  fh?: Writable | null;
-  cdxFH?: Writable | null;
+  fh: Writable | null;
+  cdxFH: Writable | null;
 
   constructor({
     archivesDir,
@@ -52,6 +52,8 @@ export class WARCWriter implements IndexerOffsetLength {
     this.rolloverSize = rolloverSize;
 
     this.filenameTemplate = filenameTemplate;
+    this.cdxFH = null;
+    this.fh = null;
   }
 
   _initNewFile() {
@@ -79,22 +81,23 @@ export class WARCWriter implements IndexerOffsetLength {
         "writer",
       );
       this.filename = this._initNewFile();
-      this.fh = null;
       this.cdxFH = null;
     } else if (!this.filename) {
       this.filename = this._initNewFile();
     }
 
-    if (!this.fh) {
-      this.fh = fs.createWriteStream(
-        path.join(this.archivesDir, this.filename),
-      );
+    let fh = this.fh;
+
+    if (!fh) {
+      fh = fs.createWriteStream(path.join(this.archivesDir, this.filename));
     }
     if (!this.cdxFH && this.tempCdxDir) {
       this.cdxFH = fs.createWriteStream(
         path.join(this.tempCdxDir, this.filename + ".cdx"),
       );
     }
+
+    return fh;
   }
 
   async writeRecordPair(
@@ -117,8 +120,6 @@ export class WARCWriter implements IndexerOffsetLength {
       responseSerializer = new WARCSerializer(responseRecord, opts);
     }
 
-    await this.initFH();
-
     this.recordLength = await this._writeRecord(
       responseRecord,
       responseSerializer,
@@ -139,17 +140,18 @@ export class WARCWriter implements IndexerOffsetLength {
     const opts = { gzip: this.gzip };
 
     const requestSerializer = new WARCSerializer(record, opts);
+
     this.recordLength = await this._writeRecord(record, requestSerializer);
 
     this._writeCDX(record);
   }
 
-  async _writeRecord(record: WARCRecord, serializer: WARCSerializer) {
+  private async _writeRecord(record: WARCRecord, serializer: WARCSerializer) {
     let total = 0;
     const url = record.warcTargetURI;
 
     if (!this.fh) {
-      throw new Error("writer not initialized");
+      this.fh = await this.initFH();
     }
 
     for await (const chunk of serializer) {

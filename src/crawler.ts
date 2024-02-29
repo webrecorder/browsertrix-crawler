@@ -93,6 +93,7 @@ type PageEntry = {
   text?: string;
   favIconUrl?: string;
   ts?: string;
+  status?: number;
 };
 
 // ============================================================================
@@ -166,6 +167,8 @@ export class Crawler {
 
   maxHeapUsed = 0;
   maxHeapTotal = 0;
+
+  warcPrefix: string;
 
   driver!: (opts: {
     page: Page;
@@ -275,6 +278,12 @@ export class Crawler {
     this.customBehaviors = "";
 
     this.browser = new Browser();
+
+    this.warcPrefix = process.env.WARC_PREFIX || this.params.warcPrefix || "";
+
+    if (this.warcPrefix) {
+      this.warcPrefix += "-" + this.crawlId + "-";
+    }
   }
 
   protected parseArgs() {
@@ -730,6 +739,7 @@ self.__bx_behaviors.selectMainBehavior();
           if (mime) {
             data.mime = mime;
           }
+          data.status = 200;
           logger.info(
             "Direct fetch successful",
             { url, ...logDetails },
@@ -775,6 +785,7 @@ self.__bx_behaviors.selectMainBehavior();
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
       const screenshots = new Screenshots({
+        warcPrefix: this.warcPrefix,
         browser: this.browser,
         page,
         url,
@@ -795,6 +806,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (data.isHTMLPage) {
       textextract = new TextExtractViaSnapshot(cdp, {
+        warcPrefix: this.warcPrefix,
         url,
         directory: this.archivesDir,
         skipDocs: this.skipTextDocs,
@@ -811,6 +823,10 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     data.loadState = LoadState.EXTRACTION_DONE;
+
+    if (data.status >= 400) {
+      return;
+    }
 
     if (this.params.behaviorOpts) {
       if (!data.isHTMLPage) {
@@ -1551,7 +1567,7 @@ self.__bx_behaviors.selectMainBehavior();
     data: PageState,
     selectorOptsList = DEFAULT_SELECTORS,
   ) {
-    const { url, seedId, depth } = data;
+    const { url, depth } = data;
 
     const logDetails = data.logDetails;
 
@@ -1586,20 +1602,32 @@ self.__bx_behaviors.selectMainBehavior();
         throw new Error("page response missing");
       }
 
+      const respUrl = resp.url();
+      const isChromeError = page.url().startsWith("chrome-error://");
+
+      if (depth === 0 && !isChromeError && respUrl !== url) {
+        const seed = this.params.scopedSeeds[data.seedId];
+        this.params.scopedSeeds.push(seed.newScopedSeed(respUrl));
+        data.seedId = this.params.scopedSeeds.length - 1;
+        logger.info("Seed page redirected, adding redirected seed", {
+          origUrl: url,
+          newUrl: respUrl,
+          seedId: data.seedId,
+        });
+      }
+
       // Handle 4xx or 5xx response as a page load error
-      const statusCode = resp.status();
-      if (
-        statusCode.toString().startsWith("4") ||
-        statusCode.toString().startsWith("5")
-      ) {
+      const status = resp.status();
+      data.status = status;
+      if (isChromeError) {
         if (failCrawlOnError) {
           logger.fatal("Seed Page Load Error, failing crawl", {
-            statusCode,
+            status,
             ...logDetails,
           });
         } else {
-          logger.error("Non-200 Status Code, skipping page", {
-            statusCode,
+          logger.error("Page Crashed on Load", {
+            status,
             ...logDetails,
           });
           throw new Error("logged");
@@ -1679,6 +1707,8 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
+    const { seedId } = data;
+
     const seed = this.params.scopedSeeds[seedId];
 
     await this.checkCF(page, logDetails);
@@ -1722,17 +1752,8 @@ self.__bx_behaviors.selectMainBehavior();
   ) {
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
-    let links: string[] = [];
-    const promiseList = [];
-
-    callbacks.addLink = (url: string) => {
-      links.push(url);
-      if (links.length == 500) {
-        promiseList.push(
-          this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
-        );
-        links = [];
-      }
+    callbacks.addLink = async (url: string) => {
+      await this.queueInScopeUrls(seedId, [url], depth, extraHops, logDetails);
     };
 
     const loadLinks = (options: {
@@ -1801,14 +1822,6 @@ self.__bx_behaviors.selectMainBehavior();
     } catch (e) {
       logger.warn("Link Extraction failed", e, "links");
     }
-
-    if (links.length) {
-      promiseList.push(
-        this.queueInScopeUrls(seedId, links, depth, extraHops, logDetails),
-      );
-    }
-
-    await Promise.allSettled(promiseList);
   }
 
   async queueInScopeUrls(
@@ -1962,6 +1975,7 @@ self.__bx_behaviors.selectMainBehavior();
     mime,
     favicon,
     ts,
+    status,
   }: PageState) {
     const row: PageEntry = { id: pageid!, url, title, loadState };
 
@@ -1971,6 +1985,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (mime) {
       row.mime = mime;
+    }
+
+    if (status) {
+      row.status = status;
     }
 
     if (this.params.writePagesToRedis) {

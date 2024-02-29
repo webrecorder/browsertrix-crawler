@@ -51,6 +51,7 @@ function validateResourcesIndex(json) {
   expect(json).toHaveProperty("url");
   expect(json).toHaveProperty("ts");
   expect(json).toHaveProperty("urls");
+  expect(json.counts).toEqual({ jsErrors: 0 });
   expect(json.urls).toEqual({
     "https://webrecorder.net/": {
       status: 200,
@@ -125,6 +126,7 @@ function validateResourcesAbout(json) {
   expect(json).toHaveProperty("url");
   expect(json).toHaveProperty("ts");
   expect(json).toHaveProperty("urls");
+  expect(json.counts).toEqual({ jsErrors: 0 });
   expect(json.urls).toEqual({
     "https://webrecorder.net/about": {
       status: 200,

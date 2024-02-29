@@ -500,7 +500,6 @@ class ArgParser {
         describe:
           "prefix for WARC files generated, including WARCs added to WACZ",
         type: "string",
-        default: "rec",
       },
 
       qaSource: {

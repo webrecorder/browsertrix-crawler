@@ -8,6 +8,7 @@ export type WARCResourceWriterOpts = {
   directory: string;
   date?: Date;
   warcName: string;
+  warcPrefix: string;
 };
 
 // ===========================================================================
@@ -17,11 +18,16 @@ export class WARCResourceWriter {
   warcName: string;
   date: Date;
 
-  constructor({ url, directory, date, warcName }: WARCResourceWriterOpts) {
+  constructor({
+    url,
+    directory,
+    date,
+    warcPrefix,
+    warcName,
+  }: WARCResourceWriterOpts) {
     this.url = url;
     this.directory = directory;
-    fs.mkdirSync(directory, { recursive: true });
-    this.warcName = path.join(this.directory, warcName);
+    this.warcName = path.join(this.directory, warcPrefix + warcName);
     this.date = date ? date : new Date();
   }
 

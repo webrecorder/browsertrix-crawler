@@ -14,20 +14,22 @@ export class ScopedSeed {
   url: string;
   scopeType: ScopeType;
   include: RegExp[];
-  exclude: RegExp[] = [];
+  exclude: RegExp[];
   allowHash = false;
   depth = -1;
   sitemap?: string | null;
-  extraHops = 0;
 
   maxExtraHops = 0;
   maxDepth = 0;
+
+  _includeStr: string[];
+  _excludeStr: string[];
 
   constructor({
     url,
     scopeType,
     include,
-    exclude = [],
+    exclude,
     allowHash = false,
     depth = -1,
     sitemap = false,
@@ -36,7 +38,7 @@ export class ScopedSeed {
     url: string;
     scopeType: ScopeType;
     include: string[];
-    exclude?: string[];
+    exclude: string[];
     allowHash?: boolean;
     depth?: number;
     sitemap?: string | boolean | null;
@@ -50,6 +52,9 @@ export class ScopedSeed {
     this.include = this.parseRx(include);
     this.exclude = this.parseRx(exclude);
     this.scopeType = scopeType;
+
+    this._includeStr = include;
+    this._excludeStr = exclude;
 
     if (!this.scopeType) {
       this.scopeType = this.include.length ? "custom" : "prefix";
@@ -76,10 +81,7 @@ export class ScopedSeed {
     this.maxDepth = depth < 0 ? MAX_DEPTH : depth;
   }
 
-  //parseRx(value? : union[string[], string, RegExp[]]) -> RegExp[] {
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  parseRx(value: any) {
+  parseRx(value: string[] | RegExp[] | string | null | undefined) {
     if (value === null || value === undefined || value === "") {
       return [];
     } else if (!(value instanceof Array)) {
@@ -87,6 +89,18 @@ export class ScopedSeed {
     } else {
       return value.map((e) => (e instanceof RegExp ? e : new RegExp(e)));
     }
+  }
+
+  newScopedSeed(url: string) {
+    return new ScopedSeed({
+      url,
+      scopeType: this.scopeType,
+      include: this._includeStr,
+      exclude: this._excludeStr,
+      allowHash: this.allowHash,
+      depth: this.maxDepth,
+      extraHops: this.maxExtraHops,
+    });
   }
 
   addExclusion(value: string | RegExp) {

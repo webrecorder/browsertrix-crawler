@@ -38,7 +38,7 @@ export type QueueEntry = {
 
 // ============================================================================
 export type PageCallbacks = {
-  addLink?: (url: string) => void;
+  addLink?: (url: string) => Promise<void>;
 };
 
 // ============================================================================
@@ -47,6 +47,8 @@ export class PageState {
   seedId: number;
   depth: number;
   extraHops: number;
+
+  status: number;
 
   workerid!: WorkerId;
 
@@ -77,6 +79,7 @@ export class PageState {
       this.ts = new Date(redisData.ts);
     }
     this.pageid = redisData.pageid;
+    this.status = 0;
   }
 }
 
