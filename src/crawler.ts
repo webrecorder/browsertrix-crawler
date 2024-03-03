@@ -1586,20 +1586,30 @@ self.__bx_behaviors.selectMainBehavior();
         });
       }
 
-      // Handle 4xx or 5xx response as a page load error
       const status = resp.status();
       data.status = status;
-      if (isChromeError) {
+
+      let failed = isChromeError;
+
+      if (this.params.failOnInvalidStatus && status >= 400) {
+        // Handle 4xx or 5xx response as a page load error
+        failed = true;
+      }
+
+      if (failed) {
         if (failCrawlOnError) {
           logger.fatal("Seed Page Load Error, failing crawl", {
             status,
             ...logDetails,
           });
         } else {
-          logger.error("Page Crashed on Load", {
-            status,
-            ...logDetails,
-          });
+          logger.error(
+            isChromeError ? "Page Crashed on Load" : "Page Invalid Status",
+            {
+              status,
+              ...logDetails,
+            },
+          );
           throw new Error("logged");
         }
       }
