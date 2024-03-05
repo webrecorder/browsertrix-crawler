@@ -635,20 +635,13 @@ export class Recorder {
         body,
       });
     } catch (e) {
-      const type = reqresp.resourceType;
-      if (type === "Document") {
-        logger.debug(
-          "document not loaded in browser, possibly other URLs missing",
-          { url, type: reqresp.resourceType },
-          "recorder",
-        );
-      } else {
-        logger.debug(
-          "URL not loaded in browser",
-          { url, type: reqresp.resourceType },
-          "recorder",
-        );
-      }
+      const { resourceType } = reqresp;
+      const msg =
+        resourceType === "document"
+          ? "document not loaded in browser, possibly other URLs missing"
+          : "URL not loaded in browser";
+
+      logger.debug(msg, { url, resourceType }, "recorder");
     }
 
     return true;
