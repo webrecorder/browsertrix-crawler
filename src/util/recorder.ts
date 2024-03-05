@@ -203,7 +203,7 @@ export class Recorder {
       });
       const reqresp = this.pendingReqResp(params.requestId, true);
       if (reqresp) {
-        reqresp.resourceType = params.this.addPageRecord(reqresp);
+        this.addPageRecord(reqresp);
 
         this.removeReqResp(params.requestId);
       }
@@ -333,7 +333,9 @@ export class Recorder {
     }
 
     const { url } = reqresp;
-    reqresp.resourceType = type;
+    if (type) {
+      reqresp.resourceType = type.toLowerCase();
+    }
 
     switch (errorText) {
       case "net::ERR_BLOCKED_BY_CLIENT":
