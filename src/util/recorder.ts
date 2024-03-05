@@ -203,7 +203,7 @@ export class Recorder {
       });
       const reqresp = this.pendingReqResp(params.requestId, true);
       if (reqresp) {
-        reqresp.resourceType = params.this.addPageRecord(reqresp);
+        this.addPageRecord(reqresp);
 
         this.removeReqResp(params.requestId);
       }
@@ -333,7 +333,9 @@ export class Recorder {
     }
 
     const { url } = reqresp;
-    reqresp.resourceType = type;
+    if (type) {
+      reqresp.resourceType = type.toLowerCase();
+    }
 
     switch (errorText) {
       case "net::ERR_BLOCKED_BY_CLIENT":
@@ -1444,6 +1446,10 @@ function createResponse(
     "WARC-Page-ID": pageid,
   };
 
+  if (reqresp.resourceType) {
+    warcHeaders["WARC-Resource-Type"] = reqresp.resourceType;
+  }
+
   if (!contentIter) {
     contentIter = [reqresp.payload] as Iterable<Uint8Array>;
   }
@@ -1491,6 +1497,10 @@ function createRequest(
     "WARC-Concurrent-To": responseRecord.warcHeader("WARC-Record-ID")!,
     "WARC-Page-ID": pageid,
   };
+
+  if (reqresp.resourceType) {
+    warcHeaders["WARC-Resource-Type"] = reqresp.resourceType;
+  }
 
   const date = responseRecord.warcDate || undefined;
 
