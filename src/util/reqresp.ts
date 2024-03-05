@@ -85,7 +85,10 @@ export class RequestResponseInfo {
     this.responseHeadersList = params.responseHeaders;
 
     this.fetch = true;
-    this.resourceType = params.resourceType;
+
+    if (params.resourceType) {
+      this.resourceType = params.resourceType.toLowerCase();
+    }
 
     this.frameId = params.frameId;
   }
@@ -109,7 +112,7 @@ export class RequestResponseInfo {
     this.protocol = response.protocol;
 
     if (type) {
-      this.resourceType = type;
+      this.resourceType = type.toLowerCase();
     }
 
     if (response.requestHeaders) {

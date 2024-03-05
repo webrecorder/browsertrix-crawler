@@ -127,6 +127,7 @@ declare module "ioredis" {
       pkeyUrl: string,
       url: string,
       maxRetryPending: number,
+      maxRegularDepth: number,
     ): Result<number, Context>;
   }
 }
@@ -260,7 +261,8 @@ if not res then
     redis.call('hdel', KEYS[1], ARGV[1]);
     if tonumber(data['retry']) <= tonumber(ARGV[2]) then
       json = cjson.encode(data);
-      redis.call('zadd', KEYS[2], 0, json);
+      local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[3]);
+      redis.call('zadd', KEYS[2], score, json);
       return 1;
     else
       return 2;
@@ -672,6 +674,7 @@ return 0;
         this.pkey + ":" + url,
         url,
         this.maxRetryPending,
+        MAX_DEPTH,
       );
       switch (res) {
         case 1:
