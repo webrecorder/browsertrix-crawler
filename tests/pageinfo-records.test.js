@@ -176,6 +176,7 @@ function validateResourcesAbout(json) {
       {
         status: 0,
         type: "xhr",
+        error: "net::ERR_BLOCKED_BY_CLIENT",
       },
   });
 }
@@ -189,6 +190,7 @@ function validateResourcesInvalid(json) {
     "https://invalid.invalid/": {
       status: 0,
       type: "document",
+      error: "net::ERR_NAME_NOT_RESOLVED",
     },
   });
 }

@@ -37,6 +37,8 @@ export class RequestResponseInfo {
   status: number = 0;
   statusText?: string;
 
+  errorText?: string;
+
   responseHeaders?: Record<string, string>;
   responseHeadersList?: { name: string; value: string }[];
   responseHeadersText?: string;
@@ -45,6 +47,7 @@ export class RequestResponseInfo {
 
   // misc
   fromServiceWorker = false;
+  fromCache = false;
 
   frameId?: string;
 
@@ -296,9 +299,14 @@ export class RequestResponseInfo {
     return true;
   }
 
+  isCached() {
+    return this.fromCache && !this.payload;
+  }
+
   shouldSkipSave() {
-    // skip OPTIONS/HEAD responses, and 304 or 206 responses
+    // skip cached, OPTIONS/HEAD responses, and 304 or 206 responses
     if (
+      this.fromCache ||
       !this.payload ||
       (this.method && ["OPTIONS", "HEAD"].includes(this.method)) ||
       [206, 304].includes(this.status)

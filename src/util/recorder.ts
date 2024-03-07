@@ -52,6 +52,8 @@ export type PageInfoValue = {
   status: number;
   mime?: string;
   type?: string;
+  error?: string;
+  fromBrowserCache?: boolean;
 };
 
 // =================================================================
@@ -166,6 +168,11 @@ export class Recorder {
       this.handleResponseReceivedExtraInfo(params),
     );
 
+    // Cache
+    cdp.on("Network.requestServedFromCache", (params) =>
+      this.handleRequestServedFromCache(params),
+    );
+
     // Request
     cdp.on("Network.requestWillBeSent", (params) =>
       this.handleRequestWillBeSent(params),
@@ -258,6 +265,26 @@ export class Recorder {
     const reqresp = this.pendingReqResp(requestId, true);
     if (reqresp) {
       reqresp.fillResponseReceivedExtraInfo(params);
+    }
+  }
+
+  handleRequestServedFromCache(
+    params: Protocol.Network.RequestServedFromCacheEvent,
+  ) {
+    const { requestId } = params;
+
+    const reqresp = this.pendingReqResp(requestId, true);
+
+    const url = reqresp?.url;
+
+    logNetwork("Network.requestServedFromCache", {
+      requestId,
+      url,
+      ...this.logDetails,
+    });
+
+    if (reqresp) {
+      reqresp.fromCache = true;
     }
   }
 
@@ -390,6 +417,8 @@ export class Recorder {
         );
     }
     reqresp.status = 0;
+    reqresp.errorText = errorText;
+
     this.addPageRecord(reqresp);
     this.removeReqResp(requestId);
   }
@@ -413,7 +442,7 @@ export class Recorder {
 
     this.removeReqResp(requestId);
 
-    if (!this.isValidUrl(reqresp.url)) {
+    if (!this.isValidUrl(url)) {
       return;
     }
 
@@ -692,7 +721,15 @@ export class Recorder {
     if (this.isValidUrl(reqresp.url)) {
       const { status, resourceType: type } = reqresp;
       const mime = reqresp.getMimeType();
-      this.pageInfo.urls[reqresp.getCanonURL()] = { status, mime, type };
+      const info: PageInfoValue = { status, mime, type };
+      if (reqresp.errorText) {
+        info.error = reqresp.errorText;
+      }
+      //TODO: revisit if we want to record this later
+      // if (reqresp.fromCache) {
+      //   info.fromBrowserCache = true;
+      // }
+      this.pageInfo.urls[reqresp.getCanonURL()] = info;
     }
   }
 
@@ -719,8 +756,6 @@ export class Recorder {
         await this.serializeToWARC(reqresp);
         // no url, likely invalid
       } else if (!reqresp.url) {
-        reqresp.status = 0;
-        this.addPageRecord(reqresp);
         this.removeReqResp(requestId);
       }
     }
@@ -990,8 +1025,17 @@ export class Recorder {
     // even if serialization does not happen
     this.addPageRecord(reqresp);
 
-    if (reqresp.shouldSkipSave()) {
-      const { url, method, status, payload, requestId } = reqresp;
+    const { url, method, status, payload, requestId } = reqresp;
+
+    // Specifically log skipping cached resources
+    if (reqresp.isCached()) {
+      logger.debug(
+        "Skipping cached resource, should be already recorded",
+        { url, status },
+        "recorder",
+      );
+      return;
+    } else if (reqresp.shouldSkipSave()) {
       logNetwork("Skipping writing request/response", {
         requestId,
         url,
@@ -1003,11 +1047,11 @@ export class Recorder {
     }
 
     if (
-      reqresp.url &&
-      reqresp.method === "GET" &&
-      !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, reqresp.url))
+      url &&
+      method === "GET" &&
+      !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url))
     ) {
-      logNetwork("Skipping dupe", { url: reqresp.url });
+      logNetwork("Skipping dupe", { url });
       return;
     }
 
