@@ -15,7 +15,11 @@ import {
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
-import { LOG_CONTEXT_TYPES, logger } from "./logger.js";
+import {
+  DEFAULT_EXCLUDE_LOG_CONTEXTS,
+  LOG_CONTEXT_TYPES,
+  logger,
+} from "./logger.js";
 
 // ============================================================================
 class ArgParser {
@@ -221,6 +225,14 @@ class ArgParser {
         describe: "Comma-separated list of contexts to include in logs",
         type: "array",
         default: [],
+        choices: LOG_CONTEXT_TYPES,
+        coerce,
+      },
+
+      logExcludeContext: {
+        describe: "Comma-separated list of contexts to NOT include in logs",
+        type: "array",
+        default: DEFAULT_EXCLUDE_LOG_CONTEXTS,
         choices: LOG_CONTEXT_TYPES,
         coerce,
       },

@@ -1,6 +1,6 @@
 {
   "name": "browsertrix-crawler",
-  "version": "1.0.0-beta.6",
+  "version": "1.0.0-beta.7",
   "main": "browsertrix-crawler",
   "type": "module",
   "repository": "https://github.com/webrecorder/browsertrix-crawler",

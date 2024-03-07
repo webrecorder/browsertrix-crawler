@@ -289,7 +289,7 @@ export class PageWorker {
   async crawlPage(opts: WorkerState) {
     const res = await this.crawler.crawlPage(opts);
     if (this.recorder) {
-      opts.data.ts = await this.recorder.finishPage();
+      await this.recorder.awaitPageResources();
     }
     return res;
   }
@@ -332,7 +332,21 @@ export class PageWorker {
           "worker",
         );
       }
+
+      await this.closePage();
     } finally {
+      try {
+        if (this.recorder) {
+          opts.data.ts = await this.recorder.writePageInfoRecord();
+        }
+      } catch (e) {
+        logger.error(
+          "Error writing pageinfo recorder",
+          { ...formatErr(e), ...this.logDetails },
+          "recorder",
+        );
+      }
+
       await timedRun(
         this.crawler.pageFinished(data),
         FINISHED_TIMEOUT,

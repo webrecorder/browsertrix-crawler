@@ -26,6 +26,7 @@ export const LOG_CONTEXT_TYPES = [
   "general",
   "worker",
   "recorder",
+  "recorderNetwork",
   "writer",
   "state",
   "redis",
@@ -52,13 +53,20 @@ export const LOG_CONTEXT_TYPES = [
 
 export type LogContext = (typeof LOG_CONTEXT_TYPES)[number];
 
+export const DEFAULT_EXCLUDE_LOG_CONTEXTS: LogContext[] = [
+  "recorderNetwork",
+  "jsError",
+  "screencast",
+];
+
 // ===========================================================================
 class Logger {
   logStream: Writable | null = null;
   debugLogging = false;
   logErrorsToRedis = false;
   logLevels: string[] = [];
-  contexts: string[] = [];
+  contexts: LogContext[] = [];
+  excludeContexts: LogContext[] = [];
   crawlState?: RedisCrawlState | null = null;
   fatalExitCode = 17;
 
@@ -82,8 +90,12 @@ class Logger {
     this.logLevels = logLevels;
   }
 
-  setContext(contexts: string[]) {
+  setContext(contexts: LogContext[]) {
     this.contexts = contexts;
+  }
+
+  setExcludeContext(contexts: LogContext[]) {
+    this.excludeContexts = contexts;
   }
 
   setCrawlState(crawlState: RedisCrawlState) {
@@ -93,7 +105,7 @@ class Logger {
   logAsJSON(
     message: string,
     dataUnknown: unknown,
-    context: string,
+    context: LogContext,
     logLevel = "info",
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,6 +119,12 @@ class Logger {
 
     if (this.contexts.length) {
       if (this.contexts.indexOf(context) < 0) {
+        return;
+      }
+    }
+
+    if (this.excludeContexts.length) {
+      if (this.excludeContexts.indexOf(context) >= 0) {
         return;
       }
     }
