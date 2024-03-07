@@ -225,11 +225,13 @@ export class Recorder {
   handleResponseReceived(params: Protocol.Network.ResponseReceivedEvent) {
     const { requestId, response, type } = params;
 
-    logNetwork("Network.responseReceived", { requestId, ...this.logDetails });
+    const { mimeType, url } = response;
 
-    // handling to fill in security details
-
-    const { mimeType } = response;
+    logNetwork("Network.responseReceived", {
+      requestId,
+      url,
+      ...this.logDetails,
+    });
 
     if (mimeType === MIME_EVENT_STREAM) {
       return;
@@ -241,8 +243,6 @@ export class Recorder {
     }
 
     reqresp.fillResponse(response, type);
-
-    this.addPageRecord(reqresp);
   }
 
   handleResponseReceivedExtraInfo(
@@ -331,17 +331,20 @@ export class Recorder {
   handleLoadingFailed(params: Protocol.Network.LoadingFailedEvent) {
     const { errorText, type, requestId } = params;
 
+    const reqresp = this.pendingReqResp(requestId, true);
+
+    const url = reqresp?.url;
+
     logNetwork("Network.loadingFailed", {
       requestId,
+      url,
       ...this.logDetails,
     });
 
-    const reqresp = this.pendingReqResp(requestId, true);
     if (!reqresp) {
       return;
     }
 
-    const { url } = reqresp;
     if (type) {
       reqresp.resourceType = type.toLowerCase();
     }
@@ -394,12 +397,15 @@ export class Recorder {
   handleLoadingFinished(params: Protocol.Network.LoadingFinishedEvent) {
     const { requestId } = params;
 
+    const reqresp = this.pendingReqResp(requestId, true);
+
+    const url = reqresp?.url;
+
     logNetwork("Network.loadingFinished", {
-      requestId: params.requestId,
+      requestId,
+      url,
       ...this.logDetails,
     });
-
-    const reqresp = this.pendingReqResp(requestId, true);
 
     if (!reqresp || reqresp.asyncLoading) {
       return;
@@ -968,6 +974,10 @@ export class Recorder {
 
   removeReqResp(requestId: string, allowReuse = false) {
     const reqresp = this.pendingRequests.get(requestId);
+    if (reqresp) {
+      const { url, requestId } = reqresp;
+      logNetwork("Removing reqresp", { requestId, url });
+    }
     this.pendingRequests.delete(requestId);
     if (!allowReuse) {
       this.skipIds.add(requestId);
@@ -976,13 +986,18 @@ export class Recorder {
   }
 
   async serializeToWARC(reqresp: RequestResponseInfo) {
+    // always include in pageinfo record if going to serialize to WARC
+    // even if serialization does not happen
+    this.addPageRecord(reqresp);
+
     if (reqresp.shouldSkipSave()) {
-      const { url, method, status, payload } = reqresp;
-      logNetwork("Skipping request/response", {
+      const { url, method, status, payload, requestId } = reqresp;
+      logNetwork("Skipping writing request/response", {
+        requestId,
         url,
         method,
         status,
-        payloadLength: payload && payload.length,
+        payloadLength: (payload && payload.length) || 0,
       });
       return;
     }
@@ -995,8 +1010,6 @@ export class Recorder {
       logNetwork("Skipping dupe", { url: reqresp.url });
       return;
     }
-
-    this.addPageRecord(reqresp);
 
     const responseRecord = createResponse(reqresp, this.pageid);
     const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
@@ -1203,8 +1216,6 @@ class AsyncFetcher {
         );
       }
 
-      recorder.addPageRecord(reqresp);
-
       recorder.warcQ.add(() =>
         recorder.writer.writeRecordPair(
           responseRecord,
@@ -1225,8 +1236,8 @@ class AsyncFetcher {
       );
       // indicate response is ultimately not valid
       reqresp.status = 0;
-      recorder.addPageRecord(reqresp);
     } finally {
+      recorder.addPageRecord(reqresp);
       recorder.removeReqResp(networkId);
     }
 
