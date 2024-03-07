@@ -44,11 +44,11 @@ export class RequestResponseInfo {
   payload?: Uint8Array;
 
   // misc
-  fromServiceWorker: boolean = false;
+  fromServiceWorker = false;
 
   frameId?: string;
 
-  fetch: boolean = false;
+  fetch = false;
 
   resourceType?: string;
 
@@ -71,13 +71,7 @@ export class RequestResponseInfo {
   }
 
   fillFetchRequestPaused(params: Protocol.Fetch.RequestPausedEvent) {
-    this.url = params.request.url;
-    this.method = params.request.method;
-    if (!this.requestHeaders) {
-      this.requestHeaders = params.request.headers;
-    }
-    this.postData = params.request.postData;
-    this.hasPostData = params.request.hasPostData || false;
+    this.fillRequest(params.request, params.resourceType);
 
     this.status = params.responseStatusCode || 0;
     this.statusText = params.responseStatusText || getStatusText(this.status);
@@ -86,14 +80,24 @@ export class RequestResponseInfo {
 
     this.fetch = true;
 
-    if (params.resourceType) {
-      this.resourceType = params.resourceType.toLowerCase();
-    }
-
     this.frameId = params.frameId;
   }
 
-  fillResponse(response: Protocol.Network.Response, type?: string) {
+  fillRequest(request: Protocol.Network.Request, resourceType?: string) {
+    this.url = request.url;
+    this.method = request.method;
+    if (!this.requestHeaders) {
+      this.requestHeaders = request.headers;
+    }
+    this.postData = request.postData;
+    this.hasPostData = request.hasPostData || false;
+
+    if (resourceType) {
+      this.resourceType = resourceType.toLowerCase();
+    }
+  }
+
+  fillResponse(response: Protocol.Network.Response, resourceType?: string) {
     // if initial fetch was a 200, but now replacing with 304, don't!
     if (
       response.status == 304 &&
@@ -111,8 +115,8 @@ export class RequestResponseInfo {
 
     this.protocol = response.protocol;
 
-    if (type) {
-      this.resourceType = type.toLowerCase();
+    if (resourceType) {
+      this.resourceType = resourceType.toLowerCase();
     }
 
     if (response.requestHeaders) {

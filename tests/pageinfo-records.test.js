@@ -5,7 +5,7 @@ import { WARCParser } from "warcio";
 
 test("run warc and ensure pageinfo records contain the correct resources", async () => {
   child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --url https://webrecorder.net/about --scopeType page --collection page-info-test --combineWARC",
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --url https://webrecorder.net/about --url https://invalid.invalid/ --scopeType page --collection page-info-test --combineWARC",
   );
 
   const filename = path.join(
@@ -21,6 +21,7 @@ test("run warc and ensure pageinfo records contain the correct resources", async
 
   let foundIndex = false;
   let foundAbout = false;
+  let foundInvalid = false;
 
   for await (const record of parser) {
     if (
@@ -40,10 +41,20 @@ test("run warc and ensure pageinfo records contain the correct resources", async
       const text = await record.contentText();
       validateResourcesAbout(JSON.parse(text));
     }
+
+    if (
+      !foundInvalid &&
+      record.warcTargetURI === "urn:pageinfo:https://invalid.invalid/"
+    ) {
+      foundInvalid = true;
+      const text = await record.contentText();
+      validateResourcesInvalid(JSON.parse(text));
+    }
   }
 
   expect(foundIndex).toBe(true);
   expect(foundAbout).toBe(true);
+  expect(foundInvalid).toBe(true);
 });
 
 function validateResourcesIndex(json) {
@@ -161,5 +172,23 @@ function validateResourcesAbout(json) {
       { status: 200, mime: "font/woff2", type: "font" },
     "https://fonts.gstatic.com/s/sourcesanspro/v22/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
+    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2Fabout&d=webrecorder.net":
+      {
+        status: 0,
+        type: "xhr",
+      },
+  });
+}
+
+function validateResourcesInvalid(json) {
+  expect(json).toHaveProperty("pageid");
+  expect(json).toHaveProperty("url");
+  expect(json).toHaveProperty("urls");
+  expect(json.counts).toEqual({ jsErrors: 0 });
+  expect(json.urls).toEqual({
+    "https://invalid.invalid/": {
+      status: 0,
+      type: "document",
+    },
   });
 }
