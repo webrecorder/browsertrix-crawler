@@ -42,10 +42,9 @@ const MIME_EVENT_STREAM = "text/event-stream";
 const encoder = new TextEncoder();
 
 // =================================================================
-// TODO: Fix this the next time the file is edited.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function logNetwork(msg: string, data: any) {
-  // logger.debug(msg, data, "recorderNetwork");
+  logger.debug(msg, data, "recorderNetwork");
 }
 
 // =================================================================
@@ -53,6 +52,8 @@ export type PageInfoValue = {
   status: number;
   mime?: string;
   type?: string;
+  error?: string;
+  fromBrowserCache?: boolean;
 };
 
 // =================================================================
@@ -150,7 +151,6 @@ export class Recorder {
 
   async onCreatePage({ cdp }: { cdp: CDPSession }) {
     // Fetch
-
     cdp.on("Fetch.requestPaused", async (params) => {
       this.handleRequestPaused(params, cdp);
     });
@@ -159,85 +159,41 @@ export class Recorder {
       patterns: [{ urlPattern: "*", requestStage: "Response" }],
     });
 
-    await cdp.send("Console.enable");
-
     // Response
-    cdp.on("Network.responseReceived", (params) => {
-      // handling to fill in security details
-      logNetwork("Network.responseReceived", {
-        requestId: params.requestId,
-        ...this.logDetails,
-      });
-      this.handleResponseReceived(params);
-    });
+    cdp.on("Network.responseReceived", (params) =>
+      this.handleResponseReceived(params),
+    );
 
-    cdp.on("Network.responseReceivedExtraInfo", (params) => {
-      logNetwork("Network.responseReceivedExtraInfo", {
-        requestId: params.requestId,
-        ...this.logDetails,
-      });
-      const reqresp = this.pendingReqResp(params.requestId, true);
-      if (reqresp) {
-        reqresp.fillResponseReceivedExtraInfo(params);
-      }
-    });
+    cdp.on("Network.responseReceivedExtraInfo", (params) =>
+      this.handleResponseReceivedExtraInfo(params),
+    );
+
+    // Cache
+    cdp.on("Network.requestServedFromCache", (params) =>
+      this.handleRequestServedFromCache(params),
+    );
 
     // Request
+    cdp.on("Network.requestWillBeSent", (params) =>
+      this.handleRequestWillBeSent(params),
+    );
 
-    cdp.on("Network.requestWillBeSent", (params) => {
-      // only handling redirect here, committing last response in redirect chain
-      // request data stored from requestPaused
-      if (params.redirectResponse) {
-        logNetwork("Network.requestWillBeSent after redirect", {
-          requestId: params.requestId,
-          ...this.logDetails,
-        });
-        this.handleRedirectResponse(params);
-      }
-    });
-
-    cdp.on("Network.requestServedFromCache", (params) => {
-      logNetwork("Network.requestServedFromCache", {
-        requestId: params.requestId,
-        ...this.logDetails,
-      });
-      const reqresp = this.pendingReqResp(params.requestId, true);
-      if (reqresp) {
-        this.addPageRecord(reqresp);
-
-        this.removeReqResp(params.requestId);
-      }
-    });
-
-    cdp.on("Network.requestWillBeSentExtraInfo", (params) => {
-      logNetwork("Network.requestWillBeSentExtraInfo", {
-        requestId: params.requestId,
-        ...this.logDetails,
-      });
-      this.handleRequestExtraInfo(params);
-    });
+    cdp.on("Network.requestWillBeSentExtraInfo", (params) =>
+      this.handleRequestExtraInfo(params),
+    );
 
     // Loading
-    cdp.on("Network.loadingFinished", (params) => {
-      logNetwork("Network.loadingFinished", {
-        requestId: params.requestId,
-        ...this.logDetails,
-      });
-      this.handleLoadingFinished(params);
-    });
+    cdp.on("Network.loadingFinished", (params) =>
+      this.handleLoadingFinished(params),
+    );
 
-    cdp.on("Network.loadingFailed", (params) => {
-      logNetwork("Network.loadingFailed", {
-        requestId: params.requestId,
-        ...this.logDetails,
-      });
-      this.handleLoadingFailed(params);
-    });
+    cdp.on("Network.loadingFailed", (params) =>
+      this.handleLoadingFailed(params),
+    );
 
     await cdp.send("Network.enable");
 
     // Target
-
     cdp.on("Target.attachedToTarget", async (params) => {
       const { url, type, sessionId } = params.targetInfo;
       if (type === "service_worker") {
@@ -255,6 +211,13 @@ export class Recorder {
       }
     });
 
+    await cdp.send("Target.setAutoAttach", {
+      autoAttach: true,
+      waitForDebuggerOnStart: false,
+      flatten: true,
+    });
+
+    // Console
     cdp.on("Console.messageAdded", (params) => {
       const { message } = params;
       const { source, level } = message;
@@ -263,17 +226,19 @@ export class Recorder {
       }
     });
 
-    await cdp.send("Target.setAutoAttach", {
-      autoAttach: true,
-      waitForDebuggerOnStart: false,
-      flatten: true,
-    });
+    await cdp.send("Console.enable");
   }
 
   handleResponseReceived(params: Protocol.Network.ResponseReceivedEvent) {
     const { requestId, response, type } = params;
 
-    const { mimeType } = response;
+    const { mimeType, url } = response;
+
+    logNetwork("Network.responseReceived", {
+      requestId,
+      url,
+      ...this.logDetails,
+    });
 
     if (mimeType === MIME_EVENT_STREAM) {
       return;
@@ -285,15 +250,81 @@ export class Recorder {
     }
 
     reqresp.fillResponse(response, type);
+  }
 
-    this.addPageRecord(reqresp);
+  handleResponseReceivedExtraInfo(
+    params: Protocol.Network.ResponseReceivedExtraInfoEvent,
+  ) {
+    const { requestId } = params;
+
+    logNetwork("Network.responseReceivedExtraInfo", {
+      requestId,
+      ...this.logDetails,
+    });
+
+    const reqresp = this.pendingReqResp(requestId, true);
+    if (reqresp) {
+      reqresp.fillResponseReceivedExtraInfo(params);
+    }
+  }
+
+  handleRequestServedFromCache(
+    params: Protocol.Network.RequestServedFromCacheEvent,
+  ) {
+    const { requestId } = params;
+
+    const reqresp = this.pendingReqResp(requestId, true);
+
+    const url = reqresp?.url;
+
+    logNetwork("Network.requestServedFromCache", {
+      requestId,
+      url,
+      ...this.logDetails,
+    });
+
+    if (reqresp) {
+      reqresp.fromCache = true;
+    }
+  }
+
+  handleRequestWillBeSent(params: Protocol.Network.RequestWillBeSentEvent) {
+    // only handling redirect here, committing last response in redirect chain
+    // request data stored from requestPaused
+    const { redirectResponse, requestId, request, type } = params;
+
+    const { headers, method, url } = request;
+
+    logNetwork("Network.requestWillBeSent", {
+      requestId,
+      redirectResponse,
+      ...this.logDetails,
+    });
+
+    if (redirectResponse) {
+      this.handleRedirectResponse(params);
+    } else {
+      if (!this.shouldSkip(headers, url, method, type)) {
+        const reqresp = this.pendingReqResp(requestId);
+        if (reqresp) {
+          reqresp.fillRequest(request);
+        }
+      }
+    }
   }
 
   handleRequestExtraInfo(
     params: Protocol.Network.RequestWillBeSentExtraInfoEvent,
   ) {
-    if (!this.shouldSkip(params.headers)) {
-      const reqresp = this.pendingReqResp(params.requestId, true);
+    const { requestId, headers } = params;
+
+    logNetwork("Network.requestWillBeSentExtraInfo", {
+      requestId,
+      ...this.logDetails,
+    });
+
+    if (!this.shouldSkip(headers)) {
+      const reqresp = this.pendingReqResp(requestId, true);
       if (reqresp) {
         reqresp.fillRequestExtraInfo(params);
       }
@@ -328,11 +359,19 @@ export class Recorder {
     const { errorText, type, requestId } = params;
 
     const reqresp = this.pendingReqResp(requestId, true);
+
+    const url = reqresp?.url;
+
+    logNetwork("Network.loadingFailed", {
+      requestId,
+      url,
+      ...this.logDetails,
+    });
+
     if (!reqresp) {
       return;
     }
 
-    const { url } = reqresp;
     if (type) {
       reqresp.resourceType = type.toLowerCase();
     }
@@ -377,19 +416,33 @@ export class Recorder {
           "recorder",
         );
     }
+    reqresp.status = 0;
+    reqresp.errorText = errorText;
+
+    this.addPageRecord(reqresp);
     this.removeReqResp(requestId);
   }
 
   handleLoadingFinished(params: Protocol.Network.LoadingFinishedEvent) {
-    const reqresp = this.pendingReqResp(params.requestId, true);
+    const { requestId } = params;
+
+    const reqresp = this.pendingReqResp(requestId, true);
+
+    const url = reqresp?.url;
+
+    logNetwork("Network.loadingFinished", {
+      requestId,
+      url,
+      ...this.logDetails,
+    });
 
     if (!reqresp || reqresp.asyncLoading) {
       return;
     }
 
-    this.removeReqResp(params.requestId);
+    this.removeReqResp(requestId);
 
-    if (!this.isValidUrl(reqresp.url)) {
+    if (!this.isValidUrl(url)) {
       return;
     }
 
@@ -668,7 +721,15 @@ export class Recorder {
     if (this.isValidUrl(reqresp.url)) {
       const { status, resourceType: type } = reqresp;
       const mime = reqresp.getMimeType();
-      this.pageInfo.urls[reqresp.getCanonURL()] = { status, mime, type };
+      const info: PageInfoValue = { status, mime, type };
+      if (reqresp.errorText) {
+        info.error = reqresp.errorText;
+      }
+      //TODO: revisit if we want to record this later
+      // if (reqresp.fromCache) {
+      //   info.fromBrowserCache = true;
+      // }
+      this.pageInfo.urls[reqresp.getCanonURL()] = info;
     }
   }
 
@@ -684,9 +745,11 @@ export class Recorder {
     );
 
     this.warcQ.add(() => this.writer.writeSingleRecord(resourceRecord));
+
+    return this.pageInfo.ts;
   }
 
-  async finishPage() {
+  async awaitPageResources() {
     for (const [requestId, reqresp] of this.pendingRequests.entries()) {
       if (reqresp.payload) {
         this.removeReqResp(requestId);
@@ -726,10 +789,6 @@ export class Recorder {
       await sleep(5.0);
       numPending = this.pendingRequests.size;
     }
-
-    await this.writePageInfoRecord();
-
-    return this.pageInfo.ts;
   }
 
   async onClosePage() {
@@ -768,7 +827,8 @@ export class Recorder {
       method = headers[":method"];
     }
 
-    if (!this.isValidUrl(url)) {
+    // only check if url is provided, since it is optional
+    if (url && !this.isValidUrl(url)) {
       return true;
     }
 
@@ -949,6 +1009,10 @@ export class Recorder {
 
   removeReqResp(requestId: string, allowReuse = false) {
     const reqresp = this.pendingRequests.get(requestId);
+    if (reqresp) {
+      const { url, requestId } = reqresp;
+      logNetwork("Removing reqresp", { requestId, url });
+    }
     this.pendingRequests.delete(requestId);
     if (!allowReuse) {
       this.skipIds.add(requestId);
@@ -957,27 +1021,39 @@ export class Recorder {
   }
 
   async serializeToWARC(reqresp: RequestResponseInfo) {
-    if (reqresp.shouldSkipSave()) {
-      const { url, method, status, payload } = reqresp;
-      logNetwork("Skipping request/response", {
+    // always include in pageinfo record if going to serialize to WARC
+    // even if serialization does not happen
+    this.addPageRecord(reqresp);
+
+    const { url, method, status, payload, requestId } = reqresp;
+
+    // Specifically log skipping cached resources
+    if (reqresp.isCached()) {
+      logger.debug(
+        "Skipping cached resource, should be already recorded",
+        { url, status },
+        "recorder",
+      );
+      return;
+    } else if (reqresp.shouldSkipSave()) {
+      logNetwork("Skipping writing request/response", {
+        requestId,
         url,
         method,
         status,
-        payloadLength: payload && payload.length,
+        payloadLength: (payload && payload.length) || 0,
       });
       return;
     }
 
     if (
-      reqresp.url &&
-      reqresp.method === "GET" &&
-      !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, reqresp.url))
+      url &&
+      method === "GET" &&
+      !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url))
     ) {
-      logNetwork("Skipping dupe", { url: reqresp.url });
+      logNetwork("Skipping dupe", { url });
       return;
     }
-
-    this.addPageRecord(reqresp);
 
     const responseRecord = createResponse(reqresp, this.pageid);
     const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
@@ -1016,8 +1092,7 @@ export class Recorder {
     const res = await fetcher.load();
 
     const mime =
-      (reqresp &&
-        reqresp.responseHeaders &&
+      (reqresp.responseHeaders &&
         reqresp.responseHeaders["content-type"] &&
         reqresp.responseHeaders["content-type"].split(";")[0]) ||
       "";
@@ -1184,8 +1259,6 @@ class AsyncFetcher {
         );
       }
 
-      recorder.addPageRecord(reqresp);
-
       recorder.warcQ.add(() =>
         recorder.writer.writeRecordPair(
           responseRecord,
@@ -1204,8 +1277,15 @@ class AsyncFetcher {
         { url, networkId, filename, ...formatErr(e), ...logDetails },
         "recorder",
       );
+      // indicate response is ultimately not valid
+      reqresp.status = 0;
+      reqresp.errorText = e.message;
     } finally {
-      recorder.removeReqResp(networkId);
+      // exclude direct fetch request with fake id
+      if (networkId !== "0") {
+        recorder.addPageRecord(reqresp);
+        recorder.removeReqResp(networkId);
+      }
     }
 
     return fetched;
