@@ -286,21 +286,6 @@ export class Recorder {
     }
   }
 
-  // handleRequestServedFromCache(
-  //   params: Protocol.Network.RequestServedFromCacheEvent,
-  // ) {
-  //   const { requestId } = params;
-
-  //   logNetwork("Network.requestServedFromCache", {
-  //     requestId,
-  //     ...this.logDetails,
-  //   });
-  //   const reqresp = this.pendingReqResp(requestId, true);
-  //   if (reqresp) {
-  //     reqresp.fromCache = true;
-  //   }
-  // }
-
   handleRequestExtraInfo(
     params: Protocol.Network.RequestWillBeSentExtraInfoEvent,
   ) {
