@@ -1092,8 +1092,7 @@ export class Recorder {
     const res = await fetcher.load();
 
     const mime =
-      (reqresp &&
-        reqresp.responseHeaders &&
+      (reqresp.responseHeaders &&
         reqresp.responseHeaders["content-type"] &&
         reqresp.responseHeaders["content-type"].split(";")[0]) ||
       "";
@@ -1280,9 +1279,13 @@ class AsyncFetcher {
       );
       // indicate response is ultimately not valid
       reqresp.status = 0;
+      reqresp.errorText = e.message;
     } finally {
-      recorder.addPageRecord(reqresp);
-      recorder.removeReqResp(networkId);
+      // exclude direct fetch request with fake id
+      if (networkId !== "0") {
+        recorder.addPageRecord(reqresp);
+        recorder.removeReqResp(networkId);
+      }
     }
 
     return fetched;
