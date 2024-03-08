@@ -33,7 +33,7 @@ import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { logger, formatErr } from "./util/logger.js";
-import { WorkerState, runWorkers } from "./util/worker.js";
+import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectAllFileSources } from "./util/file_reader.js";
 
@@ -869,7 +869,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.checkLimits();
   }
 
-  async teardownPage({ workerid }: WorkerState) {
+  async teardownPage({ workerid }: WorkerOpts) {
     if (this.screencaster) {
       await this.screencaster.stopById(workerid);
     }
