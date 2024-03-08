@@ -150,11 +150,13 @@ export class ReplayCrawler extends Crawler {
     const loader = new WACZLoader(url);
     await loader.init();
 
+    let count = 0;
+
     const pagesReader = await loader.loadFile("pages/pages.jsonl");
 
     if (pagesReader) {
       for await (const buff of pagesReader.iterLines()) {
-        await this.addPage(buff);
+        await this.addPage(buff, count++);
         if (this.limitHit) {
           break;
         }
@@ -165,7 +167,7 @@ export class ReplayCrawler extends Crawler {
 
     if (extraPagesReader) {
       for await (const buff of extraPagesReader.iterLines()) {
-        await this.addPage(buff);
+        await this.addPage(buff, count++);
         if (this.limitHit) {
           break;
         }
@@ -173,7 +175,7 @@ export class ReplayCrawler extends Crawler {
     }
   }
 
-  async addPage(page: string) {
+  async addPage(page: string, depth: number) {
     let pageData: ReplayPage;
 
     if (!page.length) {
@@ -187,12 +189,14 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
-    const { url, ts } = pageData;
+    const { url, ts, id } = pageData;
     if (!url) {
       return;
     }
 
-    await this.queueUrl(0, url, 1, 0, {}, ts);
+    console.log(depth + " " + url);
+
+    await this.queueUrl(0, url, depth, 0, {}, ts, id);
   }
 
   handleRequestWillBeSent(
@@ -276,6 +280,8 @@ export class ReplayCrawler extends Crawler {
   }
 
   async crawlPage(opts: WorkerOpts): Promise<void> {
+    await this.writeStats();
+
     const { page, data } = opts;
     const { url, ts, pageid } = data;
 
@@ -340,6 +346,14 @@ export class ReplayCrawler extends Crawler {
     data.isHTMLPage = true;
 
     data.filteredFrames = page.frames().slice(2);
+
+    try {
+      data.title = await data.filteredFrames[0].title();
+    } catch (e) {
+      // ignore
+    }
+
+    data.favicon = await this.getFavicon(page, {});
 
     await this.doPostLoadActions(opts, true);
 
@@ -607,13 +621,10 @@ export class ReplayCrawler extends Crawler {
         );
       }
 
-      if (this.params.qaRedisKey) {
-        const { url, comparison } = pageInfo;
-        const data = { url, comparison };
-        this.crawlState.writeToComparisonQueue(
-          this.params.qaRedisKey,
-          JSON.stringify(data),
-        );
+      if (this.params.qaWriteToRedis) {
+        const { url, comparison, ts, pageid } = pageInfo;
+        const data = { id: pageid, url, ts, comparison };
+        this.crawlState.writeToComparisonQueue(JSON.stringify(data));
       }
 
       const writer = new WARCResourceWriter({

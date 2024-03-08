@@ -533,9 +533,10 @@ class ArgParser {
         type: "boolean",
       },
 
-      qaRedisKey: {
-        describe: "if specified, add QA comparison stats to this redis list",
-        type: "string",
+      qaWriteToRedis: {
+        describe:
+          "if specified, add QA comparison stats to the <crawlid>:qa redis list",
+        type: "boolean",
       },
     };
   }

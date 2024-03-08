@@ -422,7 +422,9 @@ export class Crawler {
     //  logger.info("wb-manager init failed, collection likely already exists");
     //}
 
-    fs.mkdirSync(this.logDir, { recursive: true });
+    await fsp.mkdir(this.logDir, { recursive: true });
+    await fsp.mkdir(this.archivesDir, { recursive: true });
+
     this.logFH = fs.createWriteStream(this.logFilename);
     logger.setExternalLogStream(this.logFH);
 
@@ -765,14 +767,6 @@ self.__bx_behaviors.selectMainBehavior();
     data.favicon = await this.getFavicon(page, logDetails);
 
     await this.doPostLoadActions(opts);
-
-    if (this.params.pageExtraDelay) {
-      logger.info(
-        `Waiting ${this.params.pageExtraDelay} seconds before moving on to next page`,
-        logDetails,
-      );
-      await sleep(this.params.pageExtraDelay);
-    }
   }
 
   async doPostLoadActions(opts: WorkerOpts, saveOutput = false) {
@@ -857,6 +851,14 @@ self.__bx_behaviors.selectMainBehavior();
           await textextract.extractAndStoreText("textFinal", true, true);
         }
       }
+    }
+
+    if (this.params.pageExtraDelay) {
+      logger.info(
+        `Waiting ${this.params.pageExtraDelay} seconds before moving on to next page`,
+        logDetails,
+      );
+      await sleep(this.params.pageExtraDelay);
     }
   }
 

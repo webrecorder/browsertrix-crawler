@@ -148,6 +148,7 @@ export class RedisCrawlState {
   fkey: string;
   ekey: string;
   pageskey: string;
+  qakey: string;
 
   constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
@@ -167,6 +168,8 @@ export class RedisCrawlState {
     this.ekey = this.key + ":e";
     // pages
     this.pageskey = this.key + ":pages";
+    // qakey
+    this.qakey = this.key + ":qa";
 
     this._initLuaCommands(this.redis);
   }
@@ -452,7 +455,14 @@ return 0;
 
   //async addToQueue({url : string, seedId, depth = 0, extraHops = 0} = {}, limit = 0) {
   async addToQueue(
-    { url, seedId, depth = 0, extraHops = 0, ts = 0 }: QueueEntry,
+    {
+      url,
+      seedId,
+      depth = 0,
+      extraHops = 0,
+      ts = 0,
+      pageid = undefined,
+    }: QueueEntry,
     limit = 0,
   ) {
     const added = this._timestamp();
@@ -460,6 +470,9 @@ return 0;
 
     if (ts) {
       data.ts = ts;
+    }
+    if (pageid) {
+      data.pageid = pageid;
     }
 
     // return codes
@@ -708,7 +721,7 @@ return 0;
     return await this.redis.lpush(this.pageskey, value);
   }
 
-  async writeToComparisonQueue(compareQKey: string, value: string) {
-    return await this.redis.lpush(compareQKey, value);
+  async writeToComparisonQueue(value: string) {
+    return await this.redis.lpush(this.qakey, value);
   }
 }
