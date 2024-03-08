@@ -52,7 +52,7 @@ export async function runWorkers(
 }
 
 // ===========================================================================
-type WorkerOpts = {
+export type WorkerOpts = {
   page: Page;
   cdp: CDPSession;
   workerid: WorkerId;
@@ -71,9 +71,8 @@ export type WorkerState = WorkerOpts & {
 // ===========================================================================
 export class PageWorker {
   id: WorkerId;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  crawler: any;
+
+  crawler: Crawler;
   maxPageTime: number;
 
   reuseCount = 0;
@@ -97,9 +96,7 @@ export class PageWorker {
 
   constructor(
     id: WorkerId,
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    crawler: any,
+    crawler: Crawler,
     maxPageTime: number,
     collDir: string,
   ) {
@@ -127,7 +124,7 @@ export class PageWorker {
       await this.recorder.onClosePage();
     }
 
-    if (!this.crashed) {
+    if (!this.crashed && this.opts) {
       try {
         await timedRun(
           this.crawler.teardownPage(this.opts),
