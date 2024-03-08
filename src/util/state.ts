@@ -721,8 +721,4 @@ return 0;
   async writeToPagesQueue(value: string) {
     return await this.redis.lpush(this.pageskey, value);
   }
-
-  async writeToComparisonQueue(value: string) {
-    return await this.redis.lpush(this.qakey, value);
-  }
 }

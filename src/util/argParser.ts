@@ -532,12 +532,6 @@ class ArgParser {
           "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
         type: "boolean",
       },
-
-      qaWriteToRedis: {
-        describe:
-          "if specified, add QA comparison stats to the <crawlid>:qa redis list",
-        type: "boolean",
-      },
     };
   }
 

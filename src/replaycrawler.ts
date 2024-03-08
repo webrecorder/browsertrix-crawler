@@ -3,7 +3,7 @@ import { Crawler } from "./crawler.js";
 import { ReplayServer } from "./util/replayserver.js";
 import { sleep } from "./util/timing.js";
 import { logger } from "./util/logger.js";
-import { WorkerOpts } from "./util/worker.js";
+import { WorkerOpts, WorkerState } from "./util/worker.js";
 import { PageState } from "./util/state.js";
 import { PageInfoRecord, PageInfoValue, Recorder } from "./util/recorder.js";
 
@@ -36,7 +36,7 @@ type ReplayPage = {
   id: string;
 };
 
-type ReplayPageInfoRecord = PageInfoRecord & {
+type ComparisonData = {
   comparison: {
     screenshotMatch?: number;
     textMatch?: number;
@@ -48,6 +48,10 @@ type ReplayPageInfoRecord = PageInfoRecord & {
     };
   };
 };
+
+type ReplayPageInfoRecord = PageInfoRecord & ComparisonData;
+
+type ComparisonPageState = PageState & ComparisonData;
 
 // ============================================================================
 export class ReplayCrawler extends Crawler {
@@ -84,7 +88,7 @@ export class ReplayCrawler extends Crawler {
     return parseArgs(process.argv, true);
   }
 
-  async setupPage(opts: WorkerOpts) {
+  async setupPage(opts: WorkerState) {
     await super.setupPage(opts);
     const { page, cdp } = opts;
 
@@ -194,8 +198,6 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
-    console.log(depth + " " + url);
-
     await this.queueUrl(0, url, depth, 0, {}, ts, id);
   }
 
@@ -279,7 +281,7 @@ export class ReplayCrawler extends Crawler {
     }
   }
 
-  async crawlPage(opts: WorkerOpts): Promise<void> {
+  async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
     const { page, data } = opts;
@@ -363,7 +365,7 @@ export class ReplayCrawler extends Crawler {
 
     await this.compareResources(page, data, url, date);
 
-    await this.processPageInfo(page);
+    await this.processPageInfo(page, data);
   }
 
   async compareScreenshots(
@@ -610,7 +612,7 @@ export class ReplayCrawler extends Crawler {
     await super.teardownPage(opts);
   }
 
-  async processPageInfo(page: Page) {
+  async processPageInfo(page: Page, state?: PageState) {
     const pageInfo = this.pageInfos.get(page);
     if (pageInfo) {
       if (!pageInfo.urls[pageInfo.url]) {
@@ -621,10 +623,11 @@ export class ReplayCrawler extends Crawler {
         );
       }
 
-      if (this.params.qaWriteToRedis) {
-        const { url, comparison, ts, pageid } = pageInfo;
-        const data = { id: pageid, url, ts, comparison };
-        this.crawlState.writeToComparisonQueue(JSON.stringify(data));
+      if (state) {
+        const { comparison } = pageInfo;
+
+        // add comparison to page state
+        (state as ComparisonPageState).comparison = comparison;
       }
 
       const writer = new WARCResourceWriter({
@@ -641,6 +644,14 @@ export class ReplayCrawler extends Crawler {
       );
       this.pageInfos.delete(page);
     }
+  }
+
+  protected pageEntryForRedis(
+    entry: Record<string, string | number | boolean | object>,
+    state: PageState,
+  ) {
+    entry.comparison = (state as ComparisonPageState).comparison;
+    return entry;
   }
 
   createRecorder(): Recorder | null {

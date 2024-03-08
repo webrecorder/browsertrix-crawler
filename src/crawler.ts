@@ -34,7 +34,7 @@ import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
 import { logger, formatErr } from "./util/logger.js";
-import { WorkerState, runWorkers } from "./util/worker.js";
+import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectAllFileSources } from "./util/file_reader.js";
 
@@ -769,7 +769,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.doPostLoadActions(opts);
   }
 
-  async doPostLoadActions(opts: WorkerOpts, saveOutput = false) {
+  async doPostLoadActions(opts: WorkerState, saveOutput = false) {
     const { page, cdp, data, workerid } = opts;
     const { url } = data;
 
@@ -812,7 +812,7 @@ self.__bx_behaviors.selectMainBehavior();
         this.params.text.includes("to-warc"),
       );
 
-      if (this.textInPages || saveOutput) {
+      if (text && (this.textInPages || saveOutput)) {
         data.text = text;
       }
     }
@@ -896,7 +896,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.checkLimits();
   }
 
-  async teardownPage({ workerid }: WorkerState) {
+  async teardownPage({ workerid }: WorkerOpts) {
     if (this.screencaster) {
       await this.screencaster.stopById(workerid);
     }
@@ -1978,19 +1978,29 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async writePage({
-    pageid,
-    url,
-    depth,
-    title,
-    text,
-    loadState,
-    mime,
-    favicon,
-    ts,
-    status,
-  }: PageState) {
-    const row: PageEntry = { id: pageid!, url, title, loadState };
+  protected pageEntryForRedis(
+    entry: Record<string, string | number | boolean | object>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    state: PageState,
+  ) {
+    return entry;
+  }
+
+  async writePage(state: PageState) {
+    const {
+      pageid,
+      url,
+      depth,
+      title,
+      text,
+      loadState,
+      mime,
+      favicon,
+      ts,
+      status,
+    } = state;
+
+    const row: PageEntry = { id: pageid, url, title, loadState };
 
     if (ts) {
       row.ts = ts.toISOString();
@@ -2005,7 +2015,9 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.writePagesToRedis) {
-      await this.crawlState.writeToPagesQueue(JSON.stringify(row));
+      await this.crawlState.writeToPagesQueue(
+        JSON.stringify(this.pageEntryForRedis(row, state)),
+      );
     }
 
     if (depth === 0) {

@@ -52,7 +52,7 @@ export async function runWorkers(
 }
 
 // ===========================================================================
-type WorkerOpts = {
+export type WorkerOpts = {
   page: Page;
   cdp: CDPSession;
   workerid: WorkerId;
