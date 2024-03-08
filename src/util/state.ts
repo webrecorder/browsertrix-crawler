@@ -1,4 +1,5 @@
 import { Redis, Result, Callback } from "ioredis";
+import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "./logger.js";
 
@@ -52,7 +53,7 @@ export class PageState {
 
   workerid!: WorkerId;
 
-  pageid?: string;
+  pageid: string;
   title?: string;
   mime?: string;
   ts?: Date;
@@ -78,7 +79,7 @@ export class PageState {
     if (redisData.ts) {
       this.ts = new Date(redisData.ts);
     }
-    this.pageid = redisData.pageid;
+    this.pageid = redisData.pageid || uuidv4();
     this.status = 0;
   }
 }

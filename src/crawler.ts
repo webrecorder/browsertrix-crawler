@@ -34,7 +34,7 @@ import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
 import { logger, formatErr } from "./util/logger.js";
-import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
+import { WorkerState, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectAllFileSources } from "./util/file_reader.js";
 
@@ -896,7 +896,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.checkLimits();
   }
 
-  async teardownPage({ workerid }: WorkerOpts) {
+  async teardownPage({ workerid }: WorkerState) {
     if (this.screencaster) {
       await this.screencaster.stopById(workerid);
     }
