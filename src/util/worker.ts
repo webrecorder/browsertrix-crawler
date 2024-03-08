@@ -1,7 +1,5 @@
 import os from "os";
 
-import { v4 as uuidv4 } from "uuid";
-
 import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
 import { Recorder } from "./recorder.js";
@@ -54,9 +52,7 @@ export async function runWorkers(
 }
 
 // ===========================================================================
-// TODO: Fix this the next time the file is edited.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type WorkerOpts = Record<string, any> & {
+type WorkerOpts = {
   page: Page;
   cdp: CDPSession;
   workerid: WorkerId;
@@ -306,15 +302,11 @@ export class PageWorker {
   async timedCrawlPage(opts: WorkerState) {
     const workerid = this.id;
     const { data } = opts;
-    const { url } = data;
+    const { url, pageid } = data;
 
     logger.info("Starting page", { workerid, page: url }, "worker");
 
     this.logDetails = { page: url, workerid };
-
-    // set new page id
-    const pageid = uuidv4();
-    data.pageid = pageid;
 
     if (this.recorder) {
       this.recorder.startPage({ pageid, url });
