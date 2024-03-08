@@ -20,7 +20,7 @@ test("run QA comparison, with write pages to redis", async () => {
   fs.rmSync("./test-crawls/qa-wr-net-replay", { recursive: true, force: true });
 
   const child = child_process.exec(
-    "docker run -p 6379:6379 -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler qa --qaSource /crawls/collections/qa-wr-net/qa-wr-net.wacz --collection qa-wr-net-replay --crawlId test --qaDebugImageDiff --writePagesToRedis --debugAccessRedis",
+    "docker run -p 36379:6379 -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler qa --qaSource /crawls/collections/qa-wr-net/qa-wr-net.wacz --collection qa-wr-net-replay --crawlId test --qaDebugImageDiff --writePagesToRedis --debugAccessRedis",
   );
 
   // detect crawler exit
@@ -29,18 +29,11 @@ test("run QA comparison, with write pages to redis", async () => {
     crawler_exited = true;
   });
 
-  const redis = new Redis("redis://localhost:6379/0", { lazyConnect: true });
+  const redis = new Redis("redis://127.0.0.1:36379/0", { lazyConnect: true });
 
   await sleep(3000);
 
-  while (!crawler_exited) {
-    try {
-      await redis.connect();
-      break;
-    } catch (e) {
-      await sleep(500);
-    }
-  }
+  await redis.connect({ maxRetriesPerRequest: 50 });
 
   let count = 0;
 
