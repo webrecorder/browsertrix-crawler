@@ -71,6 +71,7 @@ export type WorkerState = WorkerOpts & {
 // ===========================================================================
 export class PageWorker {
   id: WorkerId;
+
   crawler: Crawler;
   maxPageTime: number;
 
