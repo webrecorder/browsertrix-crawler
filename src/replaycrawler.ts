@@ -71,6 +71,12 @@ export class ReplayCrawler extends Crawler {
     this.qaSource = this.params.qaSource;
     this.replayServer = new ReplayServer(this.qaSource);
 
+    logger.info(
+      "Replay Crawl with Source",
+      { source: this.qaSource },
+      "general",
+    );
+
     this.pageInfos = new Map<Page, ReplayPageInfoRecord>();
 
     // skip text from first two frames, as they are RWP boilerplate
@@ -134,9 +140,22 @@ export class ReplayCrawler extends Crawler {
   }
 
   async loadPages(url: string) {
-    if (url.endsWith(".wacz")) {
+    let path = url;
+
+    try {
+      path = new URL(url).pathname;
+    } catch (e) {
+      // ignore
+    }
+
+    if (path.endsWith(".wacz")) {
       await this.loadPagesForWACZ(url);
-    } else if (url.endsWith(".json")) {
+    } else if (path.endsWith(".json")) {
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        const blob = await openAsBlob(url);
+        url = URL.createObjectURL(blob);
+      }
+
       const resp = await fetch(url);
       const json = await resp.json();
 
