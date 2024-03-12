@@ -242,6 +242,10 @@ export class ReplayCrawler extends Crawler {
     await this.queueUrl(0, url, depth, 0, {}, ts, id);
   }
 
+  extraChromeArgs(): string[] {
+    return [...super.extraChromeArgs(), "--disable-web-security"];
+  }
+
   handleRequestWillBeSent(
     params: Protocol.Network.RequestWillBeSentEvent,
     page: Page,
@@ -621,6 +625,10 @@ export class ReplayCrawler extends Crawler {
       return result;
     }, replayUrl);
 
+    if (!binaryString) {
+      logger.warn("Couldn't fetch original data", { type, url, ts }, "replay");
+    }
+
     return Buffer.from(binaryString as string, "binary");
   }
 
@@ -643,6 +651,10 @@ export class ReplayCrawler extends Crawler {
       }
       return await response.text();
     }, replayUrl);
+
+    if (!text) {
+      logger.warn("Couldn't fetch original data", { type, url, ts }, "replay");
+    }
 
     return text;
   }
