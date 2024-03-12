@@ -33,6 +33,7 @@ const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
 type ReplayPage = {
   url: string;
   ts: number;
+  timestamp?: number;
   id: string;
 };
 
@@ -159,9 +160,15 @@ export class ReplayCrawler extends Crawler {
       const resp = await fetch(url);
       const json = await resp.json();
 
-      for (const entry of json.resources) {
-        if (entry.path) {
-          await this.loadPages(entry.path);
+      // if json contains pages, just load them directly
+      if (json.pages) {
+        await this.loadPagesDirect(json.pages);
+      } else {
+        // otherwise, parse pages from WACZ files
+        for (const entry of json.resources) {
+          if (entry.path) {
+            await this.loadPages(entry.path);
+          }
         }
       }
     } else {
@@ -195,6 +202,21 @@ export class ReplayCrawler extends Crawler {
           break;
         }
       }
+    }
+  }
+
+  async loadPagesDirect(pages: ReplayPage[]) {
+    let depth = 0;
+    for (const entry of pages) {
+      const { url, ts, timestamp, id } = entry;
+      console.log("PAGE", url, ts || timestamp, id);
+      if (!url) {
+        continue;
+      }
+      if (this.limitHit) {
+        break;
+      }
+      await this.queueUrl(0, url, depth++, 0, {}, ts || timestamp, id);
     }
   }
 
