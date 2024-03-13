@@ -33,7 +33,6 @@ const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
 type ReplayPage = {
   url: string;
   ts: number;
-  timestamp?: number;
   id: string;
 };
 
@@ -208,15 +207,14 @@ export class ReplayCrawler extends Crawler {
   async loadPagesDirect(pages: ReplayPage[]) {
     let depth = 0;
     for (const entry of pages) {
-      const { url, ts, timestamp, id } = entry;
-      console.log("PAGE", url, ts || timestamp, id);
+      const { url, ts, id } = entry;
       if (!url) {
         continue;
       }
       if (this.limitHit) {
         break;
       }
-      await this.queueUrl(0, url, depth++, 0, {}, ts || timestamp, id);
+      await this.queueUrl(0, url, depth++, 0, {}, ts, id);
     }
   }
 
