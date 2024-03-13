@@ -8,10 +8,10 @@
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "tsc": "tsc",
-    "format": "prettier . --check",
-    "format:fix": "prettier . --write",
-    "lint": "eslint .",
-    "lint:fix": "yarn format:fix && eslint . --fix",
+    "format": "prettier src/ --check",
+    "format:fix": "prettier src/ --write",
+    "lint": "eslint src/",
+    "lint:fix": "yarn format:fix && eslint src/ --fix",
     "test": "yarn node --experimental-vm-modules $(yarn bin jest --bail 1)",
     "prepare": "husky install"
   },
