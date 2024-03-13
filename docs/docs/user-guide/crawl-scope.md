@@ -10,19 +10,19 @@ The scope controls which linked pages are included and which pages are excluded 
 
 To make this configuration as simple as possible, there are several predefined scope types. The available types are:
 
-- `page` - crawl only this page and no additional links.
+- `page` — crawl only this page and no additional links.
 
-- `page-spa` - crawl only this page, but load any links that include different hashtags. Useful for single-page apps that may load different content based on hashtag.
+- `page-spa` — crawl only this page, but load any links that include different hashtags. Useful for single-page apps that may load different content based on hashtag.
 
-- `prefix` - crawl any pages in the same directory, eg. starting from `https://example.com/path/page.html`, crawl anything under `https://example.com/path/` (default)
+- `prefix` — crawl any pages in the same directory, eg. starting from `https://example.com/path/page.html`, crawl anything under `https://example.com/path/` (default)
 
-- `host` - crawl pages that share the same host.
+- `host` — crawl pages that share the same host.
 
-- `domain` - crawl pages that share the same domain and subdomains, eg. given `https://example.com/` will also crawl `https://anysubdomain.example.com/`
+- `domain` — crawl pages that share the same domain and subdomains, eg. given `https://example.com/` will also crawl `https://anysubdomain.example.com/`
 
-- `any` - crawl any and all pages linked from this page..
+- `any` — crawl any and all pages linked from this page..
 
-- `custom` - crawl based on the `--include` regular expression rules.
+- `custom` — crawl based on the `--include` regular expression rules.
 
 The scope settings for multi-page crawls (page-spa, prefix, host, domain) also include http/https versions, eg. given a prefix of `http://example.com/path/`,
 `https://example.com/path/` is also included.
