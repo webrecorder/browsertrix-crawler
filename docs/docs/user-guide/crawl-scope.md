@@ -24,8 +24,7 @@ To make this configuration as simple as possible, there are several predefined s
 
 - `custom` — crawl based on the `--include` regular expression rules.
 
-The scope settings for multi-page crawls (page-spa, prefix, host, domain) also include http/https versions, eg. given a prefix of `http://example.com/path/`,
-`https://example.com/path/` is also included.
+The scope settings for multi-page crawls (page-spa, prefix, host, domain) also include http/https versions, eg. given a prefix of `http://example.com/path/`, `https://example.com/path/` is also included.
 
 ## Custom Scope Inclusion Rules
 
@@ -45,8 +44,7 @@ Occasionally, it may be useful to augment the scope by allowing extra links N 'h
 
 For example, this is most useful when crawling with a `host` or `prefix` scope, but also wanting to include 'one extra hop' - any link to external pages beyond the current host, but not following those links. This is now possible with the `extraHops` setting, which defaults to 0, but can be set to a higher value N (usually 1) to go beyond the current scope.
 
-The `--extraHops` setting can be set globally or per seed to allow expanding the current inclusion scope N 'hops' beyond the configured scope. Note that this mechanism only expands the inclusion scope, and any exclusion rules are still applied. If a URL is to be excluded via the exclusion rules,
-that will take precedence over the `--extraHops`.
+The `--extraHops` setting can be set globally or per seed to allow expanding the current inclusion scope N 'hops' beyond the configured scope. Note that this mechanism only expands the inclusion scope, and any exclusion rules are still applied. If a URL is to be excluded via the exclusion rules, that will take precedence over the `--extraHops`.
 
 ## Scope Rule Examples
 
@@ -62,8 +60,7 @@ seeds:
 
 ```
 
-In the following example, the scope include regexes will crawl all page URLs that match `example.com/(crawl-this|crawl-that)`,
-but skip URLs that end with 'skip-me'. For example, `https://example.com/crawl-this/page.html` would be crawled, but `https://example.com/crawl-this/pages/skip` would not be.
+In the following example, the scope include regexes will crawl all page URLs that match `example.com/(crawl-this|crawl-that)`, but skip URLs that end with 'skip-me'. For example, `https://example.com/crawl-this/page.html` would be crawled, but `https://example.com/crawl-this/pages/skip` would not be.
 
 ```yaml
 seeds:
@@ -124,4 +121,4 @@ If it seems confusing which rules should be used, here is a quick way to determi
 
 The blockRules add a filter to each URL loaded on a page and incur an extra overhead. They should only be used in advanced use cases where part of a page needs to be blocked.
 
-These rules can not be used to prevent entire pages for loading -- use the scope exclusion rules for that (a warning will be printed if a page resource block rule matches a top-level page).
+These rules can not be used to prevent entire pages for loading — use the scope exclusion rules for that (a warning will be printed if a page resource block rule matches a top-level page).
