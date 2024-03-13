@@ -32,7 +32,7 @@ This means Browsertrix Crawler can be built natively on Apple Silicon systems us
 
 ## Modifying Browser Image
 
-It is also possible to build Browsertrix Crawler with a different browser image. Currently, browser images using Brave Browser and Chrome/Chromium (depending on host system chip architecture are supported via [browsertrix-browser-base](https://github.com/webrecorder/browsertrix-browser-base), however, only Brave Browser is receiving regular version updates.
+It is also possible to build Browsertrix Crawler with a different browser image. Currently, browser images using Brave Browser and Chrome/Chromium (depending on host system chip architecture) are supported via [browsertrix-browser-base](https://github.com/webrecorder/browsertrix-browser-base), however, only Brave Browser is receiving regular version updates.
 
 The browser base image used is specified and can be changed at the top of the Dockerfile in the Browsertrix Crawler repo.
 
