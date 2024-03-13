@@ -68,9 +68,9 @@ Then, you can open `http://localhost:9037/` and watch the crawl.
 
 Browsertrix Crawler supports text extraction via the `--text` flag, which accepts one or more of the following extraction options:
 
-- `--text to-pages` - Extract initial text and add it to the text field in pages.jsonl
-- `--text to-warc` - Extract initial page text and add it to a `urn:text:<url>` WARC resource record
-- `--text final-to-warc` - Extract the final page text after all behaviors have run and add it to a `urn:textFinal:<url>` WARC resource record
+- `--text to-pages` — Extract initial text and add it to the text field in pages.jsonl
+- `--text to-warc` — Extract initial page text and add it to a `urn:text:<url>` WARC resource record
+- `--text final-to-warc` — Extract the final page text after all behaviors have run and add it to a `urn:textFinal:<url>` WARC resource record
 
 The options can be separate or combined into a comma separate list, eg. `--text to-warc,final-to-warc` or `--text to-warc --text final-to-warc`
 are equivalent. For backwards compatibility, `--text` alone is equivalent to `--text to-pages`.
@@ -85,13 +85,13 @@ This feature can currently be enabled by setting environment variables (for secu
 
 Environment variables for S3-uploads include:
 
-- `STORE_ACCESS_KEY` / `STORE_SECRET_KEY` - S3 credentials
-- `STORE_ENDPOINT_URL` - S3 endpoint URL
-- `STORE_PATH` - optional path appended to endpoint, if provided
-- `STORE_FILENAME` - filename or template for filename to put on S3
-- `STORE_USER` - optional username to pass back as part of the webhook callback
-- `CRAWL_ID` - unique crawl id (defaults to container hostname)
-- `WEBHOOK_URL` - the URL of the webhook (can be http://, https:// or redis://)
+- `STORE_ACCESS_KEY` / `STORE_SECRET_KEY` — S3 credentials
+- `STORE_ENDPOINT_URL` — S3 endpoint URL
+- `STORE_PATH` — optional path appended to endpoint, if provided
+- `STORE_FILENAME` — filename or template for filename to put on S3
+- `STORE_USER` — optional username to pass back as part of the webhook callback
+- `CRAWL_ID` — unique crawl id (defaults to container hostname)
+- `WEBHOOK_URL` — the URL of the webhook (can be http://, https://, or redis://)
 
 ### Webhook Notification
 
@@ -99,12 +99,12 @@ The webhook URL can be an HTTP URL which receives a JSON POST request OR a Redis
 
 Webhook notification JSON includes:
 
-- `id` - crawl id (value of `CRAWL_ID`)
-- `userId` - user id (value of `STORE_USER`)
-- `filename` - bucket path + filename of the file
-- `size` - size of WACZ file
-- `hash` - SHA-256 of WACZ file
-- `completed` - boolean of whether crawl fully completed or partially (due to interrupt signal or other error).
+- `id` — crawl id (value of `CRAWL_ID`)
+- `userId` — user id (value of `STORE_USER`)
+- `filename` — bucket path + filename of the file
+- `size` — size of WACZ file
+- `hash` — SHA-256 of WACZ file
+- `completed` — boolean of whether crawl fully completed or partially (due to interrupt signal or other error).
 
 ## Saving Crawl State: Interrupting and Restarting the Crawl
 
