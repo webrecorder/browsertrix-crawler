@@ -45,6 +45,8 @@ theme:
 
 nav:
   - index.md
+  - Develop:
+    - develop/index.md
   - User Guide:
     - user-guide/index.md
     - user-guide/common-options.md
@@ -53,9 +55,6 @@ nav:
     - user-guide/browser-profiles.md
     - user-guide/behaviors.md
     - user-guide/cli-options.md
-    
-  - Develop:
-    - develop/index.md
 
 markdown_extensions:
   - toc:
