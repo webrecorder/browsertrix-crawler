@@ -1,0 +1,241 @@
+# All Command-Line Options
+
+The Browsertrix Crawler Docker image currently accepts the following parameters:
+
+```
+Options:
+      --help                                Show help                  [boolean]
+      --version                             Show version number        [boolean]
+      --seeds, --url                        The URL to start crawling from
+                                                           [array] [default: []]
+      --seedFile, --urlFile                 If set, read a list of seed urls, on
+                                            e per line, from the specified
+                                                                        [string]
+  -w, --workers                             The number of workers to run in para
+                                            llel           [number] [default: 1]
+      --crawlId, --id                       A user provided ID for this crawl or
+                                             crawl configuration (can also be se
+                                            t via CRAWL_ID env var, defaults to
+                                            hostname)                   [string]
+      --waitUntil                           Puppeteer page.goto() condition to w
+                                            ait for before continuing, can be mu
+                                            ltiple separated by ','
+   [array] [choices: "load", "domcontentloaded", "networkidle0", "networkidle2"]
+                                              [default: ["load","networkidle2"]]
+      --depth                               The depth of the crawl for all seeds
+                                                          [number] [default: -1]
+      --extraHops                           Number of extra 'hops' to follow, be
+                                            yond the current scope
+                                                           [number] [default: 0]
+      --pageLimit, --limit                  Limit crawl to this number of pages
+                                                           [number] [default: 0]
+      --maxPageLimit                        Maximum pages to crawl, overriding
+                                            pageLimit if both are set
+                                                           [number] [default: 0]
+      --pageLoadTimeout, --timeout          Timeout for each page to load (in se
+                                            conds)        [number] [default: 90]
+      --scopeType                           A predefined scope of the crawl. For
+                                             more customization, use 'custom' an
+                                            d set scopeIncludeRx regexes
+  [string] [choices: "page", "page-spa", "prefix", "host", "domain", "any", "cus
+                                                                           tom"]
+      --scopeIncludeRx, --include           Regex of page URLs that should be in
+                                            cluded in the crawl (defaults to the
+                                             immediate directory of URL)
+      --scopeExcludeRx, --exclude           Regex of page URLs that should be ex
+                                            cluded from the crawl.
+      --allowHashUrls                       Allow Hashtag URLs, useful for singl
+                                            e-page-application crawling or when
+                                            different hashtags load dynamic cont
+                                            ent
+      --blockRules                          Additional rules for blocking certai
+                                            n URLs from being loaded, by URL reg
+                                            ex and optionally via text match in
+                                            an iframe      [array] [default: []]
+      --blockMessage                        If specified, when a URL is blocked,
+                                             a record with this error message is
+                                             added instead              [string]
+      --blockAds, --blockads                If set, block advertisements from be
+                                            ing loaded (based on Stephen Black's
+                                             blocklist)
+                                                      [boolean] [default: false]
+      --adBlockMessage                      If specified, when an ad is blocked,
+                                             a record with this error message is
+                                             added instead              [string]
+  -c, --collection                          Collection name to crawl to (replay
+                                            will be accessible under this name i
+                                            n pywb preview)
+                                                 [string] [default: "crawl-@ts"]
+      --headless                            Run in headless mode, otherwise star
+                                            t xvfb    [boolean] [default: false]
+      --driver                              JS driver for the crawler
+                                        [string] [default: "./defaultDriver.js"]
+      --generateCDX, --generatecdx, --gene  If set, generate index (CDXJ) for us
+      rateCdx                               e with pywb after crawl is done
+                                                      [boolean] [default: false]
+      --combineWARC, --combinewarc, --comb  If set, combine the warcs
+      ineWarc                                         [boolean] [default: false]
+      --rolloverSize                        If set, declare the rollover size
+                                                  [number] [default: 1000000000]
+      --generateWACZ, --generatewacz, --ge  If set, generate wacz
+      nerateWacz                                      [boolean] [default: false]
+      --logging                             Logging options for crawler, can inc
+                                            lude: stats (enabled by default), js
+                                            errors, debug
+                                                    [array] [default: ["stats"]]
+      --logLevel                            Comma-separated list of log levels t
+                                            o include in logs
+                                                           [array] [default: []]
+      --context, --logContext               Comma-separated list of contexts to
+                                            include in logs
+  [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
+  , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
+  ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
+  orScript", "jsError", "fetch", "pageStatus", "memoryStatus", "crawlStatus", "l
+                                                 inks", "sitemap"] [default: []]
+      --logExcludeContext                   Comma-separated list of contexts to
+                                            NOT include in logs
+  [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
+  , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
+  ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
+  orScript", "jsError", "fetch", "pageStatus", "memoryStatus", "crawlStatus", "l
+         inks", "sitemap"] [default: ["recorderNetwork","jsError","screencast"]]
+      --text                                Extract initial (default) or final t
+                                            ext to pages.jsonl or WARC resource
+                                            record(s)
+                       [array] [choices: "to-pages", "to-warc", "final-to-warc"]
+      --cwd                                 Crawl working directory for captures
+                                             (pywb root). If not set, defaults t
+                                            o process.cwd()
+                                                   [string] [default: "/crawls"]
+      --mobileDevice                        Emulate mobile device by name from:
+                                            https://github.com/puppeteer/puppete
+                                            er/blob/main/src/common/DeviceDescri
+                                            ptors.ts                    [string]
+      --userAgent                           Override user-agent with specified s
+                                            tring                       [string]
+      --userAgentSuffix                     Append suffix to existing browser us
+                                            er-agent (ex: +MyCrawler, info@examp
+                                            le.com)                     [string]
+      --useSitemap, --sitemap               If enabled, check for sitemaps at /s
+                                            itemap.xml, or custom URL if URL is
+                                            specified
+      --sitemapFromDate, --sitemapFrom      If set, filter URLs from sitemaps to
+                                             those greater than or equal to prov
+                                            ided ISO Date string (YYYY-MM-DD or
+                                            YYYY-MM-DDTHH:MM:SS or partial date)
+      --statsFilename                       If set, output stats as JSON to this
+                                             file. (Relative filename resolves t
+                                            o crawl working directory)
+      --behaviors                           Which background behaviors to enable
+                                             on each page
+  [array] [choices: "autoplay", "autofetch", "autoscroll", "siteSpecific"] [defa
+                      ult: ["autoplay","autofetch","autoscroll","siteSpecific"]]
+      --behaviorTimeout                     If >0, timeout (in seconds) for in-p
+                                            age behavior will run on each page.
+                                            If 0, a behavior can run until finis
+                                            h.            [number] [default: 90]
+      --pageExtraDelay, --delay             If >0, amount of time to sleep (in s
+                                            econds) after behaviors before movin
+                                            g on to next page
+                                                           [number] [default: 0]
+      --dedupPolicy                         Deduplication policy
+                 [string] [choices: "skip", "revisit", "keep"] [default: "skip"]
+      --profile                             Path to tar.gz file which will be ex
+                                            tracted and used as the browser prof
+                                            ile                         [string]
+      --screenshot                          Screenshot options for crawler, can
+                                            include: view, thumbnail, fullPage
+                [array] [choices: "view", "thumbnail", "fullPage"] [default: []]
+      --screencastPort                      If set to a non-zero value, starts a
+                                            n HTTP server with screencast access
+                                            ible on this port
+                                                           [number] [default: 0]
+      --screencastRedis                     If set, will use the state store red
+                                            is pubsub for screencasting. Require
+                                            s --redisStoreUrl to be set
+                                                      [boolean] [default: false]
+      --warcInfo, --warcinfo                Optional fields added to the warcinf
+                                            o record in combined WARCs
+      --redisStoreUrl                       If set, url for remote redis server
+                                            to store state. Otherwise, using in-
+                                            memory store
+                                  [string] [default: "redis://localhost:6379/0"]
+      --saveState                           If the crawl state should be seriali
+                                            zed to the crawls/ directory. Defaul
+                                            ts to 'partial', only saved when cra
+                                            wl is interrupted
+           [string] [choices: "never", "partial", "always"] [default: "partial"]
+      --saveStateInterval                   If save state is set to 'always', al
+                                            so save state during the crawl at th
+                                            is interval (in seconds)
+                                                         [number] [default: 300]
+      --saveStateHistory                    Number of save states to keep during
+                                             the duration of a crawl
+                                                           [number] [default: 5]
+      --sizeLimit                           If set, save state and exit if size
+                                            limit exceeds this value
+                                                           [number] [default: 0]
+      --diskUtilization                     If set, save state and exit if disk
+                                            utilization exceeds this percentage
+                                            value         [number] [default: 90]
+      --timeLimit                           If set, save state and exit after ti
+                                            me limit, in seconds
+                                                           [number] [default: 0]
+      --healthCheckPort                     port to run healthcheck on
+                                                           [number] [default: 0]
+      --overwrite                           overwrite current crawl data: if set
+                                            , existing collection directory will
+                                             be deleted before crawl is started
+                                                      [boolean] [default: false]
+      --waitOnDone                          if set, wait for interrupt signal wh
+                                            en finished instead of exiting
+                                                      [boolean] [default: false]
+      --restartsOnError                     if set, assume will be restarted if
+                                            interrupted, don't run post-crawl pr
+                                            ocesses on interrupt
+                                                      [boolean] [default: false]
+      --netIdleWait                         if set, wait for network idle after
+                                            page load and after behaviors are do
+                                            ne (in seconds). if -1 (default), de
+                                            termine based on scope
+                                                          [number] [default: -1]
+      --lang                                if set, sets the language used by th
+                                            e browser, should be ISO 639 languag
+                                            e[-country] code            [string]
+      --title                               If set, write supplied title into WA
+                                            CZ datapackage.json metadata[string]
+      --description, --desc                 If set, write supplied description i
+                                            nto WACZ datapackage.json metadata
+                                                                        [string]
+      --originOverride                      if set, will redirect requests from
+                                            each origin in key to origin in the
+                                            value, eg. --originOverride https://
+                                            host:port=http://alt-host:alt-port
+                                                           [array] [default: []]
+      --logErrorsToRedis                    If set, write error messages to redi
+                                            s         [boolean] [default: false]
+      --writePagesToRedis                   If set, write page objects to redis
+                                                      [boolean] [default: false]
+      --failOnFailedSeed                    If set, crawler will fail with exit
+                                            code 1 if any seed fails
+                                                      [boolean] [default: false]
+      --failOnFailedLimit                   If set, save state and exit if numbe
+                                            r of failed pages exceeds this value
+                                                           [number] [default: 0]
+      --failOnInvalidStatus                 If set, will treat pages with non-20
+                                            0 response as failures. When combine
+                                            d with --failOnFailedLimit or --fail
+                                            OnFailedSeedmay result in crawl fail
+                                            ing due to non-200 responses
+                                                      [boolean] [default: false]
+      --customBehaviors                     injects a custom behavior file or se
+                                            t of behavior files in a directory
+                                                                        [string]
+      --debugAccessRedis                    if set, runs internal redis without
+                                            protected mode to allow external acc
+                                            ess (for debugging)        [boolean]
+      --warcPrefix                          prefix for WARC files generated, inc
+                                            luding WARCs added to WACZ  [string]
+      --config                              Path to YAML config file
+```

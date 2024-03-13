@@ -46,6 +46,17 @@ theme:
 
 nav:
   - index.md
+  - User Guide:
+    - user-guide/index.md
+    - user-guide/common-options.md
+    - user-guide/crawl-scope.md
+    - user-guide/yaml-config.md
+    - user-guide/browser-profiles.md
+    - user-guide/behaviors.md
+    - user-guide/cli-options.md
+    
+  - Develop:
+    - develop/index.md
 
 markdown_extensions:
   - toc:
