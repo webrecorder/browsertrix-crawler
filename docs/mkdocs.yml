@@ -4,8 +4,6 @@ repo_name: Browsertrix Crawler
 edit_uri: edit/main/docs/
 extra_css:
   - stylesheets/extra.css
-extra_javascript:
-  - js/insertversion.js
 theme:
   name: material
   custom_dir: docs/overrides
@@ -23,7 +21,8 @@ theme:
     - search.suggest
   palette:
     scheme: webrecorder
-  # logo: assets/brand/btrix-logo.svg
+  logo: assets/brand/browsertrix-crawler-white.svg
+  favicon: assets/brand/browsertrix-crawler-color.svg
 
   icon:
     admonition:
