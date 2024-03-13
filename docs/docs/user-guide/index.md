@@ -21,7 +21,7 @@ the following commands. Replace `[URL]` with the website you'd like to crawl.
 
 Here's how you can use some of the more common command-line options to configure the crawl:
 
-- To include automated text extraction for full text search to pages.jsonl, add the `--text` flag. To write extracted text to WARCs instead of or in addition to pages.jsonl, see [Text Extraction](TODO - LINK NEEDED).
+- To include automated text extraction for full text search to pages.jsonl, add the `--text` flag. To write extracted text to WARCs instead of or in addition to pages.jsonl, see [Text Extraction](common-options.md#text-extraction).
 
 - To limit the crawl to a maximum number of pages, add `--limit P` where P is the number of pages that will be crawled.
 
