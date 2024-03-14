@@ -329,6 +329,8 @@ export class Crawler {
       os.hostname(),
     );
 
+    await this.initExtraSeeds();
+
     // clear any pending URLs from this instance
     await this.crawlState.clearOwnPendingLocks();
 
@@ -346,6 +348,15 @@ export class Crawler {
     }
 
     return this.crawlState;
+  }
+
+  async initExtraSeeds() {
+    const extraSeeds = await this.crawlState.getExtraSeeds();
+
+    for (const { seedId, url } of extraSeeds) {
+      const seed = this.params.scopedSeeds[seedId];
+      this.params.scopedSeeds.push(seed.newScopedSeed(url));
+    }
   }
 
   initScreenCaster() {
@@ -1580,6 +1591,10 @@ self.__bx_behaviors.selectMainBehavior();
         const seed = this.params.scopedSeeds[data.seedId];
         this.params.scopedSeeds.push(seed.newScopedSeed(respUrl));
         data.seedId = this.params.scopedSeeds.length - 1;
+        await this.crawlState.addExtraSeed({
+          seedId: data.seedId,
+          url: respUrl,
+        });
         logger.info("Seed page redirected, adding redirected seed", {
           origUrl: url,
           newUrl: respUrl,
