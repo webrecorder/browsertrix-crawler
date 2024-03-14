@@ -52,13 +52,15 @@ The automated profile creation system will log in to a single website with suppl
 
 The script profile creation system also take a screenshot so you can check if the login succeeded.
 
-For example, to launch a browser, and login to the digipres.club Mastodon instance, run:
+!!! example "Example: Launch a browser and login to the digipres.club Mastodon instance"
 
-```bash
-docker run -v $PWD/crawls/profiles:/crawls/profiles -it webrecorder/browsertrix-crawler create-login-profile --url "https://digipres.club/"
-```
+	To automatically created a logged-in browser profile, run:
 
-The script will then prompt you for login credentials, attempt to login and create a tar.gz file in `./crawls/profiles/profile.tar.gz`.
+	```bash
+	docker run -v $PWD/crawls/profiles:/crawls/profiles -it webrecorder/browsertrix-crawler create-login-profile --url "https://digipres.club/"
+	```
+
+	The script will then prompt you for login credentials, attempt to login, and create a tar.gz file in `./crawls/profiles/profile.tar.gz`.
 
 - The `--url` parameter should specify the URL of a login page.
 
