@@ -1,8 +1,8 @@
 # YAML Crawl Config
 
-Browsertix Crawler supports the use of a yaml file to set parameters for a crawl. This can be used by passing a valid yaml file to the `--config` option.
+Browsertix Crawler supports the use of a YAML file to set parameters for a crawl. This can be used by passing a valid yaml file to the `--config` option.
 
-The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the yaml file, the value from the command-line will be used. For example, the following should start a crawl with config in `crawl-config.yaml`.
+The YAML file can contain the same parameters as the command-line arguments. If a parameter is set on the command-line and in the YAML file, the value from the command-line will be used. For example, the following should start a crawl with config in `crawl-config.yaml`.
 
 ```sh
 docker run -v $PWD/crawl-config.yaml:/app/crawl-config.yaml -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl --config /app/crawl-config.yaml
@@ -30,7 +30,7 @@ The list of seeds can be loaded via an external file by specifying the filename 
 
 The URL seed file should be a text file formatted so that each line of the file is a url string. An example file is available in the Github repository's fixture folder as [urlSeedFile.txt](https://github.com/webrecorder/browsertrix-crawler/blob/main/tests/fixtures/urlSeedFile.txt).
 
-The seed file must be passed as a volume to the docker container. To do that, you can format your docker command similar to the following:
+The seed file must be passed as a volume to the docker container. Your Docker command should be formatted similar to the following:
 
 ```sh
 docker run -v $PWD/seedFile.txt:/app/seedFile.txt -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl --seedFile /app/seedFile.txt
@@ -38,7 +38,7 @@ docker run -v $PWD/seedFile.txt:/app/seedFile.txt -v $PWD/crawls:/crawls/ webrec
 
 ## Per-Seed Settings
 
-Certain settings such scope type, scope includes and excludes, and depth can also be configured per seed directly in the YAML file, for example:
+Certain settings such as scope type, scope includes and excludes, and depth can also be configured per-seed directly in the YAML file, for example:
 
 ```yaml
 seeds:

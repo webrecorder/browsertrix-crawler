@@ -4,7 +4,7 @@
 
 The crawl scope can be configured globally for all seeds, or customized per seed, by specifying the `--scopeType` command-line option or setting the `type` property for each seed.
 
-There is also a `depth` setting also limits how many pages will be crawled for that seed, while the `limit` option sets the total number of pages crawled from any seed.
+The `depth` option also limits how many pages will be crawled for that seed, while the `limit` option sets the total number of pages crawled from any seed.
 
 The scope controls which linked pages are included and which pages are excluded from the crawl.
 
@@ -28,13 +28,13 @@ The scope settings for multi-page crawls (page-spa, prefix, host, domain) also i
 
 ## Custom Scope Inclusion Rules
 
-Instead of setting a scope type, it is possible to instead configure custom scope regex by setting `--include` config to one or more regular expressions. If using the YAML config, the `include` field can contain a list of regexes.
+Instead of setting a scope type, it is possible to configure a custom scope regex by setting `--include` config to one or more regular expressions. If using the YAML config, the `include` field can contain a list of regexes.
 
 Extracted links that match the regular expression will be considered 'in scope' and included.
 
 ## Custom Scope Exclusion Rules
 
-In addition to the inclusion rules, Browsertrix Crawler supports a separate list of exclusion regexes, that if match, override an exclude a URL from the crawl.
+In addition to the inclusion rules, Browsertrix Crawler supports a separate list of exclusion regexes, that if matched, override and exclude a URL from the crawl.
 
 The exclusion regexes are often used with a custom scope, but could be used with a predefined scopeType as well.
 
@@ -42,7 +42,7 @@ The exclusion regexes are often used with a custom scope, but could be used with
 
 Occasionally, it may be useful to augment the scope by allowing extra links N 'hops' beyond the current scope.
 
-For example, this is most useful when crawling with a `host` or `prefix` scope, but also wanting to include 'one extra hop' - any link to external pages beyond the current host, but not following those links. This is now possible with the `extraHops` setting, which defaults to 0, but can be set to a higher value N (usually 1) to go beyond the current scope.
+For example, this is most useful when crawling with a `host` or `prefix` scope, but also wanting to include 'one extra hop' — any link to external pages beyond the current host, but not following those links. This is possible with the `extraHops` setting, which defaults to 0, but can be set to a higher value N (usually 1) to go beyond the current scope.
 
 The `--extraHops` setting can be set globally or per seed to allow expanding the current inclusion scope N 'hops' beyond the configured scope. Note that this mechanism only expands the inclusion scope, and any exclusion rules are still applied. If a URL is to be excluded via the exclusion rules, that will take precedence over the `--extraHops`.
 

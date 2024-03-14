@@ -4,7 +4,7 @@
 
 One of the key nuances of browser-based crawling is determining when a page is finished loading. This can be configured with the `--waitUntil` flag.
 
-The default is `load,networkidle2`, which waits until page load and <=2 requests remain, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example). `--waitUntil networkidle0` may make sense for sites where absolutely all requests must be waited until before proceeding.
+The default is `load,networkidle2`, which waits until page load and ≤2 requests remain, but for static sites, `--wait-until domcontentloaded` may be used to speed up the crawl (to avoid waiting for ads to load for example). `--waitUntil networkidle0` may make sense for sites where absolutely all requests must be waited until before proceeding.
 
 See [page.goto waitUntil options](https://pptr.dev/api/puppeteer.page.goto#remarks) for more info on the options that can be used with this flag from the Puppeteer docs.
 
@@ -47,8 +47,7 @@ Three screenshot options are available:
 - `--screenshot fullPage`: Takes a png screenshot of the full page
 - `--screenshot thumbnail`: Takes a jpeg thumbnail of the initially visible viewport (1920x1080)
 
-These can be combined using a comma-separated list passed to the `--screenshot` option, e.g.: `--screenshot thumbnail,view,fullPage` or passed in
-separately `--screenshot thumbnail --screenshot view --screenshot fullPage`.
+These can be combined using a comma-separated list passed via the `--screenshot` option, e.g.: `--screenshot thumbnail,view,fullPage` or passed in separately `--screenshot thumbnail --screenshot view --screenshot fullPage`.
 
 Screenshots are written into a `screenshots.warc.gz` WARC file in the `archives/` directory. If the `--generateWACZ` command line option is used, the screenshots WARC is written into the `archive` directory of the WACZ file and indexed alongside the other WARCs.
 
@@ -62,7 +61,7 @@ To enable, add `--screencastPort` command-line option and also map the port on t
 docker run -p 9037:9037 -v $PWD/crawls:/crawls/ webrecorder/browsertrix-crawler crawl  --url https://www.example.com --screencastPort 9037
 ```
 
-Then, you can open `http://localhost:9037/` and watch the crawl.
+Then, open `http://localhost:9037/` and watch the crawl!
 
 ## Text Extraction
 
@@ -75,11 +74,11 @@ Browsertrix Crawler supports text extraction via the `--text` flag, which accept
 The options can be separate or combined into a comma separate list, eg. `--text to-warc,final-to-warc` or `--text to-warc --text final-to-warc`
 are equivalent. For backwards compatibility, `--text` alone is equivalent to `--text to-pages`.
 
-## Uploading crawl output to S3-Compatible Storage
+## Uploading Crawl Outputs to S3-Compatible Storage
 
-Browsertrix Crawler also includes support for uploading WACZ files to S3-compatible storage, and notifying a webhook when the upload succeeds.
+Browsertrix Crawler includes support for uploading WACZ files to S3-compatible storage, and notifying a webhook when the upload succeeds.
 
-(At this time, S3 upload is supported only when WACZ output is enabled, but WARC uploads may be added in the future).
+S3 upload is only supported when WACZ output is enabled and will not work for WARC output.
 
 This feature can currently be enabled by setting environment variables (for security reasons, these settings are not passed in as part of the command-line or YAML config at this time).
 
