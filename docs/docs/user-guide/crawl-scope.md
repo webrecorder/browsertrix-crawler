@@ -42,7 +42,7 @@ The exclusion regexes are often used with a custom scope, but could be used with
 
 Occasionally, it may be useful to augment the scope by allowing extra links N 'hops' beyond the current scope.
 
-For example, this is most useful when crawling with a `host` or `prefix` scope, but also wanting to include 'one extra hop' — any link to external pages beyond the current host, but not following those links. This is possible with the `extraHops` setting, which defaults to 0, but can be set to a higher value N (usually 1) to go beyond the current scope.
+For example, this is most useful when crawling with a `host` or `prefix` scope, but also wanting to include 'one extra hop' — any link to external pages beyond the current host — but not following any of the links on those pages. This is possible with the `extraHops` setting, which defaults to 0, but can be set to a higher value N (usually 1) to go beyond the current scope.
 
 The `--extraHops` setting can be set globally or per seed to allow expanding the current inclusion scope N 'hops' beyond the configured scope. Note that this mechanism only expands the inclusion scope, and any exclusion rules are still applied. If a URL is to be excluded via the exclusion rules, that will take precedence over the `--extraHops`.
 
@@ -70,7 +70,7 @@ seeds:
       - skip$
 ```
 
-The `include`, `exclude`, `scopeType` and `depth` settings can be configured per seed, or globally, for the entire crawl.
+The `include`, `exclude`, `scopeType`, and `depth` settings can be configured per seed, or globally, for the entire crawl.
 
 The per-seed settings override the per-crawl settings, if any.
 
