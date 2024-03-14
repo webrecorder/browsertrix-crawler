@@ -22,7 +22,7 @@ Then, open a browser pointing to `http://localhost:9223/` and use the embedded b
 
 Click _Create Profile_ at the top when done. The profile will then be created in `./crawls/profiles/profile.tar.gz` containing the settings of this browsing session.
 
-It is also possible to use an existing profile via the `--profile` flag.  This allows previous browsing sessions to be extended as needed.
+It is also possible to use an existing profile via the `--profile` flag. This allows previous browsing sessions to be extended as needed.
 
 ```sh
 docker run -p 6080:6080 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles -it webrecorder/browsertrix-crawler create-login-profile --url "https://example.com/" --filename "/crawls/profiles/newProfile.tar.gz" --profile "/crawls/profiles/oldProfile.tar.gz"
