@@ -67,7 +67,6 @@ The script profile creation system also take a screenshot so you can check if th
 - To specify a custom filename, pass along `--filename` parameter.
 
 - To specify the username and password on the command line (for automated profile creation), pass `--username` and `--password` flags.
-- ```
 
 - To specify headless mode, add the `--headless` flag. Note that for crawls run with `--headless` flag, it is recommended to also create the profile with `--headless` to ensure the profile is compatible.
 
