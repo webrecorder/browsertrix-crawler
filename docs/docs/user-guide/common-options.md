@@ -115,7 +115,7 @@ This crawl state YAML file can then be used as `--config` option to restart the 
 
 By default, the crawl interruption waits for current pages to finish. A subsequent SIGINT will cause the crawl to stop immediately. Any unfinished pages are recorded in the `pending` section of the crawl state (if gracefully finished, the section will be empty).
 
-By default, the crawl state is only written when a crawl is only partially done - when it is interrupted. The `--saveState` cli option can be set to `always` or `never` respectively, to control when the crawl state file should be written.
+By default, the crawl state is only written when a crawl is interrupted before completing. The `--saveState` cli option can be set to `always` or `never` respectively, to control when the crawl state file should be written.
 
 ### Periodic State Saving
 
