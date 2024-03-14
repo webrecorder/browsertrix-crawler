@@ -34,7 +34,7 @@ Browsertrix Crawler supports both headful and headless crawling. We have histori
 
 To use profiles in headless mode, profiles should also be created with `--headless` flag.
 
-When creating browser profile in headless mode, Browsertrix will use the devtools protocol on port 9222 to stream the browser interface (previously, this was also used in headful mode as well).
+When creating browser profile in headless mode, Browsertrix will use the devtools protocol on port 9222 to stream the browser interface.
 
 To create a profile in headless mode, run:
 
