@@ -2,7 +2,7 @@
 
 Browsertrix Crawler is a standalone browser-based high-fidelity crawling system, designed to run a complex, customizable browser-based crawl in a single Docker container. Browsertrix Crawler uses [Puppeteer](https://github.com/puppeteer/puppeteer) to control one or more [Brave Browser](https://brave.com/) browser windows in parallel. Data is captured through the [Chrome Devtools Protocol (CDP)](https://chromedevtools.github.io/devtools-protocol/) in the browser.
 
-For information on how to use and develop Browsertrix Crawler, see the hosted [Browsertrix Crawler documentation](https://crawler-docs.webrecorder.net).
+For information on how to use and develop Browsertrix Crawler, see the hosted [Browsertrix Crawler documentation](https://crawler.docs.browsertrix.com).
 
 For information on how to build the docs locally, see the [docs page](docs/docs/develop/docs.md).
 
