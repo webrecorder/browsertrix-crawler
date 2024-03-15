@@ -23,7 +23,7 @@ jobs:
         run: docker-compose build
 
       - name: generate cli
-        run: docs/gen_cli.sh
+        run: docs/gen-cli.sh
 
       - run: pip install mkdocs-material
       - run: cd docs/ && mkdocs gh-deploy --force
