@@ -37,8 +37,8 @@ export type QueueEntry = {
 
 // ============================================================================
 export type ExtraRedirectSeed = {
-  url: string;
-  seedId: number;
+  newUrl: string;
+  origSeedId: number;
 };
 
 // ============================================================================
@@ -135,12 +135,13 @@ declare module "ioredis" {
 
 // ============================================================================
 type SaveState = {
-  done: number | string[];
-  doneUrls: string[];
+  done?: number | string[];
+  finished: string[];
   queued: string[];
   pending: string[];
   failed: string[];
   errors: string[];
+  extraSeeds: string[];
 };
 
 // ============================================================================
@@ -513,16 +514,17 @@ return 0;
 
   async serialize(): Promise<SaveState> {
     //const queued = await this._iterSortKey(this.qkey);
-    const done = await this.numDone();
+    // const done = await this.numDone();
     const seen = await this._iterSet(this.skey);
     const queued = await this._iterSortedKey(this.qkey, seen);
     const pending = await this.getPendingList();
     const failed = await this._iterListKeys(this.fkey, seen);
     const errors = await this.getErrorList();
+    const extraSeeds = await this._iterListKeys(this.esKey, seen);
 
-    const doneUrls = [...seen.values()];
+    const finished = [...seen.values()];
 
-    return { done, doneUrls, queued, pending, failed, errors };
+    return { extraSeeds, finished, queued, pending, failed, errors };
   }
 
   _getScore(data: QueueEntry) {
@@ -606,8 +608,17 @@ return 0;
 
     let seen: string[] = [];
 
-    if (state.doneUrls) {
-      seen = state.doneUrls;
+    if (state.finished) {
+      seen = state.finished;
+
+      await this.redis.set(this.dkey, state.finished.length);
+    }
+
+    if (state.extraSeeds) {
+      for (const extraSeed of state.extraSeeds) {
+        const { newUrl, origSeedId }: ExtraRedirectSeed = JSON.parse(extraSeed);
+        await this.addExtraSeed(seeds, origSeedId, newUrl);
+      }
     }
 
     for (const json of state.queued) {
@@ -634,19 +645,23 @@ return 0;
       seen.push(data.url);
     }
 
-    if (typeof state.done === "number") {
-      // done key is just an int counter
-      await this.redis.set(this.dkey, state.done);
-    } else if (state.done instanceof Array) {
-      // for backwards compatibility with old save states
-      for (const json of state.done) {
-        const data = JSON.parse(json);
-        if (data.failed) {
-          await this.redis.zadd(this.qkey, this._getScore(data), json);
-        } else {
-          await this.redis.incr(this.dkey);
+    // backwards compatibility: not using done, instead 'finished'
+    // contains list of finished URLs
+    if (state.done) {
+      if (typeof state.done === "number") {
+        // done key is just an int counter
+        await this.redis.set(this.dkey, state.done);
+      } else if (state.done instanceof Array) {
+        // for backwards compatibility with old save states
+        for (const json of state.done) {
+          const data = JSON.parse(json);
+          if (data.failed) {
+            await this.redis.zadd(this.qkey, this._getScore(data), json);
+          } else {
+            await this.redis.incr(this.dkey);
+          }
+          seen.push(data.url);
         }
-        seen.push(data.url);
       }
     }
 
@@ -754,8 +769,20 @@ return 0;
   }
 
   // add extra seeds from redirect
-  async addExtraSeed(seed: ExtraRedirectSeed) {
-    return await this.redis.lpush(this.esKey, JSON.stringify(seed));
+  async addExtraSeed(seeds: ScopedSeed[], origSeedId: number, newUrl: string) {
+    if (!seeds[origSeedId]) {
+      logger.fatal(
+        "State load, original seed missing",
+        { origSeedId },
+        "state",
+      );
+    }
+    seeds.push(seeds[origSeedId].newScopedSeed(newUrl));
+    const newSeedId = seeds.length - 1;
+    const redirectSeed: ExtraRedirectSeed = { origSeedId, newUrl };
+    await this.redis.sadd(this.skey, newUrl);
+    await this.redis.lpush(this.esKey, JSON.stringify(redirectSeed));
+    return newSeedId;
   }
 
   async getExtraSeeds() {

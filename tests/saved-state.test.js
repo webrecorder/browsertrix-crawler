@@ -1,37 +1,40 @@
-import { exec } from "child_process";
+import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import yaml from "js-yaml";
 import Redis from "ioredis";
 
-function waitForProcess() {
-  let callback = null;
-  const p = new Promise((resolve) => {
-    callback = (/*error, stdout, stderr*/) => {
-      //console.log(stdout);
-      resolve(0);
-    };
-  });
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  return { p, callback };
+async function waitContainer(containerId) {
+  execSync(`docker kill -s SIGINT ${containerId}`);
+
+  while (true) {
+    const res = execSync("docker ps -q", { encoding: "utf-8" });
+    if (res.indexOf(containerId) < 0) {
+      return;
+    }
+    await sleep(500);
+  }
 }
 
 var savedStateFile;
 var state;
 var numDone;
+var numQueued;
+var finished;
 var redis;
-var finishProcess;
 
 test("check crawl interrupted + saved state written", async () => {
-  let proc = null;
-
-  const wait = waitForProcess();
+  let containerId = null;
 
   try {
-    proc = exec(
-      "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --limit 20",
-      { shell: "/bin/bash" },
-      wait.callback,
+    containerId = execSync(
+      "docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://iana.org/ --limit 10",
+      { encoding: "utf-8" },
+      //wait.callback,
     );
   } catch (error) {
     console.log(error);
@@ -60,12 +63,10 @@ test("check crawl interrupted + saved state written", async () => {
       // ignore
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await sleep(500);
   }
 
-  proc.kill("SIGINT");
-
-  await wait.p;
+  await waitContainer(containerId);
 
   const savedStates = fs.readdirSync(
     "test-crawls/collections/int-state-test/crawls",
@@ -87,23 +88,27 @@ test("check parsing saved state + page done + queue present", () => {
 
   expect(!!saved.state).toBe(true);
   state = saved.state;
+  numDone = state.finished.length;
+  numQueued = state.queued.length;
 
-  numDone = state.done;
+  expect(numDone > 0).toEqual(true);
+  expect(numQueued > 0).toEqual(true);
+  expect(numDone + numQueued).toEqual(10);
 
-  expect(state.done > 0).toEqual(true);
-  expect(state.queued.length > 0).toEqual(true);
+  finished = state.finished;
 });
 
 test("check crawl restarted with saved state", async () => {
-  let proc = null;
+  let containerId = null;
 
-  const wait = waitForProcess();
+  //const wait = waitForProcess();
 
   try {
-    proc = exec(
-      `docker run -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`,
-      { shell: "/bin/bash" },
-      wait.callback,
+    containerId = execSync(
+      `docker run -d -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`,
+      { encoding: "utf-8" },
+      //{ shell: "/bin/bash" },
+      //wait.callback,
     );
   } catch (error) {
     console.log(error);
@@ -124,17 +129,16 @@ test("check crawl restarted with saved state", async () => {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     expect(await redis.get("test:d")).toBe(numDone + "");
+
+    for (const url of finished) {
+      const res = await redis.sismember("test:s", url);
+      expect(res).toBe(1);
+    }
   } catch (e) {
     console.log(e);
   } finally {
-    proc.kill("SIGINT");
+    await waitContainer(containerId);
   }
 
-  finishProcess = wait.p;
-});
-
-test("interrupt crawl and exit", async () => {
-  const res = await Promise.allSettled([finishProcess, redis.quit()]);
-
-  expect(res[0].value).toBe(0);
+  await redis.disconnect();
 });
