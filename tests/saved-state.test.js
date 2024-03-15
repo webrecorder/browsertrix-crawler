@@ -9,23 +9,34 @@ function sleep(ms) {
 }
 
 async function waitContainer(containerId) {
-  execSync(`docker kill -s SIGINT ${containerId}`);
+  try {
+    execSync(`docker kill -s SIGINT ${containerId}`);
+  } catch (e) {
+    return;
+  }
+
+  // containerId is initially the full id, but docker ps
+  // only prints the short id (first 12 characters)
+  containerId = containerId.slice(0, 12);
 
   while (true) {
-    const res = execSync("docker ps -q", { encoding: "utf-8" });
-    if (res.indexOf(containerId) < 0) {
-      return;
+    try {
+      const res = execSync("docker ps -q", { encoding: "utf-8" });
+      if (res.indexOf(containerId) < 0) {
+        return;
+      }
+    } catch (e) {
+      console.error(e);
     }
     await sleep(500);
   }
 }
 
-var savedStateFile;
-var state;
-var numDone;
-var numQueued;
-var finished;
-var redis;
+let savedStateFile;
+let state;
+let numDone;
+let numQueued;
+let finished;
 
 test("check crawl interrupted + saved state written", async () => {
   let containerId = null;
@@ -106,22 +117,18 @@ test("check parsing saved state + page done + queue present", () => {
 test("check crawl restarted with saved state", async () => {
   let containerId = null;
 
-  //const wait = waitForProcess();
-
   try {
     containerId = execSync(
       `docker run -d -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`,
       { encoding: "utf-8" },
-      //{ shell: "/bin/bash" },
-      //wait.callback,
     );
   } catch (error) {
     console.log(error);
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 2000));
+  await sleep(2000);
 
-  redis = new Redis("redis://127.0.0.1:36379/0", { lazyConnect: true });
+  const redis = new Redis("redis://127.0.0.1:36379/0", { lazyConnect: true });
 
   try {
     await redis.connect({
@@ -131,7 +138,7 @@ test("check crawl restarted with saved state", async () => {
       },
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await sleep(2000);
 
     expect(await redis.get("test:d")).toBe(numDone + "");
 
@@ -143,7 +150,11 @@ test("check crawl restarted with saved state", async () => {
     console.log(e);
   } finally {
     await waitContainer(containerId);
-  }
 
-  await redis.disconnect();
+    try {
+      await redis.disconnect();
+    } catch (e) {
+      // ignore
+    }
+  }
 });
