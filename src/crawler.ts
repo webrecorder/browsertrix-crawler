@@ -329,7 +329,17 @@ export class Crawler {
       os.hostname(),
     );
 
-    await this.initExtraSeeds();
+    // load full state from config
+    if (this.params.state) {
+      await this.crawlState.load(
+        this.params.state,
+        this.params.scopedSeeds,
+        true,
+      );
+      // otherwise, just load extra seeds
+    } else {
+      await this.loadExtraSeeds();
+    }
 
     // clear any pending URLs from this instance
     await this.crawlState.clearOwnPendingLocks();
@@ -350,7 +360,7 @@ export class Crawler {
     return this.crawlState;
   }
 
-  async initExtraSeeds() {
+  async loadExtraSeeds() {
     const extraSeeds = await this.crawlState.getExtraSeeds();
 
     for (const { origSeedId, newUrl } of extraSeeds) {
@@ -1200,14 +1210,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     await this.crawlState.setStatus("running");
-
-    if (this.params.state) {
-      await this.crawlState.load(
-        this.params.state,
-        this.params.scopedSeeds,
-        true,
-      );
-    }
 
     await this.initPages();
 
