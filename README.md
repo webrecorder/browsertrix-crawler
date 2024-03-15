@@ -4,7 +4,7 @@ Browsertrix Crawler is a standalone browser-based high-fidelity crawling system,
 
 For information on how to use and develop Browsertrix Crawler, see the hosted [Browsertrix Crawler documentation](https://crawler-docs.webrecorder.net).
 
-For information on how to build the docs locally, see [docs/docs/develop/docs.md]
+For information on how to build the docs locally, see the [docs page](docs/docs/develop/docs.md).
 
 
 ## Support
