@@ -7,8 +7,8 @@ echo "" >> $out
 echo "The Browsertrix Crawler Docker image currently accepts the following parameters:" >> $out
 echo "" >> $out
 echo '```' >> $out
-#node $CURR/../dist/main.js --help >> $out
 docker run webrecorder/browsertrix-crawler crawl --help >> $out
+#node $CURR/../dist/main.js --help >> $out
 echo '```' >> $out
 
 
