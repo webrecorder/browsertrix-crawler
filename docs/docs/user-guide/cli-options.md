@@ -3,6 +3,8 @@
 The Browsertrix Crawler Docker image currently accepts the following parameters:
 
 ```
+crawler [options]
+
 Options:
       --help                                Show help                  [boolean]
       --version                             Show version number        [boolean]

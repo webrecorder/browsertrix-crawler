@@ -47,6 +47,7 @@ nav:
   - index.md
   - Develop:
     - develop/index.md
+    - develop/docs.md
   - User Guide:
     - user-guide/index.md
     - user-guide/common-options.md
