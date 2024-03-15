@@ -28,7 +28,7 @@ The scope settings for multi-page crawls (page-spa, prefix, host, domain) also i
 
 ## Custom Scope Inclusion Rules
 
-Instead of setting a scope type, it is possible to configure a custom scope regex by setting `--include` config to one or more regular expressions. If using the YAML config, the `include` field can contain a list of regexes.
+Instead of setting a scope type, it is possible to configure a custom scope regular expression (regex) by setting `--include` to one or more regular expressions. If using the YAML config, the `include` field can contain a list of regexes.
 
 Extracted links that match the regular expression will be considered 'in scope' and included.
 
@@ -48,33 +48,61 @@ The `--extraHops` setting can be set globally or per seed to allow expanding the
 
 ## Scope Rule Examples
 
-For example, the following seed will start on `https://example.com/startpage.html` and crawl all pages on the `https://example.com/` domain, except pages that match the regexes `example.com/skip.*` or `example.com/search.*`
+!!! example "Regular expression exclude rules"
 
-```yaml
-seeds:
-  - url: https://example.com/startpage.html
-    scopeType: "host"
-    exclude:
-      - example.com/skip.*
-      - example.com/search.*
+    A crawl started with this config will start on `https://example.com/startpage.html` and crawl all pages on the `https://example.com/` domain except pages that match the exclusion rules — URLs that contain the strings `example.com/skip` or `example.com/search` followed by any number of characters, and URLs that contain the string `postfeed`.
 
-```
+    `https://example.com/page.html` will be crawled but `https://example.com/skip/postfeed`, `https://example.com/skip/this-page.html`, and `https://example.com/search?q=searchstring` will not.
 
-In the following example, the scope include regexes will crawl all page URLs that match `example.com/(crawl-this|crawl-that)`, but skip URLs that end with 'skip-me'. For example, `https://example.com/crawl-this/page.html` would be crawled, but `https://example.com/crawl-this/pages/skip` would not be.
+    ```yaml
+    seeds:
+      - url: https://example.com/startpage.html
+        scopeType: "host"
+        exclude:
+          - example.com/skip.*
+          - example.com/search.*
+          - postfeed
+    ```
 
-```yaml
-seeds:
-  - url: https://example.com/startpage.html
-    include: example.com/(crawl-this|crawl-that)
-    exclude:
-      - skip$
-```
+!!! example "Regular expression include and exclude rules"
 
-The `include`, `exclude`, `scopeType`, and `depth` settings can be configured per seed, or globally, for the entire crawl.
+    In this example config, the scope includes regular expressions that will crawl all page URLs that match `example.com/(crawl-this|crawl-that)`, and exclude any URLs that terminate with exactly `skip`.
+
+    `https://example.com/crawl-this/page.html` and `https://example.com/crawl-this/page/skipme/not` will be crawled but `https://example.com/crawl-this/page/skip` will not.
+
+    ```yaml
+    seeds:
+      - url: https://example.com/startpage.html
+        include: example.com/(crawl-this|crawl-that)
+        exclude:
+          - skip$
+    ```
+
+!!! example "More complicated regular expressions"
+
+    This example exclusion rule targets characters and numbers after `search` until the string `ID=`, followed by any amount of numbers.
+
+    `https://example.com/search/ID=5819`, `https://example.com/search/6vH8R4Tm`, and `https://example.com/search/2o3Jq89cID=5ag8h19` will be crawled but `https://example.com/search/6vH8R4TmID=5819` will not.
+
+    ```yaml
+    seeds:
+      - url: https://example.com/startpage.html
+        scopeType: "host"
+        exclude:
+          - example.com/search/[A-Za-z0-9]+ID=[0-9]+
+    ```
+
+The `include`, `exclude`, `scopeType`, and `depth` settings can be configured per seed or globally for the entire crawl.
 
 The per-seed settings override the per-crawl settings, if any.
 
 See the test suite [tests/scopes.test.js](https://github.com/webrecorder/browsertrix-crawler/blob/main/tests/scopes.test.js) for additional examples of configuring scope inclusion and exclusion rules.
+
+!!! note
+
+    Include and exclude rules are always regular expressions. For rules to match, you may have to escape special characters that commonly appear in urls like `?`, `+`, or `.` by placing a `\` before the character. For example: `youtube.com/watch\?rdwz7QiG0lk`.
+
+Browsertrix Crawler does not log excluded URLs.
 
 ## Page Resource Block Rules
 
