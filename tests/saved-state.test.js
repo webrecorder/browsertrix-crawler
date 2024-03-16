@@ -43,7 +43,7 @@ test("check crawl interrupted + saved state written", async () => {
 
   try {
     containerId = execSync(
-      "docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://iana.org/ --limit 10",
+      "docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://www.webrecorder.net/ --limit 10",
       { encoding: "utf-8" },
       //wait.callback,
     );
@@ -108,7 +108,7 @@ test("check parsing saved state + page done + queue present", () => {
 
   // ensure extra seeds also set
   expect(state.extraSeeds).toEqual([
-    `{"origSeedId":0,"newUrl":"https://www.iana.org/"}`,
+    `{"origSeedId":0,"newUrl":"https://webrecorder.net/"}`,
   ]);
 
   finished = state.finished;
