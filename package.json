@@ -27,6 +27,7 @@
     "minio": "^7.1.3",
     "p-queue": "^7.3.4",
     "puppeteer-core": "^20.8.2",
+    "sax": "^1.3.0",
     "sharp": "^0.32.6",
     "sitemapper": "^3.2.6",
     "tsc": "^2.0.4",
