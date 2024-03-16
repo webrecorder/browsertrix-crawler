@@ -35,7 +35,7 @@ import { initRedis } from "./util/redis.js";
 import { logger, formatErr } from "./util/logger.js";
 import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
-import { collectAllFileSources } from "./util/file_reader.js";
+import { collectAllFileSources, getInfoString } from "./util/file_reader.js";
 
 import { Browser } from "./util/browser.js";
 
@@ -428,7 +428,7 @@ export class Crawler {
     this.logFH = fs.createWriteStream(this.logFilename);
     logger.setExternalLogStream(this.logFH);
 
-    this.infoString = await this.getInfoString();
+    this.infoString = await getInfoString();
     logger.info(this.infoString);
 
     logger.info("Seeds", this.params.scopedSeeds);
@@ -1006,22 +1006,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     return res ? frame : null;
-  }
-
-  async getInfoString() {
-    const packageFileJSON = JSON.parse(
-      await fsp.readFile(new URL("../package.json", import.meta.url), {
-        encoding: "utf-8",
-      }),
-    );
-    const warcioPackageJSON = JSON.parse(
-      await fsp.readFile(
-        new URL("../node_modules/warcio/package.json", import.meta.url),
-        { encoding: "utf-8" },
-      ),
-    );
-
-    return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version})`;
   }
 
   async createWARCInfo(filename: string) {

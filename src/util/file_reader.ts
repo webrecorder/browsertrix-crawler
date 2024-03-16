@@ -1,4 +1,5 @@
 import fs from "fs";
+import fsp from "fs/promises";
 import path from "path";
 
 const MAX_DEPTH = 2;
@@ -47,4 +48,20 @@ export function collectAllFileSources(
   }
 
   return [];
+}
+
+export async function getInfoString() {
+  const packageFileJSON = JSON.parse(
+    await fsp.readFile(new URL("../../package.json", import.meta.url), {
+      encoding: "utf-8",
+    }),
+  );
+  const warcioPackageJSON = JSON.parse(
+    await fsp.readFile(
+      new URL("../../node_modules/warcio/package.json", import.meta.url),
+      { encoding: "utf-8" },
+    ),
+  );
+
+  return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version})`;
 }
