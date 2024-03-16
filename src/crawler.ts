@@ -348,6 +348,18 @@ export class Crawler {
       os.hostname(),
     );
 
+    // load full state from config
+    if (this.params.state) {
+      await this.crawlState.load(
+        this.params.state,
+        this.params.scopedSeeds,
+        true,
+      );
+      // otherwise, just load extra seeds
+    } else {
+      await this.loadExtraSeeds();
+    }
+
     // clear any pending URLs from this instance
     await this.crawlState.clearOwnPendingLocks();
 
@@ -365,6 +377,15 @@ export class Crawler {
     }
 
     return this.crawlState;
+  }
+
+  async loadExtraSeeds() {
+    const extraSeeds = await this.crawlState.getExtraSeeds();
+
+    for (const { origSeedId, newUrl } of extraSeeds) {
+      const seed = this.params.scopedSeeds[origSeedId];
+      this.params.scopedSeeds.push(seed.newScopedSeed(newUrl));
+    }
   }
 
   initScreenCaster() {
@@ -1216,14 +1237,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.crawlState.setStatus("running");
 
-    if (this.params.state) {
-      await this.crawlState.load(
-        this.params.state,
-        this.params.scopedSeeds,
-        true,
-      );
-    }
-
     await this.initPages();
 
     this.adBlockRules = new AdBlockRules(
@@ -1609,9 +1622,11 @@ self.__bx_behaviors.selectMainBehavior();
       const isChromeError = page.url().startsWith("chrome-error://");
 
       if (depth === 0 && !isChromeError && respUrl !== url) {
-        const seed = this.params.scopedSeeds[data.seedId];
-        this.params.scopedSeeds.push(seed.newScopedSeed(respUrl));
-        data.seedId = this.params.scopedSeeds.length - 1;
+        data.seedId = await this.crawlState.addExtraSeed(
+          this.params.scopedSeeds,
+          data.seedId,
+          respUrl,
+        );
         logger.info("Seed page redirected, adding redirected seed", {
           origUrl: url,
           newUrl: respUrl,

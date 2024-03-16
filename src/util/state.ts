@@ -38,6 +38,12 @@ export type QueueEntry = {
 };
 
 // ============================================================================
+export type ExtraRedirectSeed = {
+  newUrl: string;
+  origSeedId: number;
+};
+
+// ============================================================================
 export type PageCallbacks = {
   addLink?: (url: string) => Promise<void>;
 };
@@ -134,6 +140,17 @@ declare module "ioredis" {
 }
 
 // ============================================================================
+type SaveState = {
+  done?: number | string[];
+  finished: string[];
+  queued: string[];
+  pending: string[];
+  failed: string[];
+  errors: string[];
+  extraSeeds: string[];
+};
+
+// ============================================================================
 export class RedisCrawlState {
   redis: Redis;
   maxRetryPending = 1;
@@ -149,7 +166,7 @@ export class RedisCrawlState {
   fkey: string;
   ekey: string;
   pageskey: string;
-  qakey: string;
+  esKey: string;
 
   constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
@@ -169,8 +186,8 @@ export class RedisCrawlState {
     this.ekey = this.key + ":e";
     // pages
     this.pageskey = this.key + ":pages";
-    // qakey
-    this.qakey = this.key + ":qa";
+
+    this.esKey = this.key + ":extraSeeds";
 
     this._initLuaCommands(this.redis);
   }
@@ -515,22 +532,50 @@ return 0;
     return !!(await this.redis.sismember(this.skey, url));
   }
 
-  async serialize() {
+  async serialize(): Promise<SaveState> {
     //const queued = await this._iterSortKey(this.qkey);
-    const done = await this.numDone();
-    const queued = await this._iterSortedKey(this.qkey);
+    // const done = await this.numDone();
+    const seen = await this._iterSet(this.skey);
+    const queued = await this._iterSortedKey(this.qkey, seen);
     const pending = await this.getPendingList();
-    const failed = await this._iterListKeys(this.fkey);
+    const failed = await this._iterListKeys(this.fkey, seen);
     const errors = await this.getErrorList();
+    const extraSeeds = await this._iterListKeys(this.esKey, seen);
 
-    return { done, queued, pending, failed, errors };
+    const finished = [...seen.values()];
+
+    return { extraSeeds, finished, queued, pending, failed, errors };
   }
 
   _getScore(data: QueueEntry) {
     return (data.depth || 0) + (data.extraHops || 0) * MAX_DEPTH;
   }
 
-  async _iterSortedKey(key: string, inc = 100) {
+  async _iterSet(key: string, count = 100) {
+    const stream = this.redis.sscanStream(key, { count });
+
+    const results: Set<string> = new Set<string>();
+
+    stream.on("data", async (someResults: string[]) => {
+      stream.pause();
+
+      for (const result of someResults) {
+        results.add(result);
+      }
+
+      stream.resume();
+    });
+
+    await new Promise<void>((resolve) => {
+      stream.on("end", () => {
+        resolve();
+      });
+    });
+
+    return results;
+  }
+
+  async _iterSortedKey(key: string, seenSet: Set<string>, inc = 100) {
     const results: string[] = [];
 
     const len = await this.redis.zcard(key);
@@ -544,33 +589,35 @@ return 0;
         i,
         inc,
       );
-      results.push(...someResults);
+
+      for (const result of someResults) {
+        const json = JSON.parse(result);
+        seenSet.delete(json.url);
+        results.push(result);
+      }
     }
 
     return results;
   }
 
-  async _iterListKeys(key: string, inc = 100) {
+  async _iterListKeys(key: string, seenSet: Set<string>, inc = 100) {
     const results: string[] = [];
 
     const len = await this.redis.llen(key);
 
     for (let i = 0; i < len; i += inc) {
       const someResults = await this.redis.lrange(key, i, i + inc - 1);
-      results.push(...someResults);
+
+      for (const result of someResults) {
+        const json = JSON.parse(result);
+        seenSet.delete(json.url);
+        results.push(result);
+      }
     }
     return results;
   }
 
-  async load(
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    state: Record<string, any>,
-    seeds: ScopedSeed[],
-    checkScope: boolean,
-  ) {
-    const seen: string[] = [];
-
+  async load(state: SaveState, seeds: ScopedSeed[], checkScope: boolean) {
     // need to delete existing keys, if exist to fully reset state
     await this.redis.del(this.qkey);
     await this.redis.del(this.pkey);
@@ -578,6 +625,21 @@ return 0;
     await this.redis.del(this.fkey);
     await this.redis.del(this.skey);
     await this.redis.del(this.ekey);
+
+    let seen: string[] = [];
+
+    if (state.finished) {
+      seen = state.finished;
+
+      await this.redis.set(this.dkey, state.finished.length);
+    }
+
+    if (state.extraSeeds) {
+      for (const extraSeed of state.extraSeeds) {
+        const { newUrl, origSeedId }: ExtraRedirectSeed = JSON.parse(extraSeed);
+        await this.addExtraSeed(seeds, origSeedId, newUrl);
+      }
+    }
 
     for (const json of state.queued) {
       const data = JSON.parse(json);
@@ -603,19 +665,23 @@ return 0;
       seen.push(data.url);
     }
 
-    if (typeof state.done === "number") {
-      // done key is just an int counter
-      await this.redis.set(this.dkey, state.done);
-    } else if (state.done instanceof Array) {
-      // for backwards compatibility with old save states
-      for (const json of state.done) {
-        const data = JSON.parse(json);
-        if (data.failed) {
-          await this.redis.zadd(this.qkey, this._getScore(data), json);
-        } else {
-          await this.redis.incr(this.dkey);
+    // backwards compatibility: not using done, instead 'finished'
+    // contains list of finished URLs
+    if (state.done) {
+      if (typeof state.done === "number") {
+        // done key is just an int counter
+        await this.redis.set(this.dkey, state.done);
+      } else if (state.done instanceof Array) {
+        // for backwards compatibility with old save states
+        for (const json of state.done) {
+          const data = JSON.parse(json);
+          if (data.failed) {
+            await this.redis.zadd(this.qkey, this._getScore(data), json);
+          } else {
+            await this.redis.incr(this.dkey);
+          }
+          seen.push(data.url);
         }
-        seen.push(data.url);
       }
     }
 
@@ -720,5 +786,31 @@ return 0;
 
   async writeToPagesQueue(value: string) {
     return await this.redis.lpush(this.pageskey, value);
+  }
+
+  // add extra seeds from redirect
+  async addExtraSeed(seeds: ScopedSeed[], origSeedId: number, newUrl: string) {
+    if (!seeds[origSeedId]) {
+      logger.fatal(
+        "State load, original seed missing",
+        { origSeedId },
+        "state",
+      );
+    }
+    seeds.push(seeds[origSeedId].newScopedSeed(newUrl));
+    const newSeedId = seeds.length - 1;
+    const redirectSeed: ExtraRedirectSeed = { origSeedId, newUrl };
+    await this.redis.sadd(this.skey, newUrl);
+    await this.redis.lpush(this.esKey, JSON.stringify(redirectSeed));
+    return newSeedId;
+  }
+
+  async getExtraSeeds() {
+    const seeds: ExtraRedirectSeed[] = [];
+    const res = await this.redis.lrange(this.esKey, 0, -1);
+    for (const key of res) {
+      seeds.push(JSON.parse(key));
+    }
+    return seeds;
   }
 }
