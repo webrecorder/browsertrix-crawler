@@ -1,0 +1,94 @@
+site_name: Browsertrix Crawler Docs
+repo_url: https://github.com/webrecorder/browsertrix-crawler/
+repo_name: Browsertrix Crawler
+edit_uri: edit/main/docs/
+extra_css:
+  - stylesheets/extra.css
+theme:
+  name: material
+  custom_dir: docs/overrides
+  features:
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.instant
+    - navigation.tracking
+    - navigation.indexes
+    - navigation.footer
+    - content.code.copy
+    - content.action.edit
+    - content.tooltips
+    - search.suggest
+  palette:
+    scheme: webrecorder
+  logo: assets/brand/browsertrix-crawler-white.svg
+  favicon: assets/brand/browsertrix-crawler-icon-color-dynamic.svg
+
+  icon:
+    admonition:
+      note: bootstrap/pencil-fill
+      abstract: bootstrap/file-earmark-text-fill
+      info: bootstrap/info-circle-fill
+      tip: bootstrap/exclamation-circle-fill
+      success: bootstrap/check-circle-fill
+      question: bootstrap/question-circle-fill
+      warning: bootstrap/exclamation-triangle-fill
+      failure: bootstrap/x-octagon-fill
+      danger: bootstrap/exclamation-diamond-fill
+      bug: bootstrap/bug-fill
+      example: bootstrap/mortarboard-fill
+      quote: bootstrap/quote
+
+    repo: bootstrap/github
+    edit: bootstrap/pencil
+    view: bootstrap/eye
+
+nav:
+  - index.md
+  - Develop:
+    - develop/index.md
+    - develop/docs.md
+  - User Guide:
+    - user-guide/index.md
+    - user-guide/common-options.md
+    - user-guide/crawl-scope.md
+    - user-guide/yaml-config.md
+    - user-guide/browser-profiles.md
+    - user-guide/behaviors.md
+    - user-guide/cli-options.md
+
+markdown_extensions:
+  - toc:
+      toc_depth: 3
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      options:
+        custom_icons:
+          - docs/overrides/.icons
+  - admonition
+  - pymdownx.inlinehilite
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.keys
+  - def_list
+  - attr_list
+
+extra:
+  generator: false
+  social:
+    - icon: bootstrap/globe
+      link: https://webrecorder.net
+    - icon: bootstrap/chat-left-text-fill
+      link: https://forum.webrecorder.net/
+    - icon: bootstrap/mastodon
+      link: https://digipres.club/@webrecorder
+    - icon: bootstrap/youtube
+      link: https://www.youtube.com/@webrecorder
+copyright: "Creative Commons Attribution 4.0 International (CC BY 4.0)"
+
+plugins:
+  - search
