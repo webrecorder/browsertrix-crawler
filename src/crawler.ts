@@ -13,7 +13,7 @@ import {
   PageCallbacks,
 } from "./util/state.js";
 
-import Sitemapper from "sitemapper";
+//import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
 
 import * as warcio from "warcio";
@@ -53,6 +53,7 @@ import { OriginOverride } from "./util/originoverride.js";
 import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
 import { CDPSession, Frame, HTTPRequest, Page } from "puppeteer-core";
+import { SitemapReader } from "./util/sitemapper.js";
 
 const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
@@ -2063,7 +2064,7 @@ self.__bx_behaviors.selectMainBehavior();
         "sitemap",
       );
     } else {
-      lastmodFromTimestamp = dateObj.getTime();
+      lastmodFromTimestamp = dateObj;
       logger.info(
         "Fetching and filtering sitemap by date",
         { url, sitemapFromDate },
@@ -2071,21 +2072,36 @@ self.__bx_behaviors.selectMainBehavior();
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sitemapper = new (Sitemapper as any)({
-      url,
-      timeout: 15000,
-      requestHeaders: this.headers,
-      lastmod: lastmodFromTimestamp,
+    const sitemapper = new SitemapReader(this.headers);
+
+    await sitemapper.parseSitemap(url, lastmodFromTimestamp);
+
+    sitemapper.on("url", ({ url, lastmod }) => {
+      console.log("got", url, lastmod);
     });
 
-    try {
-      const { sites } = await sitemapper.fetch();
-      logger.info("Sitemap Urls Found", { urls: sites.length }, "sitemap");
-      await this.queueInScopeUrls(seedId, sites, 0);
-    } catch (e) {
-      logger.warn("Error fetching sites from sitemap", e, "sitemap");
-    }
+    await new Promise<void>((resolve) => {
+      sitemapper.on("end", () => resolve());
+    });
+
+    //for await (const {url, lastmod} of iter) {
+    //console.log("got", url, lastmod);
+    //}
+
+    // const sitemapper = new (Sitemapper as any)({
+    //   url,
+    //   timeout: 15000,
+    //   requestHeaders: this.headers,
+    //   lastmod: lastmodFromTimestamp,
+    // });
+
+    // try {
+    //   const { sites } = await sitemapper.fetch();
+    //   logger.info("Sitemap Urls Found", { urls: sites.length }, "sitemap");
+    //   await this.queueInScopeUrls(seedId, sites, 0);
+    // } catch (e) {
+    //   logger.warn("Error fetching sites from sitemap", e, "sitemap");
+    // }
   }
 
   async combineWARC() {

@@ -1,90 +1,154 @@
-// import * as sax from 'sax';
-// //import * as PQueue from 'p-queue';
-// import { Readable } from 'stream';
-// import { ReadableStream } from 'node:stream/web';
+//import { createStream } from 'sax';
+import sax from "sax";
+//import PQueue from "p-queue";
+import { Readable } from "stream";
+import { ReadableStream } from "node:stream/web";
+import EventEmitter from "events";
 
-// class SitemapReader {
-//   async parseSitemap(url: string) {
-//     const resp = await fetch(url);
-//     const readableNodeStream = Readable.fromWeb(resp.body as ReadableStream<Uint8Array>);
-//   }
-
-//   initSaxParser(sourceStream : Readable) {
-//     const parserStream = sax.createStream(false, { trim: true, normalize: true, lowercase: true });
-
-//     let parsingIndex = false;
-
-//     let parsingUrlset = false;
-//     let parsingUrl = false;
-//     let parsingLoc = false;
-//     let parsingLastmod = false;
-
-//     let currUrl = null;
-//     let lastmod : Date = null;
-
-//     parserStream.on('opentag', (node: sax.Tag) => {
-//       switch (node.name) {
-//         case "sitemapindex":
-//           parsingIndex = true;
-//           break;
-
-//         case "urlset":
-//           parsingUrlset = true;
-//           break;
-
-//         case "url":
-//           parsingUrl = true;
-//           break;
-
-//         case "loc":
-//           parsingLoc = true;
-//           break;
-
-//         case "lastmod":
-//           parsingLastmod = true;
-//           break;
-//       }
-//     });
-
-//     parserStream.on("closetag", (node: sax.Tag) => {
-//       switch (node.name) {
-//         case "sitemapindex":
-//           parsingIndex = false;
-//           break;
-
-//         case "urlset":
-//           parsingUrlset = false;
-//           break;
-
-//         case "url":
-//           parsingUrl = false;
-
-//           break;
-
-//         case "loc":
-//           parsingLoc = false;
-//           break;
-
-//         case "lastmod":
-//           parsingLastmod = false;
-//           break;
-//       }
-//     });
-
-//     parserStream.on('text', (text: string) => {
-//       if (parsingLoc) {
-//         currUrl = text;
-//       } else if (parsingLastmod) {
-//         lastmod = new Date(text);
-//       }
-//     });
-
-//     parserStream.on('error', (err: Error) => {
-//       //      this.urlCb(null, url, err);
-//             throw err;
-//           });
-//   }
+// type SitemapUrl = {
+//   url: string;
+//   lastmod?: Date | null;
 // }
+
+export class SitemapReader extends EventEmitter {
+  headers?: Record<string, string>;
+  //q: PQueue;
+
+  constructor(headers?: Record<string, string>) {
+    super();
+    this.headers = headers;
+    //this.q = new PQueue({ concurrency: 1 });
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async parseSitemap(url: string, loadFrom?: Date): Promise<void> {
+    console.log(url, this.headers);
+    const resp = await fetch(url, { headers: this.headers });
+    if (!resp.ok) {
+      console.log(resp.status, await resp.text());
+      throw new Error("invalid_response");
+    }
+    const readableNodeStream = Readable.fromWeb(
+      resp.body as ReadableStream<Uint8Array>,
+    );
+    return await this.initSaxParser(readableNodeStream);
+  }
+
+  async initSaxParser(sourceStream: Readable) {
+    const parserStream = sax.createStream(false, {
+      trim: true,
+      normalize: true,
+      lowercase: true,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    let parsingIndex = false;
+
+    let parsingUrlset = false;
+    let parsingUrl = false;
+    let parsingLoc = false;
+    let parsingLastmod = false;
+
+    let currUrl: string | null;
+    let lastmod: Date | null = null;
+
+    //let done = false;
+
+    //let nextEntry : (value: SitemapUrl | PromiseLike<SitemapUrl>) => void;
+    //let p = new Promise<SitemapUrl>(resolve => nextEntry = resolve);
+
+    parserStream.on("end", () => {
+      this.emit("done");
+    });
+
+    parserStream.on("opentag", (node: sax.Tag) => {
+      //console.log("open", node);
+      switch (node.name) {
+        // Single Sitemap
+        case "url":
+          parsingUrl = true;
+          break;
+
+        case "loc":
+          parsingLoc = true;
+          break;
+
+        case "lastmod":
+          parsingLastmod = true;
+          break;
+
+        case "urlset":
+          parsingUrlset = true;
+          break;
+
+        // Sitemap Index
+        case "sitemapindex":
+          parsingIndex = true;
+          break;
+      }
+    });
+
+    parserStream.on("closetag", (tagName: string) => {
+      switch (tagName) {
+        // Single Sitemap
+        case "url":
+          if (currUrl) {
+            this.emit("url", { url: currUrl, lastmod });
+            //nextEntry({url: currUrl, lastmod});
+            //p = new Promise<SitemapUrl>(resolve => nextEntry = resolve);
+          }
+          currUrl = null;
+          lastmod = null;
+          parsingUrl = false;
+          break;
+
+        case "loc":
+          parsingLoc = false;
+          break;
+
+        case "lastmod":
+          parsingLastmod = false;
+          break;
+
+        case "urlset":
+          parsingUrlset = false;
+          break;
+
+        // Sitemap Index
+        case "sitemapindex":
+          parsingIndex = false;
+          break;
+      }
+    });
+
+    parserStream.on("text", (text: string) => {
+      //console.log("text", text);
+      if (parsingLoc) {
+        currUrl = text;
+      } else if (parsingLastmod) {
+        try {
+          lastmod = new Date(text);
+        } catch (e) {
+          lastmod = null;
+        }
+      } else if (parsingUrl) {
+        console.warn("text in url, ignoring");
+      } else if (parsingUrlset) {
+        console.warn("text in urlset, ignoring");
+      }
+    });
+
+    parserStream.on("error", (err: Error) => {
+      console.log("err", err);
+      throw err;
+    });
+
+    sourceStream.pipe(parserStream);
+
+    // while (!done) {
+    //   yield await p;
+    // }
+  }
+}
 
 // class SitemapParser {
 //   private visitedSitemaps: { [key: string]: boolean } = {};
