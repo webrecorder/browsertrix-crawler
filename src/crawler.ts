@@ -13,7 +13,6 @@ import {
   PageCallbacks,
 } from "./util/state.js";
 
-//import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
 
 import * as warcio from "warcio";
@@ -71,6 +70,7 @@ const behaviors = fs.readFileSync(
 
 const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
+const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
 
 const POST_CRAWL_STATES = [
   "generate-wacz",
@@ -1242,7 +1242,13 @@ self.__bx_behaviors.selectMainBehavior();
       }
 
       if (seed.sitemap) {
-        await this.parseSitemap(seed.sitemap, i, this.params.sitemapFromDate);
+        await timedRun(
+          this.parseSitemap(seed.sitemap, i),
+          SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
+          "Sitemap initial fetch timed out",
+          { sitemap: seed.sitemap, seed: seed.url },
+          "sitemap",
+        );
       }
     }
 
@@ -2053,26 +2059,26 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async parseSitemap(url: string, seedId: number, sitemapFromDate: number) {
-    // handle sitemap last modified date if passed
-    let lastmodFromTimestamp = undefined;
-    const dateObj = new Date(sitemapFromDate);
-    if (isNaN(dateObj.getTime())) {
-      logger.info(
-        "Fetching full sitemap (fromDate not specified/valid)",
-        { url, sitemapFromDate },
-        "sitemap",
-      );
-    } else {
-      lastmodFromTimestamp = dateObj;
-      logger.info(
-        "Fetching and filtering sitemap by date",
-        { url, sitemapFromDate },
-        "sitemap",
-      );
+  async parseSitemap(url: string, seedId: number) {
+    if (await this.crawlState.isSitemapDone()) {
+      logger.info("Sitemap already processed, skipping", "sitemap");
+      return;
     }
 
-    const sitemapper = new SitemapReader(this.headers, lastmodFromTimestamp);
+    const fromDate = this.params.sitemapFromDate;
+    const toDate = this.params.sitemapToDate;
+    const headers = this.headers;
+
+    logger.info(
+      "Fetching sitemap",
+      { from: fromDate || "<any date>", to: fromDate || "<any date>" },
+      "sitemap",
+    );
+    const sitemapper = new SitemapReader({
+      headers,
+      fromDate,
+      toDate,
+    });
 
     try {
       await sitemapper.parseSitemap(url);
@@ -2081,36 +2087,44 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     let count = 0;
-
-    sitemapper.on("url", ({ url }) => {
-      count++;
-      this.queueInScopeUrls(seedId, [url], 0);
-    });
+    let power = 1;
+    let resolved = false;
 
     await new Promise<void>((resolve) => {
-      sitemapper.on("end", () => resolve());
+      sitemapper.on("end", () => {
+        logger.info(
+          "Sitemap Parsing Finished",
+          { urlsFound: count },
+          "sitemap",
+        );
+        resolve();
+        this.crawlState.markSitemapDone();
+      });
+      sitemapper.on("url", ({ url }) => {
+        count++;
+        if (count % 10 ** power === 0) {
+          if (count % 10 ** (power + 1) === 0 && power <= 3) {
+            power++;
+          }
+          const sitemapsQueued = sitemapper.getSitemapsQueued();
+          logger.debug(
+            "Sitemap URLs processed",
+            { count, sitemapsQueued },
+            "sitemap",
+          );
+        }
+        this.queueInScopeUrls(seedId, [url], 0);
+        if (count >= 100 && !resolved) {
+          logger.info(
+            "Sitemap partially parsed, continue parsing large sitemap in the background",
+            { urlsFound: count },
+            "sitemap",
+          );
+          resolve();
+          resolved = true;
+        }
+      });
     });
-
-    logger.info("Sitemap Urls Found", { urls: count }, "sitemap");
-
-    //for await (const {url, lastmod} of iter) {
-    //console.log("got", url, lastmod);
-    //}
-
-    // const sitemapper = new (Sitemapper as any)({
-    //   url,
-    //   timeout: 15000,
-    //   requestHeaders: this.headers,
-    //   lastmod: lastmodFromTimestamp,
-    // });
-
-    // try {
-    //   const { sites } = await sitemapper.fetch();
-    //   logger.info("Sitemap Urls Found", { urls: sites.length }, "sitemap");
-    //   await this.queueInScopeUrls(seedId, sites, 0);
-    // } catch (e) {
-    //   logger.warn("Error fetching sites from sitemap", e, "sitemap");
-    // }
   }
 
   async combineWARC() {

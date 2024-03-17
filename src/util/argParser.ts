@@ -287,7 +287,13 @@ class ArgParser {
       sitemapFromDate: {
         alias: "sitemapFrom",
         describe:
-          "If set, filter URLs from sitemaps to those greater than or equal to provided ISO Date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS or partial date)",
+          "If set, filter URLs from sitemaps to those greater than or equal to (>=) provided ISO Date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS or partial date)",
+      },
+
+      sitemapToDate: {
+        alias: "sitemapTo",
+        describe:
+          "If set, filter URLs from sitemaps to those less than or equal to (<=) provided ISO Date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS or partial date)",
       },
 
       statsFilename: {
