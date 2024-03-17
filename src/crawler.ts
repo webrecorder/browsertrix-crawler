@@ -2072,17 +2072,26 @@ self.__bx_behaviors.selectMainBehavior();
       );
     }
 
-    const sitemapper = new SitemapReader(this.headers);
+    const sitemapper = new SitemapReader(this.headers, lastmodFromTimestamp);
 
-    await sitemapper.parseSitemap(url, lastmodFromTimestamp);
+    try {
+      await sitemapper.parseSitemap(url);
+    } catch (e) {
+      logger.warn("Sitemap parse failed", { url, ...formatErr(e) }, "sitemap");
+    }
 
-    sitemapper.on("url", ({ url, lastmod }) => {
-      console.log("got", url, lastmod);
+    let count = 0;
+
+    sitemapper.on("url", ({ url }) => {
+      count++;
+      this.queueInScopeUrls(seedId, [url], 0);
     });
 
     await new Promise<void>((resolve) => {
       sitemapper.on("end", () => resolve());
     });
+
+    logger.info("Sitemap Urls Found", { urls: count }, "sitemap");
 
     //for await (const {url, lastmod} of iter) {
     //console.log("got", url, lastmod);

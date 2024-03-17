@@ -1,31 +1,37 @@
-//import { createStream } from 'sax';
-import sax from "sax";
-//import PQueue from "p-queue";
 import { Readable } from "stream";
 import { ReadableStream } from "node:stream/web";
 import EventEmitter from "events";
 
-// type SitemapUrl = {
-//   url: string;
-//   lastmod?: Date | null;
-// }
+import sax from "sax";
+import PQueue from "p-queue";
+
+import { logger, formatErr } from "./logger.js";
 
 export class SitemapReader extends EventEmitter {
   headers?: Record<string, string>;
-  //q: PQueue;
 
-  constructor(headers?: Record<string, string>) {
+  fromDate?: Date;
+  toDate?: Date;
+
+  q: PQueue;
+  active = 0;
+
+  constructor(
+    headers?: Record<string, string>,
+    fromDate?: Date,
+    toDate?: Date,
+  ) {
     super();
     this.headers = headers;
-    //this.q = new PQueue({ concurrency: 1 });
+    this.q = new PQueue({ concurrency: 1 });
+
+    this.fromDate = fromDate;
+    this.toDate = toDate;
   }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async parseSitemap(url: string, loadFrom?: Date): Promise<void> {
-    console.log(url, this.headers);
+  async parseSitemap(url: string): Promise<void> {
     const resp = await fetch(url, { headers: this.headers });
     if (!resp.ok) {
-      console.log(resp.status, await resp.text());
-      throw new Error("invalid_response");
+      throw new Error(`invalid_response: ${resp.status}`);
     }
     const readableNodeStream = Readable.fromWeb(
       resp.body as ReadableStream<Uint8Array>,
@@ -40,8 +46,8 @@ export class SitemapReader extends EventEmitter {
       lowercase: true,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let parsingIndex = false;
+    let parsingSitemapIndex = false;
+    let parsingSitemap = false;
 
     let parsingUrlset = false;
     let parsingUrl = false;
@@ -51,13 +57,15 @@ export class SitemapReader extends EventEmitter {
     let currUrl: string | null;
     let lastmod: Date | null = null;
 
+    this.active++;
+
     //let done = false;
 
     //let nextEntry : (value: SitemapUrl | PromiseLike<SitemapUrl>) => void;
     //let p = new Promise<SitemapUrl>(resolve => nextEntry = resolve);
 
     parserStream.on("end", () => {
-      this.emit("done");
+      this.maybeEnded();
     });
 
     parserStream.on("opentag", (node: sax.Tag) => {
@@ -82,7 +90,11 @@ export class SitemapReader extends EventEmitter {
 
         // Sitemap Index
         case "sitemapindex":
-          parsingIndex = true;
+          parsingSitemapIndex = true;
+          break;
+
+        case "sitemap":
+          parsingSitemap = true;
           break;
       }
     });
@@ -91,11 +103,7 @@ export class SitemapReader extends EventEmitter {
       switch (tagName) {
         // Single Sitemap
         case "url":
-          if (currUrl) {
-            this.emit("url", { url: currUrl, lastmod });
-            //nextEntry({url: currUrl, lastmod});
-            //p = new Promise<SitemapUrl>(resolve => nextEntry = resolve);
-          }
+          this.emitEntry(currUrl, lastmod);
           currUrl = null;
           lastmod = null;
           parsingUrl = false;
@@ -115,7 +123,38 @@ export class SitemapReader extends EventEmitter {
 
         // Sitemap Index
         case "sitemapindex":
-          parsingIndex = false;
+          parsingSitemapIndex = false;
+          break;
+
+        case "sitemap":
+          if (currUrl) {
+            const url = currUrl;
+            this.q.add(async () => {
+              const nested = new SitemapReader(
+                this.headers,
+                this.fromDate,
+                this.toDate,
+              );
+              nested.on("url", (data) => {
+                this.emit("url", data);
+              });
+              nested.on("end", () => {
+                this.maybeEnded();
+              });
+              this.active++;
+              try {
+                await nested.parseSitemap(url);
+              } catch (e) {
+                logger.warn(
+                  "Sitemap parse failed",
+                  { url, ...formatErr(e) },
+                  "sitemap",
+                );
+                this.active--;
+              }
+            });
+          }
+          parsingSitemap = false;
           break;
       }
     });
@@ -134,6 +173,10 @@ export class SitemapReader extends EventEmitter {
         console.warn("text in url, ignoring");
       } else if (parsingUrlset) {
         console.warn("text in urlset, ignoring");
+      } else if (parsingSitemap) {
+        console.warn("text in sitemap, ignoring");
+      } else if (parsingSitemapIndex) {
+        console.warn("text in sitemapindex, ignoring");
       }
     });
 
@@ -144,124 +187,31 @@ export class SitemapReader extends EventEmitter {
 
     sourceStream.pipe(parserStream);
 
-    // while (!done) {
-    //   yield await p;
-    // }
+    await this.q.onIdle();
+  }
+
+  emitEntry(url: string | null, lastmod: Date | null) {
+    if (!url) {
+      return;
+    }
+
+    if (lastmod) {
+      if (this.fromDate && lastmod < this.fromDate) {
+        return;
+      }
+
+      if (this.toDate && lastmod > this.toDate) {
+        return;
+      }
+    }
+
+    this.emit("url", { url, lastmod });
+  }
+
+  maybeEnded() {
+    this.active--;
+    if (this.active <= 0) {
+      this.emit("end");
+    }
   }
 }
-
-// class SitemapParser {
-//   private visitedSitemaps: { [key: string]: boolean } = {};
-
-//   constructor(
-//     private urlCb: (text: string | null, url: string, err?: Error) => void,
-//     private sitemapCb: (text: string) => void,
-//     private options?: any
-//   ) {}
-
-//   private async _download(url: string, parserStream: any): Promise<void> {
-//     const errorCb = (err: Error) => {
-//       this.urlCb(null, url, err);
-//       throw err;
-//     };
-
-//     const response = await fetch(url);
-//     if (!response.ok) {
-//       throw new Error(`Error fetching URL: ${url}, Status: ${response.status}`);
-//     }
-
-//     const bodyStream = response.body;
-//     const finalStream = new stream.PassThrough();
-//     bodyStream.pipe(finalStream);
-
-//     finalStream.on('error', errorCb);
-//   }
-
-//   public async parse(url: string): Promise<void> {
-//     let isUrlSet = false;
-//     let isSitemapIndex = false;
-//     let inLoc = false;
-
-//     this.visitedSitemaps[url] = true;
-
-//     const parserStream = sax.createStream(false, { trim: true, normalize: true, lowercase: true });
-
-//     parserStream.on('opentag', (node: any) => {
-//       inLoc = node.name === 'loc';
-//       isUrlSet = true if node.name === 'urlset';
-//       isSitemapIndex = true if node.name === 'sitemapindex';
-//     });
-
-//     parserStream.on('error', (err: Error) => {
-//       this.urlCb(null, url, err);
-//       throw err;
-//     });
-
-//     parserStream.on('text', (text: string) => {
-//       text = urlParser.resolve(url, text);
-//       if (inLoc) {
-//         if (isUrlSet) {
-//           this.urlCb(text, url);
-//         } else if (isSitemapIndex) {
-//           if (this.visitedSitemaps[text]) {
-//             console.error(`Already parsed sitemap: ${text}`);
-//           } else {
-//             this.sitemapCb(text);
-//           }
-//         }
-//       }
-//     });
-
-//     await this._download(url, parserStream);
-//   }
-// }
-
-// const queue = new PQueue({ concurrency: 4 });
-
-// export const parseSitemap = async (
-//   url: string,
-//   urlCb: (text: string | null, url: string, err?: Error) => void,
-//   sitemapCb: (text: string) => void,
-//   options?: any
-// ): Promise<void> => {
-//   const parser = new SitemapParser(urlCb, sitemapCb, options);
-//   await queue.add(() => parser.parse(url));
-// };
-
-// export const parseSitemaps = async (
-//   urls: string | string[],
-//   urlCb: (text: string | null, url: string, err?: Error) => void,
-//   sitemapTest: (sitemap: string) => boolean,
-//   options?: any
-// ): Promise<string[]> => {
-//   urls = Array.isArray(urls) ? urls : [urls];
-
-//   const sitemapCb = (sitemap: string) => {
-//     const shouldPush = sitemapTest ? sitemapTest(sitemap) : true;
-//     queue.add(() => parseSitemap(sitemap, urlCb, () => {})) if shouldPush;
-//   };
-
-//   const parser = new SitemapParser(urlCb, sitemapCb, options);
-
-//   await Promise.all(urls.map((url) => queue.add(() => parser.parse(url))));
-
-//   return Object.keys(parser.visitedSitemaps);
-// };
-
-// export const sitemapsInRobots = async (url: string): Promise<string[]> => {
-//   try {
-//     const response = await fetch(url);
-//     if (!response.ok) {
-//       throw new Error(`Error fetching URL: ${url}, Status: ${response.status}`);
-//     }
-
-//     const body = await response.text();
-//     const matches: string[] = [];
-//     body.replace(/^Sitemap:\s?([^\s]+)$/igm, (m, p1) => {
-//       matches.push(p1);
-//     });
-//     return matches;
-//   } catch (err) {
-//     throw err;
-//   }
-// };
