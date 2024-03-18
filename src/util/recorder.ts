@@ -130,7 +130,7 @@ export class Recorder {
 
     fs.mkdirSync(this.tempdir, { recursive: true });
     fs.mkdirSync(this.archivesDir, { recursive: true });
-    fs.mkdirSync(this.tempCdxDir, { recursive: true });
+    // fs.mkdirSync(this.tempCdxDir, { recursive: true });
 
     const prefix =
       process.env.WARC_PREFIX || crawler.params.warcPrefix || "rec";
@@ -141,7 +141,7 @@ export class Recorder {
 
     this.writer = new WARCWriter({
       archivesDir: this.archivesDir,
-      tempCdxDir: this.tempCdxDir,
+      // tempCdxDir: this.tempCdxDir,
       filenameTemplate,
       rolloverSize: crawler.params.rolloverSize,
       gzip: this.gzip,
