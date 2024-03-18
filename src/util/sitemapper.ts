@@ -193,7 +193,6 @@ export class SitemapReader extends EventEmitter {
     });
 
     parserStream.on("text", (text: string) => {
-      //console.log("text", text);
       if (parsingLoc) {
         currUrl = text;
       } else if (parsingLastmod) {
