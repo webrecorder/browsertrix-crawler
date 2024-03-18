@@ -6,6 +6,7 @@ import sax from "sax";
 import PQueue from "p-queue";
 
 import { logger, formatErr } from "./logger.js";
+import { DETECT_SITEMAP } from "./constants.js";
 
 const SITEMAP_CONCURRENCY = 5;
 
@@ -48,6 +49,118 @@ export class SitemapReader extends EventEmitter {
     this.pending = new Set<string>();
   }
 
+  getCT(headers: Headers) {
+    const ct = headers.get("content-type");
+    if (!ct) {
+      return null;
+    }
+    return ct.split(";")[0];
+  }
+
+  async tryFetch(url: string, expectedCT?: string | null) {
+    try {
+      logger.debug(
+        "Detecting Sitemap: fetching",
+        { url, expectedCT },
+        "sitemap",
+      );
+      const resp = await fetch(url, { headers: this.headers });
+
+      if (!resp.ok) {
+        logger.debug(
+          "Detecting Sitemap: invalid status code",
+          { status: resp.status },
+          "sitemap",
+        );
+        return null;
+      }
+
+      const ct = resp.headers.get("content-type");
+      if (expectedCT && ct && ct.split(";")[0] != expectedCT) {
+        logger.debug(
+          "Detecting Sitemap: invalid content-type",
+          { ct },
+          "sitemap",
+        );
+        return null;
+      }
+
+      return resp;
+    } catch (e) {
+      logger.debug("Detecting Sitemap: unknown error", e, "sitemap");
+      return null;
+    }
+  }
+
+  async parse(sitemap: string, seedUrl: string) {
+    let resp: Response | null = null;
+    let fullUrl: string | null = null;
+    let isRobots = false;
+    let isSitemap = false;
+
+    // if set to auto-detect, eg. --sitemap / --useSitemap with no URL
+    // 1. first check robots.txt
+    // 2. if not found, check /sitemap.xml
+    if (sitemap === DETECT_SITEMAP) {
+      logger.debug("Detecting sitemap for seed", { seedUrl }, "sitemap");
+      fullUrl = new URL("/robots.txt", seedUrl).href;
+      resp = await this.tryFetch(fullUrl, "text/plain");
+      if (resp) {
+        isRobots = true;
+      } else {
+        fullUrl = new URL("/sitemap.xml", seedUrl).href;
+        resp = await this.tryFetch(fullUrl, "text/xml");
+        if (resp) {
+          isSitemap = true;
+        }
+      }
+    } else {
+      // if specific URL provided, check if its a .xml file or a robots.txt file
+      fullUrl = new URL(sitemap, seedUrl).href;
+      let expected = null;
+      if (fullUrl.endsWith(".xml")) {
+        expected = "text/xml";
+        isSitemap = true;
+      } else if (fullUrl.endsWith(".txt")) {
+        expected = "text/plain";
+        isRobots = true;
+      }
+      resp = await this.tryFetch(fullUrl, expected);
+    }
+
+    // fail if no successful response fetched
+    if (!resp) {
+      logger.debug(
+        "Sitemap not found",
+        { sitemap, seedUrl, fullUrl },
+        "sitemap",
+      );
+      throw new Error("not found");
+    }
+
+    // fail if neither an xml nor robots.txt
+    if (!isRobots && !isSitemap) {
+      logger.info("Sitemap not detected for seed", { seedUrl }, "sitemap");
+      throw new Error("not xml or robots.txt");
+    }
+
+    if (isRobots) {
+      logger.debug(
+        "Sitemap: parsing from robots.txt",
+        { fullUrl, seedUrl },
+        "sitemap",
+      );
+      await this._parseRobotsFromResponse(resp);
+    } else if (isSitemap) {
+      logger.debug(
+        "Sitemap: parsing from top-level sitemap XML",
+        { fullUrl, seedUrl },
+        "sitemap",
+      );
+      await this._parseSitemapFromResponse(fullUrl, resp);
+    }
+  }
+
   async parseFromRobots(url: string) {
     const resp = await fetch(url, { headers: this.headers });
     if (!resp.ok) {
@@ -59,6 +172,10 @@ export class SitemapReader extends EventEmitter {
       return;
     }
 
+    await this._parseRobotsFromResponse(resp);
+  }
+
+  private async _parseRobotsFromResponse(resp: Response) {
     const text = await resp.text();
 
     text.replace(/^Sitemap:\s?([^\s]+)$/gim, (m, url) => {
@@ -71,6 +188,10 @@ export class SitemapReader extends EventEmitter {
     this.seenSitemapSet.add(url);
 
     const resp = await fetch(url, { headers: this.headers });
+    await this._parseSitemapFromResponse(url, resp);
+  }
+
+  private async _parseSitemapFromResponse(url: string, resp: Response) {
     if (!resp.ok) {
       if (!this.atLimit()) {
         logger.error(

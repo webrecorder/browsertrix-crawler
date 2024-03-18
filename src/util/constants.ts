@@ -9,6 +9,9 @@ export const WAIT_UNTIL_OPTS = [
   "networkidle0",
   "networkidle2",
 ];
+
+export const DETECT_SITEMAP = "<detect>";
+
 export const EXTRACT_TEXT_TYPES = ["to-pages", "to-warc", "final-to-warc"];
 
 export const BEHAVIOR_LOG_FUNC = "__bx_log";

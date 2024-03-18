@@ -53,6 +53,7 @@ import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
 import { CDPSession, Frame, HTTPRequest, Page } from "puppeteer-core";
 import { SitemapReader } from "./util/sitemapper.js";
+import { ScopedSeed } from "./util/seeds.js";
 
 const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
@@ -1243,7 +1244,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (seed.sitemap) {
         await timedRun(
-          this.parseSitemap(seed.sitemap, i),
+          this.parseSitemap(seed, i),
           SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
           "Sitemap initial fetch timed out",
           { sitemap: seed.sitemap, seed: seed.url },
@@ -2059,7 +2060,11 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async parseSitemap(url: string, seedId: number) {
+  async parseSitemap({ url, sitemap }: ScopedSeed, seedId: number) {
+    if (!sitemap) {
+      return;
+    }
+
     if (await this.crawlState.isSitemapDone()) {
       logger.info("Sitemap already processed, skipping", "sitemap");
       return;
@@ -2082,13 +2087,14 @@ self.__bx_behaviors.selectMainBehavior();
     });
 
     try {
-      if (url.endsWith("/robots.txt")) {
-        await sitemapper.parseFromRobots(url);
-      } else {
-        await sitemapper.parseSitemap(url);
-      }
+      await sitemapper.parse(sitemap, url);
     } catch (e) {
-      logger.warn("Sitemap parse failed", { url, ...formatErr(e) }, "sitemap");
+      logger.warn(
+        "Sitemap for seed failed",
+        { url, sitemap, ...formatErr(e) },
+        "sitemap",
+      );
+      return;
     }
 
     let power = 1;
