@@ -2074,10 +2074,13 @@ self.__bx_behaviors.selectMainBehavior();
       { from: fromDate || "<any date>", to: fromDate || "<any date>" },
       "sitemap",
     );
+    const counter = { value: 0 };
     const sitemapper = new SitemapReader({
       headers,
       fromDate,
       toDate,
+      counter,
+      limit: this.pageLimit,
     });
 
     try {
@@ -2086,22 +2089,27 @@ self.__bx_behaviors.selectMainBehavior();
       logger.warn("Sitemap parse failed", { url, ...formatErr(e) }, "sitemap");
     }
 
-    let count = 0;
     let power = 1;
     let resolved = false;
 
+    let finished = false;
+
     await new Promise<void>((resolve) => {
       sitemapper.on("end", () => {
-        logger.info(
-          "Sitemap Parsing Finished",
-          { urlsFound: count },
-          "sitemap",
-        );
         resolve();
-        this.crawlState.markSitemapDone();
+        if (!finished) {
+          logger.info(
+            "Sitemap Parsing Finished",
+            { urlsFound: counter.value },
+            "sitemap",
+          );
+          this.crawlState.markSitemapDone();
+          finished = true;
+        }
       });
       sitemapper.on("url", ({ url }) => {
-        count++;
+        const count = counter.value;
+
         if (count % 10 ** power === 0) {
           if (count % 10 ** (power + 1) === 0 && power <= 3) {
             power++;

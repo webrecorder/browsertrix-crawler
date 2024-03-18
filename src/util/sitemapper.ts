@@ -9,6 +9,10 @@ import { logger, formatErr } from "./logger.js";
 
 const SITEMAP_CONCURRENCY = 5;
 
+export type Counter = {
+  value: number;
+};
+
 export type SitemapOpts = {
   headers?: Record<string, string>;
   q?: PQueue;
@@ -16,6 +20,8 @@ export type SitemapOpts = {
 
   fromDate?: Date;
   toDate?: Date;
+  counter?: Counter;
+  limit?: number;
 };
 
 export class SitemapReader extends EventEmitter {
@@ -28,28 +34,38 @@ export class SitemapReader extends EventEmitter {
 
   seenSitemapSet: Set<string>;
 
+  counter: Counter;
+  limit: number;
+
   isRoot = false;
 
   constructor(opts: SitemapOpts) {
     super();
     this.headers = opts.headers;
+
     this.isRoot = !opts.q;
     this.q = opts.q || new PQueue({ concurrency: SITEMAP_CONCURRENCY });
 
     this.fromDate = opts.fromDate;
     this.toDate = opts.toDate;
+
     this.seenSitemapSet = opts.seenSitemapSet || new Set<string>();
+
+    this.counter = opts.counter || { value: 0 };
+    this.limit = opts.limit || 0;
   }
   async parseSitemap(url: string): Promise<void> {
     this.seenSitemapSet.add(url);
 
     const resp = await fetch(url, { headers: this.headers });
     if (!resp.ok) {
-      logger.error(
-        "Sitemap parse failed",
-        { url, status: resp.status },
-        "sitemap",
-      );
+      if (!this.atLimit()) {
+        logger.error(
+          "Sitemap parse failed",
+          { url, status: resp.status },
+          "sitemap",
+        );
+      }
       this.emit("end");
       return;
     }
@@ -76,6 +92,8 @@ export class SitemapReader extends EventEmitter {
 
     let currUrl: string | null;
     let lastmod: Date | null = null;
+
+    let otherTags = 0;
 
     parserStream.on("end", async () => {
       if (this.isRoot) {
@@ -112,6 +130,9 @@ export class SitemapReader extends EventEmitter {
         case "sitemap":
           parsingSitemap = true;
           break;
+
+        default:
+          otherTags++;
       }
     });
 
@@ -120,6 +141,9 @@ export class SitemapReader extends EventEmitter {
         // Single Sitemap
         case "url":
           this.emitEntry(currUrl, lastmod);
+          if (this.atLimit()) {
+            parserStream._parser.close();
+          }
           currUrl = null;
           lastmod = null;
           parsingUrl = false;
@@ -148,6 +172,9 @@ export class SitemapReader extends EventEmitter {
           }
           parsingSitemap = false;
           break;
+
+        default:
+          otherTags--;
       }
     });
 
@@ -161,18 +188,23 @@ export class SitemapReader extends EventEmitter {
         } catch (e) {
           lastmod = null;
         }
-      } else if (parsingUrl) {
-        //console.warn("text in url, ignoring");
-      } else if (parsingUrlset) {
-        console.warn("text in urlset, ignoring");
-      } else if (parsingSitemap) {
-        //console.warn("text in sitemap, ignoring");
-      } else if (parsingSitemapIndex) {
-        console.warn("text in sitemapindex, ignoring");
+      } else if (!otherTags) {
+        if (parsingUrl) {
+          console.warn("text in url, ignoring");
+        } else if (parsingUrlset) {
+          console.warn("text in urlset, ignoring");
+        } else if (parsingSitemap) {
+          console.warn("text in sitemap, ignoring");
+        } else if (parsingSitemapIndex) {
+          console.warn("text in sitemapindex, ignoring");
+        }
       }
     });
 
     parserStream.on("error", (err: Error) => {
+      if (this.atLimit()) {
+        return;
+      }
       logger.warn("Sitemap error parsing XML", { err }, "sitemap");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (parserStream._parser as any).error = null;
@@ -182,8 +214,16 @@ export class SitemapReader extends EventEmitter {
     sourceStream.pipe(parserStream);
   }
 
+  atLimit() {
+    return this.limit && this.counter.value >= this.limit;
+  }
+
   addNewSitemap(url: string) {
     if (this.seenSitemapSet.has(url)) {
+      return;
+    }
+
+    if (this.atLimit()) {
       return;
     }
 
@@ -194,6 +234,8 @@ export class SitemapReader extends EventEmitter {
         toDate: this.toDate,
         seenSitemapSet: this.seenSitemapSet,
         q: this.q,
+        counter: this.counter,
+        limit: this.limit,
       });
 
       nested.on("url", (data) => {
@@ -211,7 +253,12 @@ export class SitemapReader extends EventEmitter {
       }
 
       return new Promise<void>((resolve) => {
-        nested.on("end", () => resolve());
+        nested.on("end", () => {
+          resolve();
+          if (this.atLimit()) {
+            this.emit("end");
+          }
+        });
       });
     });
   }
@@ -231,7 +278,14 @@ export class SitemapReader extends EventEmitter {
       }
     }
 
+    if (this.atLimit()) {
+      this.q.clear();
+      return;
+    }
+
     this.emit("url", { url, lastmod });
+
+    this.counter.value++;
   }
 
   getSitemapsQueued() {
