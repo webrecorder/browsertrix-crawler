@@ -2082,7 +2082,11 @@ self.__bx_behaviors.selectMainBehavior();
     });
 
     try {
-      await sitemapper.parseSitemap(url);
+      if (url.endsWith("/robots.txt")) {
+        await sitemapper.parseFromRobots(url);
+      } else {
+        await sitemapper.parseSitemap(url);
+      }
     } catch (e) {
       logger.warn("Sitemap parse failed", { url, ...formatErr(e) }, "sitemap");
     }

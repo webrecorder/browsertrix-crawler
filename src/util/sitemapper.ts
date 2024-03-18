@@ -24,7 +24,7 @@ export class SitemapReader extends EventEmitter {
   fromDate?: Date;
   toDate?: Date;
 
-  q: PQueue;
+  queue: PQueue;
 
   seenSitemapSet: Set<string>;
   pending: Set<string>;
@@ -36,7 +36,7 @@ export class SitemapReader extends EventEmitter {
     super();
     this.headers = opts.headers;
 
-    this.q = new PQueue({ concurrency: SITEMAP_CONCURRENCY });
+    this.queue = new PQueue({ concurrency: SITEMAP_CONCURRENCY });
 
     this.fromDate = opts.fromDate;
     this.toDate = opts.toDate;
@@ -48,13 +48,26 @@ export class SitemapReader extends EventEmitter {
     this.pending = new Set<string>();
   }
 
-  async maybeEnd() {
-    if (!this.pending.size) {
-      await this.q.onIdle();
+  async parseFromRobots(url: string) {
+    const resp = await fetch(url, { headers: this.headers });
+    if (!resp.ok) {
+      logger.error(
+        "Sitemap robots.txt parse failed",
+        { url, status: resp.status },
+        "sitemap",
+      );
+      return;
     }
+
+    const text = await resp.text();
+
+    text.replace(/^Sitemap:\s?([^\s]+)$/gim, (m, url) => {
+      this.addNewSitemap(url);
+      return url;
+    });
   }
 
-  async parseSitemap(url: string): Promise<void> {
+  async parseSitemap(url: string) {
     this.seenSitemapSet.add(url);
 
     const resp = await fetch(url, { headers: this.headers });
@@ -99,7 +112,7 @@ export class SitemapReader extends EventEmitter {
     parserStream.on("end", async () => {
       this.pending.delete(url);
       if (!this.pending.size) {
-        await this.q.onIdle();
+        await this.queue.onIdle();
         this.emit("end");
       }
     });
@@ -230,7 +243,7 @@ export class SitemapReader extends EventEmitter {
       return;
     }
 
-    this.q.add(async () => {
+    this.queue.add(async () => {
       try {
         await this.parseSitemap(url);
       } catch (e) {
@@ -259,7 +272,7 @@ export class SitemapReader extends EventEmitter {
     }
 
     if (this.atLimit()) {
-      this.q.clear();
+      this.queue.clear();
       return;
     }
 
@@ -269,6 +282,6 @@ export class SitemapReader extends EventEmitter {
   }
 
   getSitemapsQueued() {
-    return this.q.size;
+    return this.queue.size;
   }
 }
