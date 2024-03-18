@@ -2100,7 +2100,7 @@ self.__bx_behaviors.selectMainBehavior();
         if (!finished) {
           logger.info(
             "Sitemap Parsing Finished",
-            { urlsFound: counter.value },
+            { urlsFound: counter.value, limitHit: sitemapper.atLimit() },
             "sitemap",
           );
           this.crawlState.markSitemapDone();
@@ -2116,7 +2116,7 @@ self.__bx_behaviors.selectMainBehavior();
           }
           const sitemapsQueued = sitemapper.getSitemapsQueued();
           logger.debug(
-            "Sitemap URLs processed",
+            "Sitemap URLs processed so far",
             { count, sitemapsQueued },
             "sitemap",
           );
