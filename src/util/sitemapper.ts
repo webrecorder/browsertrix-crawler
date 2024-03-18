@@ -179,7 +179,7 @@ export class SitemapReader extends EventEmitter {
     const text = await resp.text();
 
     text.replace(/^Sitemap:\s?([^\s]+)$/gim, (m, url) => {
-      this.addNewSitemap(url);
+      this.addNewSitemap(url, null);
       return url;
     });
   }
@@ -303,8 +303,10 @@ export class SitemapReader extends EventEmitter {
 
         case "sitemap":
           if (currUrl) {
-            this.addNewSitemap(currUrl);
+            this.addNewSitemap(currUrl, lastmod);
           }
+          currUrl = null;
+          lastmod = null;
           parsingSitemap = false;
           break;
 
@@ -353,8 +355,31 @@ export class SitemapReader extends EventEmitter {
     return Boolean(this.limit && this.count >= this.limit);
   }
 
-  addNewSitemap(url: string) {
+  isWithinRange(lastmod: Date | null) {
+    // always accept entries with no date -- add option to change?
+    if (!lastmod) {
+      return true;
+    }
+
+    // earlier than fromDate
+    if (this.fromDate && lastmod < this.fromDate) {
+      return false;
+    }
+
+    // later than toDate
+    if (this.toDate && lastmod > this.toDate) {
+      return false;
+    }
+
+    return true;
+  }
+
+  addNewSitemap(url: string, lastmod: Date | null) {
     if (this.seenSitemapSet.has(url)) {
+      return;
+    }
+
+    if (!this.isWithinRange(lastmod)) {
       return;
     }
 
@@ -380,14 +405,8 @@ export class SitemapReader extends EventEmitter {
       return;
     }
 
-    if (lastmod) {
-      if (this.fromDate && lastmod < this.fromDate) {
-        return;
-      }
-
-      if (this.toDate && lastmod > this.toDate) {
-        return;
-      }
+    if (!this.isWithinRange(lastmod)) {
+      return;
     }
 
     if (this.atLimit()) {
