@@ -13,7 +13,7 @@ const DEFAULT_ROLLOVER_SIZE = 1_000_000_000;
 // =================================================================
 export class WARCWriter implements IndexerOffsetLength {
   archivesDir: string;
-  tempCdxDir: string;
+  tempCdxDir?: string;
   filenameTemplate: string;
   filename?: string;
   gzip: boolean;
@@ -39,7 +39,7 @@ export class WARCWriter implements IndexerOffsetLength {
     logDetails,
   }: {
     archivesDir: string;
-    tempCdxDir: string;
+    tempCdxDir?: string;
     filenameTemplate: string;
     rolloverSize?: number;
     gzip: boolean;
