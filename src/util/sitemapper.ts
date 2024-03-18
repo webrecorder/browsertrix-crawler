@@ -118,7 +118,6 @@ export class SitemapReader extends EventEmitter {
     });
 
     parserStream.on("opentag", (node: sax.Tag) => {
-      //console.log("open", node);
       switch (node.name) {
         // Single Sitemap
         case "url":
