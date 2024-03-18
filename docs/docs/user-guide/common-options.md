@@ -18,9 +18,9 @@ Browsertrix Crawler also supports blocking ads from being loaded during capture 
 
 ## Sitemap Parsing
 
-The `--sitemap` option can be used to have the crawler parse a sitemap and extract all relevant URLs. By default, `--sitemap` will look for a sitemap at `<your-seed>/sitemap.xml`. If a website's sitemap is hosted at a different URL, you can pass the URL with the flag like `--sitemap <sitemap url>`.
+The `--sitemap` option can be used to have the crawler parse a sitemap and queue any found URLs while respecting the crawl's scoping rules and limits. Browsertrix Crawler is able to parse regular sitemaps as well as sitemap indices that point out to nested sitemaps.
 
-Browsertrix Crawler is able to parse regular sitemaps as well as sitemap indices that point out to nested sitemaps.
+By default, `--sitemap` will look for a sitemap at `<your-seed>/sitemap.xml`. If a website's sitemap is hosted at a different URL, pass the URL with the flag like `--sitemap <sitemap url>`.
 
 The `--sitemapFrom`/`--sitemapFromDate` and `--sitemapTo`/`--sitemapToDate` options allow for only extracting pages within a specific date range. If set, these options will filter URLs from sitemaps to those greater than or equal to (>=) or lesser than or equal to (<=) a provided ISO Date string (`YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SS`, or partial date), respectively.
 
