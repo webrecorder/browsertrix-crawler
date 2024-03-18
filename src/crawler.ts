@@ -2074,12 +2074,10 @@ self.__bx_behaviors.selectMainBehavior();
       { from: fromDate || "<any date>", to: fromDate || "<any date>" },
       "sitemap",
     );
-    const counter = { value: 0 };
     const sitemapper = new SitemapReader({
       headers,
       fromDate,
       toDate,
-      counter,
       limit: this.pageLimit,
     });
 
@@ -2100,7 +2098,7 @@ self.__bx_behaviors.selectMainBehavior();
         if (!finished) {
           logger.info(
             "Sitemap Parsing Finished",
-            { urlsFound: counter.value, limitHit: sitemapper.atLimit() },
+            { urlsFound: sitemapper.count, limitHit: sitemapper.atLimit() },
             "sitemap",
           );
           this.crawlState.markSitemapDone();
@@ -2108,8 +2106,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
       });
       sitemapper.on("url", ({ url }) => {
-        const count = counter.value;
-
+        const count = sitemapper.count;
         if (count % 10 ** power === 0) {
           if (count % 10 ** (power + 1) === 0 && power <= 3) {
             power++;

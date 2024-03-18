@@ -9,18 +9,12 @@ import { logger, formatErr } from "./logger.js";
 
 const SITEMAP_CONCURRENCY = 5;
 
-export type Counter = {
-  value: number;
-};
-
 export type SitemapOpts = {
   headers?: Record<string, string>;
-  q?: PQueue;
-  seenSitemapSet?: Set<string>;
 
   fromDate?: Date;
   toDate?: Date;
-  counter?: Counter;
+
   limit?: number;
 };
 
@@ -33,27 +27,33 @@ export class SitemapReader extends EventEmitter {
   q: PQueue;
 
   seenSitemapSet: Set<string>;
+  pending: Set<string>;
 
-  counter: Counter;
+  count = 0;
   limit: number;
-
-  isRoot = false;
 
   constructor(opts: SitemapOpts) {
     super();
     this.headers = opts.headers;
 
-    this.isRoot = !opts.q;
-    this.q = opts.q || new PQueue({ concurrency: SITEMAP_CONCURRENCY });
+    this.q = new PQueue({ concurrency: SITEMAP_CONCURRENCY });
 
     this.fromDate = opts.fromDate;
     this.toDate = opts.toDate;
 
-    this.seenSitemapSet = opts.seenSitemapSet || new Set<string>();
+    this.seenSitemapSet = new Set<string>();
 
-    this.counter = opts.counter || { value: 0 };
     this.limit = opts.limit || 0;
+
+    this.pending = new Set<string>();
   }
+
+  async maybeEnd() {
+    if (!this.pending.size) {
+      await this.q.onIdle();
+    }
+  }
+
   async parseSitemap(url: string): Promise<void> {
     this.seenSitemapSet.add(url);
 
@@ -66,16 +66,17 @@ export class SitemapReader extends EventEmitter {
           "sitemap",
         );
       }
-      this.emit("end");
       return;
     }
     const readableNodeStream = Readable.fromWeb(
       resp.body as ReadableStream<Uint8Array>,
     );
-    this.initSaxParser(readableNodeStream);
+    this.initSaxParser(url, readableNodeStream);
   }
 
-  initSaxParser(sourceStream: Readable) {
+  initSaxParser(url: string, sourceStream: Readable) {
+    this.pending.add(url);
+
     const parserStream = sax.createStream(false, {
       trim: true,
       normalize: true,
@@ -96,10 +97,11 @@ export class SitemapReader extends EventEmitter {
     let otherTags = 0;
 
     parserStream.on("end", async () => {
-      if (this.isRoot) {
+      this.pending.delete(url);
+      if (!this.pending.size) {
         await this.q.onIdle();
+        this.emit("end");
       }
-      this.emit("end");
     });
 
     parserStream.on("opentag", (node: sax.Tag) => {
@@ -203,6 +205,7 @@ export class SitemapReader extends EventEmitter {
 
     parserStream.on("error", (err: Error) => {
       if (this.atLimit()) {
+        this.pending.delete(url);
         return;
       }
       logger.warn("Sitemap error parsing XML", { err }, "sitemap");
@@ -214,8 +217,8 @@ export class SitemapReader extends EventEmitter {
     sourceStream.pipe(parserStream);
   }
 
-  atLimit() {
-    return this.limit && this.counter.value >= this.limit;
+  atLimit(): boolean {
+    return Boolean(this.limit && this.count >= this.limit);
   }
 
   addNewSitemap(url: string) {
@@ -228,22 +231,8 @@ export class SitemapReader extends EventEmitter {
     }
 
     this.q.add(async () => {
-      const nested = new SitemapReader({
-        headers: this.headers,
-        fromDate: this.fromDate,
-        toDate: this.toDate,
-        seenSitemapSet: this.seenSitemapSet,
-        q: this.q,
-        counter: this.counter,
-        limit: this.limit,
-      });
-
-      nested.on("url", (data) => {
-        this.emit("url", data);
-      });
-
       try {
-        await nested.parseSitemap(url);
+        await this.parseSitemap(url);
       } catch (e) {
         logger.warn(
           "Sitemap parse failed",
@@ -251,15 +240,6 @@ export class SitemapReader extends EventEmitter {
           "sitemap",
         );
       }
-
-      return new Promise<void>((resolve) => {
-        nested.on("end", () => {
-          resolve();
-          if (this.atLimit()) {
-            this.emit("end");
-          }
-        });
-      });
     });
   }
 
@@ -285,7 +265,7 @@ export class SitemapReader extends EventEmitter {
 
     this.emit("url", { url, lastmod });
 
-    this.counter.value++;
+    this.count++;
   }
 
   getSitemapsQueued() {
