@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
+    "@types/sax": "^1.2.7",
     "@webrecorder/wabac": "^2.16.12",
     "browsertrix-behaviors": "^0.5.3",
     "crc": "^4.3.2",
@@ -30,8 +31,8 @@
     "pixelmatch": "^5.3.0",
     "pngjs": "^7.0.0",
     "puppeteer-core": "^20.8.2",
+    "sax": "^1.3.0",
     "sharp": "^0.32.6",
-    "sitemapper": "^3.2.6",
     "tsc": "^2.0.4",
     "uuid": "8.3.2",
     "warcio": "^2.2.1",

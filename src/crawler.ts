@@ -13,9 +13,6 @@ import {
   PageCallbacks,
 } from "./util/state.js";
 
-import { parseArgs } from "./util/argParser.js";
-
-import Sitemapper from "sitemapper";
 import yaml from "js-yaml";
 
 import * as warcio from "warcio";
@@ -36,7 +33,7 @@ import { initRedis } from "./util/redis.js";
 import { logger, formatErr } from "./util/logger.js";
 import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
-import { collectAllFileSources } from "./util/file_reader.js";
+import { collectAllFileSources, getInfoString } from "./util/file_reader.js";
 
 import { Browser } from "./util/browser.js";
 
@@ -55,6 +52,8 @@ import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
 import { CDPSession, Frame, HTTPRequest, Page } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
+import { SitemapReader } from "./util/sitemapper.js";
+import { ScopedSeed } from "./util/seeds.js";
 
 const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
@@ -72,6 +71,7 @@ const behaviors = fs.readFileSync(
 
 const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
+const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
 
 const POST_CRAWL_STATES = [
   "generate-wacz",
@@ -449,7 +449,7 @@ export class Crawler {
     this.logFH = fs.createWriteStream(this.logFilename);
     logger.setExternalLogStream(this.logFH);
 
-    this.infoString = await this.getInfoString();
+    this.infoString = await getInfoString();
     logger.info(this.infoString);
 
     logger.info("Seeds", this.params.scopedSeeds);
@@ -1035,22 +1035,6 @@ self.__bx_behaviors.selectMainBehavior();
     return res ? frame : null;
   }
 
-  async getInfoString() {
-    const packageFileJSON = JSON.parse(
-      await fsp.readFile(new URL("../package.json", import.meta.url), {
-        encoding: "utf-8",
-      }),
-    );
-    const warcioPackageJSON = JSON.parse(
-      await fsp.readFile(
-        new URL("../node_modules/warcio/package.json", import.meta.url),
-        { encoding: "utf-8" },
-      ),
-    );
-
-    return `Browsertrix-Crawler ${packageFileJSON.version} (with warcio.js ${warcioPackageJSON.version})`;
-  }
-
   async createWARCInfo(filename: string) {
     const warcVersion = "WARC/1.0";
     const type = "warcinfo";
@@ -1315,7 +1299,13 @@ self.__bx_behaviors.selectMainBehavior();
       }
 
       if (seed.sitemap) {
-        await this.parseSitemap(seed.sitemap, i, this.params.sitemapFromDate);
+        await timedRun(
+          this.parseSitemap(seed, i),
+          SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
+          "Sitemap initial fetch timed out",
+          { sitemap: seed.sitemap, seed: seed.url },
+          "sitemap",
+        );
       }
     }
   }
@@ -2098,40 +2088,86 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async parseSitemap(url: string, seedId: number, sitemapFromDate: number) {
-    // handle sitemap last modified date if passed
-    let lastmodFromTimestamp = undefined;
-    const dateObj = new Date(sitemapFromDate);
-    if (isNaN(dateObj.getTime())) {
-      logger.info(
-        "Fetching full sitemap (fromDate not specified/valid)",
-        { url, sitemapFromDate },
-        "sitemap",
-      );
-    } else {
-      lastmodFromTimestamp = dateObj.getTime();
-      logger.info(
-        "Fetching and filtering sitemap by date",
-        { url, sitemapFromDate },
-        "sitemap",
-      );
+  async parseSitemap({ url, sitemap }: ScopedSeed, seedId: number) {
+    if (!sitemap) {
+      return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sitemapper = new (Sitemapper as any)({
-      url,
-      timeout: 15000,
-      requestHeaders: this.headers,
-      lastmod: lastmodFromTimestamp,
+    if (await this.crawlState.isSitemapDone()) {
+      logger.info("Sitemap already processed, skipping", "sitemap");
+      return;
+    }
+
+    const fromDate = this.params.sitemapFromDate;
+    const toDate = this.params.sitemapToDate;
+    const headers = this.headers;
+
+    logger.info(
+      "Fetching sitemap",
+      { from: fromDate || "<any date>", to: fromDate || "<any date>" },
+      "sitemap",
+    );
+    const sitemapper = new SitemapReader({
+      headers,
+      fromDate,
+      toDate,
+      limit: this.pageLimit,
     });
 
     try {
-      const { sites } = await sitemapper.fetch();
-      logger.info("Sitemap Urls Found", { urls: sites.length }, "sitemap");
-      await this.queueInScopeUrls(seedId, sites, 0);
+      await sitemapper.parse(sitemap, url);
     } catch (e) {
-      logger.warn("Error fetching sites from sitemap", e, "sitemap");
+      logger.warn(
+        "Sitemap for seed failed",
+        { url, sitemap, ...formatErr(e) },
+        "sitemap",
+      );
+      return;
     }
+
+    let power = 1;
+    let resolved = false;
+
+    let finished = false;
+
+    await new Promise<void>((resolve) => {
+      sitemapper.on("end", () => {
+        resolve();
+        if (!finished) {
+          logger.info(
+            "Sitemap Parsing Finished",
+            { urlsFound: sitemapper.count, limitHit: sitemapper.atLimit() },
+            "sitemap",
+          );
+          this.crawlState.markSitemapDone();
+          finished = true;
+        }
+      });
+      sitemapper.on("url", ({ url }) => {
+        const count = sitemapper.count;
+        if (count % 10 ** power === 0) {
+          if (count % 10 ** (power + 1) === 0 && power <= 3) {
+            power++;
+          }
+          const sitemapsQueued = sitemapper.getSitemapsQueued();
+          logger.debug(
+            "Sitemap URLs processed so far",
+            { count, sitemapsQueued },
+            "sitemap",
+          );
+        }
+        this.queueInScopeUrls(seedId, [url], 0);
+        if (count >= 100 && !resolved) {
+          logger.info(
+            "Sitemap partially parsed, continue parsing large sitemap in the background",
+            { urlsFound: count },
+            "sitemap",
+          );
+          resolve();
+          resolved = true;
+        }
+      });
+    });
   }
 
   async combineWARC() {

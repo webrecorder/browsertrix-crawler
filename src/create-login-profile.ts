@@ -14,6 +14,7 @@ import { logger } from "./util/logger.js";
 import { Browser } from "./util/browser.js";
 import { initStorage } from "./util/storage.js";
 import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
+import { getInfoString } from "./util/file_reader.js";
 
 const profileHTML = fs.readFileSync(
   new URL("../html/createProfile.html", import.meta.url),
@@ -118,6 +119,11 @@ function getDefaultWindowSize() {
   return `${x},${y}`;
 }
 
+function handleTerminate(signame: string) {
+  logger.info(`Got signal ${signame}, exiting`);
+  process.exit(1);
+}
+
 async function main() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const params: any = yargs(process.argv)
@@ -125,6 +131,12 @@ async function main() {
     .option(cliOpts()).argv;
 
   logger.setDebugLogging(true);
+
+  logger.info(await getInfoString());
+
+  process.on("SIGINT", () => handleTerminate("SIGINT"));
+
+  process.on("SIGTERM", () => handleTerminate("SIGTERM"));
 
   if (!params.headless) {
     logger.debug("Launching XVFB");
@@ -164,7 +176,7 @@ async function main() {
   await browser.launch({
     profileUrl: params.profile,
     headless: params.headless,
-    signals: true,
+    signals: false,
     chromeOptions: {
       proxy: false,
       extraArgs: [

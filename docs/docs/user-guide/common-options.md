@@ -10,11 +10,19 @@ See [page.goto waitUntil options](https://pptr.dev/api/puppeteer.page.goto#remar
 
 The `--pageLoadTimeout`/`--timeout` option sets the timeout in seconds for page load, defaulting to 90 seconds. Behaviors will run on the page once either the page load condition or the page load timeout is met, whichever happens first.
 
-## Ad blocking
+## Ad Blocking
 
 Brave Browser, the browser used by Browsertrix Crawler for crawling, has some ad and tracker blocking features enabled by default. These [Shields](https://brave.com/shields/) be disabled or customized using [Browser Profiles](browser-profiles.md).
 
 Browsertrix Crawler also supports blocking ads from being loaded during capture based on [Stephen Black's list of known ad hosts](https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts). To enable ad blocking based on this list, use the `--blockAds` option. If `--adBlockMessage` is set, a record with the specified error message will be added in the ad's place.
+
+## Sitemap Parsing
+
+The `--sitemap` option can be used to have the crawler parse a sitemap and queue any found URLs while respecting the crawl's scoping rules and limits. Browsertrix Crawler is able to parse regular sitemaps as well as sitemap indices that point out to nested sitemaps.
+
+By default, `--sitemap` will look for a sitemap at `<your-seed>/sitemap.xml`. If a website's sitemap is hosted at a different URL, pass the URL with the flag like `--sitemap <sitemap url>`.
+
+The `--sitemapFrom`/`--sitemapFromDate` and `--sitemapTo`/`--sitemapToDate` options allow for only extracting pages within a specific date range. If set, these options will filter URLs from sitemaps to those greater than or equal to (>=) or lesser than or equal to (<=) a provided ISO Date string (`YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SS`, or partial date), respectively.
 
 ## Custom Warcinfo Fields
 
