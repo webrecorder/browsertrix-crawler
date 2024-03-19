@@ -13,6 +13,8 @@ import {
   PageCallbacks,
 } from "./util/state.js";
 
+import { parseArgs } from "./util/argParser.js";
+
 import yaml from "js-yaml";
 
 import * as warcio from "warcio";
