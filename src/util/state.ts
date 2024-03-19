@@ -142,6 +142,7 @@ type SaveState = {
   failed: string[];
   errors: string[];
   extraSeeds: string[];
+  sitemapDone: boolean;
 };
 
 // ============================================================================
@@ -161,6 +162,8 @@ export class RedisCrawlState {
   ekey: string;
   pageskey: string;
   esKey: string;
+
+  sitemapDoneKey: string;
 
   constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
@@ -182,6 +185,8 @@ export class RedisCrawlState {
     this.pageskey = this.key + ":pages";
 
     this.esKey = this.key + ":extraSeeds";
+
+    this.sitemapDoneKey = this.key + ":sitemapDone";
 
     this._initLuaCommands(this.redis);
   }
@@ -521,10 +526,19 @@ return 0;
     const failed = await this._iterListKeys(this.fkey, seen);
     const errors = await this.getErrorList();
     const extraSeeds = await this._iterListKeys(this.esKey, seen);
+    const sitemapDone = await this.isSitemapDone();
 
     const finished = [...seen.values()];
 
-    return { extraSeeds, finished, queued, pending, failed, errors };
+    return {
+      extraSeeds,
+      finished,
+      queued,
+      pending,
+      sitemapDone,
+      failed,
+      errors,
+    };
   }
 
   _getScore(data: QueueEntry) {
@@ -643,6 +657,10 @@ return 0;
 
       await this.redis.zadd(this.qkey, this._getScore(data), json);
       seen.push(data.url);
+
+      if (state.sitemapDone) {
+        await this.markSitemapDone();
+      }
     }
 
     // backwards compatibility: not using done, instead 'finished'
@@ -792,5 +810,13 @@ return 0;
       seeds.push(JSON.parse(key));
     }
     return seeds;
+  }
+
+  async isSitemapDone() {
+    return (await this.redis.get(this.sitemapDoneKey)) == "1";
+  }
+
+  async markSitemapDone() {
+    await this.redis.set(this.sitemapDoneKey, "1");
   }
 }

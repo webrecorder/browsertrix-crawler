@@ -144,12 +144,9 @@ export class ScopedSeed {
 
   resolveSiteMap(sitemap: boolean | string | null): string | null {
     if (sitemap === true) {
-      const url = new URL(this.url);
-      url.pathname = "/sitemap.xml";
-      return url.href;
+      return "<detect>";
     } else if (typeof sitemap === "string") {
-      const url = new URL(sitemap, this.url);
-      return url.href;
+      return sitemap;
     }
 
     return null;
