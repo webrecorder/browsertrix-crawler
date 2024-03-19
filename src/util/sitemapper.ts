@@ -7,6 +7,7 @@ import PQueue from "p-queue";
 
 import { logger, formatErr } from "./logger.js";
 import { DETECT_SITEMAP } from "./constants.js";
+import { sleep } from "./timing.js";
 
 const SITEMAP_CONCURRENCY = 5;
 
@@ -57,6 +58,31 @@ export class SitemapReader extends EventEmitter {
     return ct.split(";")[0];
   }
 
+  async _fetchWithRetry(url: string, message: string) {
+    while (true) {
+      const resp = await fetch(url, { headers: this.headers });
+
+      if (resp.ok) {
+        return resp;
+      }
+
+      const retry = resp.headers.get("retry-after");
+
+      if (retry) {
+        logger.debug(
+          "Sitemap Fetch: Retry after",
+          { retrySeconds: retry },
+          "sitemap",
+        );
+        await sleep(parseInt(retry));
+        continue;
+      }
+
+      logger.debug(message, { status: resp.status }, "sitemap");
+      return null;
+    }
+  }
+
   async tryFetch(url: string, expectedCT?: string | null) {
     try {
       logger.debug(
@@ -64,14 +90,13 @@ export class SitemapReader extends EventEmitter {
         { url, expectedCT },
         "sitemap",
       );
-      const resp = await fetch(url, { headers: this.headers });
 
-      if (!resp.ok) {
-        logger.debug(
-          "Detecting Sitemap: invalid status code",
-          { status: resp.status },
-          "sitemap",
-        );
+      const resp = await this._fetchWithRetry(
+        url,
+        "Detecting Sitemap: invalid status code",
+      );
+
+      if (!resp) {
         return null;
       }
 
@@ -162,13 +187,11 @@ export class SitemapReader extends EventEmitter {
   }
 
   async parseFromRobots(url: string) {
-    const resp = await fetch(url, { headers: this.headers });
-    if (!resp.ok) {
-      logger.error(
-        "Sitemap robots.txt parse failed",
-        { url, status: resp.status },
-        "sitemap",
-      );
+    const resp = await this._fetchWithRetry(
+      url,
+      "Sitemap robots.txt parse failed",
+    );
+    if (!resp) {
       return;
     }
 
@@ -187,21 +210,14 @@ export class SitemapReader extends EventEmitter {
   async parseSitemap(url: string) {
     this.seenSitemapSet.add(url);
 
-    const resp = await fetch(url, { headers: this.headers });
+    const resp = await this._fetchWithRetry(url, "Sitemap parse failed");
+    if (!resp) {
+      return;
+    }
     await this._parseSitemapFromResponse(url, resp);
   }
 
   private async _parseSitemapFromResponse(url: string, resp: Response) {
-    if (!resp.ok) {
-      if (!this.atLimit()) {
-        logger.error(
-          "Sitemap parse failed",
-          { url, status: resp.status },
-          "sitemap",
-        );
-      }
-      return;
-    }
     const readableNodeStream = Readable.fromWeb(
       resp.body as ReadableStream<Uint8Array>,
     );
