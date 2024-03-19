@@ -163,6 +163,8 @@ export class RedisCrawlState {
   pageskey: string;
   esKey: string;
 
+  sitemapDoneKey: string;
+
   constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
 
@@ -183,6 +185,8 @@ export class RedisCrawlState {
     this.pageskey = this.key + ":pages";
 
     this.esKey = this.key + ":extraSeeds";
+
+    this.sitemapDoneKey = this.key + ":sitemapDone";
 
     this._initLuaCommands(this.redis);
   }
@@ -809,10 +813,10 @@ return 0;
   }
 
   async isSitemapDone() {
-    return (await this.redis.get(this.key + ":sitemapDone")) == "1";
+    return (await this.redis.get(this.sitemapDoneKey)) == "1";
   }
 
   async markSitemapDone() {
-    await this.redis.set(this.key + ":sitemapDone", "1");
+    await this.redis.set(this.sitemapDoneKey, "1");
   }
 }
