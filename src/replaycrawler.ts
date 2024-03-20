@@ -335,11 +335,9 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
-    const date = ts ? new Date(ts) : undefined;
+    const date = new Date(ts);
 
-    const timestamp = date
-      ? date.toISOString().slice(0, 19).replace(/[T:-]/g, "")
-      : "";
+    const timestamp = date.toISOString().slice(0, 19).replace(/[T:-]/g, "");
 
     logger.info("Loading Replay", { url, timestamp }, "replay");
 
