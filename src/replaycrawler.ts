@@ -26,9 +26,15 @@ import levenshtein from "js-levenshtein";
 import { MAX_URL_LENGTH } from "./util/reqresp.js";
 import { openAsBlob } from "fs";
 
+// RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
 
-//import { openAsBlob } from "node:fs";
+// RWP Source Url
+const REPLAY_SOURCE = "http://localhost:9990/replay/?source=";
+
+// When iterating over page.frames(), the first two frames are for the top-level page
+// and RWP embed, the actual content starts with frame index 2
+const SKIP_FRAMES = 2;
 
 type ReplayPage = {
   url: string;
@@ -80,7 +86,7 @@ export class ReplayCrawler extends Crawler {
     this.pageInfos = new Map<Page, ReplayPageInfoRecord>();
 
     // skip text from first two frames, as they are RWP boilerplate
-    this.skipTextDocs = 2;
+    this.skipTextDocs = SKIP_FRAMES;
 
     this.params.scopedSeeds = [];
 
@@ -114,13 +120,12 @@ export class ReplayCrawler extends Crawler {
 
     await page.goto(this.replayServer.homePage);
 
-    while (page.frames().length < 2) {
-      //console.log("Frames: " + page.frames().length);
+    // wait until content frame is available
+    while (page.frames().length < SKIP_FRAMES) {
       await sleep(5);
     }
 
     const frame = page.frames()[1];
-    //console.log(frame.url());
 
     await frame.evaluate(() => {
       return navigator.serviceWorker.ready;
@@ -128,10 +133,6 @@ export class ReplayCrawler extends Crawler {
   }
 
   protected async _addInitialSeeds() {
-    // this.params.scopedSeeds = [
-    //   new ScopedSeed({url: "https://replay.example.com/", scopeType: "page", depth: 1, include: [] })
-    // ];
-
     await this.loadPages(this.qaSource);
   }
 
@@ -263,7 +264,7 @@ export class ReplayCrawler extends Crawler {
     const { response } = params;
     const { url, status } = response;
     if (!url.startsWith(REPLAY_PREFIX)) {
-      if (url.startsWith("http://localhost:9990/replay/?source=")) {
+      if (url.startsWith(REPLAY_SOURCE)) {
         const { mimeType, fromServiceWorker } = response;
         if (
           !fromServiceWorker &&
@@ -378,19 +379,15 @@ export class ReplayCrawler extends Crawler {
       timestamp,
     );
 
-    // optionally reload
+    // optionally reload (todo: reevaluate if this is needed)
     // await page.reload();
 
     await sleep(10);
 
-    // console.log("Frames");
-    // for (const frame of page.frames()) {
-    //   console.log(`${frame.name()} - ${frame.url()}`);
-    // }
-
     data.isHTMLPage = true;
 
-    data.filteredFrames = page.frames().slice(2);
+    // skipping RWP frames
+    data.filteredFrames = page.frames().slice(SKIP_FRAMES);
 
     try {
       data.title = await data.filteredFrames[0].title();
@@ -504,11 +501,6 @@ export class ReplayCrawler extends Crawler {
     const maxLen = Math.max(origText.length, replayText.length);
     const matchPercent = (maxLen - dist) / maxLen;
     logger.info("Levenshtein Dist", { url, dist, matchPercent, maxLen });
-    // if (dist) {
-    //   console.log(origText);
-    //   console.log("------------")
-    //   console.log(replayText);
-    // }
 
     const pageInfo = this.pageInfos.get(page);
     if (pageInfo) {
@@ -564,15 +556,6 @@ export class ReplayCrawler extends Crawler {
     resourceCounts.replayBad = replayBad;
 
     logger.info("Resource counts", { url, ...resourceCounts }, "replay");
-
-    // if (crawlGood !== replayGood) {
-    //   console.log("*** ORIG");
-    //   console.log(origResData);
-    // }
-
-    // //console.log(origResData);
-    // console.log("*** REPLAY");
-    // console.log(pageInfo);
   }
 
   countResources(info: PageInfoRecord) {
