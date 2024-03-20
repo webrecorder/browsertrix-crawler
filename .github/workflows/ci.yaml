@@ -44,5 +44,7 @@ jobs:
         run: docker-compose build
       - name: mkdir test crawl dir
         run: mkdir test-crawls
+      - name: run stat
+        run: stat test-crawls
       - name: run jest
         run: sudo yarn test
