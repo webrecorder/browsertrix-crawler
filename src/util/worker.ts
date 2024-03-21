@@ -15,43 +15,6 @@ const TEARDOWN_TIMEOUT = 10;
 const FINISHED_TIMEOUT = 60;
 
 // ===========================================================================
-export async function runWorkers(
-  crawler: Crawler,
-  numWorkers: number,
-  maxPageTime: number,
-  collDir: string,
-) {
-  logger.info(`Creating ${numWorkers} workers`, {}, "worker");
-
-  const workers = [];
-  let offset = 0;
-
-  // automatically set worker start by ordinal in k8s
-  // if hostname is "crawl-id-name-N"
-  // while CRAWL_ID is "crawl-id-name", then set starting
-  // worker index offset to N * numWorkers
-
-  if (process.env.CRAWL_ID) {
-    const rx = new RegExp(rxEscape(process.env.CRAWL_ID) + "\\-([\\d]+)$");
-    const m = os.hostname().match(rx);
-    if (m) {
-      offset = Number(m[1]) * numWorkers;
-      logger.info("Starting workerid index at " + offset, "worker");
-    }
-  }
-
-  for (let i = 0; i < numWorkers; i++) {
-    workers.push(new PageWorker(i + offset, crawler, maxPageTime, collDir));
-  }
-
-  await Promise.allSettled(workers.map((worker) => worker.run()));
-
-  await crawler.browser.close();
-
-  await Promise.allSettled(workers.map((worker) => worker.finalize()));
-}
-
-// ===========================================================================
 export type WorkerOpts = {
   page: Page;
   cdp: CDPSession;
@@ -372,9 +335,9 @@ export class PageWorker {
     }
   }
 
-  async finalize() {
+  async finalize(waitTime?: number) {
     if (this.recorder) {
-      await this.recorder.onDone(this.maxPageTime);
+      await this.recorder.onDone(waitTime ?? this.maxPageTime);
     }
   }
 
@@ -432,4 +395,48 @@ export class PageWorker {
       }
     }
   }
+}
+
+// ===========================================================================
+const workers: PageWorker[] = [];
+
+// ===========================================================================
+export async function runWorkers(
+  crawler: Crawler,
+  numWorkers: number,
+  maxPageTime: number,
+  collDir: string,
+) {
+  logger.info(`Creating ${numWorkers} workers`, {}, "worker");
+
+  let offset = 0;
+
+  // automatically set worker start by ordinal in k8s
+  // if hostname is "crawl-id-name-N"
+  // while CRAWL_ID is "crawl-id-name", then set starting
+  // worker index offset to N * numWorkers
+
+  if (process.env.CRAWL_ID) {
+    const rx = new RegExp(rxEscape(process.env.CRAWL_ID) + "\\-([\\d]+)$");
+    const m = os.hostname().match(rx);
+    if (m) {
+      offset = Number(m[1]) * numWorkers;
+      logger.info("Starting workerid index at " + offset, "worker");
+    }
+  }
+
+  for (let i = 0; i < numWorkers; i++) {
+    workers.push(new PageWorker(i + offset, crawler, maxPageTime, collDir));
+  }
+
+  await Promise.allSettled(workers.map((worker) => worker.run()));
+
+  await crawler.browser.close();
+
+  await closeWorkers();
+}
+
+// ===========================================================================
+export function closeWorkers(waitTime?: number) {
+  return Promise.allSettled(workers.map((worker) => worker.finalize(waitTime)));
 }

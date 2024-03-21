@@ -105,15 +105,6 @@ export class WARCWriter implements IndexerOffsetLength {
     requestRecord: WARCRecord,
     responseSerializer: WARCSerializer | undefined = undefined,
   ) {
-    if (this.done) {
-      logger.warn(
-        "Writer closed, not writing records",
-        this.logDetails,
-        "writer",
-      );
-      return;
-    }
-
     const opts = { gzip: this.gzip };
 
     if (!responseSerializer) {
@@ -147,6 +138,15 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   private async _writeRecord(record: WARCRecord, serializer: WARCSerializer) {
+    if (this.done) {
+      logger.warn(
+        "Writer closed, not writing records",
+        this.logDetails,
+        "writer",
+      );
+      return 0;
+    }
+
     let total = 0;
     const url = record.warcTargetURI;
 
@@ -171,6 +171,11 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   _writeCDX(record: WARCRecord | null) {
+    if (this.done) {
+      logger.warn("Writer closed, not writing CDX", this.logDetails, "writer");
+      return;
+    }
+
     if (this.indexer && this.filename) {
       const cdx = this.indexer.indexRecord(record, this, this.filename);
 
@@ -183,6 +188,8 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   async flush() {
+    this.done = true;
+
     if (this.fh) {
       await streamFinish(this.fh);
       this.fh = null;
@@ -194,8 +201,6 @@ export class WARCWriter implements IndexerOffsetLength {
       await streamFinish(this.cdxFH);
       this.cdxFH = null;
     }
-
-    this.done = true;
   }
 }
 
