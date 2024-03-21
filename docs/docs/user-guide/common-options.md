@@ -135,16 +135,16 @@ Browsertrix Crawler has different crawl interruption modes, and does everything 
 
 ### 1. Graceful Shutdown
 
-Initiated when a single SIGINT (Ctrl+C) or SIGTERM (`docker kill -s SIGINT`, `docker kill -s SIGTERM`, `kill`) signal received
+Initiated when a single SIGINT (Ctrl+C) or SIGTERM (`docker kill -s SIGINT`, `docker kill -s SIGTERM`, `kill`) signal is received.
 The crawler will attempt to finish current pages, finish any pending async requests, write all WARCS, generate WACZ files
 and other post-processing, save state from Redis and then exit.
 
 ### 2. Less-Graceful, Quick Shutdown
 
 If a second SIGINT / SIGTERM is received, the crawler will close the browser immediately, interrupting any on-going network requests.
-Any pending network requests will not be awaited. However, anything in the WARC queue will be written and WARC files will be flushed.
-WACZ files and other post-processing will not be generated, but the state will be saved in Redis.
-WARC files should still be valid.
+Any asynchronous fetching will not be finished. However, anything in the WARC queue will be written and WARC files will be flushed.
+WACZ files and other post-processing will not be generated, but the current state from Redis will still be saved if enabled (see above).
+WARC records should be fully finished and WARC file should be valid, though not necessarily contain all the data for the pages being processed during the interruption.
 
 ### 3. Violent / Immediate Shutdown
 
@@ -153,6 +153,6 @@ If a crawler is killed, eg. with SIGKILL signal (`docker kill`, `kill -9`), the 
 
 ### Recommendations
 
-It is recommended to graceful stop the crawler by sending a SIGINT or SIGTERM signal, which can be done via Ctrl+C or `docker kill -s SIGINT <containerid>`. Repeating the command will result in a faster, slightly less-graceful shutdown.
-Kubernetes also uses SIGTERM by default when shutting down container pods. Using SIGKILL is not recommended
+It is recommended to gracefully stop the crawler by sending a SIGINT or SIGTERM signal, which can be done via Ctrl+C or `docker kill -s SIGINT <containerid>`. Repeating the command will result in a faster, slightly less-graceful shutdown.
+Using SIGKILL is not recommended
 except for last resort, and only when data is to be discarded.
