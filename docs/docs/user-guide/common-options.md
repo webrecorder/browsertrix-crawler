@@ -136,15 +136,12 @@ Browsertrix Crawler has different crawl interruption modes, and does everything 
 ### 1. Graceful Shutdown
 
 Initiated when a single SIGINT (Ctrl+C) or SIGTERM (`docker kill -s SIGINT`, `docker kill -s SIGTERM`, `kill`) signal is received.
-The crawler will attempt to finish current pages, finish any pending async requests, write all WARCS, generate WACZ files
-and other post-processing, save state from Redis and then exit.
+
+The crawler will attempt to finish current pages, finish any pending async requests, write all WARCS, generate WACZ files and finish other post-processing, save state from Redis, and then exit.
 
 ### 2. Less-Graceful, Quick Shutdown
 
-If a second SIGINT / SIGTERM is received, the crawler will close the browser immediately, interrupting any on-going network requests.
-Any asynchronous fetching will not be finished. However, anything in the WARC queue will be written and WARC files will be flushed.
-WACZ files and other post-processing will not be generated, but the current state from Redis will still be saved if enabled (see above).
-WARC records should be fully finished and WARC file should be valid, though not necessarily contain all the data for the pages being processed during the interruption.
+If a second SIGINT / SIGTERM is received, the crawler will close the browser immediately, interrupting any on-going network requests. Any asynchronous fetching will not be finished. However, anything in the WARC queue will be written and WARC files will be flushed. WACZ files and other post-processing will not be generated, but the current state from Redis will still be saved if enabled (see above). WARC records should be fully finished and WARC files should be valid, though they may not contain all the data for the pages being processed during the interruption.
 
 ### 3. Violent / Immediate Shutdown
 
