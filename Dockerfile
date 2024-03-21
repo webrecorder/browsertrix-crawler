@@ -15,7 +15,10 @@ ENV PROXY_HOST=localhost \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=google-chrome \
     OPENSSL_CONF=/app/openssl.conf \
-    VNC_PASS=vncpassw0rd!
+    VNC_PASS=vncpassw0rd! \
+    DETACHED_CHILD_PROC=1
+
+RUN apt-get update && apt-get install -qqy gosu
 
 WORKDIR /app
 
@@ -50,9 +53,6 @@ ADD html/ /app/html/
 RUN chmod a+x /app/dist/main.js /app/dist/create-login-profile.js
 
 RUN ln -s /app/dist/main.js /usr/bin/crawl; ln -s /app/dist/create-login-profile.js /usr/bin/create-login-profile
-
-
-RUN apt-get update && apt-get install -qqy gosu
 
 WORKDIR /crawls
 

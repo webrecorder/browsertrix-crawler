@@ -20,7 +20,6 @@ if [ "$MY_GID" != "$VOLUME_GID" ] || [ "$MY_UID" != "$VOLUME_UID" ]; then
     useradd -ms /bin/bash -g $VOLUME_GID btrix
     usermod -o -u $VOLUME_UID btrix > /dev/null
 
-    export DETACHED_PROC=1
     exec gosu btrix:btrix "$@"
 else
     exec "$@"

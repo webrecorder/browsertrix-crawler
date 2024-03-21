@@ -73,7 +73,7 @@ const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
 const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
 
-const RUN_DETACHED = process.env.DETACHED_PROC == "1";
+const RUN_DETACHED = process.env.DETACHED_CHILD_PROC == "1";
 
 const POST_CRAWL_STATES = [
   "generate-wacz",
