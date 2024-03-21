@@ -1,6 +1,6 @@
 # Browsertrix Crawler User Guide
 
-Welcome to the Browsertrix User Guide. This page covers the basics of using Browsertrix Crawler, Webrecorder's browser-based high-fidelity crawling system, designed to run a complex, customizable browser-based crawl in a single Docker container.
+Welcome to the Browsertrix Crawler User Guide. This page covers the basics of using Browsertrix Crawler, Webrecorder's browser-based high-fidelity crawling system, designed to run a complex, customizable, browser-based crawl in a single Docker container.
 
 ## Getting Started
 
