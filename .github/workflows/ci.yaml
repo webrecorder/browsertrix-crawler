@@ -42,7 +42,10 @@ jobs:
         run: yarn run tsc
       - name: build docker
         run: docker-compose build
-      - name: mkdir test crawl dir
-        run: mkdir test-crawls
       - name: run jest
         run: sudo yarn test
+      - name: run saved state test with volume owned by different user
+        run: |
+          sudo rm -rf ./test-crawls
+          mkdir test-crawls
+          sudo yarn test ./tests/saved-state.test.js
