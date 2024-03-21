@@ -129,7 +129,7 @@ By default, the crawl state is only written when a crawl is interrupted before c
 
 When the `--saveState` is set to always, Browsertrix Crawler will also save the state automatically during the crawl, as set by the `--saveStateInterval` setting. The crawler will keep the last `--saveStateHistory` save states and delete older ones. This provides extra backup, in the event that the crawl fails unexpectedly or is not terminated via Ctrl-C, several previous crawl states are still available.
 
-### Note/Caveat on Crawl Interruption
+## Crawl Interruption Options
 
 Browsertrix Crawler has different crawl interruption modes, and does everything it can to ensure the WARC data written is always valid when a crawl is interrupted. The following are three interruption scenarios:
 
