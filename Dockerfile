@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=1.62.165
+ARG BROWSER_VERSION=1.64.109
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
 FROM ${BROWSER_IMAGE_BASE}
@@ -17,8 +17,6 @@ ENV PROXY_HOST=localhost \
     OPENSSL_CONF=/app/openssl.conf \
     VNC_PASS=vncpassw0rd! \
     DETACHED_CHILD_PROC=1
-
-RUN apt-get update && apt-get install -qqy gosu
 
 WORKDIR /app
 
