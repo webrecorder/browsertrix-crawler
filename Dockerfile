@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=1.62.165
+ARG BROWSER_VERSION=1.64.109
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
 FROM ${BROWSER_IMAGE_BASE}
@@ -15,7 +15,8 @@ ENV PROXY_HOST=localhost \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=google-chrome \
     OPENSSL_CONF=/app/openssl.conf \
-    VNC_PASS=vncpassw0rd!
+    VNC_PASS=vncpassw0rd! \
+    DETACHED_CHILD_PROC=1
 
 WORKDIR /app
 
@@ -47,7 +48,7 @@ ADD config/ /app/
 
 ADD html/ /app/html/
 
-RUN chmod u+x /app/dist/main.js /app/dist/create-login-profile.js
+RUN chmod a+x /app/dist/main.js /app/dist/create-login-profile.js
 
 RUN ln -s /app/dist/main.js /usr/bin/crawl; ln -s /app/dist/create-login-profile.js /usr/bin/create-login-profile
 

@@ -44,3 +44,8 @@ jobs:
         run: docker-compose build
       - name: run jest
         run: sudo yarn test
+      - name: run saved state test with volume owned by different user
+        run: |
+          sudo rm -rf ./test-crawls
+          mkdir test-crawls
+          sudo yarn test ./tests/saved-state.test.js
