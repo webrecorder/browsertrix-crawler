@@ -154,5 +154,6 @@ If a crawler is killed, eg. with SIGKILL signal (`docker kill`, `kill -9`), the 
 ### Recommendations
 
 It is recommended to gracefully stop the crawler by sending a SIGINT or SIGTERM signal, which can be done via Ctrl+C or `docker kill -s SIGINT <containerid>`. Repeating the command will result in a faster, slightly less-graceful shutdown.
-Using SIGKILL is not recommended
-except for last resort, and only when data is to be discarded.
+Using SIGKILL is not recommended except for last resort, and only when data is to be discarded.
+
+Note: When using the crawler in the Browsertrix app / in Kubernetes general, stopping a crawl / stopping a pod always results in option #1 (sending a single SIGTERM signal) to the crawler pod(s)
