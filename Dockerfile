@@ -51,6 +51,9 @@ RUN chmod a+x /app/dist/main.js /app/dist/create-login-profile.js
 
 RUN ln -s /app/dist/main.js /usr/bin/crawl; ln -s /app/dist/create-login-profile.js /usr/bin/create-login-profile
 
+
+RUN apt-get update && apt-get install -qqy gosu
+
 WORKDIR /crawls
 
 # enable to test custom behaviors build (from browsertrix-behaviors)

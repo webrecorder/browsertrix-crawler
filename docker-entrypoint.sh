@@ -21,7 +21,7 @@ if [ "$MY_GID" != "$VOLUME_GID" ] || [ "$MY_UID" != "$VOLUME_UID" ]; then
     usermod -o -u $VOLUME_UID btrix > /dev/null
 
     export DETACHED_PROC=1
-    su btrix --session-command '"$@"' -- argv0-ignore "$@"
+    exec gosu btrix:btrix "$@"
 else
     exec "$@"
 fi
