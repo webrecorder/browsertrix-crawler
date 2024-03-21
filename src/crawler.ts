@@ -33,7 +33,12 @@ import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
 import { logger, formatErr } from "./util/logger.js";
-import { WorkerOpts, WorkerState, runWorkers } from "./util/worker.js";
+import {
+  WorkerOpts,
+  WorkerState,
+  closeWorkers,
+  runWorkers,
+} from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectAllFileSources, getInfoString } from "./util/file_reader.js";
 
@@ -1143,6 +1148,8 @@ self.__bx_behaviors.selectMainBehavior();
     await this.serializeConfig();
 
     if (this.interrupted) {
+      await this.browser.close();
+      await closeWorkers(0);
       await this.setStatusAndExit(13, "interrupted");
     } else {
       await this.setStatusAndExit(0, "done");

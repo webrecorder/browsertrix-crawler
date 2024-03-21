@@ -803,13 +803,15 @@ export class Recorder {
       await this.fetcherQ.onIdle();
     };
 
-    await timedRun(
-      finishFetch(),
-      timeout,
-      "Finishing Fetch Timed Out",
-      this.logDetails,
-      "recorder",
-    );
+    if (timeout > 0) {
+      await timedRun(
+        finishFetch(),
+        timeout,
+        "Finishing Fetch Timed Out",
+        this.logDetails,
+        "recorder",
+      );
+    }
 
     logger.debug("Finishing WARC writing", this.logDetails, "recorder");
     await this.warcQ.onIdle();
