@@ -73,6 +73,8 @@ const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
 const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
 
+const RUN_DETACHED = process.env.DETACHED_PROC == "1";
+
 const POST_CRAWL_STATES = [
   "generate-wacz",
   "uploading-wacz",
@@ -412,6 +414,7 @@ export class Crawler {
     return child_process.spawn("redis-server", redisArgs, {
       cwd: "/tmp/",
       stdio: redisStdio,
+      detached: RUN_DETACHED,
     });
   }
 
@@ -462,23 +465,28 @@ export class Crawler {
       }
     });
 
-    child_process.spawn("socat", [
-      "tcp-listen:9222,reuseaddr,fork",
-      "tcp:localhost:9221",
-    ]);
+    child_process.spawn(
+      "socat",
+      ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"],
+      { detached: RUN_DETACHED },
+    );
 
     if (!this.params.headless && !process.env.NO_XVFB) {
-      child_process.spawn("Xvfb", [
-        process.env.DISPLAY || "",
-        "-listen",
-        "tcp",
-        "-screen",
-        "0",
-        process.env.GEOMETRY || "",
-        "-ac",
-        "+extension",
-        "RANDR",
-      ]);
+      child_process.spawn(
+        "Xvfb",
+        [
+          process.env.DISPLAY || "",
+          "-listen",
+          "tcp",
+          "-screen",
+          "0",
+          process.env.GEOMETRY || "",
+          "-ac",
+          "+extension",
+          "RANDR",
+        ],
+        { detached: RUN_DETACHED },
+      );
     }
   }
 
@@ -1427,7 +1435,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // create WACZ
     const waczResult = await this.awaitProcess(
-      child_process.spawn("wacz", createArgs),
+      child_process.spawn("wacz", createArgs, { detached: RUN_DETACHED }),
     );
 
     if (waczResult !== 0) {
