@@ -115,7 +115,7 @@ Webhook notification JSON includes:
 
 ## Saving Crawl State: Interrupting and Restarting the Crawl
 
-A crawl can be gracefully interrupted with Ctrl-C (SIGINT) or a SIGTERM.
+A crawl can be gracefully interrupted with Ctrl-C (SIGINT) or a SIGTERM (see below for more details).
 
 When a crawl is interrupted, the current crawl state is written to the `crawls` subdirectory inside the collection directory. The crawl state includes the current YAML config, if any, plus the current state of the crawl.
 
@@ -128,3 +128,31 @@ By default, the crawl state is only written when a crawl is interrupted before c
 ### Periodic State Saving
 
 When the `--saveState` is set to always, Browsertrix Crawler will also save the state automatically during the crawl, as set by the `--saveStateInterval` setting. The crawler will keep the last `--saveStateHistory` save states and delete older ones. This provides extra backup, in the event that the crawl fails unexpectedly or is not terminated via Ctrl-C, several previous crawl states are still available.
+
+### Note/Caveat on Crawl Interruption
+
+Browsertrix Crawler has different crawl interruption modes, and does everything it can to ensure the WARC data written is always valid when a crawl is interrupted. The following are three interruption scenarios:
+
+### 1. Graceful Shutdown
+
+Initiated when a single SIGINT (Ctrl+C) or SIGTERM (`docker kill -s SIGINT`, `docker kill -s SIGTERM`, `kill`) signal received
+The crawler will attempt to finish current pages, finish any pending async requests, write all WARCS, generate WACZ files
+and other post-processing, save state from Redis and then exit.
+
+### 2. Less-Graceful, Quick Shutdown
+
+If a second SIGINT / SIGTERM is received, the crawler will close the browser immediately, interrupting any on-going network requests.
+Any pending network requests will not be awaited. However, anything in the WARC queue will be written and WARC files will be flushed.
+WACZ files and other post-processing will not be generated, but the state will be saved in Redis.
+WARC files should still be valid.
+
+### 3. Violent / Immediate Shutdown
+
+If a crawler is killed, eg. with SIGKILL signal (`docker kill`, `kill -9`), the crawler container / process will be immediately shut down. It will not have a chance to finish any WARC files, and there is no guarantee that WARC files will be valid, but the crawler will of course exit right away.
+
+
+### Recommendations
+
+It is recommended to graceful stop the crawler by sending a SIGINT or SIGTERM signal, which can be done via Ctrl+C or `docker kill -s SIGINT <containerid>`. Repeating the command will result in a faster, slightly less-graceful shutdown.
+Kubernetes also uses SIGTERM by default when shutting down container pods. Using SIGKILL is not recommended
+except for last resort, and only when data is to be discarded.
