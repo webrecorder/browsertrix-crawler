@@ -1343,14 +1343,8 @@ self.__bx_behaviors.selectMainBehavior();
 
       const tmpCdxList = await fsp.readdir(src);
       for (const filename of tmpCdxList) {
-        await fsp.rename(path.join(src, filename), path.join(dest, filename));
+        await fsp.copyFile(path.join(src, filename), path.join(dest, filename));
       }
-    } else {
-      // just remove the tmp-cdx
-      await fsp.rm(path.join(this.collDir, "tmp-cdx"), {
-        recursive: true,
-        force: true,
-      });
     }
 
     logger.info("Crawling done");
@@ -1372,6 +1366,13 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
     }
+
+    // remove tmp-cdx, now that it's already been added to the WACZ and/or
+    // copied to indexes
+    await fsp.rm(path.join(this.collDir, "tmp-cdx"), {
+      recursive: true,
+      force: true,
+    });
 
     if (this.params.waitOnDone && (!this.interrupted || this.finalExit)) {
       this.done = true;
