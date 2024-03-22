@@ -1332,31 +1332,25 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.generateCDX) {
+      // just move cdx files from tmp-cdx -> indexes at this point
       logger.info("Generating CDX");
-      await fsp.mkdir(path.join(this.collDir, "indexes"), { recursive: true });
+
+      const src = path.join(this.collDir, "tmp-cdx");
+      const dest = path.join(this.collDir, "indexes");
+
       await this.crawlState.setStatus("generate-cdx");
+      await fsp.mkdir(dest, { recursive: true });
 
-      const warcList = await fsp.readdir(path.join(this.collDir, "archive"));
-      const warcListFull = warcList.map((filename) =>
-        path.join(this.collDir, "archive", filename),
-      );
-
-      //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
-      const params = [
-        "-o",
-        path.join(this.collDir, "indexes", "index.cdxj"),
-        ...warcListFull,
-      ];
-      const indexResult = await this.awaitProcess(
-        child_process.spawn("cdxj-indexer", params, { cwd: this.params.cwd }),
-      );
-      if (indexResult === 0) {
-        logger.debug("Indexing complete, CDX successfully created");
-      } else {
-        logger.error("Error indexing and generating CDX", {
-          "status code": indexResult,
-        });
+      const tmpCdxList = await fsp.readdir(src);
+      for (const filename of tmpCdxList) {
+        await fsp.rename(path.join(src, filename), path.join(dest, filename));
       }
+    } else {
+      // just remove the tmp-cdx
+      await fsp.rm(path.join(this.collDir, "tmp-cdx"), {
+        recursive: true,
+        force: true,
+      });
     }
 
     logger.info("Crawling done");
@@ -1473,19 +1467,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     logger.debug(`WACZ successfully generated and saved to: ${waczPath}`);
 
-    // Verify WACZ
-    /*
-    const validateArgs = ["validate"];
-    validateArgs.push("-f");
-    validateArgs.push(waczPath);
-
-    const waczVerifyResult = await this.awaitProcess(child_process.spawn("wacz", validateArgs));
-
-    if (waczVerifyResult !== 0) {
-      console.log("validate", waczVerifyResult);
-      logger.fatal("Unable to verify WACZ created successfully");
-    }
-*/
     if (this.storage) {
       await this.crawlState.setStatus("uploading-wacz");
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
@@ -1520,31 +1501,6 @@ self.__bx_behaviors.selectMainBehavior();
     } catch (err) {
       logger.error("CDXJ Indexing Error", err);
     }
-  }
-
-  awaitProcess(proc: ChildProcess) {
-    const stdout: string[] = [];
-    const stderr: string[] = [];
-
-    proc.stdout!.on("data", (data) => {
-      stdout.push(data.toString());
-    });
-
-    proc.stderr!.on("data", (data) => {
-      stderr.push(data.toString());
-    });
-
-    return new Promise((resolve) => {
-      proc.on("close", (code) => {
-        if (stdout.length) {
-          logger.debug(stdout.join("\n"));
-        }
-        if (stderr.length && this.params.logging.includes("debug")) {
-          logger.debug(stderr.join("\n"));
-        }
-        resolve(code);
-      });
-    });
   }
 
   logMemory() {
@@ -2055,10 +2011,6 @@ self.__bx_behaviors.selectMainBehavior();
     const processedRow = JSON.stringify(row) + "\n";
 
     const pagesFH = depth > 0 ? this.extraPagesFH : this.pagesFH;
-
-    if (depth > 0) {
-      //hasNonSeeds = true;
-    }
 
     if (!pagesFH) {
       logger.error("Can't write pages, missing stream");
