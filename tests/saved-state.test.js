@@ -117,9 +117,11 @@ test("check parsing saved state + page done + queue present", () => {
 test("check crawl restarted with saved state", async () => {
   let containerId = null;
 
+  const port = process.env.REPEAT == "1" ? 36389 : 36379;
+
   try {
     containerId = execSync(
-      `docker run -d -p 36379:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`,
+      `docker run -d -p ${port}:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`,
       { encoding: "utf-8" },
     );
   } catch (error) {
@@ -128,7 +130,7 @@ test("check crawl restarted with saved state", async () => {
 
   await sleep(2000);
 
-  const redis = new Redis("redis://127.0.0.1:36379/0", { lazyConnect: true, retryStrategy: () => null });
+  const redis = new Redis(`redis://127.0.0.1:${port}/0`, { lazyConnect: true, retryStrategy: () => null });
 
   try {
     await redis.connect({
