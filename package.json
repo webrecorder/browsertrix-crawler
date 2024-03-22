@@ -16,6 +16,7 @@
     "prepare": "husky install"
   },
   "dependencies": {
+    "@harvard-lil/js-wacz": "github:tw4l/js-wacz#issue-91-copy-pages-files",
     "@novnc/novnc": "^1.4.0",
     "@types/sax": "^1.2.7",
     "@webrecorder/wabac": "^2.16.12",

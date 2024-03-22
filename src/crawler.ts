@@ -2,7 +2,8 @@ import child_process, { ChildProcess, StdioOptions } from "child_process";
 import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
-import fsp, { FileHandle } from "fs/promises";
+import fsp from "fs/promises";
+import readline from "readline";
 
 import {
   RedisCrawlState,
@@ -16,6 +17,9 @@ import {
 import yaml from "js-yaml";
 
 import * as warcio from "warcio";
+
+// @ts-expect-error TODO fill in why error is expected
+import { WACZ } from "@harvard-lil/js-wacz";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
@@ -118,7 +122,8 @@ export class Crawler {
 
   crawlState!: RedisCrawlState;
 
-  pagesFH?: FileHandle | null = null;
+  pagesFH?: WriteStream | null = null;
+  extraPagesFH?: WriteStream | null = null;
   logFH!: WriteStream;
 
   crawlId: string;
@@ -144,7 +149,8 @@ export class Crawler {
   gotoOpts: Record<string, any>;
 
   pagesDir: string;
-  pagesFile: string;
+  seedPagesFile: string;
+  otherPagesFile: string;
 
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
@@ -257,7 +263,8 @@ export class Crawler {
     this.pagesDir = path.join(this.collDir, "pages");
 
     // pages file
-    this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
+    this.seedPagesFile = path.join(this.pagesDir, "pages.jsonl");
+    this.otherPagesFile = path.join(this.pagesDir, "extraPages.jsonl");
 
     this.blockRules = null;
     this.adBlockRules = null;
@@ -1212,7 +1219,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.crawlState.setStatus("running");
 
-    await this.initPages();
+    this.pagesFH = await this.initPages(true);
+    this.extraPagesFH = await this.initPages(false);
 
     this.adBlockRules = new AdBlockRules(
       this.captureBasePrefix,
@@ -1280,10 +1288,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.serializeConfig(true);
 
-    if (this.pagesFH) {
-      await this.pagesFH.sync();
-      await this.pagesFH.close();
-    }
+    await this.closePages();
 
     await this.writeStats();
 
@@ -1293,6 +1298,32 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     await this.postCrawl();
+  }
+
+  async closePages() {
+    if (this.pagesFH) {
+      try {
+        await new Promise<void>((resolve) =>
+          this.pagesFH!.close(() => resolve()),
+        );
+      } catch (e) {
+        // ignore
+      } finally {
+        this.pagesFH = null;
+      }
+    }
+
+    if (this.extraPagesFH) {
+      try {
+        await new Promise<void>((resolve) =>
+          this.extraPagesFH!.close(() => resolve()),
+        );
+      } catch (e) {
+        // ignore
+      } finally {
+        this.extraPagesFH = null;
+      }
+    }
   }
 
   async postCrawl() {
@@ -1406,47 +1437,37 @@ self.__bx_behaviors.selectMainBehavior();
     const waczFilename = this.params.collection.concat(".wacz");
     const waczPath = path.join(this.collDir, waczFilename);
 
-    const createArgs = [
-      "create",
-      "--split-seeds",
-      "-o",
-      waczPath,
-      "--pages",
-      this.pagesFile,
-      "--log-directory",
-      this.logDir,
-    ];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const waczOpts: Record<string, any> = {
+      input: warcFileList.map((x) => path.join(archiveDir, x)),
+      output: waczPath,
+      pages: this.pagesDir,
+      detectPages: false,
+      indexFromWARCs: false,
+      logDirectory: this.logDir,
+    };
 
     if (process.env.WACZ_SIGN_URL) {
-      createArgs.push("--signing-url");
-      createArgs.push(process.env.WACZ_SIGN_URL);
+      waczOpts.signingUrl = process.env.WACZ_SIGN_URL;
       if (process.env.WACZ_SIGN_TOKEN) {
-        createArgs.push("--signing-token");
-        createArgs.push(process.env.WACZ_SIGN_TOKEN);
+        waczOpts.signingToken = process.env.WACZ_SIGN_TOKEN;
       }
     }
 
     if (this.params.title) {
-      createArgs.push("--title");
-      createArgs.push(this.params.title);
+      waczOpts.title = this.params.title;
     }
 
     if (this.params.description) {
-      createArgs.push("--desc");
-      createArgs.push(this.params.description);
+      waczOpts.description = this.params.description;
     }
 
-    createArgs.push("-f");
-
-    warcFileList.forEach((val) => createArgs.push(path.join(archiveDir, val)));
-
-    // create WACZ
-    const waczResult = await this.awaitProcess(
-      child_process.spawn("wacz", createArgs, { detached: RUN_DETACHED }),
-    );
-
-    if (waczResult !== 0) {
-      logger.error("Error creating WACZ", { "status code": waczResult });
+    try {
+      const wacz = new WACZ(waczOpts);
+      await this._addCDXJ(wacz);
+      await wacz.process();
+    } catch (e) {
+      logger.error("Error creating WACZ", e);
       logger.fatal("Unable to write WACZ successfully");
     }
 
@@ -1475,6 +1496,30 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     return false;
+  }
+
+  // todo: replace with js-wacz impl eventually
+  async _addCDXJ(wacz: WACZ) {
+    const dirPath = path.join(this.collDir, "tmp-cdx");
+
+    try {
+      const cdxjFiles = await fsp.readdir(dirPath);
+
+      for (let i = 0; i < cdxjFiles.length; i++) {
+        const cdxjFile = path.join(dirPath, cdxjFiles[i]);
+
+        logger.debug(`CDXJ: Reading entries from ${cdxjFile}`);
+        const rl = readline.createInterface({
+          input: fs.createReadStream(cdxjFile),
+        });
+
+        for await (const line of rl) {
+          wacz.addCDXJ(line + "\n");
+        }
+      }
+    } catch (err) {
+      logger.error("CDXJ Indexing Error", err);
+    }
   }
 
   awaitProcess(proc: ChildProcess) {
@@ -1934,36 +1979,35 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async initPages() {
+  async initPages(seedPages: boolean) {
+    const filename = seedPages ? this.seedPagesFile : this.otherPagesFile;
+    let fh = null;
+
     try {
-      let createNew = false;
+      await fsp.mkdir(this.pagesDir, { recursive: true });
 
-      // create pages dir if doesn't exist and write pages.jsonl header
-      if (fs.existsSync(this.pagesDir) != true) {
-        await fsp.mkdir(this.pagesDir);
-        createNew = true;
-      }
+      const createNew = !fs.existsSync(filename);
 
-      this.pagesFH = await fsp.open(this.pagesFile, "a");
+      fh = fs.createWriteStream(filename, { flags: "a" });
 
       if (createNew) {
         const header: Record<string, string> = {
           format: "json-pages-1.0",
           id: "pages",
-          title: "All Pages",
+          title: seedPages ? "Seed Pages" : "Non-Seed Pages",
         };
-        header["hasText"] = this.params.text.includes("to-pages");
+        header.hasText = this.params.text.includes("to-pages");
         if (this.params.text.length) {
           logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
           logger.debug("Text Extraction: None");
         }
-        const header_formatted = JSON.stringify(header).concat("\n");
-        await this.pagesFH.writeFile(header_formatted);
+        await fh.write(JSON.stringify(header) + "\n");
       }
     } catch (err) {
-      logger.error("pages/pages.jsonl creation failed", err);
+      logger.error(`"${filename}" creation failed`, err);
     }
+    return fh;
   }
 
   async writePage({
@@ -2009,10 +2053,22 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const processedRow = JSON.stringify(row) + "\n";
+
+    const pagesFH = depth > 0 ? this.extraPagesFH : this.pagesFH;
+
+    if (depth > 0) {
+      //hasNonSeeds = true;
+    }
+
+    if (!pagesFH) {
+      logger.error("Can't write pages, missing stream");
+      return;
+    }
+
     try {
-      await this.pagesFH!.writeFile(processedRow);
+      await pagesFH.write(processedRow);
     } catch (err) {
-      logger.warn("pages/pages.jsonl append failed", err);
+      logger.warn("pages/pages.jsonl append failed");
     }
   }
 
