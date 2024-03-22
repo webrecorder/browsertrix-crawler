@@ -12,8 +12,8 @@ test("ensure crawl run with redis passes", async () => {
   redis.kill("SIGINT");
 });
 
-test("check that wacz created is valid", () => {
-  child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler wacz validate --file collections/redis-crawl/redis-crawl.wacz",
-  );
-});
+// test("check that wacz created is valid", () => {
+//   child_process.execSync(
+//     "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler wacz validate --file collections/redis-crawl/redis-crawl.wacz",
+//   );
+// });

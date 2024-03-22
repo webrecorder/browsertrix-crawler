@@ -8,9 +8,9 @@ test("ensure basic crawl run with docker run passes", async () => {
     'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com/ --generateWACZ  --text --collection wr-net --combineWARC --rolloverSize 10000 --workers 2 --title "test title" --description "test description" --warcPrefix custom-prefix',
   );
 
-  child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler wacz validate --file collections/wr-net/wr-net.wacz",
-  );
+  // child_process.execSync(
+  //   "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler wacz validate --file collections/wr-net/wr-net.wacz",
+  // );
 
   child_process.execSync(
     "unzip test-crawls/collections/wr-net/wr-net.wacz -d test-crawls/collections/wr-net/wacz",

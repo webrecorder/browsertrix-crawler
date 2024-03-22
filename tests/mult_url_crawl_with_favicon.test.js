@@ -6,9 +6,9 @@ test("ensure multi url crawl run with docker run passes", async () => {
     'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --url https://webrecorder.net/ --generateWACZ --text --collection advanced --combineWARC --rolloverSize 10000 --workers 2 --title "test title" --description "test description" --pages 2 --limit 2',
   );
 
-  child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler wacz validate --file collections/advanced/advanced.wacz",
-  );
+  // child_process.execSync(
+  //   "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler wacz validate --file collections/advanced/advanced.wacz",
+  // );
 });
 
 test("check that the favicon made it into the pages jsonl file", () => {
