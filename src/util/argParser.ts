@@ -528,7 +528,7 @@ class ArgParser {
           "prefix for WARC files generated, including WARCs added to WACZ",
         type: "string",
       },
-      
+
       serviceWorker: {
         alias: "sw",
         describe:
@@ -546,7 +546,7 @@ class ArgParser {
         describe:
           "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
         type: "boolean",
-      }
+      },
     };
   }
 

@@ -35,7 +35,7 @@ type LaunchOpts = {
   ondisconnect?: ((err: any) => NonNullable<unknown>) | null;
 
   swOpt?: ServiceWorkerOpt;
-  
+
   recording: boolean;
 };
 
