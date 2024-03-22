@@ -11,6 +11,7 @@ import {
   BEHAVIOR_LOG_FUNC,
   WAIT_UNTIL_OPTS,
   EXTRACT_TEXT_TYPES,
+  SERVICE_WORKER_OPTS,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
@@ -527,6 +528,14 @@ class ArgParser {
           "prefix for WARC files generated, including WARCs added to WACZ",
         type: "string",
       },
+      
+      serviceWorker: {
+        alias: "sw",
+        describe:
+          "service worker handling: disabled, enabled, or disabled with custom profile",
+        choices: SERVICE_WORKER_OPTS,
+        default: "disabled",
+      },
 
       qaSource: {
         describe: "Required for QA mode. Source (WACZ or multi WACZ) for QA",
@@ -537,7 +546,7 @@ class ArgParser {
         describe:
           "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
         type: "boolean",
-      },
+      }
     };
   }
 

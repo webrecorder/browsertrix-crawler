@@ -779,6 +779,7 @@ self.__bx_behaviors.selectMainBehavior();
             data.mime = mime;
           }
           data.status = 200;
+          data.ts = new Date();
           logger.info(
             "Direct fetch successful",
             { url, ...logDetails },
@@ -1265,6 +1266,7 @@ self.__bx_behaviors.selectMainBehavior();
       profileUrl: this.params.profile,
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
+      swOpt: this.params.serviceWorker,
       chromeOptions: {
         proxy: false,
         userAgent: this.emulateDevice.userAgent,
@@ -2024,9 +2026,12 @@ self.__bx_behaviors.selectMainBehavior();
 
     const row: PageEntry = { id: pageid, url, title, loadState };
 
-    if (ts) {
-      row.ts = ts.toISOString();
+    if (!ts) {
+      ts = new Date();
+      logger.warn("Page date missing, setting to now", { url, ts });
     }
+
+    row.ts = ts.toISOString();
 
     if (mime) {
       row.mime = mime;
@@ -2046,11 +2051,11 @@ self.__bx_behaviors.selectMainBehavior();
       row.seed = true;
     }
 
-    if (text !== null && this.textInPages) {
+    if (text && this.textInPages) {
       row.text = text;
     }
 
-    if (favicon !== null) {
+    if (favicon) {
       row.favIconUrl = favicon;
     }
 

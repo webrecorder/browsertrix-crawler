@@ -9,6 +9,8 @@ import path from "path";
 import { LogContext, logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
+import type { ServiceWorkerOpt } from "./constants.js";
+
 import puppeteer, {
   Frame,
   HTTPRequest,
@@ -32,6 +34,8 @@ type LaunchOpts = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ondisconnect?: ((err: any) => NonNullable<unknown>) | null;
 
+  swOpt?: ServiceWorkerOpt;
+  
   recording: boolean;
 };
 
@@ -50,6 +54,8 @@ export class Browser {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   recorders: any[] = [];
 
+  swOpt?: ServiceWorkerOpt = "disabled";
+
   constructor() {
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
   }
@@ -60,6 +66,7 @@ export class Browser {
     signals = false,
     headless = false,
     emulateDevice = {},
+    swOpt = "disabled",
     ondisconnect = null,
     recording = true,
   }: LaunchOpts) {
@@ -70,6 +77,8 @@ export class Browser {
     if (profileUrl) {
       this.customProfile = await this.loadProfile(profileUrl);
     }
+
+    this.swOpt = swOpt;
 
     this.emulateDevice = emulateDevice;
 
@@ -108,10 +117,26 @@ export class Browser {
       'Object.defineProperty(navigator, "webdriver", {value: false});',
     );
 
-    if (this.customProfile) {
-      logger.info("Disabling Service Workers for profile", {}, "browser");
+    switch (this.swOpt) {
+      case "disabled":
+        logger.info("Service Workers: always disabled", {}, "browser");
+        await page.setBypassServiceWorker(true);
+        break;
 
-      await page.setBypassServiceWorker(true);
+      case "disabled-if-profile":
+        if (this.customProfile) {
+          logger.info(
+            "Service Workers: disabled since using profile",
+            {},
+            "browser",
+          );
+          await page.setBypassServiceWorker(true);
+        }
+        break;
+
+      case "enabled":
+        logger.info("Service Workers: always enabled", {}, "browser");
+        break;
     }
   }
 

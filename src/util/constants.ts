@@ -10,6 +10,14 @@ export const WAIT_UNTIL_OPTS = [
   "networkidle2",
 ];
 
+export const SERVICE_WORKER_OPTS = [
+  "disabled",
+  "disabled-if-profile",
+  "enabled",
+] as const;
+
+export type ServiceWorkerOpt = (typeof SERVICE_WORKER_OPTS)[number];
+
 export const DETECT_SITEMAP = "<detect>";
 
 export const EXTRACT_TEXT_TYPES = ["to-pages", "to-warc", "final-to-warc"];
