@@ -52,7 +52,7 @@ ARG RWP_VERSION=1.8.15
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/ui.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/sw.js /app/html/rwp/
 
-RUN chmod a+x /app/dist/main.js /app/dist/create-login-profile.js
+RUN chmod a+x /app/dist/main.js /app/dist/create-login-profile.js && chmod a+r /app/html/rwp/*
 
 RUN ln -s /app/dist/main.js /usr/bin/crawl; \
     ln -s /app/dist/main.js /usr/bin/qa; \

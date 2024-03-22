@@ -29,7 +29,7 @@ test("run QA comparison, with write pages to redis", async () => {
     crawler_exited = true;
   });
 
-  const redis = new Redis("redis://127.0.0.1:36380/0", { lazyConnect: true });
+  const redis = new Redis("redis://127.0.0.1:36380/0", { lazyConnect: true, retryStrategy: () => null });
 
   await sleep(3000);
 
@@ -67,12 +67,6 @@ test("run QA comparison, with write pages to redis", async () => {
   }
 
   expect(count).toBe(3);
-
-  try {
-    await redis.disconnect();
-  } catch (e) {
-    console.log(e);
-  }
 
   // wait for crawler exit
   while (!crawler_exited) {
