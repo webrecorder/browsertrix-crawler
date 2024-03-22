@@ -117,7 +117,7 @@ test("check parsing saved state + page done + queue present", () => {
 test("check crawl restarted with saved state", async () => {
   let containerId = null;
 
-  const port = process.env.REPEAT == "1" ? 36389 : 36379;
+  const port = 36379;
 
   try {
     containerId = execSync(

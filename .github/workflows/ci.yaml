@@ -48,5 +48,4 @@ jobs:
         run: |
           sudo rm -rf ./test-crawls
           mkdir test-crawls
-          export REPEAT=1
-          sudo -E yarn test ./tests/saved-state.test.js
+          sudo yarn test ./tests/saved-state.test.js ./tests/qa_compare.test.js 
