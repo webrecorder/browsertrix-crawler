@@ -114,23 +114,25 @@ export class Browser {
       'Object.defineProperty(navigator, "webdriver", {value: false});',
     );
 
-    if (this.customProfile) {
-      logger.info("Disabling Service Workers for profile", {}, "browser");
-    }
-
     switch (this.swOpt) {
       case "disabled":
+        logger.info("Service Workers: always disabled", {}, "browser");
         await page.setBypassServiceWorker(true);
         break;
 
       case "disabled-if-profile":
         if (this.customProfile) {
+          logger.info(
+            "Service Workers: disabled since using profile",
+            {},
+            "browser",
+          );
           await page.setBypassServiceWorker(true);
         }
         break;
 
       case "enabled":
-        // do nothing
+        logger.info("Service Workers: always enabled", {}, "browser");
         break;
     }
   }
