@@ -11,6 +11,7 @@ import {
   BEHAVIOR_LOG_FUNC,
   WAIT_UNTIL_OPTS,
   EXTRACT_TEXT_TYPES,
+  SERVICE_WORKER_OPTS,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
@@ -526,6 +527,14 @@ class ArgParser {
         describe:
           "prefix for WARC files generated, including WARCs added to WACZ",
         type: "string",
+      },
+
+      serviceWorker: {
+        alias: "sw",
+        describe:
+          "service worker handling: disabled, enabled, or disabled with custom profile",
+        choices: SERVICE_WORKER_OPTS,
+        default: "disabled",
       },
     };
   }

@@ -9,6 +9,8 @@ import path from "path";
 import { LogContext, logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
+import type { ServiceWorkerOpt } from "./constants.js";
+
 import puppeteer, {
   Frame,
   HTTPRequest,
@@ -31,6 +33,8 @@ type LaunchOpts = {
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ondisconnect?: ((err: any) => NonNullable<unknown>) | null;
+
+  swOpt?: ServiceWorkerOpt;
 };
 
 // ==================================================================
@@ -48,6 +52,8 @@ export class Browser {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   recorders: any[] = [];
 
+  swOpt?: ServiceWorkerOpt = "disabled";
+
   constructor() {
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
   }
@@ -58,6 +64,7 @@ export class Browser {
     signals = false,
     headless = false,
     emulateDevice = {},
+    swOpt = "disabled",
     ondisconnect = null,
   }: LaunchOpts) {
     if (this.isLaunched()) {
@@ -67,6 +74,8 @@ export class Browser {
     if (profileUrl) {
       this.customProfile = await this.loadProfile(profileUrl);
     }
+
+    this.swOpt = swOpt;
 
     this.emulateDevice = emulateDevice;
 
@@ -107,8 +116,22 @@ export class Browser {
 
     if (this.customProfile) {
       logger.info("Disabling Service Workers for profile", {}, "browser");
+    }
 
-      await page.setBypassServiceWorker(true);
+    switch (this.swOpt) {
+      case "disabled":
+        await page.setBypassServiceWorker(true);
+        break;
+
+      case "disabled-if-profile":
+        if (this.customProfile) {
+          await page.setBypassServiceWorker(true);
+        }
+        break;
+
+      case "enabled":
+        // do nothing
+        break;
     }
   }
 
