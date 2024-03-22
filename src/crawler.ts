@@ -35,7 +35,7 @@ import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
-import { logger, formatErr } from "./util/logger.js";
+import { logger, formatErr, WACZLogger } from "./util/logger.js";
 import {
   WorkerOpts,
   WorkerState,
@@ -1432,6 +1432,8 @@ self.__bx_behaviors.selectMainBehavior();
     const waczFilename = this.params.collection.concat(".wacz");
     const waczPath = path.join(this.collDir, waczFilename);
 
+    const waczLogger = new WACZLogger(logger);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const waczOpts: Record<string, any> = {
       input: warcFileList.map((x) => path.join(archiveDir, x)),
@@ -1440,6 +1442,7 @@ self.__bx_behaviors.selectMainBehavior();
       detectPages: false,
       indexFromWARCs: false,
       logDirectory: this.logDir,
+      log: waczLogger,
     };
 
     if (process.env.WACZ_SIGN_URL) {
