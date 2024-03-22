@@ -28,7 +28,7 @@ test(
       "test-crawls/collections/extra-hops-beyond/pages/extraPages.jsonl",
       "utf8",
     );
-    const crawledExtraPagesArray = crawledPages.trim().split("\n");
+    const crawledExtraPagesArray = crawledExtraPages.trim().split("\n");
 
     const expectedPages = [
       "https://webrecorder.net/",
