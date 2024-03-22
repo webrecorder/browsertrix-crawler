@@ -128,14 +128,11 @@ test("check crawl restarted with saved state", async () => {
 
   await sleep(2000);
 
-  const redis = new Redis("redis://127.0.0.1:36379/0", { lazyConnect: true });
+  const redis = new Redis("redis://127.0.0.1:36379/0", { lazyConnect: true, retryStrategy: () => null });
 
   try {
     await redis.connect({
       maxRetriesPerRequest: 100,
-      retryStrategy(times) {
-        return times < 100 ? 1000 : null;
-      },
     });
 
     await sleep(2000);
@@ -150,11 +147,5 @@ test("check crawl restarted with saved state", async () => {
     console.log(e);
   } finally {
     await waitContainer(containerId);
-
-    try {
-      await redis.disconnect();
-    } catch (e) {
-      // ignore
-    }
   }
 });
