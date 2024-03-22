@@ -1335,16 +1335,28 @@ self.__bx_behaviors.selectMainBehavior();
       // just move cdx files from tmp-cdx -> indexes at this point
       logger.info("Generating CDX");
 
-      const src = path.join(this.collDir, "tmp-cdx");
-      const dest = path.join(this.collDir, "indexes");
+      const indexer = new warcio.CDXIndexer({ format: "cdxj" });
 
       await this.crawlState.setStatus("generate-cdx");
-      await fsp.mkdir(dest, { recursive: true });
 
-      const tmpCdxList = await fsp.readdir(src);
-      for (const filename of tmpCdxList) {
-        await fsp.copyFile(path.join(src, filename), path.join(dest, filename));
-      }
+      const indexesDir = path.join(this.collDir, "indexes");
+      await fsp.mkdir(indexesDir, { recursive: true });
+
+      const indexFile = path.join(indexesDir, "index.cdxj");
+      const destFh = fs.createWriteStream(indexFile);
+
+      const archiveDir = path.join(this.collDir, "archive");
+      const archiveFiles = await fsp.readdir(archiveDir);
+      const warcFiles = archiveFiles.filter((f) => f.endsWith(".warc.gz"));
+
+      const files = warcFiles.map((warcFile) => {
+        return {
+          reader: fs.createReadStream(path.join(archiveDir, warcFile)),
+          filename: warcFile,
+        };
+      });
+
+      await indexer.writeAll(files, destFh);
     }
 
     logger.info("Crawling done");
