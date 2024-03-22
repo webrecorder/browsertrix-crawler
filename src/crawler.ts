@@ -2020,12 +2020,12 @@ self.__bx_behaviors.selectMainBehavior();
       loadState,
       mime,
       favicon,
-      ts,
       status,
     } = state;
 
     const row: PageEntry = { id: pageid, url, title, loadState };
 
+    let { ts } = state;
     if (!ts) {
       ts = new Date();
       logger.warn("Page date missing, setting to now", { url, ts });
