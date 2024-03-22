@@ -55,5 +55,8 @@
   "jest": {
     "transform": {},
     "testTimeout": 90000
+  },
+  "resolutions": {
+    "wrap-ansi": "7.0.0"
   }
 }
