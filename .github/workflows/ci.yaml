@@ -42,9 +42,9 @@ jobs:
         run: yarn run tsc
       - name: build docker
         run: docker-compose build
-      - name: run jest
+      - name: run all tests as root
         run: sudo yarn test
-      - name: run saved state test with volume owned by different user
+      - name: run saved state + qa compare test as non-root - with volume owned by current user
         run: |
           sudo rm -rf ./test-crawls
           mkdir test-crawls
