@@ -93,6 +93,8 @@ export class ReplayCrawler extends Crawler {
     this.params.screenshot = ["view"];
     this.params.text = ["to-warc"];
 
+    this.params.serviceWorker = "enabled";
+
     this.reloadTimeouts = new WeakMap<Page, NodeJS.Timeout>();
   }
 

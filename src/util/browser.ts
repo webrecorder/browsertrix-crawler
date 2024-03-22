@@ -119,13 +119,13 @@ export class Browser {
 
     switch (this.swOpt) {
       case "disabled":
-        logger.info("Service Workers: always disabled", {}, "browser");
+        logger.debug("Service Workers: always disabled", {}, "browser");
         await page.setBypassServiceWorker(true);
         break;
 
       case "disabled-if-profile":
         if (this.customProfile) {
-          logger.info(
+          logger.debug(
             "Service Workers: disabled since using profile",
             {},
             "browser",
@@ -135,7 +135,7 @@ export class Browser {
         break;
 
       case "enabled":
-        logger.info("Service Workers: always enabled", {}, "browser");
+        logger.debug("Service Workers: always enabled", {}, "browser");
         break;
     }
   }
