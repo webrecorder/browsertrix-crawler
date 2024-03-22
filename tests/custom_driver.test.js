@@ -30,7 +30,7 @@ test("ensure custom driver with custom selector crawls JS files as pages", async
   );
   const extraPages = new Set();
 
-  for (const line of crawledPExtraages.trim().split("\n")) {
+  for (const line of crawledExtraPages.trim().split("\n")) {
     const url = JSON.parse(line).url;
     if (!url) {
       continue;
