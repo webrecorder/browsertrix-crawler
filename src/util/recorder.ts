@@ -771,8 +771,6 @@ export class Recorder {
   }
 
   async onDone(timeout: number) {
-    console.log("ON DONE!!");
-
     await this.crawlState.setStatus("pending-wait");
 
     const finishFetch = async () => {

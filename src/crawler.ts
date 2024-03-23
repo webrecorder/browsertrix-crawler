@@ -1155,6 +1155,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.interrupted) {
       await this.browser.close();
       await closeWorkers(0);
+      await this.closeFiles();
       await this.setStatusAndExit(13, "interrupted");
     } else {
       await this.setStatusAndExit(0, "done");
