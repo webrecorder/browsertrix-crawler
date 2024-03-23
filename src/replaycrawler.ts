@@ -60,6 +60,8 @@ type ReplayPageInfoRecord = PageInfoRecord & ComparisonData;
 type ComparisonPageState = PageState & ComparisonData;
 
 // ============================================================================
+// Crawler designed to run over replay of existing WACZ files to generate comparison
+// data (eg. for QA)
 export class ReplayCrawler extends Crawler {
   replayServer: ReplayServer;
   qaSource: string;

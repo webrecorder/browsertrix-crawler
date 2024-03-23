@@ -19,20 +19,23 @@ import puppeteer, {
   Viewport,
 } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
+import { Recorder } from "./recorder.js";
+
+type BtrixChromeOpts = {
+  proxy?: boolean;
+  userAgent?: string | null;
+  extraArgs?: string[];
+};
 
 type LaunchOpts = {
   profileUrl: string;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  chromeOptions: Record<string, any>;
+  chromeOptions: BtrixChromeOpts;
   signals: boolean;
   headless: boolean;
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   emulateDevice?: Record<string, any>;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ondisconnect?: ((err: any) => NonNullable<unknown>) | null;
+  ondisconnect?: ((err: unknown) => NonNullable<unknown>) | null;
 
   swOpt?: ServiceWorkerOpt;
 
@@ -50,9 +53,7 @@ export class Browser {
   browser?: PptrBrowser | null = null;
   firstCDP: CDPSession | null = null;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  recorders: any[] = [];
+  recorders: Recorder[] = [];
 
   swOpt?: ServiceWorkerOpt = "disabled";
 
@@ -198,7 +199,11 @@ export class Browser {
     });
   }
 
-  chromeArgs({ proxy = true, userAgent = null, extraArgs = [] } = {}) {
+  chromeArgs({
+    proxy = true,
+    userAgent = null,
+    extraArgs = [],
+  }: BtrixChromeOpts) {
     // Chrome Flags, including proxy server
     const args = [
       // eslint-disable-next-line no-use-before-define
@@ -502,8 +507,6 @@ export class Browser {
       patterns: [{ urlPattern: "*", requestStage: "Response" }],
     });
   }
-
-  // TODO: Fix this the next time the file is edited.
 
   async evaluateWithCLI(
     _: unknown,
