@@ -19,22 +19,27 @@ import puppeteer, {
   Viewport,
 } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
+import { Recorder } from "./recorder.js";
+
+type BtrixChromeOpts = {
+  proxy?: boolean;
+  userAgent?: string | null;
+  extraArgs?: string[];
+};
 
 type LaunchOpts = {
   profileUrl: string;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  chromeOptions: Record<string, any>;
+  chromeOptions: BtrixChromeOpts;
   signals: boolean;
   headless: boolean;
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   emulateDevice?: Record<string, any>;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ondisconnect?: ((err: any) => NonNullable<unknown>) | null;
+  ondisconnect?: ((err: unknown) => NonNullable<unknown>) | null;
 
   swOpt?: ServiceWorkerOpt;
+
+  recording: boolean;
 };
 
 // ==================================================================
@@ -48,9 +53,7 @@ export class Browser {
   browser?: PptrBrowser | null = null;
   firstCDP: CDPSession | null = null;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  recorders: any[] = [];
+  recorders: Recorder[] = [];
 
   swOpt?: ServiceWorkerOpt = "disabled";
 
@@ -66,6 +69,7 @@ export class Browser {
     emulateDevice = {},
     swOpt = "disabled",
     ondisconnect = null,
+    recording = true,
   }: LaunchOpts) {
     if (this.isLaunched()) {
       return;
@@ -105,7 +109,7 @@ export class Browser {
       userDataDir: this.profileDir,
     };
 
-    await this._init(launchOpts, ondisconnect);
+    await this._init(launchOpts, ondisconnect, recording);
   }
 
   async setupPage({ page }: { page: Page; cdp: CDPSession }) {
@@ -116,13 +120,13 @@ export class Browser {
 
     switch (this.swOpt) {
       case "disabled":
-        logger.info("Service Workers: always disabled", {}, "browser");
+        logger.debug("Service Workers: always disabled", {}, "browser");
         await page.setBypassServiceWorker(true);
         break;
 
       case "disabled-if-profile":
         if (this.customProfile) {
-          logger.info(
+          logger.debug(
             "Service Workers: disabled since using profile",
             {},
             "browser",
@@ -132,7 +136,7 @@ export class Browser {
         break;
 
       case "enabled":
-        logger.info("Service Workers: always enabled", {}, "browser");
+        logger.debug("Service Workers: always enabled", {}, "browser");
         break;
     }
   }
@@ -195,7 +199,11 @@ export class Browser {
     });
   }
 
-  chromeArgs({ proxy = true, userAgent = null, extraArgs = [] } = {}) {
+  chromeArgs({
+    proxy = true,
+    userAgent = null,
+    extraArgs = [],
+  }: BtrixChromeOpts) {
     // Chrome Flags, including proxy server
     const args = [
       // eslint-disable-next-line no-use-before-define
@@ -347,6 +355,7 @@ export class Browser {
     launchOpts: PuppeteerLaunchOptions,
     // eslint-disable-next-line @typescript-eslint/ban-types
     ondisconnect: Function | null = null,
+    recording: boolean,
   ) {
     this.browser = await puppeteer.launch(launchOpts);
 
@@ -354,7 +363,9 @@ export class Browser {
 
     this.firstCDP = await target.createCDPSession();
 
-    await this.serviceWorkerFetch();
+    if (recording) {
+      await this.serviceWorkerFetch();
+    }
 
     if (ondisconnect) {
       this.browser.on("disconnected", (err) => ondisconnect(err));
@@ -496,8 +507,6 @@ export class Browser {
       patterns: [{ urlPattern: "*", requestStage: "Response" }],
     });
   }
-
-  // TODO: Fix this the next time the file is edited.
 
   async evaluateWithCLI(
     _: unknown,
