@@ -55,6 +55,8 @@ export class WARCWriter implements IndexerOffsetLength {
   }) {
     this.archivesDir = archivesDir;
     this.tempCdxDir = tempCdxDir;
+    // for now, disabling CDX
+    this.tempCdxDir = undefined;
     this.logDetails = logDetails;
     this.gzip = gzip;
     this.rolloverSize = rolloverSize;

@@ -515,7 +515,7 @@ export class Crawler {
     }
 
     if (this.params.screenshot) {
-      this.screenshotWriter = this.createExtraResourceWarcWriter("screenshot");
+      this.screenshotWriter = this.createExtraResourceWarcWriter("screenshots");
     }
     if (this.params.text) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
