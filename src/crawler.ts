@@ -65,6 +65,7 @@ import { CDPSession, Frame, HTTPRequest, Page } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
+import { WARCWriter } from "./util/warcwriter.js";
 
 const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
@@ -155,6 +156,11 @@ export class Crawler {
   otherPagesFile: string;
 
   archivesDir: string;
+  tempdir: string;
+  tempCdxDir: string;
+
+  screenshotWriter: WARCWriter | null;
+  textWriter: WARCWriter | null;
 
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
@@ -182,8 +188,6 @@ export class Crawler {
 
   maxHeapUsed = 0;
   maxHeapTotal = 0;
-
-  warcPrefix: string;
 
   driver!: (opts: {
     page: Page;
@@ -278,6 +282,11 @@ export class Crawler {
 
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
+    this.tempdir = path.join(os.tmpdir(), "tmp-dl");
+    this.tempCdxDir = path.join(this.collDir, "tmp-cdx");
+
+    this.screenshotWriter = null;
+    this.textWriter = null;
 
     this.blockRules = null;
     this.adBlockRules = null;
@@ -295,12 +304,6 @@ export class Crawler {
     this.customBehaviors = "";
 
     this.browser = new Browser();
-
-    this.warcPrefix = process.env.WARC_PREFIX || this.params.warcPrefix || "";
-
-    if (this.warcPrefix) {
-      this.warcPrefix += "-" + this.crawlId + "-";
-    }
   }
 
   protected parseArgs() {
@@ -454,14 +457,10 @@ export class Crawler {
 
     subprocesses.push(this.launchRedis());
 
-    //const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
-
-    //if (initRes.status) {
-    //  logger.info("wb-manager init failed, collection likely already exists");
-    //}
-
     await fsp.mkdir(this.logDir, { recursive: true });
     await fsp.mkdir(this.archivesDir, { recursive: true });
+    await fsp.mkdir(this.tempdir, { recursive: true });
+    await fsp.mkdir(this.tempCdxDir, { recursive: true });
 
     this.logFH = fs.createWriteStream(this.logFilename);
     logger.setExternalLogStream(this.logFH);
@@ -520,6 +519,13 @@ export class Crawler {
         ],
         { detached: RUN_DETACHED },
       );
+    }
+
+    if (this.params.screenshot) {
+      this.screenshotWriter = this.createExtraResourceWarcWriter("screenshots");
+    }
+    if (this.params.text) {
+      this.textWriter = this.createExtraResourceWarcWriter("text");
     }
   }
 
@@ -819,16 +825,15 @@ self.__bx_behaviors.selectMainBehavior();
 
     const logDetails = { page: url, workerid };
 
-    if (this.params.screenshot) {
+    if (this.params.screenshot && this.screenshotWriter) {
       if (!data.isHTMLPage) {
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
       const screenshots = new Screenshots({
-        warcPrefix: this.warcPrefix,
         browser: this.browser,
         page,
         url,
-        directory: this.archivesDir,
+        writer: this.screenshotWriter,
       });
       if (this.params.screenshot.includes("view")) {
         await screenshots.take("view", saveOutput ? data : null);
@@ -843,11 +848,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     let textextract = null;
 
-    if (data.isHTMLPage) {
+    if (data.isHTMLPage && this.textWriter) {
       textextract = new TextExtractViaSnapshot(cdp, {
-        warcPrefix: this.warcPrefix,
+        writer: this.textWriter,
         url,
-        directory: this.archivesDir,
         skipDocs: this.skipTextDocs,
       });
       const { text } = await textextract.extractAndStoreText(
@@ -1303,6 +1307,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.closePages();
 
+    await this.closeFiles();
+
     await this.writeStats();
 
     // if crawl has been stopped, mark as final exit for post-crawl tasks
@@ -1336,6 +1342,15 @@ self.__bx_behaviors.selectMainBehavior();
       } finally {
         this.extraPagesFH = null;
       }
+    }
+  }
+
+  async closeFiles() {
+    if (this.textWriter) {
+      await this.textWriter.flush();
+    }
+    if (this.screenshotWriter) {
+      await this.screenshotWriter.flush();
     }
   }
 
@@ -2385,15 +2400,54 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  getWarcPrefix(defaultValue = "") {
+    let warcPrefix =
+      process.env.WARC_PREFIX || this.params.warcPrefix || defaultValue;
+
+    if (warcPrefix) {
+      warcPrefix += "-" + this.crawlId + "-";
+    }
+
+    return warcPrefix;
+  }
+
+  createExtraResourceWarcWriter(resourceName: string, gzip = true) {
+    const filenameBase = `${this.getWarcPrefix()}${resourceName}`;
+
+    return this.createWarcWriter(filenameBase, gzip, { resourceName });
+  }
+
+  createWarcWriter(
+    filenameBase: string,
+    gzip: boolean,
+    logDetails: Record<string, string>,
+  ) {
+    const filenameTemplate = `${filenameBase}.warc${gzip ? ".gz" : ""}`;
+
+    return new WARCWriter({
+      archivesDir: this.archivesDir,
+      tempCdxDir: this.tempCdxDir,
+      filenameTemplate,
+      rolloverSize: this.params.rolloverSize,
+      gzip,
+      logDetails,
+    });
+  }
+
   createRecorder(id: number): Recorder | null {
     if (!this.recording) {
       return null;
     }
 
+    const filenameBase = `${this.getWarcPrefix("rec")}$ts-${id}`;
+
+    const writer = this.createWarcWriter(filenameBase, true, { id: id + "" });
+
     const res = new Recorder({
       workerid: id,
-      collDir: this.collDir,
       crawler: this,
+      writer,
+      tempdir: this.tempdir,
     });
 
     this.browser.recorders.push(res);

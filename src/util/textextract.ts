@@ -1,26 +1,28 @@
-import { WARCResourceWriter } from "./warcresourcewriter.js";
 import { logger } from "./logger.js";
 import { CDPSession, Protocol } from "puppeteer-core";
+import { WARCWriter } from "./warcwriter.js";
 
 // ============================================================================
 type TextExtractOpts = {
   url: string;
-  directory: string;
-  warcPrefix: string;
+  writer: WARCWriter;
   skipDocs: number;
 };
 
 // ============================================================================
-export abstract class BaseTextExtract extends WARCResourceWriter {
+export abstract class BaseTextExtract {
   cdp: CDPSession;
   lastText: string | null = null;
   text: string | null = null;
   skipDocs: number = 0;
+  writer: WARCWriter;
+  url: string;
 
-  constructor(cdp: CDPSession, opts: TextExtractOpts) {
-    super({ ...opts, warcName: "text.warc.gz" });
+  constructor(cdp: CDPSession, { writer, skipDocs, url }: TextExtractOpts) {
+    this.writer = writer;
     this.cdp = cdp;
-    this.skipDocs = opts.skipDocs || 0;
+    this.url = url;
+    this.skipDocs = skipDocs || 0;
   }
 
   async extractAndStoreText(
@@ -41,13 +43,14 @@ export abstract class BaseTextExtract extends WARCResourceWriter {
         return { changed: false, text };
       }
       if (saveToWarc) {
-        await this.writeBufferToWARC(
-          new TextEncoder().encode(text),
+        await this.writer.writeNewResourceRecord({
+          buffer: new TextEncoder().encode(text),
           resourceType,
-          "text/plain",
-        );
+          contentType: "text/plain",
+          url: this.url,
+        });
         logger.debug(
-          `Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.warcName}`,
+          `Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.writer.filename}`,
         );
       }
 

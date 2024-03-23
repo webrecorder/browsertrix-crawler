@@ -290,7 +290,7 @@ export class PageWorker {
     } finally {
       try {
         if (this.recorder) {
-          opts.data.ts = await this.recorder.writePageInfoRecord();
+          opts.data.ts = this.recorder.writePageInfoRecord();
         }
       } catch (e) {
         logger.error(
@@ -403,7 +403,6 @@ export async function runWorkers(
 ) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
-  const workers = [];
   let offset = 0;
 
   // automatically set worker start by ordinal in k8s
