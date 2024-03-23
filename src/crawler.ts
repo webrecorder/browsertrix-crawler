@@ -1430,7 +1430,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // remove tmp-cdx, now that it's already been added to the WACZ and/or
     // copied to indexes
-    await fsp.rm(path.join(this.collDir, "tmp-cdx"), {
+    await fsp.rm(this.tempCdxDir, {
       recursive: true,
       force: true,
     });
@@ -1544,7 +1544,7 @@ self.__bx_behaviors.selectMainBehavior();
 
   // todo: replace with js-wacz impl eventually
   async _addCDXJ(wacz: WACZ) {
-    const dirPath = path.join(this.collDir, "tmp-cdx");
+    const dirPath = this.tempCdxDir;
 
     try {
       const cdxjFiles = await fsp.readdir(dirPath);
