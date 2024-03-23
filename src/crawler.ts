@@ -14,6 +14,8 @@ import {
   PageCallbacks,
 } from "./util/state.js";
 
+import { parseArgs } from "./util/argParser.js";
+
 import yaml from "js-yaml";
 
 import * as warcio from "warcio";
@@ -33,7 +35,6 @@ import {
 } from "./util/storage.js";
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
-import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { logger, formatErr, WACZLogger } from "./util/logger.js";
 import {
@@ -61,6 +62,7 @@ import { OriginOverride } from "./util/originoverride.js";
 import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
 import { CDPSession, Frame, HTTPRequest, Page } from "puppeteer-core";
+import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
 
@@ -152,6 +154,8 @@ export class Crawler {
   seedPagesFile: string;
   otherPagesFile: string;
 
+  archivesDir: string;
+
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
 
@@ -160,10 +164,14 @@ export class Crawler {
 
   screencaster: ScreenCaster | null = null;
 
+  skipTextDocs = 0;
+
   interrupted = false;
   finalExit = false;
   uploadAndDeleteLocal = false;
   done = false;
+
+  textInPages = false;
 
   customBehaviors = "";
   behaviorsChecked = false;
@@ -184,10 +192,12 @@ export class Crawler {
     crawler: Crawler;
   }) => NonNullable<unknown>;
 
+  recording = true;
+
   constructor() {
-    const res = parseArgs();
-    this.params = res.parsed;
-    this.origConfig = res.origConfig;
+    const args = this.parseArgs();
+    this.params = args.parsed;
+    this.origConfig = args.origConfig;
 
     // root collections dir
     this.collDir = path.join(
@@ -266,6 +276,9 @@ export class Crawler {
     this.seedPagesFile = path.join(this.pagesDir, "pages.jsonl");
     this.otherPagesFile = path.join(this.pagesDir, "extraPages.jsonl");
 
+    // archives dir
+    this.archivesDir = path.join(this.collDir, "archive");
+
     this.blockRules = null;
     this.adBlockRules = null;
 
@@ -274,6 +287,8 @@ export class Crawler {
     this.interrupted = false;
     this.finalExit = false;
     this.uploadAndDeleteLocal = false;
+
+    this.textInPages = this.params.text.includes("to-pages");
 
     this.done = false;
 
@@ -286,6 +301,10 @@ export class Crawler {
     if (this.warcPrefix) {
       this.warcPrefix += "-" + this.crawlId + "-";
     }
+  }
+
+  protected parseArgs() {
+    return parseArgs();
   }
 
   configureUA() {
@@ -441,7 +460,9 @@ export class Crawler {
     //  logger.info("wb-manager init failed, collection likely already exists");
     //}
 
-    fs.mkdirSync(this.logDir, { recursive: true });
+    await fsp.mkdir(this.logDir, { recursive: true });
+    await fsp.mkdir(this.archivesDir, { recursive: true });
+
     this.logFH = fs.createWriteStream(this.logFilename);
     logger.setExternalLogStream(this.logFH);
 
@@ -728,10 +749,10 @@ self.__bx_behaviors.selectMainBehavior();
     return "";
   }
 
-  async crawlPage(opts: WorkerState) {
+  async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
-    const { page, cdp, data, workerid, callbacks, directFetchCapture } = opts;
+    const { page, data, workerid, callbacks, directFetchCapture } = opts;
     data.callbacks = callbacks;
 
     const { url } = data;
@@ -765,12 +786,13 @@ self.__bx_behaviors.selectMainBehavior();
             data.mime = mime;
           }
           data.status = 200;
+          data.ts = new Date();
           logger.info(
             "Direct fetch successful",
             { url, ...logDetails },
             "fetch",
           );
-          return true;
+          return;
         }
       } catch (e) {
         // filtered out direct fetch
@@ -788,7 +810,14 @@ self.__bx_behaviors.selectMainBehavior();
     data.title = await page.title();
     data.favicon = await this.getFavicon(page, logDetails);
 
-    const archiveDir = path.join(this.collDir, "archive");
+    await this.doPostLoadActions(opts);
+  }
+
+  async doPostLoadActions(opts: WorkerState, saveOutput = false) {
+    const { page, cdp, data, workerid } = opts;
+    const { url } = data;
+
+    const logDetails = { page: url, workerid };
 
     if (this.params.screenshot) {
       if (!data.isHTMLPage) {
@@ -799,10 +828,10 @@ self.__bx_behaviors.selectMainBehavior();
         browser: this.browser,
         page,
         url,
-        directory: archiveDir,
+        directory: this.archivesDir,
       });
       if (this.params.screenshot.includes("view")) {
-        await screenshots.take();
+        await screenshots.take("view", saveOutput ? data : null);
       }
       if (this.params.screenshot.includes("fullPage")) {
         await screenshots.takeFullPage();
@@ -818,15 +847,16 @@ self.__bx_behaviors.selectMainBehavior();
       textextract = new TextExtractViaSnapshot(cdp, {
         warcPrefix: this.warcPrefix,
         url,
-        directory: archiveDir,
+        directory: this.archivesDir,
+        skipDocs: this.skipTextDocs,
       });
-      const { changed, text } = await textextract.extractAndStoreText(
+      const { text } = await textextract.extractAndStoreText(
         "text",
         false,
         this.params.text.includes("to-warc"),
       );
 
-      if (changed && text && this.params.text.includes("to-pages")) {
+      if (text && (this.textInPages || saveOutput)) {
         data.text = text;
       }
     }
@@ -874,8 +904,6 @@ self.__bx_behaviors.selectMainBehavior();
       );
       await sleep(this.params.pageExtraDelay);
     }
-
-    return true;
   }
 
   async pageFinished(data: PageState) {
@@ -1053,8 +1081,7 @@ self.__bx_behaviors.selectMainBehavior();
   async checkLimits() {
     let interrupt = false;
 
-    const dir = path.join(this.collDir, "archive");
-    const size = await getDirSize(dir);
+    const size = await getDirSize(this.archivesDir);
 
     await this.crawlState.setArchiveSize(size);
 
@@ -1237,33 +1264,17 @@ self.__bx_behaviors.selectMainBehavior();
 
     this.screencaster = this.initScreenCaster();
 
-    if (this.params.originOverride.length) {
+    if (this.params.originOverride && this.params.originOverride.length) {
       this.originOverride = new OriginOverride(this.params.originOverride);
     }
 
-    for (let i = 0; i < this.params.scopedSeeds.length; i++) {
-      const seed = this.params.scopedSeeds[i];
-      if (!(await this.queueUrl(i, seed.url, 0, 0))) {
-        if (this.limitHit) {
-          break;
-        }
-      }
-
-      if (seed.sitemap) {
-        await timedRun(
-          this.parseSitemap(seed, i),
-          SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
-          "Sitemap initial fetch timed out",
-          { sitemap: seed.sitemap, seed: seed.url },
-          "sitemap",
-        );
-      }
-    }
+    await this._addInitialSeeds();
 
     await this.browser.launch({
       profileUrl: this.params.profile,
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
+      swOpt: this.params.serviceWorker,
       chromeOptions: {
         proxy: false,
         userAgent: this.emulateDevice.userAgent,
@@ -1278,12 +1289,14 @@ self.__bx_behaviors.selectMainBehavior();
           "browser",
         );
       },
+
+      recording: this.recording,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     // --------------
     // Run Crawl Here!
-    await runWorkers(this, this.params.workers, this.maxPageTime, this.collDir);
+    await runWorkers(this, this.params.workers, this.maxPageTime);
     // --------------
 
     await this.serializeConfig(true);
@@ -1322,6 +1335,27 @@ self.__bx_behaviors.selectMainBehavior();
         // ignore
       } finally {
         this.extraPagesFH = null;
+      }
+    }
+  }
+
+  protected async _addInitialSeeds() {
+    for (let i = 0; i < this.params.scopedSeeds.length; i++) {
+      const seed = this.params.scopedSeeds[i];
+      if (!(await this.queueUrl(i, seed.url, 0, 0))) {
+        if (this.limitHit) {
+          break;
+        }
+      }
+
+      if (seed.sitemap) {
+        await timedRun(
+          this.parseSitemap(seed, i),
+          SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
+          "Sitemap initial fetch timed out",
+          { sitemap: seed.sitemap, seed: seed.url },
+          "sitemap",
+        );
       }
     }
   }
@@ -1413,10 +1447,8 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info("Generating WACZ");
     await this.crawlState.setStatus("generate-wacz");
 
-    const archiveDir = path.join(this.collDir, "archive");
-
     // Get a list of the warcs inside
-    const warcFileList = await fsp.readdir(archiveDir);
+    const warcFileList = await fsp.readdir(this.archivesDir);
 
     // is finished (>0 pages and all pages written)
     const isFinished = await this.crawlState.isFinished();
@@ -1448,7 +1480,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const waczOpts: Record<string, any> = {
-      input: warcFileList.map((x) => path.join(archiveDir, x)),
+      input: warcFileList.map((x) => path.join(this.archivesDir, x)),
       output: waczPath,
       pages: this.pagesDir,
       detectPages: false,
@@ -1915,13 +1947,15 @@ self.__bx_behaviors.selectMainBehavior();
     depth: number,
     extraHops: number,
     logDetails: LogDetails = {},
+    ts = 0,
+    pageid?: string,
   ) {
     if (this.limitHit) {
       return false;
     }
 
     const result = await this.crawlState.addToQueue(
-      { url, seedId, depth, extraHops },
+      { url, seedId, depth, extraHops, ts, pageid },
       this.pageLimit,
     );
 
@@ -1982,23 +2016,36 @@ self.__bx_behaviors.selectMainBehavior();
     return fh;
   }
 
-  async writePage({
-    pageid,
-    url,
-    depth,
-    title,
-    text,
-    loadState,
-    mime,
-    favicon,
-    ts,
-    status,
-  }: PageState) {
-    const row: PageEntry = { id: pageid!, url, title, loadState };
+  protected pageEntryForRedis(
+    entry: Record<string, string | number | boolean | object>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    state: PageState,
+  ) {
+    return entry;
+  }
 
-    if (ts) {
-      row.ts = ts.toISOString();
+  async writePage(state: PageState) {
+    const {
+      pageid,
+      url,
+      depth,
+      title,
+      text,
+      loadState,
+      mime,
+      favicon,
+      status,
+    } = state;
+
+    const row: PageEntry = { id: pageid, url, title, loadState };
+
+    let { ts } = state;
+    if (!ts) {
+      ts = new Date();
+      logger.warn("Page date missing, setting to now", { url, ts });
     }
+
+    row.ts = ts.toISOString();
 
     if (mime) {
       row.mime = mime;
@@ -2009,18 +2056,20 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.writePagesToRedis) {
-      await this.crawlState.writeToPagesQueue(JSON.stringify(row));
+      await this.crawlState.writeToPagesQueue(
+        JSON.stringify(this.pageEntryForRedis(row, state)),
+      );
     }
 
     if (depth === 0) {
       row.seed = true;
     }
 
-    if (text !== null) {
+    if (text && this.textInPages) {
       row.text = text;
     }
 
-    if (favicon !== null) {
+    if (favicon) {
       row.favIconUrl = favicon;
     }
 
@@ -2170,7 +2219,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.crawlState.setStatus("generate-warc");
 
     // Get the list of created Warcs
-    const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));
+    const warcLists = await fsp.readdir(this.archivesDir);
 
     logger.debug(`Combining ${warcLists.length} WARCs...`);
 
@@ -2178,7 +2227,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
     for (let i = 0; i < warcLists.length; i++) {
-      const fileName = path.join(this.collDir, "archive", warcLists[i]);
+      const fileName = path.join(this.archivesDir, warcLists[i]);
       const fileSize = await getFileSize(fileName);
       fileSizeObjects.push({ fileSize: fileSize, fileName: fileName });
       fileSizeObjects.sort((a, b) => b.fileSize - a.fileSize);
@@ -2334,6 +2383,21 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.storage.uploadFile(filename, targetFilename);
     }
+  }
+
+  createRecorder(id: number): Recorder | null {
+    if (!this.recording) {
+      return null;
+    }
+
+    const res = new Recorder({
+      workerid: id,
+      collDir: this.collDir,
+      crawler: this,
+    });
+
+    this.browser.recorders.push(res);
+    return res;
   }
 }
 

@@ -1,7 +1,6 @@
 import child_process from "child_process";
 import Redis from "ioredis";
 
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -31,20 +30,17 @@ async function waitContainer(containerId) {
 }
 
 async function runCrawl(numExpected, url, sitemap="", limit=0) {
-  const containerId = child_process.execSync(`docker run -d -p 36379:6379 -e CRAWL_ID=test webrecorder/browsertrix-crawler crawl --url ${url} --sitemap ${sitemap} --limit ${limit} --context sitemap --logging debug --debugAccessRedis`, {encoding: "utf-8"});
+  const containerId = child_process.execSync(`docker run -d -p 36381:6379 -e CRAWL_ID=test webrecorder/browsertrix-crawler crawl --url ${url} --sitemap ${sitemap} --limit ${limit} --context sitemap --logging debug --debugAccessRedis`, {encoding: "utf-8"});
 
-  await sleep(2000);
+  await sleep(3000);
 
-  const redis = new Redis("redis://127.0.0.1:36379/0", { lazyConnect: true });
+  const redis = new Redis("redis://127.0.0.1:36381/0", { lazyConnect: true, retryStrategy: () => null });
 
   let finished = 0;
 
   try {
     await redis.connect({
       maxRetriesPerRequest: 100,
-      retryStrategy(times) {
-        return times < 100 ? 1000 : null;
-      },
     });
 
     while (true) {
@@ -58,11 +54,6 @@ async function runCrawl(numExpected, url, sitemap="", limit=0) {
     console.error(e);
   } finally {
     await waitContainer(containerId);
-    try {
-      await redis.disconnect();
-    } catch (e) {
-      // ignore
-    }
   }
 
   expect(finished).toBeGreaterThanOrEqual(numExpected);
@@ -79,4 +70,3 @@ test("test sitemap with limit", async () => {
 test("test sitemap with limit, specific URL", async () => {
   await runCrawl(1900, "https://www.mozilla.org/", "https://www.mozilla.org/sitemap.xml", 2000);
 });
-

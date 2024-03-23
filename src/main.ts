@@ -3,6 +3,7 @@
 import { logger } from "./util/logger.js";
 import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
+import { ReplayCrawler } from "./replaycrawler.js";
 
 let crawler: Crawler | null = null;
 
@@ -49,5 +50,10 @@ process.on("SIGABRT", async () => {
   forceTerm = true;
 });
 
-crawler = new Crawler();
+if (process.argv[1].endsWith("qa")) {
+  crawler = new ReplayCrawler();
+} else {
+  crawler = new Crawler();
+}
+
 crawler.run();

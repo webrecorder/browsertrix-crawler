@@ -2,10 +2,17 @@ import fs from "fs";
 import path from "path";
 import * as warcio from "warcio";
 
+// ===========================================================================
+export type WARCResourceWriterOpts = {
+  url: string;
+  directory: string;
+  date?: Date;
+  warcName: string;
+  warcPrefix: string;
+};
+
+// ===========================================================================
 export class WARCResourceWriter {
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  page: any;
   url: string;
   directory: string;
   warcName: string;
@@ -17,13 +24,7 @@ export class WARCResourceWriter {
     date,
     warcPrefix,
     warcName,
-  }: {
-    url: string;
-    directory: string;
-    date: Date;
-    warcPrefix: string;
-    warcName: string;
-  }) {
+  }: WARCResourceWriterOpts) {
     this.url = url;
     this.directory = directory;
     this.warcName = path.join(this.directory, warcPrefix + warcName);
