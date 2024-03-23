@@ -403,7 +403,6 @@ export async function runWorkers(
 ) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
-  const workers = [];
   let offset = 0;
 
   // automatically set worker start by ordinal in k8s
