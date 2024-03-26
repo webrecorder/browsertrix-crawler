@@ -30,20 +30,17 @@ async function waitContainer(containerId) {
 }
 
 async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessThan=0, extra="") {
-  const containerId = child_process.execSync(`docker run -d -p 36379:6379 -e CRAWL_ID=test webrecorder/browsertrix-crawler crawl --url ${url} --sitemap ${sitemap} --limit ${limit} --context sitemap --logging debug --debugAccessRedis ${extra}`, {encoding: "utf-8"});
+  const containerId = child_process.execSync(`docker run -d -p 36381:6379 -e CRAWL_ID=test webrecorder/browsertrix-crawler crawl --url ${url} --sitemap ${sitemap} --limit ${limit} --context sitemap --logging debug --debugAccessRedis ${extra}`, {encoding: "utf-8"});
 
-  await sleep(2000);
+  await sleep(3000);
 
-  const redis = new Redis("redis://127.0.0.1:36379/0", { lazyConnect: true });
+  const redis = new Redis("redis://127.0.0.1:36381/0", { lazyConnect: true, retryStrategy: () => null });
 
   let finished = 0;
 
   try {
     await redis.connect({
       maxRetriesPerRequest: 100,
-      retryStrategy(times) {
-        return times < 100 ? 1000 : null;
-      },
     });
 
     while (true) {
@@ -57,11 +54,6 @@ async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessTh
     console.error(e);
   } finally {
     await waitContainer(containerId);
-    try {
-      await redis.disconnect();
-    } catch (e) {
-      // ignore
-    }
   }
 
   expect(finished).toBeGreaterThanOrEqual(numExpected);
@@ -91,4 +83,3 @@ test("test sitemap with application/xml content-type", async () => {
 test("test sitemap with narrow scope, extraHops, to ensure extraHops don't apply to sitemap", async () => {
   await runCrawl(1, "https://www.mozilla.org/", "", 2000, 100, "--extraHops 1 --scopeType page");
 });
-
