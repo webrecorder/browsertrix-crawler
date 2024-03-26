@@ -4,17 +4,15 @@ import path from "path";
 import yaml from "js-yaml";
 import Redis from "ioredis";
 
+
+const pagesFile = "test-crawls/collections/int-state-test/pages/pages.jsonl";
+
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function waitContainer(containerId) {
-  try {
-    execSync(`docker kill -s SIGINT ${containerId}`);
-  } catch (e) {
-    return;
-  }
-
+async function waitContainerDone(containerId) {
   // containerId is initially the full id, but docker ps
   // only prints the short id (first 12 characters)
   containerId = containerId.slice(0, 12);
@@ -32,6 +30,17 @@ async function waitContainer(containerId) {
   }
 }
 
+async function killContainer(containerId) {
+  try {
+    execSync(`docker kill -s SIGINT ${containerId}`);
+  } catch (e) {
+    return;
+  }
+
+  await waitContainerDone(containerId);
+}
+
+
 let savedStateFile;
 let state;
 let numDone;
@@ -43,15 +52,13 @@ test("check crawl interrupted + saved state written", async () => {
 
   try {
     containerId = execSync(
-      "docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://www.webrecorder.net/ --limit 10",
+      "docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://www.webrecorder.net/ --limit 10 --behaviors \"\"",
       { encoding: "utf-8" },
       //wait.callback,
     );
   } catch (error) {
     console.log(error);
   }
-
-  const pagesFile = "test-crawls/collections/int-state-test/pages/pages.jsonl";
 
   // remove existing pagesFile to support reentrancy
   try {
@@ -77,7 +84,7 @@ test("check crawl interrupted + saved state written", async () => {
     await sleep(500);
   }
 
-  await waitContainer(containerId);
+  await killContainer(containerId);
 
   const savedStates = fs.readdirSync(
     "test-crawls/collections/int-state-test/crawls",
@@ -97,11 +104,13 @@ test("check parsing saved state + page done + queue present", () => {
 
   const saved = yaml.load(savedState);
 
-  expect(!!saved.state).toBe(true);
   state = saved.state;
-  numDone = state.finished.length;
+  finished = state.finished;
+
+  numDone = finished.length;
   numQueued = state.queued.length;
 
+  expect(!!state).toBe(true);
   expect(numDone > 0).toEqual(true);
   expect(numQueued > 0).toEqual(true);
   expect(numDone + numQueued).toEqual(10);
@@ -110,8 +119,6 @@ test("check parsing saved state + page done + queue present", () => {
   expect(state.extraSeeds).toEqual([
     `{"origSeedId":0,"newUrl":"https://webrecorder.net/"}`,
   ]);
-
-  finished = state.finished;
 });
 
 test("check crawl restarted with saved state", async () => {
@@ -121,7 +128,7 @@ test("check crawl restarted with saved state", async () => {
 
   try {
     containerId = execSync(
-      `docker run -d -p ${port}:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 5`,
+      `docker run -d -p ${port}:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 10 --behaviors ""`,
       { encoding: "utf-8" },
     );
   } catch (error) {
@@ -148,6 +155,16 @@ test("check crawl restarted with saved state", async () => {
   } catch (e) {
     console.log(e);
   } finally {
-    await waitContainer(containerId);
+    await waitContainerDone(containerId);
   }
+});
+
+test("ensure correct number of pages was written", () => {
+  const pages = fs
+    .readFileSync(pagesFile, { encoding: "utf-8" })
+    .trim()
+    .split("\n");
+
+  // first line is the header
+  expect(pages.length).toBe(10 + 1);
 });

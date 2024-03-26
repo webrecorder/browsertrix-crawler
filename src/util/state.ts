@@ -97,6 +97,7 @@ declare module "ioredis" {
       pkey: string,
       qkey: string,
       skey: string,
+      esKey: string,
       url: string,
       score: number,
       data: string,
@@ -199,9 +200,9 @@ export class RedisCrawlState {
 
   _initLuaCommands(redis: Redis) {
     redis.defineCommand("addqueue", {
-      numberOfKeys: 3,
+      numberOfKeys: 4,
       lua: `
-local size = redis.call('scard', KEYS[3]);
+local size = redis.call('scard', KEYS[3]) - redis.call('llen', KEYS[4]);
 local limit = tonumber(ARGV[4]);
 if limit > 0 and size >= limit then
   return 1;
@@ -506,6 +507,7 @@ return 0;
       this.pkey,
       this.qkey,
       this.skey,
+      this.esKey,
       url,
       this._getScore(data),
       JSON.stringify(data),
@@ -624,7 +626,8 @@ return 0;
 
       for (const result of someResults) {
         const json = JSON.parse(result);
-        seenSet.delete(json.url);
+        //for extra seeds
+        seenSet.delete(json.url || json.newUrl);
         results.push(result);
       }
     }
@@ -720,10 +723,6 @@ return 0;
   async numDone() {
     const done = await this.redis.get(this.dkey);
     return parseInt(done || "0");
-  }
-
-  async numSeen() {
-    return await this.redis.scard(this.skey);
   }
 
   async numPending() {
