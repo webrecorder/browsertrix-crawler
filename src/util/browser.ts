@@ -95,7 +95,7 @@ export class Browser {
 
     const launchOpts: PuppeteerLaunchOptions = {
       args,
-      headless: headless ? "new" : false,
+      headless,
       executablePath: this.getBrowserExe(),
       ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
       ignoreHTTPSErrors: true,
@@ -277,7 +277,7 @@ export class Browser {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let details: Record<string, any> = { frameUrl, ...logData };
 
-    if (!frameUrl || frame.isDetached()) {
+    if (!frameUrl || frame.detached) {
       logger.info(
         "Run Script Skipped, frame no longer attached or has no URL",
         details,
@@ -385,7 +385,7 @@ export class Browser {
         if (target.url() === startPage) {
           resolve(target);
           if (this.browser) {
-            this.browser.removeListener("targetcreated", listener);
+            this.browser.off("targetcreated", listener);
           }
         }
       };

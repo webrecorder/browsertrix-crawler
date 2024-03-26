@@ -79,7 +79,7 @@ export class Recorder {
   skipIds!: Set<string>;
   pageInfo!: PageInfoRecord;
 
-  swSessionId?: string | null;
+  swTargetId?: string | null;
   swFrameIds = new Set<string>();
   swUrls = new Set<string>();
 
@@ -169,19 +169,19 @@ export class Recorder {
 
     // Target
     cdp.on("Target.attachedToTarget", async (params) => {
-      const { url, type, sessionId } = params.targetInfo;
+      const { url, type, targetId } = params.targetInfo;
       if (type === "service_worker") {
-        this.swSessionId = sessionId;
+        this.swTargetId = targetId;
         this.swUrls.add(url);
       }
     });
 
     cdp.on("Target.detachedFromTarget", async (params) => {
-      const { sessionId } = params;
-      if (this.swSessionId && sessionId === this.swSessionId) {
+      const { targetId } = params;
+      if (this.swTargetId && targetId === this.swTargetId) {
         this.swUrls.clear();
         this.swFrameIds.clear();
-        this.swSessionId = null;
+        this.swTargetId = null;
       }
     });
 
