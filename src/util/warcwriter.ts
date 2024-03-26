@@ -2,13 +2,21 @@ import fs from "fs";
 import { Writable } from "stream";
 import path from "path";
 
-import { CDXIndexer } from "warcio";
+import { CDXIndexer, WARCRecord } from "warcio";
 import { WARCSerializer } from "warcio/node";
 import { logger, formatErr } from "./logger.js";
-import type { IndexerOffsetLength, WARCRecord } from "warcio";
+import type { IndexerOffsetLength } from "warcio";
 import { timestampNow } from "./timing.js";
 
 const DEFAULT_ROLLOVER_SIZE = 1_000_000_000;
+
+export type ResourceRecordData = {
+  buffer: Uint8Array;
+  resourceType: string;
+  contentType: string;
+  url: string;
+  date?: Date;
+};
 
 // =================================================================
 export class WARCWriter implements IndexerOffsetLength {
@@ -47,6 +55,8 @@ export class WARCWriter implements IndexerOffsetLength {
   }) {
     this.archivesDir = archivesDir;
     this.tempCdxDir = tempCdxDir;
+    // for now, disabling CDX
+    this.tempCdxDir = undefined;
     this.logDetails = logDetails;
     this.gzip = gzip;
     this.rolloverSize = rolloverSize;
@@ -137,6 +147,39 @@ export class WARCWriter implements IndexerOffsetLength {
     this._writeCDX(record);
   }
 
+  async writeNewResourceRecord({
+    buffer,
+    resourceType,
+    contentType,
+    url,
+    date,
+  }: ResourceRecordData) {
+    const warcVersion = "WARC/1.1";
+    const warcRecordType = "resource";
+    const warcHeaders = { "Content-Type": contentType };
+    async function* content() {
+      yield buffer;
+    }
+    const resourceUrl = `urn:${resourceType}:${url}`;
+
+    if (!date) {
+      date = new Date();
+    }
+
+    return await this.writeSingleRecord(
+      WARCRecord.create(
+        {
+          url: resourceUrl,
+          date: date.toISOString(),
+          type: warcRecordType,
+          warcVersion,
+          warcHeaders,
+        },
+        content(),
+      ),
+    );
+  }
+
   private async _writeRecord(record: WARCRecord, serializer: WARCSerializer) {
     if (this.done) {
       logger.warn(
@@ -188,8 +231,6 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   async flush() {
-    this.done = true;
-
     if (this.fh) {
       await streamFinish(this.fh);
       this.fh = null;
@@ -201,6 +242,8 @@ export class WARCWriter implements IndexerOffsetLength {
       await streamFinish(this.cdxFH);
       this.cdxFH = null;
     }
+
+    this.done = true;
   }
 }
 
