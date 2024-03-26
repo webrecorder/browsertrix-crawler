@@ -1,7 +1,6 @@
 import child_process from "child_process";
 import Redis from "ioredis";
 
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -84,7 +83,12 @@ test("test sitemap with limit, specific URL", async () => {
   await runCrawl(1900, "https://www.mozilla.org/", "https://www.mozilla.org/sitemap.xml", 2000);
 });
 
+test("test sitemap with application/xml content-type", async () => {
+  await runCrawl(10, "https://bitarchivist.net/", "", 0);
+});
+
+
 test("test sitemap with narrow scope, extraHops, to ensure extraHops don't apply to sitemap", async () => {
-  await runCrawl(1, "https://www.mozilla.org/", true, 2000, 100, "--extraHops 1 --scopeType page");
+  await runCrawl(1, "https://www.mozilla.org/", "", 2000, 100, "--extraHops 1 --scopeType page");
 });
 
