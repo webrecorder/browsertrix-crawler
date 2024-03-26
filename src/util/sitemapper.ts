@@ -11,6 +11,9 @@ import { sleep } from "./timing.js";
 
 const SITEMAP_CONCURRENCY = 5;
 
+const TEXT_CONTENT_TYPE = ["text/plain"];
+const XML_CONTENT_TYPES = ["text/xml", "application/xml"];
+
 export type SitemapOpts = {
   headers?: Record<string, string>;
 
@@ -83,7 +86,7 @@ export class SitemapReader extends EventEmitter {
     }
   }
 
-  async tryFetch(url: string, expectedCT?: string | null) {
+  async tryFetch(url: string, expectedCT?: string[] | null) {
     try {
       logger.debug(
         "Detecting Sitemap: fetching",
@@ -101,7 +104,7 @@ export class SitemapReader extends EventEmitter {
       }
 
       const ct = resp.headers.get("content-type");
-      if (expectedCT && ct && ct.split(";")[0] != expectedCT) {
+      if (expectedCT && ct && !expectedCT.includes(ct.split(";")[0])) {
         logger.debug(
           "Detecting Sitemap: invalid content-type",
           { ct },
@@ -129,12 +132,12 @@ export class SitemapReader extends EventEmitter {
     if (sitemap === DETECT_SITEMAP) {
       logger.debug("Detecting sitemap for seed", { seedUrl }, "sitemap");
       fullUrl = new URL("/robots.txt", seedUrl).href;
-      resp = await this.tryFetch(fullUrl, "text/plain");
+      resp = await this.tryFetch(fullUrl, TEXT_CONTENT_TYPE);
       if (resp) {
         isRobots = true;
       } else {
         fullUrl = new URL("/sitemap.xml", seedUrl).href;
-        resp = await this.tryFetch(fullUrl, "text/xml");
+        resp = await this.tryFetch(fullUrl, XML_CONTENT_TYPES);
         if (resp) {
           isSitemap = true;
         }
@@ -144,10 +147,10 @@ export class SitemapReader extends EventEmitter {
       fullUrl = new URL(sitemap, seedUrl).href;
       let expected = null;
       if (fullUrl.endsWith(".xml")) {
-        expected = "text/xml";
+        expected = XML_CONTENT_TYPES;
         isSitemap = true;
       } else if (fullUrl.endsWith(".txt")) {
-        expected = "text/plain";
+        expected = TEXT_CONTENT_TYPE;
         isRobots = true;
       }
       resp = await this.tryFetch(fullUrl, expected);
@@ -218,8 +221,22 @@ export class SitemapReader extends EventEmitter {
   }
 
   private async _parseSitemapFromResponse(url: string, resp: Response) {
+    let stream;
+
+    const { body } = resp;
+    if (!body) {
+      throw new Error("missing response body");
+    }
+    // decompress .gz sitemaps
+    if (url.endsWith(".gz")) {
+      const ds = new DecompressionStream("gzip");
+      stream = body.pipeThrough(ds);
+    } else {
+      stream = body;
+    }
+
     const readableNodeStream = Readable.fromWeb(
-      resp.body as ReadableStream<Uint8Array>,
+      stream as ReadableStream<Uint8Array>,
     );
     this.initSaxParser(url, readableNodeStream);
   }
@@ -243,6 +260,8 @@ export class SitemapReader extends EventEmitter {
 
     let currUrl: string | null;
     let lastmod: Date | null = null;
+
+    let errCount = 0;
 
     let otherTags = 0;
 
@@ -358,10 +377,16 @@ export class SitemapReader extends EventEmitter {
         this.pending.delete(url);
         return;
       }
-      logger.warn("Sitemap error parsing XML", { err }, "sitemap");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (parserStream._parser as any).error = null;
-      parserStream._parser.resume();
+      logger.warn(
+        "Sitemap error parsing XML",
+        { url, err, errCount },
+        "sitemap",
+      );
+      if (errCount++ < 3) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (parserStream._parser as any).error = null;
+        parserStream._parser.resume();
+      }
     });
 
     sourceStream.pipe(parserStream);
