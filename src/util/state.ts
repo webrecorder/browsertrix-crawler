@@ -705,10 +705,6 @@ return 0;
     return parseInt(done || "0");
   }
 
-  // async numSeen() {
-  //   return await this.redis.scard(this.skey);
-  // }
-
   async numPending() {
     const res = await this.redis.hlen(this.pkey);
 
