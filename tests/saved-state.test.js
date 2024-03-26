@@ -50,6 +50,8 @@ let finished;
 test("check crawl interrupted + saved state written", async () => {
   let containerId = null;
 
+  fs.rmSync("./test-crawls/int-state-test", { recursive: true, force: true });
+
   try {
     containerId = execSync(
       "docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://www.webrecorder.net/ --limit 10 --behaviors \"\"",
