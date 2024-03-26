@@ -2420,7 +2420,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     const filenameBase = `${this.getWarcPrefix("rec")}$ts-${id}`;
 
-    const writer = this.createWarcWriter(filenameBase, true, { id: id.toString() });
+    const writer = this.createWarcWriter(filenameBase, true, {
+      id: id.toString(),
+    });
 
     const res = new Recorder({
       workerid: id,
