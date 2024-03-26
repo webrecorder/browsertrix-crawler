@@ -33,6 +33,8 @@ export type QueueEntry = {
   seedId: number;
   depth: number;
   extraHops: number;
+  ts?: number;
+  pageid?: string;
 };
 
 // ============================================================================
@@ -66,6 +68,7 @@ export class PageState {
 
   isHTMLPage?: boolean;
   text?: string;
+  screenshotView?: Buffer;
   favicon?: string;
 
   skipBehaviors = false;
@@ -79,7 +82,10 @@ export class PageState {
     this.seedId = redisData.seedId;
     this.depth = redisData.depth;
     this.extraHops = redisData.extraHops || 0;
-    this.pageid = uuidv4();
+    if (redisData.ts) {
+      this.ts = new Date(redisData.ts);
+    }
+    this.pageid = redisData.pageid || uuidv4();
     this.status = 0;
   }
 }
@@ -473,11 +479,25 @@ return 0;
 
   //async addToQueue({url : string, seedId, depth = 0, extraHops = 0} = {}, limit = 0) {
   async addToQueue(
-    { url, seedId, depth = 0, extraHops = 0 }: QueueEntry,
+    {
+      url,
+      seedId,
+      depth = 0,
+      extraHops = 0,
+      ts = 0,
+      pageid = undefined,
+    }: QueueEntry,
     limit = 0,
   ) {
     const added = this._timestamp();
     const data: QueueEntry = { added, url, seedId, depth, extraHops };
+
+    if (ts) {
+      data.ts = ts;
+    }
+    if (pageid) {
+      data.pageid = pageid;
+    }
 
     // return codes
     // 0 - url queued successfully
