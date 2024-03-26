@@ -218,8 +218,22 @@ export class SitemapReader extends EventEmitter {
   }
 
   private async _parseSitemapFromResponse(url: string, resp: Response) {
+    let stream;
+
+    const { body } = resp;
+    if (!body) {
+      throw new Error("missing response body");
+    }
+    // decompress .gz sitemaps
+    if (url.endsWith(".gz")) {
+      const ds = new DecompressionStream("gzip");
+      stream = body.pipeThrough(ds);
+    } else {
+      stream = body;
+    }
+
     const readableNodeStream = Readable.fromWeb(
-      resp.body as ReadableStream<Uint8Array>,
+      stream as ReadableStream<Uint8Array>,
     );
     this.initSaxParser(url, readableNodeStream);
   }
@@ -243,6 +257,8 @@ export class SitemapReader extends EventEmitter {
 
     let currUrl: string | null;
     let lastmod: Date | null = null;
+
+    let errCount = 0;
 
     let otherTags = 0;
 
@@ -358,10 +374,16 @@ export class SitemapReader extends EventEmitter {
         this.pending.delete(url);
         return;
       }
-      logger.warn("Sitemap error parsing XML", { err }, "sitemap");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (parserStream._parser as any).error = null;
-      parserStream._parser.resume();
+      logger.warn(
+        "Sitemap error parsing XML",
+        { url, err, errCount },
+        "sitemap",
+      );
+      if (errCount++ < 3) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (parserStream._parser as any).error = null;
+        parserStream._parser.resume();
+      }
     });
 
     sourceStream.pipe(parserStream);
