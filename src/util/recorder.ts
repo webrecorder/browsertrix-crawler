@@ -1,6 +1,4 @@
-import fs from "fs";
 import path from "path";
-import os from "os";
 
 import { v4 as uuidv4 } from "uuid";
 
@@ -24,7 +22,6 @@ import { WARCWriter } from "./warcwriter.js";
 import { RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
-import { WARCResourceWriter } from "./warcresourcewriter.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_BROWSER_TEXT_FETCH_SIZE = 25_000_000;
@@ -70,7 +67,6 @@ export type PageInfoRecord = {
 // =================================================================
 export class Recorder {
   workerid: WorkerId;
-  collDir: string;
 
   crawler: Crawler;
 
@@ -94,9 +90,7 @@ export class Recorder {
 
   allowFull206 = false;
 
-  archivesDir: string;
   tempdir: string;
-  tempCdxDir: string;
 
   gzip = true;
 
@@ -107,46 +101,26 @@ export class Recorder {
 
   constructor({
     workerid,
-    collDir,
+    writer,
     crawler,
+    tempdir,
   }: {
     workerid: WorkerId;
-    collDir: string;
+    writer: WARCWriter;
     crawler: Crawler;
+    tempdir: string;
   }) {
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
 
+    this.writer = writer;
+
+    this.tempdir = tempdir;
+
     this.warcQ = new PQueue({ concurrency: 1 });
 
     this.fetcherQ = new PQueue({ concurrency: 1 });
-
-    this.collDir = collDir;
-
-    this.archivesDir = path.join(this.collDir, "archive");
-    this.tempdir = path.join(os.tmpdir(), "tmp-dl");
-    this.tempCdxDir = path.join(this.collDir, "tmp-cdx");
-
-    fs.mkdirSync(this.tempdir, { recursive: true });
-    fs.mkdirSync(this.archivesDir, { recursive: true });
-    // fs.mkdirSync(this.tempCdxDir, { recursive: true });
-
-    const prefix =
-      process.env.WARC_PREFIX || crawler.params.warcPrefix || "rec";
-    const crawlId = process.env.CRAWL_ID || os.hostname();
-    const filenameTemplate = `${prefix}-${crawlId}-$ts-${this.workerid}.warc${
-      this.gzip ? ".gz" : ""
-    }`;
-
-    this.writer = new WARCWriter({
-      archivesDir: this.archivesDir,
-      // tempCdxDir: this.tempCdxDir,
-      filenameTemplate,
-      rolloverSize: crawler.params.rolloverSize,
-      gzip: this.gzip,
-      logDetails: this.logDetails,
-    });
   }
 
   async onCreatePage({ cdp }: { cdp: CDPSession }) {
@@ -733,18 +707,19 @@ export class Recorder {
     }
   }
 
-  async writePageInfoRecord() {
+  writePageInfoRecord() {
     const text = JSON.stringify(this.pageInfo, null, 2);
 
-    const resourceRecord = await WARCResourceWriter.createResourceRecord(
-      new TextEncoder().encode(text),
-      "pageinfo",
-      "application/json",
-      this.pageUrl,
-      new Date(),
-    );
+    const url = this.pageUrl;
 
-    this.warcQ.add(() => this.writer.writeSingleRecord(resourceRecord));
+    this.warcQ.add(() =>
+      this.writer.writeNewResourceRecord({
+        buffer: new TextEncoder().encode(text),
+        resourceType: "pageinfo",
+        contentType: "application/json",
+        url,
+      }),
+    );
 
     return this.pageInfo.ts;
   }

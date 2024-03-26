@@ -16,7 +16,6 @@ import { ZipRangeReader } from "@webrecorder/wabac/src/wacz/ziprangereader.js";
 import { createLoader } from "@webrecorder/wabac/src/blockloaders.js";
 
 import { AsyncIterReader } from "warcio";
-import { WARCResourceWriter } from "./util/warcresourcewriter.js";
 import { parseArgs } from "./util/argParser.js";
 
 import { PNG } from "pngjs";
@@ -25,6 +24,7 @@ import pixelmatch from "pixelmatch";
 import levenshtein from "js-levenshtein";
 import { MAX_URL_LENGTH } from "./util/reqresp.js";
 import { openAsBlob } from "fs";
+import { WARCWriter } from "./util/warcwriter.js";
 
 // RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
@@ -67,6 +67,7 @@ export class ReplayCrawler extends Crawler {
   qaSource: string;
 
   pageInfos: Map<Page, ReplayPageInfoRecord>;
+  infoWriter: WARCWriter | null;
 
   reloadTimeouts: WeakMap<Page, NodeJS.Timeout>;
 
@@ -98,6 +99,14 @@ export class ReplayCrawler extends Crawler {
     this.params.serviceWorker = "enabled";
 
     this.reloadTimeouts = new WeakMap<Page, NodeJS.Timeout>();
+
+    this.infoWriter = null;
+  }
+
+  async bootstrap(): Promise<void> {
+    await super.bootstrap();
+
+    this.infoWriter = this.createExtraResourceWarcWriter("info");
   }
 
   protected parseArgs() {
@@ -666,18 +675,13 @@ export class ReplayCrawler extends Crawler {
         (state as ComparisonPageState).comparison = comparison;
       }
 
-      const writer = new WARCResourceWriter({
+      await this.infoWriter?.writeNewResourceRecord({
+        buffer: new TextEncoder().encode(JSON.stringify(pageInfo, null, 2)),
+        resourceType: "pageinfo",
+        contentType: "application/json",
         url: pageInfo.url,
-        directory: this.archivesDir,
-        warcPrefix: this.warcPrefix,
-        date: new Date(),
-        warcName: "info.warc.gz",
       });
-      await writer.writeBufferToWARC(
-        new TextEncoder().encode(JSON.stringify(pageInfo, null, 2)),
-        "pageinfo",
-        "application/json",
-      );
+
       this.pageInfos.delete(page);
     }
   }

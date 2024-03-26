@@ -290,7 +290,7 @@ export class PageWorker {
     } finally {
       try {
         if (this.recorder) {
-          opts.data.ts = await this.recorder.writePageInfoRecord();
+          opts.data.ts = this.recorder.writePageInfoRecord();
         }
       } catch (e) {
         logger.error(
