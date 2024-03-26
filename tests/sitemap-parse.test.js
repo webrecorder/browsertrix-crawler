@@ -30,8 +30,8 @@ async function waitContainer(containerId) {
   }
 }
 
-async function runCrawl(numExpected, url, sitemap="", limit=0) {
-  const containerId = child_process.execSync(`docker run -d -p 36379:6379 -e CRAWL_ID=test webrecorder/browsertrix-crawler crawl --url ${url} --sitemap ${sitemap} --limit ${limit} --context sitemap --logging debug --debugAccessRedis`, {encoding: "utf-8"});
+async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessThan=0, extra="") {
+  const containerId = child_process.execSync(`docker run -d -p 36379:6379 -e CRAWL_ID=test webrecorder/browsertrix-crawler crawl --url ${url} --sitemap ${sitemap} --limit ${limit} --context sitemap --logging debug --debugAccessRedis ${extra}`, {encoding: "utf-8"});
 
   await sleep(2000);
 
@@ -66,6 +66,10 @@ async function runCrawl(numExpected, url, sitemap="", limit=0) {
   }
 
   expect(finished).toBeGreaterThanOrEqual(numExpected);
+
+  if (numExpectedLessThan) {
+    expect(finished).toBeLessThanOrEqual(numExpectedLessThan);
+  }
 }
 
 test("test sitemap fully finish", async () => {
@@ -78,5 +82,9 @@ test("test sitemap with limit", async () => {
 
 test("test sitemap with limit, specific URL", async () => {
   await runCrawl(1900, "https://www.mozilla.org/", "https://www.mozilla.org/sitemap.xml", 2000);
+});
+
+test("test sitemap with narrow scope, extraHops, to ensure extraHops don't apply to sitemap", async () => {
+  await runCrawl(1, "https://www.mozilla.org/", true, 2000, 100, "--extraHops 1 --scopeType page");
 });
 
