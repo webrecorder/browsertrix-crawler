@@ -6,6 +6,7 @@ import Redis from "ioredis";
 
 
 const pagesFile = "test-crawls/collections/int-state-test/pages/pages.jsonl";
+const extraPagesFile = "test-crawls/collections/int-state-test/pages/extraPages.jsonl";
 
 
 function sleep(ms) {
@@ -49,8 +50,6 @@ let finished;
 
 test("check crawl interrupted + saved state written", async () => {
   let containerId = null;
-
-  fs.rmSync("./test-crawls/int-state-test", { recursive: true, force: true });
 
   try {
     containerId = execSync(
@@ -161,12 +160,20 @@ test("check crawl restarted with saved state", async () => {
   }
 });
 
-test("ensure correct number of pages was written", () => {
+test("ensure correct number of pages was written to pages + extraPages", () => {
   const pages = fs
     .readFileSync(pagesFile, { encoding: "utf-8" })
     .trim()
     .split("\n");
 
   // first line is the header
-  expect(pages.length).toBe(10 + 1);
+  expect(pages.length).toBe(2);
+
+  const extraPages = fs
+    .readFileSync(extraPagesFile, { encoding: "utf-8" })
+    .trim()
+    .split("\n");
+
+  // first line is the header
+  expect(extraPages.length).toBe(10);
 });
