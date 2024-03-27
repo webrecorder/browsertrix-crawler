@@ -61,6 +61,7 @@ import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
 import { WARCWriter } from "./util/warcwriter.js";
+import { BrowserPage } from "./util/page.js";
 
 const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
@@ -185,6 +186,7 @@ export class Crawler {
   driver!: (opts: {
     page: Page;
     data: PageState;
+    browserpage: BrowserPage;
     // eslint-disable-next-line no-use-before-define
     crawler: Crawler;
   }) => NonNullable<unknown>;
@@ -835,7 +837,12 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     // run custom driver here
-    await this.driver({ page, data, crawler: this });
+    await this.driver({
+      page,
+      data,
+      crawler: this,
+      browserpage: new BrowserPage(opts.cdp),
+    });
 
     data.title = await page.title();
     data.favicon = await this.getFavicon(page, logDetails);
@@ -1644,6 +1651,7 @@ self.__bx_behaviors.selectMainBehavior();
   async loadPage(
     page: Page,
     data: PageState,
+    browserpage: BrowserPage,
     selectorOptsList = DEFAULT_SELECTORS,
   ) {
     const { url, depth } = data;
@@ -1668,21 +1676,22 @@ self.__bx_behaviors.selectMainBehavior();
       });
     }
 
-    const gotoOpts = isHTMLPage
-      ? this.gotoOpts
-      : { waitUntil: "domcontentloaded" };
+    // const gotoOpts = isHTMLPage
+    //   ? this.gotoOpts
+    //   : { waitUntil: "domcontentloaded" };
 
     logger.info("Awaiting page load", logDetails);
 
     try {
-      const resp = await page.goto(url, gotoOpts);
+      //const resp = await page.goto(url, gotoOpts);
+      await browserpage.goto(url);
 
-      if (!resp) {
-        throw new Error("page response missing");
-      }
+      // if (!resp) {
+      //   throw new Error("page response missing");
+      // }
 
-      const respUrl = resp.url();
-      const isChromeError = page.url().startsWith("chrome-error://");
+      const respUrl = url; //resp.url();
+      const isChromeError = false; //page.url().startsWith("chrome-error://");
 
       if (depth === 0 && !isChromeError && respUrl !== url) {
         data.seedId = await this.crawlState.addExtraSeed(
@@ -1697,7 +1706,7 @@ self.__bx_behaviors.selectMainBehavior();
         });
       }
 
-      const status = resp.status();
+      const status = 200; //resp.status();
       data.status = status;
 
       let failed = isChromeError;
@@ -1725,7 +1734,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
 
-      const contentType = resp.headers()["content-type"];
+      const contentType = "text/html"; //resp.headers()["content-type"];
 
       isHTMLPage = this.isHTMLContentType(contentType);
     } catch (e) {
