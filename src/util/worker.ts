@@ -23,6 +23,7 @@ export type WorkerOpts = {
   directFetchCapture?:
     | ((url: string) => Promise<{ fetched: boolean; mime: string }>)
     | null;
+  frameIdToExecId: Map<string, number>;
 };
 
 // ===========================================================================
@@ -178,6 +179,7 @@ export class PageWorker {
           workerid,
           callbacks: this.callbacks,
           directFetchCapture,
+          frameIdToExecId: new Map<string, number>(),
         };
 
         if (this.recorder) {

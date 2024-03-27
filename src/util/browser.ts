@@ -15,7 +15,6 @@ import puppeteer, {
   Frame,
   HTTPRequest,
   Page,
-  Protocol,
   PuppeteerLaunchOptions,
   Viewport,
 } from "puppeteer-core";
@@ -57,8 +56,6 @@ export class Browser {
   recorders: Recorder[] = [];
 
   swOpt?: ServiceWorkerOpt = "disabled";
-
-  frameIdToExecId = new Map<string, number>();
 
   constructor() {
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
@@ -115,7 +112,7 @@ export class Browser {
     await this._init(launchOpts, ondisconnect, recording);
   }
 
-  async setupPage({ page, cdp }: { page: Page; cdp: CDPSession }) {
+  async setupPage({ page }: { page: Page; cdp: CDPSession }) {
     await this.addInitScript(
       page,
       'Object.defineProperty(navigator, "webdriver", {value: false});',
@@ -142,34 +139,6 @@ export class Browser {
         logger.debug("Service Workers: always enabled", {}, "browser");
         break;
     }
-
-    await cdp.send("Runtime.enable");
-
-    await cdp.on(
-      "Runtime.executionContextCreated",
-      (params: Protocol.Runtime.ExecutionContextCreatedEvent) => {
-        const { id, auxData } = params.context;
-        if (auxData && auxData.isDefault && auxData.frameId) {
-          this.frameIdToExecId.set(auxData.frameId, id);
-        }
-      },
-    );
-
-    await cdp.on(
-      "Runtime.executionContextDestroyed",
-      (params: Protocol.Runtime.ExecutionContextDestroyedEvent) => {
-        const { executionContextId } = params;
-        for (const [frameId, execId] of this.frameIdToExecId.entries()) {
-          if (execId === executionContextId) {
-            this.frameIdToExecId.delete(frameId);
-          }
-        }
-      },
-    );
-
-    await cdp.on("Runtime.executionContextsCleared", () => {
-      this.frameIdToExecId.clear();
-    });
   }
 
   async loadProfile(profileFilename: string): Promise<boolean> {
@@ -295,10 +264,10 @@ export class Browser {
     }
   }
 
-  async evaluateWithCLI_(
+  async evaluateWithCLI(
     cdp: CDPSession,
     frame: Frame,
-    cdpContextId: number,
+    frameIdToExecId: Map<string, number>,
     funcString: string,
     logData: Record<string, string>,
     contextName: LogContext,
@@ -317,6 +286,20 @@ export class Browser {
       return false;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const frameId = (frame as any)._id;
+
+    const contextId = frameIdToExecId.get(frameId);
+
+    if (!contextId) {
+      logger.warn(
+        "Not running behavior, missing CDP context id for frame id",
+        { frameId },
+        "browser",
+      );
+      return;
+    }
+
     logger.info("Run Script Started", details, contextName);
 
     // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
@@ -325,7 +308,7 @@ export class Browser {
 
     const { exceptionDetails, result } = await cdp.send("Runtime.evaluate", {
       expression,
-      contextId: cdpContextId,
+      contextId,
       returnByValue: true,
       awaitPromise: true,
       userGesture: true,
@@ -398,25 +381,11 @@ export class Browser {
       await this.serviceWorkerFetch();
     }
 
-    //await this.runtimeHandle();
-
     if (ondisconnect) {
       this.browser.on("disconnected", (err) => ondisconnect(err));
     }
     this.browser.on("disconnected", () => {
       this.browser = null;
-    });
-  }
-
-  async runtimeHandle() {
-    if (!this.firstCDP) {
-      return;
-    }
-    await this.firstCDP.send("Runtime.enable");
-
-    await this.firstCDP.on("Runtime.executionContextCreated", (params) => {
-      console.log("EXEC CONTEXT");
-      console.log(params);
     });
   }
 
@@ -551,39 +520,6 @@ export class Browser {
     await this.firstCDP.send("Fetch.enable", {
       patterns: [{ urlPattern: "*", requestStage: "Response" }],
     });
-  }
-
-  async evaluateWithCLI(
-    _: unknown,
-    frame: Frame,
-    cdp: CDPSession,
-    funcString: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    logData: Record<string, any>,
-    contextName: LogContext,
-  ) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const id = (frame as any)._id;
-
-    const cdpContextId = this.frameIdToExecId.get(id);
-
-    if (!cdpContextId) {
-      logger.warn(
-        "Not running behavior, missing CDP context id for frame id",
-        { frameId: id },
-        "browser",
-      );
-      return;
-    }
-
-    return await this.evaluateWithCLI_(
-      cdp,
-      frame,
-      cdpContextId,
-      funcString,
-      logData,
-      contextName,
-    );
   }
 
   interceptRequest(page: Page, callback: (event: HTTPRequest) => void) {
