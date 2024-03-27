@@ -2,7 +2,8 @@ import child_process, { ChildProcess, StdioOptions } from "child_process";
 import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
-import fsp, { FileHandle } from "fs/promises";
+import fsp from "fs/promises";
+import readline from "readline";
 
 import {
   RedisCrawlState,
@@ -19,6 +20,9 @@ import yaml from "js-yaml";
 
 import * as warcio from "warcio";
 
+// @ts-expect-error TODO fill in why error is expected
+import { WACZ } from "@harvard-lil/js-wacz";
+
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
 import {
@@ -32,7 +36,7 @@ import {
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
-import { logger, formatErr } from "./util/logger.js";
+import { logger, formatErr, WACZLogger } from "./util/logger.js";
 import {
   WorkerOpts,
   WorkerState,
@@ -121,7 +125,8 @@ export class Crawler {
 
   crawlState!: RedisCrawlState;
 
-  pagesFH?: FileHandle | null = null;
+  pagesFH?: WriteStream | null = null;
+  extraPagesFH?: WriteStream | null = null;
   logFH!: WriteStream;
 
   crawlId: string;
@@ -147,7 +152,8 @@ export class Crawler {
   gotoOpts: Record<string, any>;
 
   pagesDir: string;
-  pagesFile: string;
+  seedPagesFile: string;
+  otherPagesFile: string;
 
   archivesDir: string;
   tempdir: string;
@@ -271,7 +277,8 @@ export class Crawler {
     this.pagesDir = path.join(this.collDir, "pages");
 
     // pages file
-    this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
+    this.seedPagesFile = path.join(this.pagesDir, "pages.jsonl");
+    this.otherPagesFile = path.join(this.pagesDir, "extraPages.jsonl");
 
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
@@ -1244,7 +1251,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.crawlState.setStatus("running");
 
-    await this.initPages();
+    this.pagesFH = await this.initPages(true);
+    this.extraPagesFH = await this.initPages(false);
 
     this.adBlockRules = new AdBlockRules(
       this.captureBasePrefix,
@@ -1298,10 +1306,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.serializeConfig(true);
 
-    if (this.pagesFH) {
-      await this.pagesFH.sync();
-      await this.pagesFH.close();
-    }
+    await this.closePages();
 
     await this.closeFiles();
 
@@ -1313,6 +1318,32 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     await this.postCrawl();
+  }
+
+  async closePages() {
+    if (this.pagesFH) {
+      try {
+        await new Promise<void>((resolve) =>
+          this.pagesFH!.close(() => resolve()),
+        );
+      } catch (e) {
+        // ignore
+      } finally {
+        this.pagesFH = null;
+      }
+    }
+
+    if (this.extraPagesFH) {
+      try {
+        await new Promise<void>((resolve) =>
+          this.extraPagesFH!.close(() => resolve()),
+        );
+      } catch (e) {
+        // ignore
+      } finally {
+        this.extraPagesFH = null;
+      }
+    }
   }
 
   async closeFiles() {
@@ -1351,31 +1382,31 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.generateCDX) {
+      // just move cdx files from tmp-cdx -> indexes at this point
       logger.info("Generating CDX");
-      await fsp.mkdir(path.join(this.collDir, "indexes"), { recursive: true });
+
+      const indexer = new warcio.CDXIndexer({ format: "cdxj" });
+
       await this.crawlState.setStatus("generate-cdx");
 
-      const warcList = await fsp.readdir(this.archivesDir);
-      const warcListFull = warcList.map((filename) =>
-        path.join(this.archivesDir, filename),
-      );
+      const indexesDir = path.join(this.collDir, "indexes");
+      await fsp.mkdir(indexesDir, { recursive: true });
 
-      //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
-      const params = [
-        "-o",
-        path.join(this.collDir, "indexes", "index.cdxj"),
-        ...warcListFull,
-      ];
-      const indexResult = await this.awaitProcess(
-        child_process.spawn("cdxj-indexer", params, { cwd: this.params.cwd }),
-      );
-      if (indexResult === 0) {
-        logger.debug("Indexing complete, CDX successfully created");
-      } else {
-        logger.error("Error indexing and generating CDX", {
-          "status code": indexResult,
-        });
-      }
+      const indexFile = path.join(indexesDir, "index.cdxj");
+      const destFh = fs.createWriteStream(indexFile);
+
+      const archiveDir = path.join(this.collDir, "archive");
+      const archiveFiles = await fsp.readdir(archiveDir);
+      const warcFiles = archiveFiles.filter((f) => f.endsWith(".warc.gz"));
+
+      const files = warcFiles.map((warcFile) => {
+        return {
+          reader: fs.createReadStream(path.join(archiveDir, warcFile)),
+          filename: warcFile,
+        };
+      });
+
+      await indexer.writeAll(files, destFh);
     }
 
     logger.info("Crawling done");
@@ -1397,6 +1428,13 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
     }
+
+    // remove tmp-cdx, now that it's already been added to the WACZ and/or
+    // copied to indexes
+    await fsp.rm(this.tempCdxDir, {
+      recursive: true,
+      force: true,
+    });
 
     if (this.params.waitOnDone && (!this.interrupted || this.finalExit)) {
       this.done = true;
@@ -1454,67 +1492,45 @@ self.__bx_behaviors.selectMainBehavior();
     const waczFilename = this.params.collection.concat(".wacz");
     const waczPath = path.join(this.collDir, waczFilename);
 
-    const createArgs = [
-      "create",
-      "--split-seeds",
-      "-o",
-      waczPath,
-      "--pages",
-      this.pagesFile,
-      "--log-directory",
-      this.logDir,
-    ];
+    const waczLogger = new WACZLogger(logger);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const waczOpts: Record<string, any> = {
+      input: warcFileList.map((x) => path.join(this.archivesDir, x)),
+      output: waczPath,
+      pages: this.pagesDir,
+      detectPages: false,
+      indexFromWARCs: false,
+      logDirectory: this.logDir,
+      log: waczLogger,
+    };
 
     if (process.env.WACZ_SIGN_URL) {
-      createArgs.push("--signing-url");
-      createArgs.push(process.env.WACZ_SIGN_URL);
+      waczOpts.signingUrl = process.env.WACZ_SIGN_URL;
       if (process.env.WACZ_SIGN_TOKEN) {
-        createArgs.push("--signing-token");
-        createArgs.push(process.env.WACZ_SIGN_TOKEN);
+        waczOpts.signingToken = process.env.WACZ_SIGN_TOKEN;
       }
     }
 
     if (this.params.title) {
-      createArgs.push("--title");
-      createArgs.push(this.params.title);
+      waczOpts.title = this.params.title;
     }
 
     if (this.params.description) {
-      createArgs.push("--desc");
-      createArgs.push(this.params.description);
+      waczOpts.description = this.params.description;
     }
 
-    createArgs.push("-f");
-
-    warcFileList.forEach((val) =>
-      createArgs.push(path.join(this.archivesDir, val)),
-    );
-
-    // create WACZ
-    const waczResult = await this.awaitProcess(
-      child_process.spawn("wacz", createArgs, { detached: RUN_DETACHED }),
-    );
-
-    if (waczResult !== 0) {
-      logger.error("Error creating WACZ", { "status code": waczResult });
+    try {
+      const wacz = new WACZ(waczOpts);
+      await this._addCDXJ(wacz);
+      await wacz.process();
+    } catch (e) {
+      logger.error("Error creating WACZ", e);
       logger.fatal("Unable to write WACZ successfully");
     }
 
     logger.debug(`WACZ successfully generated and saved to: ${waczPath}`);
 
-    // Verify WACZ
-    /*
-    const validateArgs = ["validate"];
-    validateArgs.push("-f");
-    validateArgs.push(waczPath);
-
-    const waczVerifyResult = await this.awaitProcess(child_process.spawn("wacz", validateArgs));
-
-    if (waczVerifyResult !== 0) {
-      console.log("validate", waczVerifyResult);
-      logger.fatal("Unable to verify WACZ created successfully");
-    }
-*/
     if (this.storage) {
       await this.crawlState.setStatus("uploading-wacz");
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
@@ -1527,29 +1543,28 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  awaitProcess(proc: ChildProcess) {
-    const stdout: string[] = [];
-    const stderr: string[] = [];
+  // todo: replace with js-wacz impl eventually
+  async _addCDXJ(wacz: WACZ) {
+    const dirPath = this.tempCdxDir;
 
-    proc.stdout!.on("data", (data) => {
-      stdout.push(data.toString());
-    });
+    try {
+      const cdxjFiles = await fsp.readdir(dirPath);
 
-    proc.stderr!.on("data", (data) => {
-      stderr.push(data.toString());
-    });
+      for (let i = 0; i < cdxjFiles.length; i++) {
+        const cdxjFile = path.join(dirPath, cdxjFiles[i]);
 
-    return new Promise((resolve) => {
-      proc.on("close", (code) => {
-        if (stdout.length) {
-          logger.debug(stdout.join("\n"));
+        logger.debug(`CDXJ: Reading entries from ${cdxjFile}`);
+        const rl = readline.createInterface({
+          input: fs.createReadStream(cdxjFile),
+        });
+
+        for await (const line of rl) {
+          wacz.addCDXJ(line + "\n");
         }
-        if (stderr.length && this.params.logging.includes("debug")) {
-          logger.debug(stderr.join("\n"));
-        }
-        resolve(code);
-      });
-    });
+      }
+    } catch (err) {
+      logger.error("CDXJ Indexing Error", err);
+    }
   }
 
   logMemory() {
@@ -1986,36 +2001,35 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async initPages() {
+  async initPages(seedPages: boolean) {
+    const filename = seedPages ? this.seedPagesFile : this.otherPagesFile;
+    let fh = null;
+
     try {
-      let createNew = false;
+      await fsp.mkdir(this.pagesDir, { recursive: true });
 
-      // create pages dir if doesn't exist and write pages.jsonl header
-      if (fs.existsSync(this.pagesDir) != true) {
-        await fsp.mkdir(this.pagesDir);
-        createNew = true;
-      }
+      const createNew = !fs.existsSync(filename);
 
-      this.pagesFH = await fsp.open(this.pagesFile, "a");
+      fh = fs.createWriteStream(filename, { flags: "a" });
 
       if (createNew) {
         const header: Record<string, string> = {
           format: "json-pages-1.0",
           id: "pages",
-          title: "All Pages",
+          title: seedPages ? "Seed Pages" : "Non-Seed Pages",
         };
-        header["hasText"] = String(this.textInPages);
+        header.hasText = this.params.text.includes("to-pages");
         if (this.params.text.length) {
           logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
           logger.debug("Text Extraction: None");
         }
-        const header_formatted = JSON.stringify(header).concat("\n");
-        await this.pagesFH.writeFile(header_formatted);
+        await fh.write(JSON.stringify(header) + "\n");
       }
     } catch (err) {
-      logger.error("pages/pages.jsonl creation failed", err);
+      logger.error(`"${filename}" creation failed`, err);
     }
+    return fh;
   }
 
   protected pageEntryForRedis(
@@ -2076,10 +2090,18 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const processedRow = JSON.stringify(row) + "\n";
+
+    const pagesFH = depth > 0 ? this.extraPagesFH : this.pagesFH;
+
+    if (!pagesFH) {
+      logger.error("Can't write pages, missing stream");
+      return;
+    }
+
     try {
-      await this.pagesFH!.writeFile(processedRow);
+      await pagesFH.write(processedRow);
     } catch (err) {
-      logger.warn("pages/pages.jsonl append failed", err);
+      logger.warn("pages/pages.jsonl append failed");
     }
   }
 

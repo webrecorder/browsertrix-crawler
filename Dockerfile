@@ -20,8 +20,8 @@ ENV PROXY_HOST=localhost \
 
 WORKDIR /app
 
-ADD requirements.txt /app/
-RUN pip install -U setuptools; pip install -r requirements.txt
+#ADD requirements.txt /app/
+#RUN pip install -U setuptools; pip install -r requirements.txt
 
 ADD package.json /app/
 
@@ -29,7 +29,7 @@ ADD package.json /app/
 ARG REBUILD
 
 # Prefetch tldextract so pywb is able to boot in environments with limited internet access
-RUN tldextract --update 
+#RUN tldextract --update
 
 # Download and format ad host blocklist as JSON
 RUN mkdir -p /tmp/ads && cd /tmp/ads && \

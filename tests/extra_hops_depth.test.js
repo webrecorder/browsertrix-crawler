@@ -24,8 +24,17 @@ test(
     );
     const crawledPagesArray = crawledPages.trim().split("\n");
 
+    const crawledExtraPages = fs.readFileSync(
+      "test-crawls/collections/extra-hops-beyond/pages/extraPages.jsonl",
+      "utf8",
+    );
+    const crawledExtraPagesArray = crawledExtraPages.trim().split("\n");
+
     const expectedPages = [
       "https://webrecorder.net/",
+    ];
+
+    const expectedExtraPages = [
       "https://webrecorder.net/blog",
       "https://webrecorder.net/tools",
       "https://webrecorder.net/community",
@@ -36,6 +45,7 @@ test(
 
     // first line is the header, not page, so adding -1
     expect(crawledPagesArray.length - 1).toEqual(expectedPages.length);
+    expect(crawledExtraPagesArray.length - 1).toEqual(expectedExtraPages.length);
 
     for (const page of crawledPagesArray) {
       const url = JSON.parse(page).url;
@@ -43,6 +53,14 @@ test(
         continue;
       }
       expect(expectedPages.indexOf(url) >= 0).toBe(true);
+    }
+
+    for (const page of crawledExtraPagesArray) {
+      const url = JSON.parse(page).url;
+      if (!url) {
+        continue;
+      }
+      expect(expectedExtraPages.indexOf(url) >= 0).toBe(true);
     }
   },
   extraHopsTimeout,
