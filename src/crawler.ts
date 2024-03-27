@@ -988,11 +988,11 @@ self.__bx_behaviors.selectMainBehavior();
       );
 
       for (const res of results) {
-        const { status, reason }: { status: string; reason?: string } = res;
+        const { status, reason }: { status: string; reason?: unknown } = res;
         if (status === "rejected") {
           logger.warn(
             "Behavior run partially failed",
-            { reason, ...logDetails },
+            { reason: formatErr(reason), ...logDetails },
             "behavior",
           );
         }
