@@ -95,7 +95,7 @@ export class Browser {
 
     const launchOpts: PuppeteerLaunchOptions = {
       args,
-      headless: headless ? "new" : false,
+      headless,
       executablePath: this.getBrowserExe(),
       ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
       ignoreHTTPSErrors: true,
@@ -264,10 +264,10 @@ export class Browser {
     }
   }
 
-  async evaluateWithCLI_(
+  async evaluateWithCLI(
     cdp: CDPSession,
     frame: Frame,
-    cdpContextId: number,
+    frameIdToExecId: Map<string, number>,
     funcString: string,
     logData: Record<string, string>,
     contextName: LogContext,
@@ -277,13 +277,27 @@ export class Browser {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let details: Record<string, any> = { frameUrl, ...logData };
 
-    if (!frameUrl || frame.isDetached()) {
+    if (!frameUrl || frame.detached) {
       logger.info(
         "Run Script Skipped, frame no longer attached or has no URL",
         details,
         contextName,
       );
       return false;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const frameId = (frame as any)._id;
+
+    const contextId = frameIdToExecId.get(frameId);
+
+    if (!contextId) {
+      logger.warn(
+        "Not running behavior, missing CDP context id for frame id",
+        { frameId },
+        "browser",
+      );
+      return;
     }
 
     logger.info("Run Script Started", details, contextName);
@@ -294,7 +308,7 @@ export class Browser {
 
     const { exceptionDetails, result } = await cdp.send("Runtime.evaluate", {
       expression,
-      contextId: cdpContextId,
+      contextId,
       returnByValue: true,
       awaitPromise: true,
       userGesture: true,
@@ -385,7 +399,7 @@ export class Browser {
         if (target.url() === startPage) {
           resolve(target);
           if (this.browser) {
-            this.browser.removeListener("targetcreated", listener);
+            this.browser.off("targetcreated", listener);
           }
         }
       };
@@ -506,30 +520,6 @@ export class Browser {
     await this.firstCDP.send("Fetch.enable", {
       patterns: [{ urlPattern: "*", requestStage: "Response" }],
     });
-  }
-
-  async evaluateWithCLI(
-    _: unknown,
-    frame: Frame,
-    cdp: CDPSession,
-    funcString: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    logData: Record<string, any>,
-    contextName: LogContext,
-  ) {
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const context = await (frame as any).executionContext();
-    cdp = context._client;
-    const cdpContextId = context._contextId;
-    return await this.evaluateWithCLI_(
-      cdp,
-      frame,
-      cdpContextId,
-      funcString,
-      logData,
-      contextName,
-    );
   }
 
   interceptRequest(page: Page, callback: (event: HTTPRequest) => void) {

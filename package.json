@@ -30,7 +30,7 @@
     "p-queue": "^7.3.4",
     "pixelmatch": "^5.3.0",
     "pngjs": "^7.0.0",
-    "puppeteer-core": "^20.8.2",
+    "puppeteer-core": "^22.6.1",
     "sax": "^1.3.0",
     "sharp": "^0.32.6",
     "tsc": "^2.0.4",
