@@ -727,7 +727,6 @@ self.__bx_behaviors.selectMainBehavior();
             break;
           }
         }
-        console.log("FRAME-TO-EXEC REM", frameIdToExecId.size);
       },
     );
 
