@@ -85,6 +85,10 @@ export class Browser {
 
     const args = this.chromeArgs(chromeOptions);
 
+    if (recording) {
+      args.push("--disable-site-isolation-trials");
+    }
+
     let defaultViewport = null;
 
     if (process.env.GEOMETRY) {
@@ -107,9 +111,22 @@ export class Browser {
       defaultViewport,
       waitForInitialPage: false,
       userDataDir: this.profileDir,
+      targetFilter: recording
+        ? undefined
+        : (target) => this.targetFilter(target),
     };
 
     await this._init(launchOpts, ondisconnect, recording);
+  }
+
+  targetFilter(target: Target) {
+    const attach = !(!target.url() && target.type() === "other");
+    logger.debug(
+      "Target Filter",
+      { url: target.url(), type: target.type(), attach },
+      "browser",
+    );
+    return attach;
   }
 
   async setupPage({ page }: { page: Page; cdp: CDPSession }) {
@@ -215,7 +232,6 @@ export class Browser {
       "--remote-debugging-port=9221",
       "--remote-allow-origins=*",
       "--autoplay-policy=no-user-gesture-required",
-      "--disable-site-isolation-trials",
       `--user-agent=${userAgent || this.getDefaultUA()}`,
       ...extraArgs,
     ];

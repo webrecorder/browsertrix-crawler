@@ -891,11 +891,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     data.loadState = LoadState.EXTRACTION_DONE;
 
-    if (data.status >= 400) {
-      return;
-    }
-
-    if (this.params.behaviorOpts) {
+    if (this.params.behaviorOpts && data.status < 400) {
       if (!data.isHTMLPage) {
         logger.debug(
           "Skipping behaviors for non-HTML page",
