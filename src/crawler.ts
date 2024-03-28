@@ -11,7 +11,6 @@ import {
   QueueState,
   PageState,
   WorkerId,
-  PageCallbacks,
 } from "./util/state.js";
 
 import { parseArgs } from "./util/argParser.js";
@@ -61,7 +60,7 @@ import { OriginOverride } from "./util/originoverride.js";
 // to ignore HTTPS error for HEAD check
 import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
-import { CDPSession, Frame, HTTPRequest, Page } from "puppeteer-core";
+import { CDPSession, Frame, HTTPRequest, Page, Protocol } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
@@ -631,13 +630,11 @@ export class Crawler {
     cdp,
     workerid,
     callbacks,
-  }: {
-    page: Page;
-    cdp: CDPSession;
-    workerid: WorkerId;
-    callbacks: PageCallbacks;
-  }) {
+    frameIdToExecId,
+  }: WorkerOpts) {
     await this.browser.setupPage({ page, cdp });
+
+    await this.setupExecContextEvents(cdp, frameIdToExecId);
 
     if (
       (this.adBlockRules && this.params.blockAds) ||
@@ -709,6 +706,40 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.browser.addInitScript(page, initScript);
     }
+  }
+
+  async setupExecContextEvents(
+    cdp: CDPSession,
+    frameIdToExecId: Map<string, number>,
+  ) {
+    await cdp.send("Runtime.enable");
+
+    await cdp.on(
+      "Runtime.executionContextCreated",
+      (params: Protocol.Runtime.ExecutionContextCreatedEvent) => {
+        const { id, auxData } = params.context;
+        if (auxData && auxData.isDefault && auxData.frameId) {
+          frameIdToExecId.set(auxData.frameId, id);
+        }
+      },
+    );
+
+    await cdp.on(
+      "Runtime.executionContextDestroyed",
+      (params: Protocol.Runtime.ExecutionContextDestroyedEvent) => {
+        const { executionContextId } = params;
+        for (const [frameId, execId] of frameIdToExecId.entries()) {
+          if (execId === executionContextId) {
+            frameIdToExecId.delete(frameId);
+            break;
+          }
+        }
+      },
+    );
+
+    await cdp.on("Runtime.executionContextsCleared", () => {
+      frameIdToExecId.clear();
+    });
   }
 
   loadCustomBehaviors(filename: string) {
@@ -867,11 +898,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     data.loadState = LoadState.EXTRACTION_DONE;
 
-    if (data.status >= 400) {
-      return;
-    }
-
-    if (this.params.behaviorOpts) {
+    if (this.params.behaviorOpts && data.status < 400) {
       if (!data.isHTMLPage) {
         logger.debug(
           "Skipping behaviors for non-HTML page",
@@ -882,7 +909,13 @@ self.__bx_behaviors.selectMainBehavior();
         logger.info("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
         const res = await timedRun(
-          this.runBehaviors(page, cdp, data.filteredFrames, logDetails),
+          this.runBehaviors(
+            page,
+            cdp,
+            data.filteredFrames,
+            opts.frameIdToExecId,
+            logDetails,
+          ),
           this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
@@ -961,6 +994,7 @@ self.__bx_behaviors.selectMainBehavior();
     page: Page,
     cdp: CDPSession,
     frames: Frame[],
+    frameIdToExecId: Map<string, number>,
     logDetails: LogDetails,
   ) {
     try {
@@ -979,9 +1013,9 @@ self.__bx_behaviors.selectMainBehavior();
       const results = await Promise.allSettled(
         frames.map((frame) =>
           this.browser.evaluateWithCLI(
-            page,
-            frame,
             cdp,
+            frame,
+            frameIdToExecId,
             `
           if (!self.__bx_behaviors) {
             console.error("__bx_behaviors missing, can't run behaviors");
@@ -995,11 +1029,11 @@ self.__bx_behaviors.selectMainBehavior();
       );
 
       for (const res of results) {
-        const { status, reason }: { status: string; reason?: string } = res;
+        const { status, reason }: { status: string; reason?: unknown } = res;
         if (status === "rejected") {
           logger.warn(
             "Behavior run partially failed",
-            { reason, ...logDetails },
+            { reason: formatErr(reason), ...logDetails },
             "behavior",
           );
         }
