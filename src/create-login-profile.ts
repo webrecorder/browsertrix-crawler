@@ -223,15 +223,11 @@ async function main() {
     );
   }
 
-  logger.info(`Loading page: ${params.url}`);
-
-  await page.goto(params.url, { waitUntil });
-
   if (!params.automated) {
     const target = await cdp.send("Target.getTargetInfo");
     const targetId = target.targetInfo.targetId;
 
-    new InteractiveBrowser(params, browser, page, cdp, targetId);
+    new InteractiveBrowser(params, browser, page, cdp, targetId, waitUntil);
   } else {
     await automatedProfile(params, browser, page, cdp, waitUntil);
   }
@@ -247,6 +243,10 @@ async function automatedProfile(
   waitUntil: PuppeteerLifeCycleEvent,
 ) {
   let u, p;
+
+  logger.info(`Loading page: ${params.url}`);
+
+  await page.goto(params.url, { waitUntil });
 
   logger.debug("Looking for username and password entry fields on page...");
 
@@ -372,6 +372,7 @@ class InteractiveBrowser {
     page: Page,
     cdp: CDPSession,
     targetId: string,
+    waitUntil: PuppeteerLifeCycleEvent = "load",
   ) {
     logger.info("Creating Profile Interactively...");
     child_process.spawn("socat", [
@@ -427,6 +428,12 @@ class InteractiveBrowser {
     } else {
       logger.info("Screencasting with CDP on port 9222");
     }
+
+    logger.info(`Loading page: ${params.url}`);
+
+    page.goto(params.url, { waitUntil, timeout: 0 }).finally(() => {
+      logger.info("Loaded!");
+    });
   }
 
   handlePageLoad() {
