@@ -1,10 +1,10 @@
 # All Command-Line Options
 
-The Browsertrix Crawler Docker image currently accepts the following parameters:
+The Browsertrix Crawler Docker image currently accepts the following parameters, broken down by entrypoint:
+
+## crawler
 
 ```
-crawler [options]
-
 Options:
       --help                                Show help                  [boolean]
       --version                             Show version number        [boolean]
@@ -240,4 +240,38 @@ Options:
       --warcPrefix                          prefix for WARC files generated, inc
                                             luding WARCs added to WACZ  [string]
       --config                              Path to YAML config file
+```
+
+## create-login-profile
+
+```
+Options:
+  --help             Show help                                         [boolean]
+  --version          Show version number                               [boolean]
+  --url              The URL of the login page               [string] [required]
+  --user             The username for the login. If not specified, will be promp
+                     ted
+  --password         The password for the login. If not specified, will be promp
+                     ted (recommended)
+  --filename         The filename for the profile tarball, stored within /crawls
+                     /profiles if absolute path not provided
+                                    [default: "/crawls/profiles/profile.tar.gz"]
+  --debugScreenshot  If specified, take a screenshot after login and save as thi
+                     s filename
+  --headless         Run in headless mode, otherwise start xvfb
+                                                      [boolean] [default: false]
+  --automated        Start in automated mode, no interactive browser
+                                                      [boolean] [default: false]
+  --interactive      Deprecated. Now the default option!
+                                                      [boolean] [default: false]
+  --shutdownWait     Shutdown browser in interactive after this many seconds, if
+                      no pings received                    [number] [default: 0]
+  --profile          Path to tar.gz file which will be extracted and used as the
+                      browser profile                                   [string]
+  --windowSize       Browser window dimensions, specified as: width,height
+                                                 [string] [default: "1360,1020"]
+  --proxy                                             [boolean] [default: false]
+  --cookieDays       If >0, set all cookies, including session cookies, to have
+                     this duration in days before saving profile
+                                                           [number] [default: 7]
 ```
