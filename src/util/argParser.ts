@@ -317,6 +317,13 @@ class ArgParser {
         type: "number",
       },
 
+      postLoadDelay: {
+        describe:
+          "If >0, amount of time to sleep (in seconds) after page has loaded, before taking screenshots / getting text / running behaviors",
+        default: 0,
+        type: "number",
+      },
+
       pageExtraDelay: {
         alias: "delay",
         describe:

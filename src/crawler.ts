@@ -1802,6 +1802,13 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.netIdle(page, logDetails);
 
+    if (this.params.postLoadDelay) {
+      logger.info("Awaiting post load delay", {
+        seconds: this.params.pagePostLoadDelay,
+      });
+      await sleep(this.params.pagePostLoadDelay);
+    }
+
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
       logger.debug("Skipping Link Extraction, At Max Depth");
