@@ -52,7 +52,8 @@ function cliOpts(): { [key: string]: Options } {
     },
 
     filename: {
-      describe: "The filename for the profile tarball",
+      describe:
+        "The filename for the profile tarball, stored within /crawls/profiles if absolute path not provided",
       default: "/crawls/profiles/profile.tar.gz",
     },
 
@@ -299,6 +300,13 @@ async function createProfile(
   await browser.close();
 
   logger.info("Creating profile");
+
+  if (params.filename && !params.filename.startsWith("/")) {
+    params.filename = path.resolve("/crawls/profiles/", params.filename);
+    logger.info(
+      `Absolute path for filename not provided, saving to ${params.filename}`,
+    );
+  }
 
   const profileFilename = params.filename || "/crawls/profiles/profile.tar.gz";
 
