@@ -606,7 +606,7 @@ export class Recorder {
       : MAX_BROWSER_DEFAULT_FETCH_SIZE;
 
     if (contentLen < 0 || contentLen > maxFetchSize) {
-      logger.warn(
+      logger.debug(
         "Large/unknown resource fetch",
         { url, contentLen, contentType, resourceType },
         "recorder",
