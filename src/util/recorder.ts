@@ -27,7 +27,7 @@ import { Crawler } from "../crawler.js";
 import { WARCResourceWriter } from "./warcresourcewriter.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
-const MAX_BROWSER_TEXT_FETCH_SIZE = 50_000_000;
+const MAX_TEXT_REWRITE_SIZE = 25_000_000;
 
 const MAX_NETWORK_LOAD_SIZE = 200_000_000;
 
@@ -596,21 +596,14 @@ export class Recorder {
 
     let streamingConsume = false;
 
-    const resourceType = reqresp.resourceType;
-
     const contentType = this._getContentType(responseHeaders);
 
-    // set max fetch size higher for HTML responses for current page
-    const maxFetchSize = this.allowLargeContent(resourceType, contentType)
-      ? MAX_BROWSER_TEXT_FETCH_SIZE
-      : MAX_BROWSER_DEFAULT_FETCH_SIZE;
-
-    if (contentLen < 0 || contentLen > maxFetchSize) {
-      logger.debug(
-        "Large/unknown resource fetch",
-        { url, contentLen, contentType, resourceType },
-        "recorder",
-      );
+    // if contentLength is large or unknown, do streaming, unless its an essential resource
+    // in which case, need to do a full fetch either way
+    if (
+      (contentLen < 0 || contentLen > MAX_BROWSER_DEFAULT_FETCH_SIZE) &&
+      !this.isEssentialResource(reqresp.resourceType, contentType)
+    ) {
       const opts: ResponseStreamAsyncFetchOptions = {
         tempdir: this.tempdir,
         reqresp,
@@ -619,7 +612,6 @@ export class Recorder {
         networkId,
         cdp,
         requestId,
-        maxFetchSize,
       };
 
       // fetching using response stream, await here and then either call fulFill, or if not started, return false
@@ -891,7 +883,8 @@ export class Recorder {
   ) {
     const { url, extraOpts, payload } = reqresp;
 
-    if (!payload || !payload.length) {
+    // don't rewrite if payload is missing or too big
+    if (!payload || !payload.length || payload.length > MAX_TEXT_REWRITE_SIZE) {
       return false;
     }
 
@@ -941,27 +934,26 @@ export class Recorder {
     } else {
       return false;
     }
-
-    //return Buffer.from(newString).toString("base64");
   }
 
-  allowLargeContent(
+  isEssentialResource(
     resourceType: string | undefined,
     contentType: string | null,
   ) {
-    const allowLargeRTs = ["document", "stylesheet", "script"];
+    const essentialRT = ["document", "stylesheet", "script"];
 
-    const allowLargeCTs = [
+    const essentialCT = [
       "text/html",
       "application/json",
       "text/javascript",
       "application/javascript",
       "application/x-javascript",
+      "text/css",
     ];
 
     return (
-      allowLargeRTs.includes(resourceType || "") ||
-      allowLargeCTs.includes(contentType || "")
+      essentialRT.includes(resourceType || "") ||
+      essentialCT.includes(contentType || "")
     );
   }
 
@@ -1277,8 +1269,12 @@ class AsyncFetcher {
         if (buffers && buffers.length && !fh) {
           reqresp.payload = Buffer.concat(buffers, currSize);
           externalBuffer.buffers = [reqresp.payload];
-        } else {
-          // not returning to browser
+        } else if (fh) {
+          logger.warn(
+            "Large streamed written to WARC, but not returned to browser, requires reading into memory",
+            { url, actualSize: reqresp.readSize, maxSize: this.maxFetchSize },
+            "recorder",
+          );
         }
       }
 
