@@ -63,6 +63,8 @@ WORKDIR /crawls
 # enable to test custom behaviors build (from browsertrix-behaviors)
 # COPY behaviors.js /app/node_modules/browsertrix-behaviors/dist/behaviors.js
 
+RUN chmod o=rX -R /app
+
 ADD docker-entrypoint.sh /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
