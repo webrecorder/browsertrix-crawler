@@ -591,6 +591,8 @@ class ArgParser {
     const behaviorOpts: { [key: string]: string | boolean } = {};
     argv.behaviors.forEach((x: string) => (behaviorOpts[x] = true));
     behaviorOpts.log = BEHAVIOR_LOG_FUNC;
+    // ensure autofetch, autoplay behaviors run right away
+    behaviorOpts.startEarly = true;
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 
     argv.text = argv.text || [];
