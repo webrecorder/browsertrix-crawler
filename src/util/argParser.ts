@@ -560,8 +560,13 @@ class ArgParser {
   parseArgs(argvParams?: string[], isQA = false) {
     let argv = argvParams || process.argv;
 
-    if (process.env.CRAWL_ARGS) {
-      argv = argv.concat(this.splitCrawlArgsQuoteSafe(process.env.CRAWL_ARGS));
+    const envArgs =
+      isQA && process.env.QA_ARGS
+        ? process.env.QA_ARGS
+        : process.env.CRAWL_ARGS;
+
+    if (envArgs) {
+      argv = argv.concat(this.splitCrawlArgsQuoteSafe(envArgs));
     }
 
     let origConfig = {};
@@ -609,6 +614,7 @@ class ArgParser {
     const behaviorOpts: { [key: string]: string | boolean } = {};
     argv.behaviors.forEach((x: string) => (behaviorOpts[x] = true));
     behaviorOpts.log = BEHAVIOR_LOG_FUNC;
+    behaviorOpts.startEarly = true;
     argv.behaviorOpts = JSON.stringify(behaviorOpts);
 
     argv.text = argv.text || [];

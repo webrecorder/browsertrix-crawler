@@ -2,7 +2,7 @@ import { Page, Protocol } from "puppeteer-core";
 import { Crawler } from "./crawler.js";
 import { ReplayServer } from "./util/replayserver.js";
 import { sleep } from "./util/timing.js";
-import { logger } from "./util/logger.js";
+import { logger, formatErr } from "./util/logger.js";
 import { WorkerOpts, WorkerState } from "./util/worker.js";
 import { PageState } from "./util/state.js";
 import { PageInfoRecord, PageInfoValue, Recorder } from "./util/recorder.js";
@@ -25,6 +25,7 @@ import levenshtein from "js-levenshtein";
 import { MAX_URL_LENGTH } from "./util/reqresp.js";
 import { openAsBlob } from "fs";
 import { WARCWriter } from "./util/warcwriter.js";
+import { parseRx } from "./util/seeds.js";
 
 // RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
@@ -71,6 +72,12 @@ export class ReplayCrawler extends Crawler {
 
   reloadTimeouts: WeakMap<Page, NodeJS.Timeout>;
 
+  includeRx: RegExp[];
+  excludeRx: RegExp[];
+
+  // for qaDebugImageDiff incremental file output
+  counter: number = 0;
+
   constructor() {
     super();
     this.recording = false;
@@ -101,6 +108,9 @@ export class ReplayCrawler extends Crawler {
     this.reloadTimeouts = new WeakMap<Page, NodeJS.Timeout>();
 
     this.infoWriter = null;
+
+    this.includeRx = parseRx(this.params.include);
+    this.excludeRx = parseRx(this.params.include);
   }
 
   async bootstrap(): Promise<void> {
@@ -131,10 +141,14 @@ export class ReplayCrawler extends Crawler {
       this.handleRequestWillBeSent(params, page),
     );
 
+    await this.awaitRWPLoad(page);
+  }
+
+  async awaitRWPLoad(page: Page) {
     await page.goto(this.replayServer.homePage);
 
     // wait until content frame is available
-    while (page.frames().length < SKIP_FRAMES) {
+    while (page.frames().length <= SKIP_FRAMES) {
       await sleep(5);
     }
 
@@ -143,6 +157,8 @@ export class ReplayCrawler extends Crawler {
     await frame.evaluate(() => {
       return navigator.serviceWorker.ready;
     });
+
+    return page.frames()[SKIP_FRAMES];
   }
 
   protected async _addInitialSeeds() {
@@ -218,17 +234,41 @@ export class ReplayCrawler extends Crawler {
     }
   }
 
+  async _addPageIfInScope({ url, ts, id }: ReplayPage, depth: number) {
+    if (this.includeRx.length) {
+      let inScope = false;
+      for (const s of this.includeRx) {
+        if (s.test(url)) {
+          inScope = true;
+          break;
+        }
+      }
+      if (!inScope) {
+        logger.info("Skipping not included page", { url }, "replay");
+        return;
+      }
+    }
+
+    for (const s of this.excludeRx) {
+      if (!s.test(url)) {
+        logger.info("Skipping excluded page", { url }, "replay");
+        return;
+      }
+    }
+
+    await this.queueUrl(0, url, depth, 0, {}, ts, id);
+  }
+
   async loadPagesDirect(pages: ReplayPage[]) {
     let depth = 0;
     for (const entry of pages) {
-      const { url, ts, id } = entry;
-      if (!url) {
+      if (!entry.url) {
         continue;
       }
       if (this.limitHit) {
         break;
       }
-      await this.queueUrl(0, url, depth++, 0, {}, ts, id);
+      this._addPageIfInScope(entry, depth++);
     }
   }
 
@@ -246,12 +286,11 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
-    const { url, ts, id } = pageData;
-    if (!url) {
+    if (!pageData.url) {
       return;
     }
 
-    await this.queueUrl(0, url, depth, 0, {}, ts, id);
+    await this._addPageIfInScope(pageData, depth);
   }
 
   extraChromeArgs(): string[] {
@@ -287,7 +326,11 @@ export class ReplayCrawler extends Crawler {
           const frame = page.frames()[1];
           const timeoutid = setTimeout(() => {
             logger.warn("Reloading RWP Frame, not inited", { url }, "replay");
-            frame.evaluate("window.location.reload();");
+            try {
+              frame.evaluate("window.location.reload();");
+            } catch (e) {
+              logger.error("RWP Reload failed, retrying", e, "replay");
+            }
           }, 10000);
           this.reloadTimeouts.set(page, timeoutid);
         } else if (fromServiceWorker && mimeType !== "application/json") {
@@ -341,7 +384,7 @@ export class ReplayCrawler extends Crawler {
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
-    const { page, data } = opts;
+    const { page, data, workerid } = opts;
     const { url, ts, pageid } = data;
 
     if (!ts) {
@@ -364,44 +407,49 @@ export class ReplayCrawler extends Crawler {
     };
     this.pageInfos.set(page, pageInfo);
 
-    await page.evaluate(
-      (url, ts) => {
-        const rwp = document.querySelector("replay-web-page");
-        if (!rwp) {
-          return;
-        }
-        const p = new Promise<void>((resolve) => {
-          window.addEventListener(
-            "message",
-            (e) => {
-              if (e.data && e.data.url && e.data.view) {
-                resolve();
-              }
-            },
-            { once: true },
-          );
-        });
+    let replayFrame;
 
-        rwp.setAttribute("url", url);
-        rwp.setAttribute("ts", ts ? ts : "");
-        return p;
-      },
-      url,
-      timestamp,
-    );
+    if (page.frames().length <= SKIP_FRAMES) {
+      logger.warn(
+        "RWP possibly crashed, reloading page",
+        { url, timestamp, id: workerid, pageid },
+        "replay",
+      );
+      //throw new Error("logged");
+      replayFrame = await this.awaitRWPLoad(page);
+    } else {
+      replayFrame = page.frames()[SKIP_FRAMES];
+    }
+
+    try {
+      await replayFrame.goto(
+        `${REPLAY_PREFIX}${timestamp}mp_/${url}`,
+        this.gotoOpts,
+      );
+    } catch (e) {
+      logger.warn(
+        "Loading replay timed out",
+        { url, timestamp, id: workerid, pageid, ...formatErr(e) },
+        "replay",
+      );
+    }
 
     // optionally reload (todo: reevaluate if this is needed)
     // await page.reload();
 
-    await sleep(10);
+    if (this.params.postLoadDelay) {
+      logger.info("Awaiting post load delay", {
+        seconds: this.params.postLoadDelay,
+      });
+      await sleep(this.params.postLoadDelay);
+    }
 
     data.isHTMLPage = true;
 
-    // skipping RWP frames
     data.filteredFrames = page.frames().slice(SKIP_FRAMES);
 
     try {
-      data.title = await data.filteredFrames[0].title();
+      data.title = await replayFrame.title();
     } catch (e) {
       // ignore
     }
@@ -410,7 +458,7 @@ export class ReplayCrawler extends Crawler {
 
     await this.doPostLoadActions(opts, true);
 
-    await this.compareScreenshots(page, data, url, date);
+    await this.compareScreenshots(page, data, url, date, workerid);
 
     await this.compareText(page, data, url, date);
 
@@ -423,13 +471,14 @@ export class ReplayCrawler extends Crawler {
     page: Page,
     state: PageState,
     url: string,
-    date?: Date,
+    date: Date,
+    workerid: number,
   ) {
     const origScreenshot = await this.fetchOrigBinary(
       page,
       "view",
       url,
-      date ? date.toISOString().replace(/[^\d]/g, "") : "",
+      date.toISOString().replace(/[^\d]/g, ""),
     );
     const { pageid, screenshotView } = state;
 
@@ -472,12 +521,27 @@ export class ReplayCrawler extends Crawler {
       "replay",
     );
 
-    if (res && this.params.qaDebugImageDiff) {
-      const dir = path.join(this.collDir, "screenshots", pageid || "unknown");
+    if (this.params.qaDebugImageDiff) {
+      const dir = path.join(this.collDir, "screenshots");
       await fsp.mkdir(dir, { recursive: true });
-      await fsp.writeFile(path.join(dir, "crawl.png"), PNG.sync.write(crawl));
-      await fsp.writeFile(path.join(dir, "replay.png"), PNG.sync.write(replay));
-      await fsp.writeFile(path.join(dir, "diff.png"), PNG.sync.write(diff));
+      const counter = this.counter++;
+      logger.debug(
+        `Saving crawl/replay/vdiff images to ${counter}-${workerid}-${pageid}-{crawl,replay,vdiff}.png`,
+        { url },
+        "replay",
+      );
+      await fsp.writeFile(
+        path.join(dir, `${counter}-${workerid}-${pageid}-crawl.png`),
+        PNG.sync.write(crawl),
+      );
+      await fsp.writeFile(
+        path.join(dir, `${counter}-${workerid}-${pageid}-replay.png`),
+        PNG.sync.write(replay),
+      );
+      await fsp.writeFile(
+        path.join(dir, `${counter}-${workerid}-${pageid}-vdiff.png`),
+        PNG.sync.write(diff),
+      );
     }
 
     const pageInfo = this.pageInfos.get(page);
@@ -486,16 +550,16 @@ export class ReplayCrawler extends Crawler {
     }
   }
 
-  async compareText(page: Page, state: PageState, url: string, date?: Date) {
+  async compareText(page: Page, state: PageState, url: string, date: Date) {
     const origText = await this.fetchOrigText(
       page,
       "text",
       url,
-      date ? date.toISOString().replace(/[^\d]/g, "") : "",
+      date.toISOString().replace(/[^\d]/g, ""),
     );
     const replayText = state.text;
 
-    if (!origText || !replayText) {
+    if (origText === undefined || replayText === undefined) {
       logger.warn(
         "Text missing for comparison",
         {
@@ -523,13 +587,13 @@ export class ReplayCrawler extends Crawler {
     page: Page,
     state: PageState,
     url: string,
-    date?: Date,
+    date: Date,
   ) {
     const origResources = await this.fetchOrigText(
       page,
       "pageinfo",
       url,
-      date ? date.toISOString().replace(/[^\d]/g, "") : "",
+      date.toISOString().replace(/[^\d]/g, ""),
     );
 
     let origResData: PageInfoRecord | null;
@@ -639,12 +703,12 @@ export class ReplayCrawler extends Crawler {
         credentials: "include",
       });
       if (response.status !== 200) {
-        return "";
+        return undefined;
       }
       return await response.text();
     }, replayUrl);
 
-    if (!text) {
+    if (text === undefined) {
       logger.warn("Couldn't fetch original data", { type, url, ts }, "replay");
     }
 
@@ -655,6 +719,14 @@ export class ReplayCrawler extends Crawler {
     const { page } = opts;
     await this.processPageInfo(page);
     await super.teardownPage(opts);
+  }
+
+  async closeFiles() {
+    await super.closeFiles();
+
+    if (this.infoWriter) {
+      await this.infoWriter.flush();
+    }
   }
 
   async processPageInfo(page: Page, state?: PageState) {

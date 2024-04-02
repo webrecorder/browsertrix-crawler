@@ -49,8 +49,8 @@ export class ScopedSeed {
       throw new Error("Invalid URL");
     }
     this.url = parsedUrl.href;
-    this.include = this.parseRx(include);
-    this.exclude = this.parseRx(exclude);
+    this.include = parseRx(include);
+    this.exclude = parseRx(exclude);
     this.scopeType = scopeType;
 
     this._includeStr = include;
@@ -79,16 +79,6 @@ export class ScopedSeed {
     this.allowHash = allowHash;
     this.maxExtraHops = extraHops;
     this.maxDepth = depth < 0 ? MAX_DEPTH : depth;
-  }
-
-  parseRx(value: string[] | RegExp[] | string | null | undefined) {
-    if (value === null || value === undefined || value === "") {
-      return [];
-    } else if (!(value instanceof Array)) {
-      return [new RegExp(value)];
-    } else {
-      return value.map((e) => (e instanceof RegExp ? e : new RegExp(e)));
-    }
   }
 
   newScopedSeed(url: string) {
@@ -287,4 +277,16 @@ export function rxEscape(string: string) {
 
 export function urlRxEscape(url: string, parsedUrl: URL) {
   return rxEscape(url).replace(parsedUrl.protocol, "https?:");
+}
+
+export function parseRx(
+  value: string[] | RegExp[] | string | null | undefined,
+) {
+  if (value === null || value === undefined || value === "") {
+    return [];
+  } else if (!(value instanceof Array)) {
+    return [new RegExp(value)];
+  } else {
+    return value.map((e) => (e instanceof RegExp ? e : new RegExp(e)));
+  }
 }
