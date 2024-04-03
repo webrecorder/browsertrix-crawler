@@ -16,6 +16,11 @@ const uiJS = fs.readFileSync(new URL("../../html/rwp/ui.js", import.meta.url), {
   encoding: "utf8",
 });
 
+const adblockGZ = fs.readFileSync(
+  new URL("../../html/rwp/adblock.gz", import.meta.url),
+  {},
+);
+
 // ============================================================================
 const PORT = 9990;
 
@@ -76,9 +81,7 @@ export class ReplayServer {
         return;
 
       case "/sw.js":
-      case "/sw.js?serveIndex=1":
       case "/replay/sw.js":
-      case "/replay/sw.js?serveIndex=1":
         response.writeHead(200, { "Content-Type": "application/javascript" });
         response.end(swJS);
         return;
@@ -86,6 +89,11 @@ export class ReplayServer {
       case "/ui.js":
         response.writeHead(200, { "Content-Type": "application/javascript" });
         response.end(uiJS);
+        return;
+
+      case "/replay/adblock/adblock.gz":
+        response.writeHead(200, { "Content-Type": "application/gzip" });
+        response.end(adblockGZ);
         return;
 
       case this.sourceUrl:
