@@ -27,7 +27,7 @@ import { Crawler } from "../crawler.js";
 import { WARCResourceWriter } from "./warcresourcewriter.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
-const MAX_BROWSER_TEXT_FETCH_SIZE = 25_000_000;
+const MAX_TEXT_REWRITE_SIZE = 25_000_000;
 
 const MAX_NETWORK_LOAD_SIZE = 200_000_000;
 
@@ -65,6 +65,25 @@ export type PageInfoRecord = {
   counts: {
     jsErrors: number;
   };
+};
+
+// =================================================================
+export type AsyncFetchOptions = {
+  tempdir: string;
+  reqresp: RequestResponseInfo;
+  expectedSize?: number;
+  // eslint-disable-next-line no-use-before-define
+  recorder: Recorder;
+  networkId: string;
+  filter?: (resp: Response) => boolean;
+  ignoreDupe?: boolean;
+  maxFetchSize?: number;
+};
+
+// =================================================================
+export type ResponseStreamAsyncFetchOptions = AsyncFetchOptions & {
+  cdp: CDPSession;
+  requestId: string;
 };
 
 // =================================================================
@@ -307,7 +326,7 @@ export class Recorder {
       if (!this.shouldSkip(headers, url, method, type)) {
         const reqresp = this.pendingReqResp(requestId);
         if (reqresp) {
-          reqresp.fillRequest(request);
+          reqresp.fillRequest(request, type || "");
         }
       }
     }
@@ -577,15 +596,13 @@ export class Recorder {
 
     let streamingConsume = false;
 
-    const contentType = this._getContentType(responseHeaders);
-
-    // set max fetch size higher for HTML responses for current page
-    const matchFetchSize = this.allowLargeContent(contentType)
-      ? MAX_BROWSER_TEXT_FETCH_SIZE
-      : MAX_BROWSER_DEFAULT_FETCH_SIZE;
-
-    if (contentLen < 0 || contentLen > matchFetchSize) {
-      const opts = {
+    // if contentLength is large or unknown, do streaming, unless its an essential resource
+    // in which case, need to do a full fetch either way
+    if (
+      (contentLen < 0 || contentLen > MAX_BROWSER_DEFAULT_FETCH_SIZE) &&
+      !this.isEssentialResource(reqresp.resourceType)
+    ) {
+      const opts: ResponseStreamAsyncFetchOptions = {
         tempdir: this.tempdir,
         reqresp,
         expectedSize: contentLen,
@@ -593,7 +610,6 @@ export class Recorder {
         networkId,
         cdp,
         requestId,
-        matchFetchSize,
       };
 
       // fetching using response stream, await here and then either call fulFill, or if not started, return false
@@ -652,7 +668,7 @@ export class Recorder {
       }
     }
 
-    const rewritten = await this.rewriteResponse(reqresp, contentType);
+    const rewritten = await this.rewriteResponse(reqresp, responseHeaders);
 
     // if in service worker, serialize here
     // as won't be getting a loadingFinished message
@@ -861,16 +877,19 @@ export class Recorder {
 
   async rewriteResponse(
     reqresp: RequestResponseInfo,
-    contentType: string | null,
+    responseHeaders?: Protocol.Fetch.HeaderEntry[],
   ) {
     const { url, extraOpts, payload } = reqresp;
 
-    if (!payload || !payload.length) {
+    // don't rewrite if payload is missing or too big
+    if (!payload || !payload.length || payload.length > MAX_TEXT_REWRITE_SIZE) {
       return false;
     }
 
     let newString = null;
     let string = null;
+
+    const contentType = this._getContentType(responseHeaders);
 
     switch (contentType) {
       case "application/x-mpegURL":
@@ -915,20 +934,10 @@ export class Recorder {
     } else {
       return false;
     }
-
-    //return Buffer.from(newString).toString("base64");
   }
 
-  allowLargeContent(contentType: string | null) {
-    const allowLargeCTs = [
-      "text/html",
-      "application/json",
-      "text/javascript",
-      "application/javascript",
-      "application/x-javascript",
-    ];
-
-    return allowLargeCTs.includes(contentType || "");
+  isEssentialResource(resourceType: string | undefined) {
+    return ["document", "stylesheet", "script"].includes(resourceType || "");
   }
 
   _getContentType(
@@ -1127,16 +1136,7 @@ class AsyncFetcher {
     filter = undefined,
     ignoreDupe = false,
     maxFetchSize = MAX_BROWSER_DEFAULT_FETCH_SIZE,
-  }: {
-    tempdir: string;
-    reqresp: RequestResponseInfo;
-    expectedSize?: number;
-    recorder: Recorder;
-    networkId: string;
-    filter?: (resp: Response) => boolean;
-    ignoreDupe?: boolean;
-    maxFetchSize?: number;
-  }) {
+  }: AsyncFetchOptions) {
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
     this.reqresp.asyncLoading = true;
@@ -1248,9 +1248,16 @@ class AsyncFetcher {
       if (externalBuffer) {
         const { currSize, buffers, fh } = externalBuffer;
 
+        // if fully buffered in memory, then populate the payload to return to browser
         if (buffers && buffers.length && !fh) {
           reqresp.payload = Buffer.concat(buffers, currSize);
           externalBuffer.buffers = [reqresp.payload];
+        } else if (fh) {
+          logger.warn(
+            "Large streamed written to WARC, but not returned to browser, requires reading into memory",
+            { url, actualSize: reqresp.readSize, maxSize: this.maxFetchSize },
+            "recorder",
+          );
         }
       }
 
@@ -1405,9 +1412,7 @@ class ResponseStreamAsyncFetcher extends AsyncFetcher {
   cdp: CDPSession;
   requestId: string;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(opts: any) {
+  constructor(opts: ResponseStreamAsyncFetchOptions) {
     super(opts);
     this.cdp = opts.cdp;
     this.requestId = opts.requestId;
@@ -1430,9 +1435,7 @@ class ResponseStreamAsyncFetcher extends AsyncFetcher {
 class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
   cdp: CDPSession;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(opts: any) {
+  constructor(opts: ResponseStreamAsyncFetchOptions) {
     super(opts);
     this.cdp = opts.cdp;
   }
