@@ -596,13 +596,11 @@ export class Recorder {
 
     let streamingConsume = false;
 
-    const contentType = this._getContentType(responseHeaders);
-
     // if contentLength is large or unknown, do streaming, unless its an essential resource
     // in which case, need to do a full fetch either way
     if (
       (contentLen < 0 || contentLen > MAX_BROWSER_DEFAULT_FETCH_SIZE) &&
-      !this.isEssentialResource(reqresp.resourceType, contentType)
+      !this.isEssentialResource(reqresp.resourceType)
     ) {
       const opts: ResponseStreamAsyncFetchOptions = {
         tempdir: this.tempdir,
@@ -670,7 +668,7 @@ export class Recorder {
       }
     }
 
-    const rewritten = await this.rewriteResponse(reqresp, contentType);
+    const rewritten = await this.rewriteResponse(reqresp, responseHeaders);
 
     // if in service worker, serialize here
     // as won't be getting a loadingFinished message
@@ -879,7 +877,7 @@ export class Recorder {
 
   async rewriteResponse(
     reqresp: RequestResponseInfo,
-    contentType: string | null,
+    responseHeaders?: Protocol.Fetch.HeaderEntry[],
   ) {
     const { url, extraOpts, payload } = reqresp;
 
@@ -890,6 +888,8 @@ export class Recorder {
 
     let newString = null;
     let string = null;
+
+    const contentType = this._getContentType(responseHeaders);
 
     switch (contentType) {
       case "application/x-mpegURL":
@@ -936,25 +936,8 @@ export class Recorder {
     }
   }
 
-  isEssentialResource(
-    resourceType: string | undefined,
-    contentType: string | null,
-  ) {
-    const essentialRT = ["document", "stylesheet", "script"];
-
-    const essentialCT = [
-      "text/html",
-      "application/json",
-      "text/javascript",
-      "application/javascript",
-      "application/x-javascript",
-      "text/css",
-    ];
-
-    return (
-      essentialRT.includes(resourceType || "") ||
-      essentialCT.includes(contentType || "")
-    );
+  isEssentialResource(resourceType: string | undefined) {
+    return ["document", "stylesheet", "script"].includes(resourceType || "");
   }
 
   _getContentType(
