@@ -326,7 +326,7 @@ export class Recorder {
       if (!this.shouldSkip(headers, url, method, type)) {
         const reqresp = this.pendingReqResp(requestId);
         if (reqresp) {
-          reqresp.fillRequest(request);
+          reqresp.fillRequest(request, type || "");
         }
       }
     }
