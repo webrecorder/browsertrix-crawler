@@ -500,26 +500,25 @@ export class ReplayCrawler extends Crawler {
     const replay = PNG.sync.read(screenshotView);
 
     const { width, height } = replay;
-    const diff = new PNG({ width, height });
+    const diffImage = new PNG({ width, height });
 
-    const res = pixelmatch(crawl.data, replay.data, diff.data, width, height, {
-      threshold: 0.1,
-      alpha: 0,
-    });
+    const diff = pixelmatch(
+      crawl.data,
+      replay.data,
+      diffImage.data,
+      width,
+      height,
+      {
+        threshold: 0.1,
+        alpha: 0,
+      },
+    );
 
     const total = width * height;
 
-    const matchPercent = (total - res) / total;
+    const matchPercent = (total - diff) / total;
 
-    logger.info(
-      "Screenshot Diff",
-      {
-        url,
-        diff: res,
-        matchPercent,
-      },
-      "replay",
-    );
+    logger.info("Screenshot Diff", { url, diff, matchPercent }, "replay");
 
     if (this.params.qaDebugImageDiff) {
       const dir = path.join(this.collDir, "screenshots");
@@ -538,10 +537,10 @@ export class ReplayCrawler extends Crawler {
         path.join(dir, `${counter}-${workerid}-${pageid}-replay.png`),
         PNG.sync.write(replay),
       );
-      if (res && matchPercent < 1) {
+      if (diff && matchPercent < 1) {
         await fsp.writeFile(
           path.join(dir, `${counter}-${workerid}-${pageid}-vdiff.png`),
-          PNG.sync.write(diff),
+          PNG.sync.write(diffImage),
         );
       }
     }
