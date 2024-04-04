@@ -1804,9 +1804,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.postLoadDelay) {
       logger.info("Awaiting post load delay", {
-        seconds: this.params.pagePostLoadDelay,
+        seconds: this.params.postLoadDelay,
       });
-      await sleep(this.params.pagePostLoadDelay);
+      await sleep(this.params.postLoadDelay);
     }
 
     // skip extraction if at max depth
