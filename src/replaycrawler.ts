@@ -675,7 +675,7 @@ export class ReplayCrawler extends Crawler {
         (state as ComparisonPageState).comparison = comparison;
       }
 
-      await this.infoWriter?.writeNewResourceRecord({
+      this.infoWriter?.writeNewResourceRecord({
         buffer: new TextEncoder().encode(JSON.stringify(pageInfo, null, 2)),
         resourceType: "pageinfo",
         contentType: "application/json",

@@ -7,6 +7,7 @@ import { WARCSerializer } from "warcio/node";
 import { logger, formatErr } from "./logger.js";
 import type { IndexerOffsetLength } from "warcio";
 import { timestampNow } from "./timing.js";
+import PQueue from "p-queue";
 
 const DEFAULT_ROLLOVER_SIZE = 1_000_000_000;
 
@@ -38,6 +39,8 @@ export class WARCWriter implements IndexerOffsetLength {
   fh: Writable | null;
   cdxFH: Writable | null;
 
+  warcQ = new PQueue({ concurrency: 1 });
+
   constructor({
     archivesDir,
     tempCdxDir,
@@ -66,7 +69,7 @@ export class WARCWriter implements IndexerOffsetLength {
     this.fh = null;
   }
 
-  _initNewFile() {
+  private _initNewFile() {
     const filename = this.filenameTemplate.replace("$ts", timestampNow());
 
     this.offset = 0;
@@ -110,7 +113,17 @@ export class WARCWriter implements IndexerOffsetLength {
     return fh;
   }
 
-  async writeRecordPair(
+  writeRecordPair(
+    responseRecord: WARCRecord,
+    requestRecord: WARCRecord,
+    responseSerializer: WARCSerializer | undefined = undefined,
+  ) {
+    this.warcQ.add(() =>
+      this._writeRecordPair(responseRecord, requestRecord, responseSerializer),
+    );
+  }
+
+  private async _writeRecordPair(
     responseRecord: WARCRecord,
     requestRecord: WARCRecord,
     responseSerializer: WARCSerializer | undefined = undefined,
@@ -137,7 +150,11 @@ export class WARCWriter implements IndexerOffsetLength {
     this._writeCDX(requestRecord);
   }
 
-  async writeSingleRecord(record: WARCRecord) {
+  writeSingleRecord(record: WARCRecord) {
+    this.warcQ.add(() => this._writeSingleRecord(record));
+  }
+
+  private async _writeSingleRecord(record: WARCRecord) {
     const opts = { gzip: this.gzip };
 
     const requestSerializer = new WARCSerializer(record, opts);
@@ -147,7 +164,11 @@ export class WARCWriter implements IndexerOffsetLength {
     this._writeCDX(record);
   }
 
-  async writeNewResourceRecord({
+  writeNewResourceRecord(record: ResourceRecordData) {
+    this.warcQ.add(() => this._writeNewResourceRecord(record));
+  }
+
+  private async _writeNewResourceRecord({
     buffer,
     resourceType,
     contentType,
@@ -166,7 +187,7 @@ export class WARCWriter implements IndexerOffsetLength {
       date = new Date();
     }
 
-    return await this.writeSingleRecord(
+    return await this._writeSingleRecord(
       WARCRecord.create(
         {
           url: resourceUrl,
@@ -213,7 +234,7 @@ export class WARCWriter implements IndexerOffsetLength {
     return total;
   }
 
-  _writeCDX(record: WARCRecord | null) {
+  private _writeCDX(record: WARCRecord | null) {
     if (this.done) {
       logger.warn("Writer closed, not writing CDX", this.logDetails, "writer");
       return;
@@ -231,6 +252,8 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   async flush() {
+    await this.warcQ.onIdle();
+
     if (this.fh) {
       await streamFinish(this.fh);
       this.fh = null;

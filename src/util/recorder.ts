@@ -91,7 +91,6 @@ export class Recorder {
 
   crawlState: RedisCrawlState;
 
-  warcQ: PQueue;
   fetcherQ: PQueue;
 
   pendingRequests!: Map<string, RequestResponseInfo>;
@@ -136,8 +135,6 @@ export class Recorder {
     this.writer = writer;
 
     this.tempdir = tempdir;
-
-    this.warcQ = new PQueue({ concurrency: 1 });
 
     this.fetcherQ = new PQueue({ concurrency: 1 });
   }
@@ -728,14 +725,12 @@ export class Recorder {
 
     const url = this.pageUrl;
 
-    this.warcQ.add(() =>
-      this.writer.writeNewResourceRecord({
-        buffer: new TextEncoder().encode(text),
-        resourceType: "pageinfo",
-        contentType: "application/json",
-        url,
-      }),
-    );
+    this.writer.writeNewResourceRecord({
+      buffer: new TextEncoder().encode(text),
+      resourceType: "pageinfo",
+      contentType: "application/json",
+      url,
+    });
 
     return this.pageInfo.ts;
   }
@@ -805,7 +800,6 @@ export class Recorder {
     }
 
     logger.debug("Finishing WARC writing", this.logDetails, "recorder");
-    await this.warcQ.onIdle();
 
     await this.writer.flush();
   }
@@ -1044,9 +1038,7 @@ export class Recorder {
     const responseRecord = createResponse(reqresp, this.pageid);
     const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
 
-    this.warcQ.add(() =>
-      this.writer.writeRecordPair(responseRecord, requestRecord),
-    );
+    this.writer.writeRecordPair(responseRecord, requestRecord);
   }
 
   async directFetchCapture(
@@ -1243,13 +1235,12 @@ class AsyncFetcher {
         );
       }
 
-      recorder.warcQ.add(() =>
-        recorder.writer.writeRecordPair(
-          responseRecord,
-          requestRecord,
-          serializer,
-        ),
+      recorder.writer.writeRecordPair(
+        responseRecord,
+        requestRecord,
+        serializer,
       );
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url!);
