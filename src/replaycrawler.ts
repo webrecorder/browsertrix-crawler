@@ -268,7 +268,7 @@ export class ReplayCrawler extends Crawler {
       if (this.limitHit) {
         break;
       }
-      this._addPageIfInScope(entry, depth++);
+      await this._addPageIfInScope(entry, depth++);
     }
   }
 
