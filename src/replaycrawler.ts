@@ -538,10 +538,12 @@ export class ReplayCrawler extends Crawler {
         path.join(dir, `${counter}-${workerid}-${pageid}-replay.png`),
         PNG.sync.write(replay),
       );
-      await fsp.writeFile(
-        path.join(dir, `${counter}-${workerid}-${pageid}-vdiff.png`),
-        PNG.sync.write(diff),
-      );
+      if (res && matchPercent < 1) {
+        await fsp.writeFile(
+          path.join(dir, `${counter}-${workerid}-${pageid}-vdiff.png`),
+          PNG.sync.write(diff),
+        );
+      }
     }
 
     const pageInfo = this.pageInfos.get(page);
