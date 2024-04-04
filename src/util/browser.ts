@@ -19,22 +19,27 @@ import puppeteer, {
   Viewport,
 } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
+import { Recorder } from "./recorder.js";
+
+type BtrixChromeOpts = {
+  proxy?: boolean;
+  userAgent?: string | null;
+  extraArgs?: string[];
+};
 
 type LaunchOpts = {
   profileUrl: string;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  chromeOptions: Record<string, any>;
+  chromeOptions: BtrixChromeOpts;
   signals: boolean;
   headless: boolean;
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   emulateDevice?: Record<string, any>;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ondisconnect?: ((err: any) => NonNullable<unknown>) | null;
+  ondisconnect?: ((err: unknown) => NonNullable<unknown>) | null;
 
   swOpt?: ServiceWorkerOpt;
+
+  recording: boolean;
 };
 
 // ==================================================================
@@ -48,9 +53,7 @@ export class Browser {
   browser?: PptrBrowser | null = null;
   firstCDP: CDPSession | null = null;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  recorders: any[] = [];
+  recorders: Recorder[] = [];
 
   swOpt?: ServiceWorkerOpt = "disabled";
 
@@ -66,6 +69,7 @@ export class Browser {
     emulateDevice = {},
     swOpt = "disabled",
     ondisconnect = null,
+    recording = true,
   }: LaunchOpts) {
     if (this.isLaunched()) {
       return;
@@ -81,6 +85,10 @@ export class Browser {
 
     const args = this.chromeArgs(chromeOptions);
 
+    if (recording) {
+      args.push("--disable-site-isolation-trials");
+    }
+
     let defaultViewport = null;
 
     if (process.env.GEOMETRY) {
@@ -91,7 +99,7 @@ export class Browser {
 
     const launchOpts: PuppeteerLaunchOptions = {
       args,
-      headless: headless ? "new" : false,
+      headless,
       executablePath: this.getBrowserExe(),
       ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
       ignoreHTTPSErrors: true,
@@ -103,9 +111,22 @@ export class Browser {
       defaultViewport,
       waitForInitialPage: false,
       userDataDir: this.profileDir,
+      targetFilter: recording
+        ? undefined
+        : (target) => this.targetFilter(target),
     };
 
-    await this._init(launchOpts, ondisconnect);
+    await this._init(launchOpts, ondisconnect, recording);
+  }
+
+  targetFilter(target: Target) {
+    const attach = !(!target.url() && target.type() === "other");
+    logger.debug(
+      "Target Filter",
+      { url: target.url(), type: target.type(), attach },
+      "browser",
+    );
+    return attach;
   }
 
   async setupPage({ page }: { page: Page; cdp: CDPSession }) {
@@ -116,13 +137,13 @@ export class Browser {
 
     switch (this.swOpt) {
       case "disabled":
-        logger.info("Service Workers: always disabled", {}, "browser");
+        logger.debug("Service Workers: always disabled", {}, "browser");
         await page.setBypassServiceWorker(true);
         break;
 
       case "disabled-if-profile":
         if (this.customProfile) {
-          logger.info(
+          logger.debug(
             "Service Workers: disabled since using profile",
             {},
             "browser",
@@ -132,7 +153,7 @@ export class Browser {
         break;
 
       case "enabled":
-        logger.info("Service Workers: always enabled", {}, "browser");
+        logger.debug("Service Workers: always enabled", {}, "browser");
         break;
     }
   }
@@ -195,7 +216,11 @@ export class Browser {
     });
   }
 
-  chromeArgs({ proxy = true, userAgent = null, extraArgs = [] } = {}) {
+  chromeArgs({
+    proxy = true,
+    userAgent = null,
+    extraArgs = [],
+  }: BtrixChromeOpts) {
     // Chrome Flags, including proxy server
     const args = [
       // eslint-disable-next-line no-use-before-define
@@ -207,7 +232,6 @@ export class Browser {
       "--remote-debugging-port=9221",
       "--remote-allow-origins=*",
       "--autoplay-policy=no-user-gesture-required",
-      "--disable-site-isolation-trials",
       `--user-agent=${userAgent || this.getDefaultUA()}`,
       ...extraArgs,
     ];
@@ -256,10 +280,10 @@ export class Browser {
     }
   }
 
-  async evaluateWithCLI_(
+  async evaluateWithCLI(
     cdp: CDPSession,
     frame: Frame,
-    cdpContextId: number,
+    frameIdToExecId: Map<string, number>,
     funcString: string,
     logData: Record<string, string>,
     contextName: LogContext,
@@ -269,13 +293,27 @@ export class Browser {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let details: Record<string, any> = { frameUrl, ...logData };
 
-    if (!frameUrl || frame.isDetached()) {
+    if (!frameUrl || frame.detached) {
       logger.info(
         "Run Script Skipped, frame no longer attached or has no URL",
         details,
         contextName,
       );
       return false;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const frameId = (frame as any)._id;
+
+    const contextId = frameIdToExecId.get(frameId);
+
+    if (!contextId) {
+      logger.warn(
+        "Not running behavior, missing CDP context id for frame id",
+        { frameId },
+        "browser",
+      );
+      return;
     }
 
     logger.info("Run Script Started", details, contextName);
@@ -286,7 +324,7 @@ export class Browser {
 
     const { exceptionDetails, result } = await cdp.send("Runtime.evaluate", {
       expression,
-      contextId: cdpContextId,
+      contextId,
       returnByValue: true,
       awaitPromise: true,
       userGesture: true,
@@ -347,6 +385,7 @@ export class Browser {
     launchOpts: PuppeteerLaunchOptions,
     // eslint-disable-next-line @typescript-eslint/ban-types
     ondisconnect: Function | null = null,
+    recording: boolean,
   ) {
     this.browser = await puppeteer.launch(launchOpts);
 
@@ -354,7 +393,9 @@ export class Browser {
 
     this.firstCDP = await target.createCDPSession();
 
-    await this.serviceWorkerFetch();
+    if (recording) {
+      await this.serviceWorkerFetch();
+    }
 
     if (ondisconnect) {
       this.browser.on("disconnected", (err) => ondisconnect(err));
@@ -374,7 +415,7 @@ export class Browser {
         if (target.url() === startPage) {
           resolve(target);
           if (this.browser) {
-            this.browser.removeListener("targetcreated", listener);
+            this.browser.off("targetcreated", listener);
           }
         }
       };
@@ -497,32 +538,6 @@ export class Browser {
     });
   }
 
-  // TODO: Fix this the next time the file is edited.
-
-  async evaluateWithCLI(
-    _: unknown,
-    frame: Frame,
-    cdp: CDPSession,
-    funcString: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    logData: Record<string, any>,
-    contextName: LogContext,
-  ) {
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const context = await (frame as any).executionContext();
-    cdp = context._client;
-    const cdpContextId = context._contextId;
-    return await this.evaluateWithCLI_(
-      cdp,
-      frame,
-      cdpContextId,
-      funcString,
-      logData,
-      contextName,
-    );
-  }
-
   interceptRequest(page: Page, callback: (event: HTTPRequest) => void) {
     page.on("request", callback);
   }
@@ -584,8 +599,8 @@ export const defaultArgs = [
   "--no-service-autorun",
   "--export-tagged-pdf",
   "--apps-keep-chrome-alive-in-tests",
-  "--apps-gallery-url=https://invalid.webstore.example.com/",
-  "--apps-gallery-update-url=https://invalid.webstore.example.com/",
-  //"--component-updater=url-source=http://invalid.dev/",
-  "--brave-stats-updater-server=url-source=http://invalid.dev/",
+  "--apps-gallery-url=https://gallery.invalid/",
+  "--apps-gallery-update-url=https://gallery-update.invalid/",
+  //"--component-updater=url-source=http://updater.invalid/",
+  "--brave-stats-updater-server=url-source=http://stats-updater.invalid/",
 ];

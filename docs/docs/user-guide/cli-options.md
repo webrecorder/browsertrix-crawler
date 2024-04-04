@@ -1,10 +1,10 @@
 # All Command-Line Options
 
-The Browsertrix Crawler Docker image currently accepts the following parameters:
+The Browsertrix Crawler Docker image currently accepts the following parameters, broken down by entrypoint:
+
+## crawler
 
 ```
-crawler [options]
-
 Options:
       --help                                Show help                  [boolean]
       --version                             Show version number        [boolean]
@@ -94,14 +94,15 @@ Options:
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "jsError", "fetch", "pageStatus", "memoryStatus", "crawlStatus", "l
-                                                 inks", "sitemap"] [default: []]
+                                       inks", "sitemap", "replay"] [default: []]
       --logExcludeContext                   Comma-separated list of contexts to
                                             NOT include in logs
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "jsError", "fetch", "pageStatus", "memoryStatus", "crawlStatus", "l
-         inks", "sitemap"] [default: ["recorderNetwork","jsError","screencast"]]
+  inks", "sitemap", "replay"] [default: ["recorderNetwork","jsError","screencast
+                                                                             "]]
       --text                                Extract initial (default) or final t
                                             ext to pages.jsonl or WARC resource
                                             record(s)
@@ -123,9 +124,15 @@ Options:
                                             itemap.xml, or custom URL if URL is
                                             specified
       --sitemapFromDate, --sitemapFrom      If set, filter URLs from sitemaps to
-                                             those greater than or equal to prov
-                                            ided ISO Date string (YYYY-MM-DD or
-                                            YYYY-MM-DDTHH:MM:SS or partial date)
+                                             those greater than or equal to (>=)
+                                             provided ISO Date string (YYYY-MM-D
+                                            D or YYYY-MM-DDTHH:MM:SS or partial
+                                            date)
+      --sitemapToDate, --sitemapTo          If set, filter URLs from sitemaps to
+                                             those less than or equal to (<=) pr
+                                            ovided ISO Date string (YYYY-MM-DD o
+                                            r YYYY-MM-DDTHH:MM:SS or partial dat
+                                            e)
       --statsFilename                       If set, output stats as JSON to this
                                              file. (Relative filename resolves t
                                             o crawl working directory)
@@ -239,5 +246,47 @@ Options:
                                             ess (for debugging)        [boolean]
       --warcPrefix                          prefix for WARC files generated, inc
                                             luding WARCs added to WACZ  [string]
+      --serviceWorker, --sw                 service worker handling: disabled, e
+                                            nabled, or disabled with custom prof
+                                            ile
+   [choices: "disabled", "disabled-if-profile", "enabled"] [default: "disabled"]
+      --qaSource                            Required for QA mode. Source (WACZ o
+                                            r multi WACZ) for QA        [string]
+      --qaDebugImageDiff                    if specified, will write crawl.png,
+                                            replay.png and diff.png for each pag
+                                            e where they're different  [boolean]
       --config                              Path to YAML config file
+```
+
+## create-login-profile
+
+```
+Options:
+  --help             Show help                                         [boolean]
+  --version          Show version number                               [boolean]
+  --url              The URL of the login page               [string] [required]
+  --user             The username for the login. If not specified, will be promp
+                     ted
+  --password         The password for the login. If not specified, will be promp
+                     ted (recommended)
+  --filename         The filename for the profile tarball
+                                    [default: "/crawls/profiles/profile.tar.gz"]
+  --debugScreenshot  If specified, take a screenshot after login and save as thi
+                     s filename
+  --headless         Run in headless mode, otherwise start xvfb
+                                                      [boolean] [default: false]
+  --automated        Start in automated mode, no interactive browser
+                                                      [boolean] [default: false]
+  --interactive      Deprecated. Now the default option!
+                                                      [boolean] [default: false]
+  --shutdownWait     Shutdown browser in interactive after this many seconds, if
+                      no pings received                    [number] [default: 0]
+  --profile          Path to tar.gz file which will be extracted and used as the
+                      browser profile                                   [string]
+  --windowSize       Browser window dimensions, specified as: width,height
+                                                 [string] [default: "1360,1020"]
+  --proxy                                             [boolean] [default: false]
+  --cookieDays       If >0, set all cookies, including session cookies, to have
+                     this duration in days before saving profile
+                                                           [number] [default: 7]
 ```

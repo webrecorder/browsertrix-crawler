@@ -8,3 +8,5 @@ test-crawls/
 .DS_Store
 dist
 scratch/
+venv/
+docs/venv/

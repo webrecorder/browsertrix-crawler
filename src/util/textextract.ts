@@ -1,18 +1,28 @@
-import { WARCResourceWriter } from "./warcresourcewriter.js";
 import { logger } from "./logger.js";
 import { CDPSession, Protocol } from "puppeteer-core";
+import { WARCWriter } from "./warcwriter.js";
 
 // ============================================================================
-export abstract class BaseTextExtract extends WARCResourceWriter {
+type TextExtractOpts = {
+  url: string;
+  writer: WARCWriter;
+  skipDocs: number;
+};
+
+// ============================================================================
+export abstract class BaseTextExtract {
   cdp: CDPSession;
   lastText: string | null = null;
   text: string | null = null;
+  skipDocs: number = 0;
+  writer: WARCWriter;
+  url: string;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(cdp: CDPSession, opts: any) {
-    super({ ...opts, warcName: "text.warc.gz" });
+  constructor(cdp: CDPSession, { writer, skipDocs, url }: TextExtractOpts) {
+    this.writer = writer;
     this.cdp = cdp;
+    this.url = url;
+    this.skipDocs = skipDocs || 0;
   }
 
   async extractAndStoreText(
@@ -33,13 +43,14 @@ export abstract class BaseTextExtract extends WARCResourceWriter {
         return { changed: false, text };
       }
       if (saveToWarc) {
-        await this.writeBufferToWARC(
-          new TextEncoder().encode(text),
+        await this.writer.writeNewResourceRecord({
+          buffer: new TextEncoder().encode(text),
           resourceType,
-          "text/plain",
-        );
+          contentType: "text/plain",
+          url: this.url,
+        });
         logger.debug(
-          `Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.warcName}`,
+          `Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.writer.filename}`,
         );
       }
 
@@ -83,7 +94,7 @@ export class TextExtractViaSnapshot extends BaseTextExtract {
 
     const accum: string[] = [];
 
-    for (const doc of documents) {
+    for (const doc of documents.slice(this.skipDocs)) {
       const nodeValues = doc.nodes.nodeValue || [];
       const nodeNames = doc.nodes.nodeName || [];
       const nodeTypes = doc.nodes.nodeType || [];

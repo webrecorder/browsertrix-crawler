@@ -10,8 +10,9 @@ import {
   QueueState,
   PageState,
   WorkerId,
-  PageCallbacks,
 } from "./util/state.js";
+
+import { parseArgs } from "./util/argParser.js";
 
 import yaml from "js-yaml";
 
@@ -29,7 +30,6 @@ import {
 } from "./util/storage.js";
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
-import { parseArgs } from "./util/argParser.js";
 import { initRedis } from "./util/redis.js";
 import { logger, formatErr } from "./util/logger.js";
 import {
@@ -56,9 +56,11 @@ import { OriginOverride } from "./util/originoverride.js";
 // to ignore HTTPS error for HEAD check
 import { Agent as HTTPAgent } from "http";
 import { Agent as HTTPSAgent } from "https";
-import { CDPSession, Frame, HTTPRequest, Page } from "puppeteer-core";
+import { CDPSession, Frame, HTTPRequest, Page, Protocol } from "puppeteer-core";
+import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
+import { WARCWriter } from "./util/warcwriter.js";
 
 const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
@@ -146,6 +148,13 @@ export class Crawler {
   pagesDir: string;
   pagesFile: string;
 
+  archivesDir: string;
+  tempdir: string;
+  tempCdxDir: string;
+
+  screenshotWriter: WARCWriter | null;
+  textWriter: WARCWriter | null;
+
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
 
@@ -154,10 +163,14 @@ export class Crawler {
 
   screencaster: ScreenCaster | null = null;
 
+  skipTextDocs = 0;
+
   interrupted = false;
   finalExit = false;
   uploadAndDeleteLocal = false;
   done = false;
+
+  textInPages = false;
 
   customBehaviors = "";
   behaviorsChecked = false;
@@ -169,8 +182,6 @@ export class Crawler {
   maxHeapUsed = 0;
   maxHeapTotal = 0;
 
-  warcPrefix: string;
-
   driver!: (opts: {
     page: Page;
     data: PageState;
@@ -178,10 +189,12 @@ export class Crawler {
     crawler: Crawler;
   }) => NonNullable<unknown>;
 
+  recording = true;
+
   constructor() {
-    const res = parseArgs();
-    this.params = res.parsed;
-    this.origConfig = res.origConfig;
+    const args = this.parseArgs();
+    this.params = args.parsed;
+    this.origConfig = args.origConfig;
 
     // root collections dir
     this.collDir = path.join(
@@ -259,6 +272,14 @@ export class Crawler {
     // pages file
     this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
 
+    // archives dir
+    this.archivesDir = path.join(this.collDir, "archive");
+    this.tempdir = path.join(os.tmpdir(), "tmp-dl");
+    this.tempCdxDir = path.join(this.collDir, "tmp-cdx");
+
+    this.screenshotWriter = null;
+    this.textWriter = null;
+
     this.blockRules = null;
     this.adBlockRules = null;
 
@@ -268,17 +289,17 @@ export class Crawler {
     this.finalExit = false;
     this.uploadAndDeleteLocal = false;
 
+    this.textInPages = this.params.text.includes("to-pages");
+
     this.done = false;
 
     this.customBehaviors = "";
 
     this.browser = new Browser();
+  }
 
-    this.warcPrefix = process.env.WARC_PREFIX || this.params.warcPrefix || "";
-
-    if (this.warcPrefix) {
-      this.warcPrefix += "-" + this.crawlId + "-";
-    }
+  protected parseArgs() {
+    return parseArgs();
   }
 
   configureUA() {
@@ -428,13 +449,11 @@ export class Crawler {
 
     subprocesses.push(this.launchRedis());
 
-    //const initRes = child_process.spawnSync("wb-manager", ["init", this.params.collection], {cwd: this.params.cwd});
+    await fsp.mkdir(this.logDir, { recursive: true });
+    await fsp.mkdir(this.archivesDir, { recursive: true });
+    await fsp.mkdir(this.tempdir, { recursive: true });
+    await fsp.mkdir(this.tempCdxDir, { recursive: true });
 
-    //if (initRes.status) {
-    //  logger.info("wb-manager init failed, collection likely already exists");
-    //}
-
-    fs.mkdirSync(this.logDir, { recursive: true });
     this.logFH = fs.createWriteStream(this.logFilename);
     logger.setExternalLogStream(this.logFH);
 
@@ -492,6 +511,13 @@ export class Crawler {
         ],
         { detached: RUN_DETACHED },
       );
+    }
+
+    if (this.params.screenshot) {
+      this.screenshotWriter = this.createExtraResourceWarcWriter("screenshots");
+    }
+    if (this.params.text) {
+      this.textWriter = this.createExtraResourceWarcWriter("text");
     }
   }
 
@@ -597,13 +623,11 @@ export class Crawler {
     cdp,
     workerid,
     callbacks,
-  }: {
-    page: Page;
-    cdp: CDPSession;
-    workerid: WorkerId;
-    callbacks: PageCallbacks;
-  }) {
+    frameIdToExecId,
+  }: WorkerOpts) {
     await this.browser.setupPage({ page, cdp });
+
+    await this.setupExecContextEvents(cdp, frameIdToExecId);
 
     if (
       (this.adBlockRules && this.params.blockAds) ||
@@ -677,6 +701,40 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  async setupExecContextEvents(
+    cdp: CDPSession,
+    frameIdToExecId: Map<string, number>,
+  ) {
+    await cdp.send("Runtime.enable");
+
+    await cdp.on(
+      "Runtime.executionContextCreated",
+      (params: Protocol.Runtime.ExecutionContextCreatedEvent) => {
+        const { id, auxData } = params.context;
+        if (auxData && auxData.isDefault && auxData.frameId) {
+          frameIdToExecId.set(auxData.frameId, id);
+        }
+      },
+    );
+
+    await cdp.on(
+      "Runtime.executionContextDestroyed",
+      (params: Protocol.Runtime.ExecutionContextDestroyedEvent) => {
+        const { executionContextId } = params;
+        for (const [frameId, execId] of frameIdToExecId.entries()) {
+          if (execId === executionContextId) {
+            frameIdToExecId.delete(frameId);
+            break;
+          }
+        }
+      },
+    );
+
+    await cdp.on("Runtime.executionContextsCleared", () => {
+      frameIdToExecId.clear();
+    });
+  }
+
   loadCustomBehaviors(filename: string) {
     let str = "";
 
@@ -721,10 +779,10 @@ self.__bx_behaviors.selectMainBehavior();
     return "";
   }
 
-  async crawlPage(opts: WorkerState) {
+  async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
-    const { page, cdp, data, workerid, callbacks, directFetchCapture } = opts;
+    const { page, data, workerid, callbacks, directFetchCapture } = opts;
     data.callbacks = callbacks;
 
     const { url } = data;
@@ -764,7 +822,7 @@ self.__bx_behaviors.selectMainBehavior();
             { url, ...logDetails },
             "fetch",
           );
-          return true;
+          return;
         }
       } catch (e) {
         // filtered out direct fetch
@@ -782,21 +840,27 @@ self.__bx_behaviors.selectMainBehavior();
     data.title = await page.title();
     data.favicon = await this.getFavicon(page, logDetails);
 
-    const archiveDir = path.join(this.collDir, "archive");
+    await this.doPostLoadActions(opts);
+  }
 
-    if (this.params.screenshot) {
+  async doPostLoadActions(opts: WorkerState, saveOutput = false) {
+    const { page, cdp, data, workerid } = opts;
+    const { url } = data;
+
+    const logDetails = { page: url, workerid };
+
+    if (this.params.screenshot && this.screenshotWriter) {
       if (!data.isHTMLPage) {
         logger.debug("Skipping screenshots for non-HTML page", logDetails);
       }
       const screenshots = new Screenshots({
-        warcPrefix: this.warcPrefix,
         browser: this.browser,
         page,
         url,
-        directory: archiveDir,
+        writer: this.screenshotWriter,
       });
       if (this.params.screenshot.includes("view")) {
-        await screenshots.take();
+        await screenshots.take("view", saveOutput ? data : null);
       }
       if (this.params.screenshot.includes("fullPage")) {
         await screenshots.takeFullPage();
@@ -808,30 +872,26 @@ self.__bx_behaviors.selectMainBehavior();
 
     let textextract = null;
 
-    if (data.isHTMLPage) {
+    if (data.isHTMLPage && this.textWriter) {
       textextract = new TextExtractViaSnapshot(cdp, {
-        warcPrefix: this.warcPrefix,
+        writer: this.textWriter,
         url,
-        directory: archiveDir,
+        skipDocs: this.skipTextDocs,
       });
-      const { changed, text } = await textextract.extractAndStoreText(
+      const { text } = await textextract.extractAndStoreText(
         "text",
         false,
         this.params.text.includes("to-warc"),
       );
 
-      if (changed && text && this.params.text.includes("to-pages")) {
+      if (text && (this.textInPages || saveOutput)) {
         data.text = text;
       }
     }
 
     data.loadState = LoadState.EXTRACTION_DONE;
 
-    if (data.status >= 400) {
-      return;
-    }
-
-    if (this.params.behaviorOpts) {
+    if (this.params.behaviorOpts && data.status < 400) {
       if (!data.isHTMLPage) {
         logger.debug(
           "Skipping behaviors for non-HTML page",
@@ -842,7 +902,13 @@ self.__bx_behaviors.selectMainBehavior();
         logger.info("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
         const res = await timedRun(
-          this.runBehaviors(page, cdp, data.filteredFrames, logDetails),
+          this.runBehaviors(
+            page,
+            cdp,
+            data.filteredFrames,
+            opts.frameIdToExecId,
+            logDetails,
+          ),
           this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
@@ -868,8 +934,6 @@ self.__bx_behaviors.selectMainBehavior();
       );
       await sleep(this.params.pageExtraDelay);
     }
-
-    return true;
   }
 
   async pageFinished(data: PageState) {
@@ -923,6 +987,7 @@ self.__bx_behaviors.selectMainBehavior();
     page: Page,
     cdp: CDPSession,
     frames: Frame[],
+    frameIdToExecId: Map<string, number>,
     logDetails: LogDetails,
   ) {
     try {
@@ -941,9 +1006,9 @@ self.__bx_behaviors.selectMainBehavior();
       const results = await Promise.allSettled(
         frames.map((frame) =>
           this.browser.evaluateWithCLI(
-            page,
-            frame,
             cdp,
+            frame,
+            frameIdToExecId,
             `
           if (!self.__bx_behaviors) {
             console.error("__bx_behaviors missing, can't run behaviors");
@@ -957,11 +1022,11 @@ self.__bx_behaviors.selectMainBehavior();
       );
 
       for (const res of results) {
-        const { status, reason }: { status: string; reason?: string } = res;
+        const { status, reason }: { status: string; reason?: unknown } = res;
         if (status === "rejected") {
           logger.warn(
             "Behavior run partially failed",
-            { reason, ...logDetails },
+            { reason: formatErr(reason), ...logDetails },
             "behavior",
           );
         }
@@ -1047,8 +1112,7 @@ self.__bx_behaviors.selectMainBehavior();
   async checkLimits() {
     let interrupt = false;
 
-    const dir = path.join(this.collDir, "archive");
-    const size = await getDirSize(dir);
+    const size = await getDirSize(this.archivesDir);
 
     await this.crawlState.setArchiveSize(size);
 
@@ -1125,6 +1189,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.interrupted) {
       await this.browser.close();
       await closeWorkers(0);
+      await this.closeFiles();
       await this.setStatusAndExit(13, "interrupted");
     } else {
       await this.setStatusAndExit(0, "done");
@@ -1230,28 +1295,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     this.screencaster = this.initScreenCaster();
 
-    if (this.params.originOverride.length) {
+    if (this.params.originOverride && this.params.originOverride.length) {
       this.originOverride = new OriginOverride(this.params.originOverride);
     }
 
-    for (let i = 0; i < this.params.scopedSeeds.length; i++) {
-      const seed = this.params.scopedSeeds[i];
-      if (!(await this.queueUrl(i, seed.url, 0, 0))) {
-        if (this.limitHit) {
-          break;
-        }
-      }
-
-      if (seed.sitemap) {
-        await timedRun(
-          this.parseSitemap(seed, i),
-          SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
-          "Sitemap initial fetch timed out",
-          { sitemap: seed.sitemap, seed: seed.url },
-          "sitemap",
-        );
-      }
-    }
+    await this._addInitialSeeds();
 
     await this.browser.launch({
       profileUrl: this.params.profile,
@@ -1272,12 +1320,14 @@ self.__bx_behaviors.selectMainBehavior();
           "browser",
         );
       },
+
+      recording: this.recording,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     // --------------
     // Run Crawl Here!
-    await runWorkers(this, this.params.workers, this.maxPageTime, this.collDir);
+    await runWorkers(this, this.params.workers, this.maxPageTime);
     // --------------
 
     await this.serializeConfig(true);
@@ -1287,6 +1337,8 @@ self.__bx_behaviors.selectMainBehavior();
       await this.pagesFH.close();
     }
 
+    await this.closeFiles();
+
     await this.writeStats();
 
     // if crawl has been stopped, mark as final exit for post-crawl tasks
@@ -1295,6 +1347,36 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     await this.postCrawl();
+  }
+
+  async closeFiles() {
+    if (this.textWriter) {
+      await this.textWriter.flush();
+    }
+    if (this.screenshotWriter) {
+      await this.screenshotWriter.flush();
+    }
+  }
+
+  protected async _addInitialSeeds() {
+    for (let i = 0; i < this.params.scopedSeeds.length; i++) {
+      const seed = this.params.scopedSeeds[i];
+      if (!(await this.queueUrl(i, seed.url, 0, 0))) {
+        if (this.limitHit) {
+          break;
+        }
+      }
+
+      if (seed.sitemap) {
+        await timedRun(
+          this.parseSitemap(seed, i),
+          SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
+          "Sitemap initial fetch timed out",
+          { sitemap: seed.sitemap, seed: seed.url },
+          "sitemap",
+        );
+      }
+    }
   }
 
   async postCrawl() {
@@ -1307,9 +1389,9 @@ self.__bx_behaviors.selectMainBehavior();
       await fsp.mkdir(path.join(this.collDir, "indexes"), { recursive: true });
       await this.crawlState.setStatus("generate-cdx");
 
-      const warcList = await fsp.readdir(path.join(this.collDir, "archive"));
+      const warcList = await fsp.readdir(this.archivesDir);
       const warcListFull = warcList.map((filename) =>
-        path.join(this.collDir, "archive", filename),
+        path.join(this.archivesDir, filename),
       );
 
       //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
@@ -1377,10 +1459,8 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info("Generating WACZ");
     await this.crawlState.setStatus("generate-wacz");
 
-    const archiveDir = path.join(this.collDir, "archive");
-
     // Get a list of the warcs inside
-    const warcFileList = await fsp.readdir(archiveDir);
+    const warcFileList = await fsp.readdir(this.archivesDir);
 
     // is finished (>0 pages and all pages written)
     const isFinished = await this.crawlState.isFinished();
@@ -1440,7 +1520,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     createArgs.push("-f");
 
-    warcFileList.forEach((val) => createArgs.push(path.join(archiveDir, val)));
+    warcFileList.forEach((val) =>
+      createArgs.push(path.join(this.archivesDir, val)),
+    );
 
     // create WACZ
     const waczResult = await this.awaitProcess(
@@ -1720,6 +1802,13 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.netIdle(page, logDetails);
 
+    if (this.params.postLoadDelay) {
+      logger.info("Awaiting post load delay", {
+        seconds: this.params.pagePostLoadDelay,
+      });
+      await sleep(this.params.pagePostLoadDelay);
+    }
+
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
       logger.debug("Skipping Link Extraction, At Max Depth");
@@ -1900,13 +1989,15 @@ self.__bx_behaviors.selectMainBehavior();
     depth: number,
     extraHops: number,
     logDetails: LogDetails = {},
+    ts = 0,
+    pageid?: string,
   ) {
     if (this.limitHit) {
       return false;
     }
 
     const result = await this.crawlState.addToQueue(
-      { url, seedId, depth, extraHops },
+      { url, seedId, depth, extraHops, ts, pageid },
       this.pageLimit,
     );
 
@@ -1954,7 +2045,7 @@ self.__bx_behaviors.selectMainBehavior();
           id: "pages",
           title: "All Pages",
         };
-        header["hasText"] = this.params.text.includes("to-pages");
+        header["hasText"] = String(this.textInPages);
         if (this.params.text.length) {
           logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
@@ -1968,20 +2059,30 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async writePage({
-    pageid,
-    url,
-    depth,
-    title,
-    text,
-    loadState,
-    mime,
-    favicon,
-    ts,
-    status,
-  }: PageState) {
-    const row: PageEntry = { id: pageid!, url, title, loadState };
+  protected pageEntryForRedis(
+    entry: Record<string, string | number | boolean | object>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    state: PageState,
+  ) {
+    return entry;
+  }
 
+  async writePage(state: PageState) {
+    const {
+      pageid,
+      url,
+      depth,
+      title,
+      text,
+      loadState,
+      mime,
+      favicon,
+      status,
+    } = state;
+
+    const row: PageEntry = { id: pageid, url, title, loadState };
+
+    let { ts } = state;
     if (!ts) {
       ts = new Date();
       logger.warn("Page date missing, setting to now", { url, ts });
@@ -1998,14 +2099,16 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.writePagesToRedis) {
-      await this.crawlState.writeToPagesQueue(JSON.stringify(row));
+      await this.crawlState.writeToPagesQueue(
+        JSON.stringify(this.pageEntryForRedis(row, state)),
+      );
     }
 
     if (depth === 0) {
       row.seed = true;
     }
 
-    if (text) {
+    if (text && this.textInPages) {
       row.text = text;
     }
 
@@ -2156,7 +2259,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.crawlState.setStatus("generate-warc");
 
     // Get the list of created Warcs
-    const warcLists = await fsp.readdir(path.join(this.collDir, "archive"));
+    const warcLists = await fsp.readdir(this.archivesDir);
 
     logger.debug(`Combining ${warcLists.length} WARCs...`);
 
@@ -2164,7 +2267,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // Go through a list of the created works and create an array sorted by their filesize with the largest file first.
     for (let i = 0; i < warcLists.length; i++) {
-      const fileName = path.join(this.collDir, "archive", warcLists[i]);
+      const fileName = path.join(this.archivesDir, warcLists[i]);
       const fileSize = await getFileSize(fileName);
       fileSizeObjects.push({ fileSize: fileSize, fileName: fileName });
       fileSizeObjects.sort((a, b) => b.fileSize - a.fileSize);
@@ -2320,6 +2423,62 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.storage.uploadFile(filename, targetFilename);
     }
+  }
+
+  getWarcPrefix(defaultValue = "") {
+    let warcPrefix =
+      process.env.WARC_PREFIX || this.params.warcPrefix || defaultValue;
+
+    if (warcPrefix) {
+      warcPrefix += "-" + this.crawlId + "-";
+    }
+
+    return warcPrefix;
+  }
+
+  createExtraResourceWarcWriter(resourceName: string, gzip = true) {
+    const filenameBase = `${this.getWarcPrefix()}${resourceName}`;
+
+    return this.createWarcWriter(filenameBase, gzip, { resourceName });
+  }
+
+  createWarcWriter(
+    filenameBase: string,
+    gzip: boolean,
+    logDetails: Record<string, string>,
+  ) {
+    const filenameTemplate = `${filenameBase}.warc${gzip ? ".gz" : ""}`;
+
+    return new WARCWriter({
+      archivesDir: this.archivesDir,
+      tempCdxDir: this.tempCdxDir,
+      filenameTemplate,
+      rolloverSize: this.params.rolloverSize,
+      gzip,
+      logDetails,
+    });
+  }
+
+  createRecorder(id: number): Recorder | null {
+    if (!this.recording) {
+      return null;
+    }
+
+    const filenameBase = `${this.getWarcPrefix("rec")}$ts-${id}`;
+
+    const writer = this.createWarcWriter(filenameBase, true, {
+      id: id.toString(),
+    });
+
+    const res = new Recorder({
+      workerid: id,
+      crawler: this,
+      writer,
+      tempdir: this.tempdir,
+    });
+
+    this.browser.recorders.push(res);
+    return res;
   }
 }
 

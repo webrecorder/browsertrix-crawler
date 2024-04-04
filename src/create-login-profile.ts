@@ -52,7 +52,8 @@ function cliOpts(): { [key: string]: Options } {
     },
 
     filename: {
-      describe: "The filename for the profile tarball",
+      describe:
+        "The filename for the profile tarball, stored within /crawls/profiles if absolute path not provided",
       default: "/crawls/profiles/profile.tar.gz",
     },
 
@@ -186,6 +187,7 @@ async function main() {
         "--test-type",
       ],
     },
+    recording: false,
   });
 
   if (params.interactive) {
@@ -222,15 +224,11 @@ async function main() {
     );
   }
 
-  logger.info(`Loading page: ${params.url}`);
-
-  await page.goto(params.url, { waitUntil });
-
   if (!params.automated) {
     const target = await cdp.send("Target.getTargetInfo");
     const targetId = target.targetInfo.targetId;
 
-    new InteractiveBrowser(params, browser, page, cdp, targetId);
+    new InteractiveBrowser(params, browser, page, cdp, targetId, waitUntil);
   } else {
     await automatedProfile(params, browser, page, cdp, waitUntil);
   }
@@ -246,6 +244,10 @@ async function automatedProfile(
   waitUntil: PuppeteerLifeCycleEvent,
 ) {
   let u, p;
+
+  logger.info(`Loading page: ${params.url}`);
+
+  await page.goto(params.url, { waitUntil });
 
   logger.debug("Looking for username and password entry fields on page...");
 
@@ -298,6 +300,13 @@ async function createProfile(
   await browser.close();
 
   logger.info("Creating profile");
+
+  if (params.filename && !params.filename.startsWith("/")) {
+    params.filename = path.resolve("/crawls/profiles/", params.filename);
+    logger.info(
+      `Absolute path for filename not provided, saving to ${params.filename}`,
+    );
+  }
 
   const profileFilename = params.filename || "/crawls/profiles/profile.tar.gz";
 
@@ -371,6 +380,7 @@ class InteractiveBrowser {
     page: Page,
     cdp: CDPSession,
     targetId: string,
+    waitUntil: PuppeteerLifeCycleEvent = "load",
   ) {
     logger.info("Creating Profile Interactively...");
     child_process.spawn("socat", [
@@ -426,6 +436,12 @@ class InteractiveBrowser {
     } else {
       logger.info("Screencasting with CDP on port 9222");
     }
+
+    logger.info(`Loading page: ${params.url}`);
+
+    page.goto(params.url, { waitUntil, timeout: 0 }).finally(() => {
+      logger.info("Loaded!");
+    });
   }
 
   handlePageLoad() {

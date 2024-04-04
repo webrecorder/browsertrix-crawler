@@ -1,50 +1,67 @@
 import sharp from "sharp";
 
-import { WARCResourceWriter } from "./warcresourcewriter.js";
 import { logger, formatErr } from "./logger.js";
 import { Browser } from "./browser.js";
+import { Page } from "puppeteer-core";
+import { PageState } from "./state.js";
+import { WARCWriter } from "./warcwriter.js";
 
 // ============================================================================
 
-type ScreenShotType = {
-  type: string;
+type ScreenShotDesc = {
+  type: "png" | "jpeg";
   omitBackground: boolean;
   fullPage: boolean;
+  encoding: "binary";
 };
 
-export const screenshotTypes: Record<string, ScreenShotType> = {
+type ScreeshotType = "view" | "thumbnail" | "fullPage";
+
+export const screenshotTypes: Record<string, ScreenShotDesc> = {
   view: {
     type: "png",
     omitBackground: true,
     fullPage: false,
+    encoding: "binary",
   },
   thumbnail: {
     type: "jpeg",
     omitBackground: true,
     fullPage: false,
+    encoding: "binary",
   },
   fullPage: {
     type: "png",
     omitBackground: true,
     fullPage: true,
+    encoding: "binary",
   },
 };
 
-export class Screenshots extends WARCResourceWriter {
+export type ScreenshotOpts = {
   browser: Browser;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  page: any;
+  page: Page;
+  url: string;
+  writer: WARCWriter;
+};
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(opts: any) {
-    super({ ...opts, warcName: "screenshots.warc.gz" });
-    this.browser = opts.browser;
-    this.page = opts.page;
+export class Screenshots {
+  browser: Browser;
+  page: Page;
+  url: string;
+  writer: WARCWriter;
+
+  constructor({ browser, page, writer, url }: ScreenshotOpts) {
+    this.browser = browser;
+    this.page = page;
+    this.url = url;
+    this.writer = writer;
   }
 
-  async take(screenshotType = "view") {
+  async take(
+    screenshotType: ScreeshotType = "view",
+    state: PageState | null = null,
+  ) {
     try {
       if (screenshotType !== "fullPage") {
         await this.browser.setViewport(this.page, {
@@ -54,13 +71,17 @@ export class Screenshots extends WARCResourceWriter {
       }
       const options = screenshotTypes[screenshotType];
       const screenshotBuffer = await this.page.screenshot(options);
-      await this.writeBufferToWARC(
-        screenshotBuffer,
-        screenshotType,
-        "image/" + options.type,
-      );
+      if (state && screenshotType === "view") {
+        state.screenshotView = screenshotBuffer;
+      }
+      await this.writer.writeNewResourceRecord({
+        buffer: screenshotBuffer,
+        resourceType: screenshotType,
+        contentType: "image/" + options.type,
+        url: this.url,
+      });
       logger.info(
-        `Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.warcName}`,
+        `Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.writer.filename}`,
       );
     } catch (e) {
       logger.error(
@@ -85,13 +106,14 @@ export class Screenshots extends WARCResourceWriter {
         // 16:9 thumbnail
         .resize(640, 360)
         .toBuffer();
-      await this.writeBufferToWARC(
-        thumbnailBuffer,
-        screenshotType,
-        "image/" + options.type,
-      );
+      await this.writer.writeNewResourceRecord({
+        buffer: thumbnailBuffer,
+        resourceType: screenshotType,
+        contentType: "image/" + options.type,
+        url: this.url,
+      });
       logger.info(
-        `Screenshot (type: thumbnail) for ${this.url} written to ${this.warcName}`,
+        `Screenshot (type: thumbnail) for ${this.url} written to ${this.writer.filename}`,
       );
     } catch (e) {
       logger.error(

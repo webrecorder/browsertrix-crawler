@@ -10,6 +10,13 @@ See [page.goto waitUntil options](https://pptr.dev/api/puppeteer.page.goto#remar
 
 The `--pageLoadTimeout`/`--timeout` option sets the timeout in seconds for page load, defaulting to 90 seconds. Behaviors will run on the page once either the page load condition or the page load timeout is met, whichever happens first.
 
+### Additional Wait
+
+Occasionally, a page may seem to have loaded, but performs dynamic initialization / additional loading. This is can be hard to detect, and the `--postLoadDelay` flag
+can be used to specify additional seconds to wait after the page appears to have loaded, before moving on to post-processing actions, such as link extraction, screenshotting and text extraction (see below).
+
+(On the other hand, the `--pageExtraDelay`/`--delay` adds an extra after all post-load actions have taken place, and can be useful for rate-limiting.)
+
 ## Ad Blocking
 
 Brave Browser, the browser used by Browsertrix Crawler for crawling, has some ad and tracker blocking features enabled by default. These [Shields](https://brave.com/shields/) be disabled or customized using [Browser Profiles](browser-profiles.md).
