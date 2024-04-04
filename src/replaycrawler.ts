@@ -329,7 +329,7 @@ export class ReplayCrawler extends Crawler {
             try {
               frame.evaluate("window.location.reload();");
             } catch (e) {
-              logger.error("RWP Reload failed, retrying", e, "replay");
+              logger.error("RWP Reload failed", e, "replay");
             }
           }, 10000);
           this.reloadTimeouts.set(page, timeoutid);
