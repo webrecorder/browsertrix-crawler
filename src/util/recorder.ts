@@ -20,7 +20,7 @@ import { WARCRecord } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
 import { RedisCrawlState, WorkerId } from "./state.js";
-import { CDPSession, Protocol } from "puppeteer-core";
+import { CDPSession, Page, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
@@ -118,6 +118,8 @@ export class Recorder {
   pageUrl!: string;
   pageid!: string;
 
+  pixelRatio: number = 0;
+
   constructor({
     workerid,
     writer,
@@ -142,7 +144,7 @@ export class Recorder {
     this.fetcherQ = new PQueue({ concurrency: 1 });
   }
 
-  async onCreatePage({ cdp }: { cdp: CDPSession }) {
+  async onCreatePage({ cdp, page }: { cdp: CDPSession; page: Page }) {
     // Fetch
     cdp.on("Fetch.requestPaused", async (params) => {
       this.handleRequestPaused(params, cdp);
@@ -203,6 +205,16 @@ export class Recorder {
         this.swTargetId = null;
       }
     });
+
+    // just set the first time
+    if (!this.pixelRatio) {
+      try {
+        const res = await page.evaluate("window.devicePixelRatio");
+        this.pixelRatio = typeof res === "number" ? res : 1;
+      } catch (e) {
+        this.pixelRatio = 1;
+      }
+    }
 
     await cdp.send("Target.setAutoAttach", {
       autoAttach: true,
@@ -550,9 +562,12 @@ export class Recorder {
       return false;
     }
 
-    if (url === this.pageUrl && !this.pageInfo.ts) {
-      logger.debug("Setting page timestamp", { ts: reqresp.ts, url });
-      this.pageInfo.ts = reqresp.ts;
+    if (url === this.pageUrl) {
+      if (!this.pageInfo.ts) {
+        logger.debug("Setting page timestamp", { ts: reqresp.ts, url });
+        this.pageInfo.ts = reqresp.ts;
+      }
+      reqresp.extraOpts.pixelRatio = this.pixelRatio;
     }
 
     reqresp.fillFetchRequestPaused(params);

@@ -15,6 +15,19 @@ export const MAX_URL_LENGTH = 4096;
 const MAX_ARG_LEN = 512;
 
 // ===========================================================================
+export type ExtraOptsType = {
+  cert?: { issuer: string; ctc: string };
+  ipType?: string;
+  rewritten?: number;
+  pixelRatio?: number;
+
+  // for wabac.js video rewriting
+  maxRes?: number;
+  maxBand?: number;
+  maxBitrate?: number;
+};
+
+// ===========================================================================
 export class RequestResponseInfo {
   ts: Date = new Date();
 
@@ -55,9 +68,7 @@ export class RequestResponseInfo {
 
   resourceType?: string;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  extraOpts: Record<string, any> = {};
+  extraOpts: ExtraOptsType = {};
 
   // stats
   readSize: number = 0;
