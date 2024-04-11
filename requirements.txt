@@ -1,1 +1,2 @@
-wacz>=0.4.9
+#wacz>=0.4.9
+git+https://github.com/webrecorder/py-wacz@copy-pages-files
