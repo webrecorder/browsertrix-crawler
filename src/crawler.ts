@@ -1520,7 +1520,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     const createArgs = [
       "create",
-      //"--split-seeds",
       "-o",
       waczPath,
       "--pages",
