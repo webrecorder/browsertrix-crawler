@@ -2,7 +2,7 @@ import child_process, { ChildProcess, StdioOptions } from "child_process";
 import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
-import fsp, { FileHandle } from "fs/promises";
+import fsp from "fs/promises";
 
 import {
   RedisCrawlState,
@@ -120,7 +120,8 @@ export class Crawler {
 
   crawlState!: RedisCrawlState;
 
-  pagesFH?: FileHandle | null = null;
+  pagesFH?: WriteStream | null = null;
+  extraPagesFH?: WriteStream | null = null;
   logFH!: WriteStream;
 
   crawlId: string;
@@ -146,7 +147,8 @@ export class Crawler {
   gotoOpts: Record<string, any>;
 
   pagesDir: string;
-  pagesFile: string;
+  seedPagesFile: string;
+  otherPagesFile: string;
 
   archivesDir: string;
   tempdir: string;
@@ -270,7 +272,8 @@ export class Crawler {
     this.pagesDir = path.join(this.collDir, "pages");
 
     // pages file
-    this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
+    this.seedPagesFile = path.join(this.pagesDir, "pages.jsonl");
+    this.otherPagesFile = path.join(this.pagesDir, "extraPages.jsonl");
 
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
@@ -1278,7 +1281,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.crawlState.setStatus("running");
 
-    await this.initPages();
+    this.pagesFH = await this.initPages(true);
+    this.extraPagesFH = await this.initPages(false);
 
     this.adBlockRules = new AdBlockRules(
       this.captureBasePrefix,
@@ -1332,10 +1336,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.serializeConfig(true);
 
-    if (this.pagesFH) {
-      await this.pagesFH.sync();
-      await this.pagesFH.close();
-    }
+    await this.closePages();
 
     await this.closeFiles();
 
@@ -1347,6 +1348,32 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     await this.postCrawl();
+  }
+
+  async closePages() {
+    if (this.pagesFH) {
+      try {
+        await new Promise<void>((resolve) =>
+          this.pagesFH!.close(() => resolve()),
+        );
+      } catch (e) {
+        // ignore
+      } finally {
+        this.pagesFH = null;
+      }
+    }
+
+    if (this.extraPagesFH) {
+      try {
+        await new Promise<void>((resolve) =>
+          this.extraPagesFH!.close(() => resolve()),
+        );
+      } catch (e) {
+        // ignore
+      } finally {
+        this.extraPagesFH = null;
+      }
+    }
   }
 
   async closeFiles() {
