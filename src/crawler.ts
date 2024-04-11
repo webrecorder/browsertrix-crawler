@@ -2115,7 +2115,11 @@ self.__bx_behaviors.selectMainBehavior();
     let { ts } = state;
     if (!ts) {
       ts = new Date();
-      logger.warn("Page date missing, setting to now", { url, ts });
+      logger.warn(
+        "Page date missing, setting to now",
+        { url, ts },
+        "pageStatus",
+      );
     }
 
     row.ts = ts.toISOString();
@@ -2151,14 +2155,18 @@ self.__bx_behaviors.selectMainBehavior();
     const pagesFH = depth > 0 ? this.extraPagesFH : this.pagesFH;
 
     if (!pagesFH) {
-      logger.error("Can't write pages, missing stream");
+      logger.error("Can't write pages, missing stream", {}, "pageStatus");
       return;
     }
 
     try {
       await pagesFH.write(processedRow);
     } catch (err) {
-      logger.warn("pages/pages.jsonl append failed");
+      logger.warn(
+        "Page append failed",
+        { pagesFile: depth > 0 ? this.otherPagesFile : this.seedPagesFile },
+        "pageStatus",
+      );
     }
   }
 
