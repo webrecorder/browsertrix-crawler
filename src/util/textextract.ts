@@ -43,7 +43,7 @@ export abstract class BaseTextExtract {
         return { changed: false, text };
       }
       if (saveToWarc) {
-        await this.writer.writeNewResourceRecord({
+        this.writer.writeNewResourceRecord({
           buffer: new TextEncoder().encode(text),
           resourceType,
           contentType: "text/plain",

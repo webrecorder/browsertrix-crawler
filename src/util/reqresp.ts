@@ -86,7 +86,7 @@ export class RequestResponseInfo {
     this.frameId = params.frameId;
   }
 
-  fillRequest(request: Protocol.Network.Request, resourceType?: string) {
+  fillRequest(request: Protocol.Network.Request, resourceType: string) {
     this.url = request.url;
     this.method = request.method;
     if (!this.requestHeaders) {

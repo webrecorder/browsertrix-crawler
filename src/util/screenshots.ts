@@ -74,7 +74,7 @@ export class Screenshots {
       if (state && screenshotType === "view") {
         state.screenshotView = screenshotBuffer;
       }
-      await this.writer.writeNewResourceRecord({
+      this.writer.writeNewResourceRecord({
         buffer: screenshotBuffer,
         resourceType: screenshotType,
         contentType: "image/" + options.type,
@@ -106,7 +106,7 @@ export class Screenshots {
         // 16:9 thumbnail
         .resize(640, 360)
         .toBuffer();
-      await this.writer.writeNewResourceRecord({
+      this.writer.writeNewResourceRecord({
         buffer: thumbnailBuffer,
         resourceType: screenshotType,
         contentType: "image/" + options.type,
