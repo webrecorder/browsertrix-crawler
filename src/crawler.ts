@@ -1281,8 +1281,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.crawlState.setStatus("running");
 
-    this.pagesFH = await this.initPages(true);
-    this.extraPagesFH = await this.initPages(false);
+    this.pagesFH = await this.initPages(this.seedPagesFile, "Seed Pages");
+    this.extraPagesFH = await this.initPages(
+      this.otherPagesFile,
+      "Non-Seed Pages",
+    );
 
     this.adBlockRules = new AdBlockRules(
       this.captureBasePrefix,
@@ -1517,12 +1520,12 @@ self.__bx_behaviors.selectMainBehavior();
 
     const createArgs = [
       "create",
-      "--split-seeds",
+      //"--split-seeds",
       "-o",
       waczPath,
       "--pages",
       this.seedPagesFile,
-      "--extraPages",
+      "--extra-pages",
       this.otherPagesFile,
       "--copy-pages",
       "--log-directory",
@@ -2057,8 +2060,7 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async initPages(seedPages: boolean) {
-    const filename = seedPages ? this.seedPagesFile : this.otherPagesFile;
+  async initPages(filename: string, title: string) {
     let fh = null;
 
     try {
@@ -2072,7 +2074,7 @@ self.__bx_behaviors.selectMainBehavior();
         const header: Record<string, string> = {
           format: "json-pages-1.0",
           id: "pages",
-          title: seedPages ? "Seed Pages" : "Non-Seed Pages",
+          title,
         };
         header.hasText = this.params.text.includes("to-pages");
         if (this.params.text.length) {
