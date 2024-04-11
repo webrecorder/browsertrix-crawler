@@ -2054,36 +2054,35 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async initPages() {
+  async initPages(seedPages: boolean) {
+    const filename = seedPages ? this.seedPagesFile : this.otherPagesFile;
+    let fh = null;
+
     try {
-      let createNew = false;
+      await fsp.mkdir(this.pagesDir, { recursive: true });
 
-      // create pages dir if doesn't exist and write pages.jsonl header
-      if (fs.existsSync(this.pagesDir) != true) {
-        await fsp.mkdir(this.pagesDir);
-        createNew = true;
-      }
+      const createNew = !fs.existsSync(filename);
 
-      this.pagesFH = await fsp.open(this.pagesFile, "a");
+      fh = fs.createWriteStream(filename, { flags: "a" });
 
       if (createNew) {
         const header: Record<string, string> = {
           format: "json-pages-1.0",
           id: "pages",
-          title: "All Pages",
+          title: seedPages ? "Seed Pages" : "Non-Seed Pages",
         };
-        header["hasText"] = String(this.textInPages);
+        header.hasText = this.params.text.includes("to-pages");
         if (this.params.text.length) {
           logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
           logger.debug("Text Extraction: None");
         }
-        const header_formatted = JSON.stringify(header).concat("\n");
-        await this.pagesFH.writeFile(header_formatted);
+        await fh.write(JSON.stringify(header) + "\n");
       }
     } catch (err) {
-      logger.error("pages/pages.jsonl creation failed", err);
+      logger.error(`"${filename}" creation failed`, err);
     }
+    return fh;
   }
 
   protected pageEntryForRedis(
@@ -2144,10 +2143,18 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const processedRow = JSON.stringify(row) + "\n";
+
+    const pagesFH = depth > 0 ? this.extraPagesFH : this.pagesFH;
+
+    if (!pagesFH) {
+      logger.error("Can't write pages, missing stream");
+      return;
+    }
+
     try {
-      await this.pagesFH!.writeFile(processedRow);
+      await pagesFH.write(processedRow);
     } catch (err) {
-      logger.warn("pages/pages.jsonl append failed", err);
+      logger.warn("pages/pages.jsonl append failed");
     }
   }
 
