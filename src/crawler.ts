@@ -1521,7 +1521,10 @@ self.__bx_behaviors.selectMainBehavior();
       "-o",
       waczPath,
       "--pages",
-      this.pagesFile,
+      this.seedPagesFile,
+      "--extraPages",
+      this.otherPagesFile,
+      "--copy-pages",
       "--log-directory",
       this.logDir,
     ];
