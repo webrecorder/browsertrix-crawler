@@ -2,7 +2,7 @@ import child_process, { ChildProcess, StdioOptions } from "child_process";
 import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
-import fsp, { FileHandle } from "fs/promises";
+import fsp from "fs/promises";
 
 import {
   RedisCrawlState,
@@ -120,7 +120,8 @@ export class Crawler {
 
   crawlState!: RedisCrawlState;
 
-  pagesFH?: FileHandle | null = null;
+  pagesFH?: WriteStream | null = null;
+  extraPagesFH?: WriteStream | null = null;
   logFH!: WriteStream;
 
   crawlId: string;
@@ -146,7 +147,8 @@ export class Crawler {
   gotoOpts: Record<string, any>;
 
   pagesDir: string;
-  pagesFile: string;
+  seedPagesFile: string;
+  otherPagesFile: string;
 
   archivesDir: string;
   tempdir: string;
@@ -270,7 +272,8 @@ export class Crawler {
     this.pagesDir = path.join(this.collDir, "pages");
 
     // pages file
-    this.pagesFile = path.join(this.pagesDir, "pages.jsonl");
+    this.seedPagesFile = path.join(this.pagesDir, "pages.jsonl");
+    this.otherPagesFile = path.join(this.pagesDir, "extraPages.jsonl");
 
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
@@ -1278,7 +1281,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.crawlState.setStatus("running");
 
-    await this.initPages();
+    this.pagesFH = await this.initPages(this.seedPagesFile, "Seed Pages");
+    this.extraPagesFH = await this.initPages(
+      this.otherPagesFile,
+      "Non-Seed Pages",
+    );
 
     this.adBlockRules = new AdBlockRules(
       this.captureBasePrefix,
@@ -1332,10 +1339,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.serializeConfig(true);
 
-    if (this.pagesFH) {
-      await this.pagesFH.sync();
-      await this.pagesFH.close();
-    }
+    await this.closePages();
 
     await this.closeFiles();
 
@@ -1347,6 +1351,32 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     await this.postCrawl();
+  }
+
+  async closePages() {
+    if (this.pagesFH) {
+      try {
+        await new Promise<void>((resolve) =>
+          this.pagesFH!.close(() => resolve()),
+        );
+      } catch (e) {
+        // ignore
+      } finally {
+        this.pagesFH = null;
+      }
+    }
+
+    if (this.extraPagesFH) {
+      try {
+        await new Promise<void>((resolve) =>
+          this.extraPagesFH!.close(() => resolve()),
+        );
+      } catch (e) {
+        // ignore
+      } finally {
+        this.extraPagesFH = null;
+      }
+    }
   }
 
   async closeFiles() {
@@ -1490,11 +1520,13 @@ self.__bx_behaviors.selectMainBehavior();
 
     const createArgs = [
       "create",
-      "--split-seeds",
       "-o",
       waczPath,
       "--pages",
-      this.pagesFile,
+      this.seedPagesFile,
+      "--extra-pages",
+      this.otherPagesFile,
+      "--copy-pages",
       "--log-directory",
       this.logDir,
     ];
@@ -2027,36 +2059,34 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async initPages() {
+  async initPages(filename: string, title: string) {
+    let fh = null;
+
     try {
-      let createNew = false;
+      await fsp.mkdir(this.pagesDir, { recursive: true });
 
-      // create pages dir if doesn't exist and write pages.jsonl header
-      if (fs.existsSync(this.pagesDir) != true) {
-        await fsp.mkdir(this.pagesDir);
-        createNew = true;
-      }
+      const createNew = !fs.existsSync(filename);
 
-      this.pagesFH = await fsp.open(this.pagesFile, "a");
+      fh = fs.createWriteStream(filename, { flags: "a" });
 
       if (createNew) {
         const header: Record<string, string> = {
           format: "json-pages-1.0",
           id: "pages",
-          title: "All Pages",
+          title,
         };
-        header["hasText"] = String(this.textInPages);
+        header.hasText = this.params.text.includes("to-pages");
         if (this.params.text.length) {
           logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
           logger.debug("Text Extraction: None");
         }
-        const header_formatted = JSON.stringify(header).concat("\n");
-        await this.pagesFH.writeFile(header_formatted);
+        await fh.write(JSON.stringify(header) + "\n");
       }
     } catch (err) {
-      logger.error("pages/pages.jsonl creation failed", err);
+      logger.error(`"${filename}" creation failed`, err);
     }
+    return fh;
   }
 
   protected pageEntryForRedis(
@@ -2085,7 +2115,11 @@ self.__bx_behaviors.selectMainBehavior();
     let { ts } = state;
     if (!ts) {
       ts = new Date();
-      logger.warn("Page date missing, setting to now", { url, ts });
+      logger.warn(
+        "Page date missing, setting to now",
+        { url, ts },
+        "pageStatus",
+      );
     }
 
     row.ts = ts.toISOString();
@@ -2117,10 +2151,22 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const processedRow = JSON.stringify(row) + "\n";
+
+    const pagesFH = depth > 0 ? this.extraPagesFH : this.pagesFH;
+
+    if (!pagesFH) {
+      logger.error("Can't write pages, missing stream", {}, "pageStatus");
+      return;
+    }
+
     try {
-      await this.pagesFH!.writeFile(processedRow);
+      await pagesFH.write(processedRow);
     } catch (err) {
-      logger.warn("pages/pages.jsonl append failed", err);
+      logger.warn(
+        "Page append failed",
+        { pagesFile: depth > 0 ? this.otherPagesFile : this.seedPagesFile },
+        "pageStatus",
+      );
     }
   }
 
