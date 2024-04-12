@@ -31,7 +31,7 @@ import {
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
-import { logger, formatErr } from "./util/logger.js";
+import { logger, formatErr, LogDetails } from "./util/logger.js";
 import {
   WorkerOpts,
   WorkerState,
@@ -88,9 +88,6 @@ const POST_CRAWL_STATES = [
   "generate-cdx",
   "generate-warc",
 ];
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type LogDetails = Record<string, any>;
 
 type PageEntry = {
   id: string;

@@ -43,15 +43,18 @@ export abstract class BaseTextExtract {
         return { changed: false, text };
       }
       if (saveToWarc) {
-        this.writer.writeNewResourceRecord({
-          buffer: new TextEncoder().encode(text),
-          resourceType,
-          contentType: "text/plain",
-          url: this.url,
-        });
-        logger.debug(
-          `Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.writer.filename}`,
+        this.writer.writeNewResourceRecord(
+          {
+            buffer: new TextEncoder().encode(text),
+            resourceType,
+            contentType: "text/plain",
+            url: this.url,
+          },
+          { type: resourceType, url: this.url, filename: this.writer.filename },
         );
+        // logger.debug(
+        //   `Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.writer.filename}`,
+        // );
       }
 
       this.lastText = text;
