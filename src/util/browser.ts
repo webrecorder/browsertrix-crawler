@@ -599,8 +599,4 @@ export const defaultArgs = [
   "--no-service-autorun",
   "--export-tagged-pdf",
   "--apps-keep-chrome-alive-in-tests",
-  // "--apps-gallery-url=https://gallery.invalid/",
-  // "--apps-gallery-update-url=https://gallery-update.invalid/",
-  // "--component-updater=url-source=http://updater.invalid/",
-  // "--brave-stats-updater-server=url-source=http://stats-updater.invalid/",
 ];
