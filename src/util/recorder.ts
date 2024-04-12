@@ -113,6 +113,7 @@ export class Recorder {
   gzip = true;
 
   writer: WARCWriter;
+  infoWriter: WARCWriter;
 
   pageUrl!: string;
   pageid!: string;
@@ -120,11 +121,13 @@ export class Recorder {
   constructor({
     workerid,
     writer,
+    infoWriter,
     crawler,
     tempdir,
   }: {
     workerid: WorkerId;
     writer: WARCWriter;
+    infoWriter?: WARCWriter;
     crawler: Crawler;
     tempdir: string;
   }) {
@@ -133,6 +136,7 @@ export class Recorder {
     this.crawlState = crawler.crawlState;
 
     this.writer = writer;
+    this.infoWriter = infoWriter || writer;
 
     this.tempdir = tempdir;
 
@@ -725,7 +729,7 @@ export class Recorder {
 
     const url = this.pageUrl;
 
-    this.writer.writeNewResourceRecord(
+    this.infoWriter.writeNewResourceRecord(
       {
         buffer: new TextEncoder().encode(text),
         resourceType: "pageinfo",
@@ -806,6 +810,10 @@ export class Recorder {
     logger.debug("Finishing WARC writing", this.logDetails, "recorder");
 
     await this.writer.flush();
+
+    if (this.infoWriter !== this.writer) {
+      await this.infoWriter.flush();
+    }
   }
 
   shouldSkip(

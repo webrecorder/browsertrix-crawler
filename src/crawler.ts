@@ -2513,10 +2513,13 @@ self.__bx_behaviors.selectMainBehavior();
       id: id.toString(),
     });
 
+    const infoWriter = this.createExtraResourceWarcWriter("info");
+
     const res = new Recorder({
       workerid: id,
       crawler: this,
       writer,
+      infoWriter,
       tempdir: this.tempdir,
     });
 
