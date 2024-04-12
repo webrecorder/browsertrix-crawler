@@ -81,7 +81,13 @@ export class Screenshots {
           contentType: "image/" + options.type,
           url: this.url,
         },
-        { type: screenshotType, url: this.url, filename: this.writer.filename },
+        {
+          resource: "screenshot",
+          type: screenshotType,
+          url: this.url,
+          filename: this.writer.filename,
+        },
+        "screenshots",
       );
       // logger.info(
       //   `Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.writer.filename}`,
@@ -116,11 +122,14 @@ export class Screenshots {
           contentType: "image/" + options.type,
           url: this.url,
         },
-        { type: screenshotType, url: this.url, filename: this.writer.filename },
+        {
+          resource: "screenshot",
+          type: screenshotType,
+          url: this.url,
+          filename: this.writer.filename,
+        },
+        "screenshots",
       );
-      // logger.info(
-      //   `Screenshot (type: thumbnail) for ${this.url} written to ${this.writer.filename}`,
-      // );
     } catch (e) {
       logger.error(
         "Taking screenshot failed",

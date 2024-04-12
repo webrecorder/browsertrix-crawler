@@ -756,6 +756,7 @@ export class ReplayCrawler extends Crawler {
           url: pageInfo.url,
         },
         { type: "pageinfo", url: pageInfo.url },
+        "replay",
       );
 
       this.pageInfos.delete(page);

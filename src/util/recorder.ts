@@ -733,6 +733,7 @@ export class Recorder {
         url,
       },
       { type: "pageinfo", url },
+      "recorder",
     );
 
     return this.pageInfo.ts;

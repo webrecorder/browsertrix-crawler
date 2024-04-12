@@ -4,7 +4,7 @@ import path from "path";
 
 import { CDXIndexer, WARCRecord } from "warcio";
 import { WARCSerializer } from "warcio/node";
-import { logger, formatErr, LogDetails } from "./logger.js";
+import { logger, formatErr, LogDetails, LogContext } from "./logger.js";
 import type { IndexerOffsetLength } from "warcio";
 import { timestampNow } from "./timing.js";
 import PQueue from "p-queue";
@@ -153,18 +153,19 @@ export class WARCWriter implements IndexerOffsetLength {
   private addToQueue(
     func: () => Promise<void>,
     details: LogDetails | null = null,
+    logContext: LogContext = "writer",
   ) {
     this.warcQ.add(async () => {
       try {
         await func();
         if (details) {
-          logger.debug("WARC Record Written", details, "writer");
+          logger.debug("WARC Record Written", details, logContext);
         }
       } catch (e) {
         logger.error(
           "WARC Record Write Failed",
           { ...details, ...formatErr(e) },
-          "writer",
+          logContext,
         );
       }
     });
@@ -184,8 +185,16 @@ export class WARCWriter implements IndexerOffsetLength {
     this._writeCDX(record);
   }
 
-  writeNewResourceRecord(record: ResourceRecordData, details: LogDetails) {
-    this.addToQueue(() => this._writeNewResourceRecord(record), details);
+  writeNewResourceRecord(
+    record: ResourceRecordData,
+    details: LogDetails,
+    logContext: LogContext,
+  ) {
+    this.addToQueue(
+      () => this._writeNewResourceRecord(record),
+      details,
+      logContext,
+    );
   }
 
   private async _writeNewResourceRecord({

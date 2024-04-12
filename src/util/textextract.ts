@@ -50,11 +50,14 @@ export abstract class BaseTextExtract {
             contentType: "text/plain",
             url: this.url,
           },
-          { type: resourceType, url: this.url, filename: this.writer.filename },
+          {
+            resource: "text",
+            type: resourceType,
+            url: this.url,
+            filename: this.writer.filename,
+          },
+          "text",
         );
-        // logger.debug(
-        //   `Text Extracted (type: ${resourceType}) for ${this.url} written to ${this.writer.filename}`,
-        // );
       }
 
       this.lastText = text;
