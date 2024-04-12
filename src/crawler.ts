@@ -1756,6 +1756,10 @@ self.__bx_behaviors.selectMainBehavior();
       const contentType = resp.headers()["content-type"];
 
       isHTMLPage = this.isHTMLContentType(contentType);
+
+      if (!isHTMLPage) {
+        data.mime = contentType.split(";")[0];
+      }
     } catch (e) {
       if (!(e instanceof Error)) {
         throw e;

@@ -41,6 +41,7 @@ type ReplayPage = {
   url: string;
   ts: number;
   id: string;
+  mime?: string;
 };
 
 type ComparisonData = {
@@ -234,7 +235,12 @@ export class ReplayCrawler extends Crawler {
     }
   }
 
-  async _addPageIfInScope({ url, ts, id }: ReplayPage, depth: number) {
+  async _addPageIfInScope({ url, ts, id, mime }: ReplayPage, depth: number) {
+    if (mime && mime !== "text/html") {
+      logger.info("Skipping non-HTML page", { url, mime }, "replay");
+      return;
+    }
+
     if (this.includeRx.length) {
       let inScope = false;
       for (const s of this.includeRx) {
