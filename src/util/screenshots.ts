@@ -74,15 +74,24 @@ export class Screenshots {
       if (state && screenshotType === "view") {
         state.screenshotView = screenshotBuffer;
       }
-      this.writer.writeNewResourceRecord({
-        buffer: screenshotBuffer,
-        resourceType: screenshotType,
-        contentType: "image/" + options.type,
-        url: this.url,
-      });
-      logger.info(
-        `Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.writer.filename}`,
+      this.writer.writeNewResourceRecord(
+        {
+          buffer: screenshotBuffer,
+          resourceType: screenshotType,
+          contentType: "image/" + options.type,
+          url: this.url,
+        },
+        {
+          resource: "screenshot",
+          type: screenshotType,
+          url: this.url,
+          filename: this.writer.filename,
+        },
+        "screenshots",
       );
+      // logger.info(
+      //   `Screenshot (type: ${screenshotType}) for ${this.url} written to ${this.writer.filename}`,
+      // );
     } catch (e) {
       logger.error(
         "Taking screenshot failed",
@@ -106,14 +115,20 @@ export class Screenshots {
         // 16:9 thumbnail
         .resize(640, 360)
         .toBuffer();
-      this.writer.writeNewResourceRecord({
-        buffer: thumbnailBuffer,
-        resourceType: screenshotType,
-        contentType: "image/" + options.type,
-        url: this.url,
-      });
-      logger.info(
-        `Screenshot (type: thumbnail) for ${this.url} written to ${this.writer.filename}`,
+      this.writer.writeNewResourceRecord(
+        {
+          buffer: thumbnailBuffer,
+          resourceType: screenshotType,
+          contentType: "image/" + options.type,
+          url: this.url,
+        },
+        {
+          resource: "screenshot",
+          type: screenshotType,
+          url: this.url,
+          filename: this.writer.filename,
+        },
+        "screenshots",
       );
     } catch (e) {
       logger.error(

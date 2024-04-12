@@ -748,12 +748,16 @@ export class ReplayCrawler extends Crawler {
         (state as ComparisonPageState).comparison = comparison;
       }
 
-      this.infoWriter?.writeNewResourceRecord({
-        buffer: new TextEncoder().encode(JSON.stringify(pageInfo, null, 2)),
-        resourceType: "pageinfo",
-        contentType: "application/json",
-        url: pageInfo.url,
-      });
+      this.infoWriter?.writeNewResourceRecord(
+        {
+          buffer: new TextEncoder().encode(JSON.stringify(pageInfo, null, 2)),
+          resourceType: "pageinfo",
+          contentType: "application/json",
+          url: pageInfo.url,
+        },
+        { type: "pageinfo", url: pageInfo.url },
+        "replay",
+      );
 
       this.pageInfos.delete(page);
     }
