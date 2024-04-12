@@ -118,7 +118,7 @@ export class WARCWriter implements IndexerOffsetLength {
     requestRecord: WARCRecord,
     responseSerializer: WARCSerializer | undefined = undefined,
   ) {
-    this.addToQueue(
+    this.addToQueue(() =>
       this._writeRecordPair(responseRecord, requestRecord, responseSerializer),
     );
   }
@@ -151,12 +151,12 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   private addToQueue(
-    promise: Promise<void>,
+    func: () => Promise<void>,
     details: LogDetails | null = null,
   ) {
     this.warcQ.add(async () => {
       try {
-        await promise;
+        await func();
         if (details) {
           logger.debug("WARC Record Written", details, "writer");
         }
@@ -171,7 +171,7 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   writeSingleRecord(record: WARCRecord) {
-    this.addToQueue(this._writeSingleRecord(record));
+    this.addToQueue(() => this._writeSingleRecord(record));
   }
 
   private async _writeSingleRecord(record: WARCRecord) {
@@ -185,7 +185,7 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   writeNewResourceRecord(record: ResourceRecordData, details: LogDetails) {
-    this.addToQueue(this._writeNewResourceRecord(record), details);
+    this.addToQueue(() => this._writeNewResourceRecord(record), details);
   }
 
   private async _writeNewResourceRecord({
