@@ -85,14 +85,15 @@ export class WARCWriter implements IndexerOffsetLength {
   private async initFH() {
     if (this.filename && this.offset >= this.rolloverSize) {
       const oldFilename = this.filename;
+      const size = this.offset;
       this.filename = this._initNewFile();
       logger.info(
         `Rollover size exceeded, creating new WARC`,
         {
+          size,
           oldFilename,
           newFilename: this.filename,
           rolloverSize: this.rolloverSize,
-          size: this.offset,
           ...this.logDetails,
         },
         "writer",
