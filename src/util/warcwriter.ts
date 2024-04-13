@@ -83,18 +83,21 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   private async initFH() {
-    if (this.offset >= this.rolloverSize) {
+    if (this.filename && this.offset >= this.rolloverSize) {
+      const oldFilename = this.filename;
+      this.filename = this._initNewFile();
       logger.info(
         `Rollover size exceeded, creating new WARC`,
         {
+          oldFilename,
+          newFilename: this.filename,
           rolloverSize: this.rolloverSize,
           size: this.offset,
           ...this.logDetails,
         },
         "writer",
       );
-      this.filename = this._initNewFile();
-      this.cdxFH = null;
+      await this._close();
     } else if (!this.filename) {
       this.filename = this._initNewFile();
     }
@@ -102,11 +105,14 @@ export class WARCWriter implements IndexerOffsetLength {
     let fh = this.fh;
 
     if (!fh) {
-      fh = fs.createWriteStream(path.join(this.archivesDir, this.filename));
+      fh = fs.createWriteStream(path.join(this.archivesDir, this.filename), {
+        flags: "a",
+      });
     }
     if (!this.cdxFH && this.tempCdxDir) {
       this.cdxFH = fs.createWriteStream(
         path.join(this.tempCdxDir, this.filename + ".cdx"),
+        { flags: "a" },
       );
     }
 
@@ -243,7 +249,7 @@ export class WARCWriter implements IndexerOffsetLength {
     let total = 0;
     const url = record.warcTargetURI;
 
-    if (!this.fh) {
+    if (!this.fh || this.offset >= this.rolloverSize) {
       this.fh = await this.initFH();
     }
 
@@ -280,9 +286,7 @@ export class WARCWriter implements IndexerOffsetLength {
     this.offset += this.recordLength;
   }
 
-  async flush() {
-    await this.warcQ.onIdle();
-
+  private async _close() {
     if (this.fh) {
       await streamFinish(this.fh);
       this.fh = null;
@@ -294,6 +298,12 @@ export class WARCWriter implements IndexerOffsetLength {
       await streamFinish(this.cdxFH);
       this.cdxFH = null;
     }
+  }
+
+  async flush() {
+    await this.warcQ.onIdle();
+
+    await this._close();
 
     this.done = true;
   }
