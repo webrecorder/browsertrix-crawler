@@ -1754,7 +1754,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
-      if (!isHTMLPage) {
+      if (contentType) {
         data.mime = contentType.split(";")[0];
       }
     } catch (e) {
