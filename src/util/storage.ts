@@ -2,13 +2,19 @@ import child_process from "child_process";
 import fs from "fs";
 import fsp from "fs/promises";
 import util from "util";
+import { pipeline } from "stream/promises";
+import type { Readable } from "stream";
 
 import os from "os";
 import { createHash } from "crypto";
 
 import crc32 from "crc/crc32";
 
-import * as Minio from "minio";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
@@ -19,7 +25,7 @@ import getFolderSize from "get-folder-size";
 // ===========================================================================
 export class S3StorageSync {
   fullPrefix: string;
-  client: Minio.Client;
+  client: S3Client;
 
   bucketName: string;
   objectPrefix: string;
@@ -58,13 +64,12 @@ export class S3StorageSync {
       this.fullPrefix = url.href;
     }
 
-    this.client = new Minio.Client({
-      endPoint: url.hostname,
-      port: Number(url.port) || (url.protocol === "https:" ? 443 : 80),
-      useSSL: url.protocol === "https:",
-      accessKey,
-      secretKey,
-      partSize: 100 * 1024 * 1024,
+    this.client = new S3Client({
+      credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretKey,
+      },
+      endpoint: url.href,
       region: "auto",
     });
 
@@ -88,10 +93,12 @@ export class S3StorageSync {
     };
     logger.info("S3 file upload information", fileUploadInfo, "storage");
 
-    await this.client.fPutObject(
-      this.bucketName,
-      this.objectPrefix + targetFilename,
-      srcFilename,
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: this.objectPrefix + targetFilename,
+        Body: fs.createReadStream(srcFilename),
+      }),
     );
 
     const { hash, crc32 } = await checksumFile("sha256", srcFilename);
@@ -104,11 +111,13 @@ export class S3StorageSync {
   }
 
   async downloadFile(srcFilename: string, destFilename: string) {
-    await this.client.fGetObject(
-      this.bucketName,
-      this.objectPrefix + srcFilename,
-      destFilename,
+    const res = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: this.objectPrefix + srcFilename,
+      }),
     );
+    await pipeline(res.Body as Readable, fs.createWriteStream(destFilename));
   }
 
   async uploadCollWACZ(
