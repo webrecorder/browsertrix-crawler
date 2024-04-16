@@ -153,7 +153,7 @@ export class RequestResponseInfo {
       return false;
     }
     try {
-      const headers = new Headers(this.responseHeaders);
+      const headers = new Headers(this.getResponseHeadersDict());
       const location = headers.get("location") || "";
       const redirUrl = new URL(location, this.url).href;
       return this.url === redirUrl;
@@ -225,6 +225,9 @@ export class RequestResponseInfo {
 
       for (const header of headersList) {
         let headerName = header.name.toLowerCase();
+        if (header.name.startsWith(":")) {
+          continue;
+        }
         if (EXCLUDE_HEADERS.includes(headerName)) {
           headerName = "x-orig-" + headerName;
           continue;
@@ -324,7 +327,7 @@ export class RequestResponseInfo {
 
     const convData = {
       url: this.url,
-      headers: new Headers(this.requestHeaders),
+      headers: new Headers(this.getRequestHeadersDict()),
       method: this.method,
       postData: this.postData || "",
     };
