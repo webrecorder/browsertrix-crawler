@@ -454,7 +454,7 @@ export class Crawler {
     await fsp.mkdir(this.tempdir, { recursive: true });
     await fsp.mkdir(this.tempCdxDir, { recursive: true });
 
-    this.logFH = fs.createWriteStream(this.logFilename);
+    this.logFH = fs.createWriteStream(this.logFilename, { flags: "a" });
     logger.setExternalLogStream(this.logFH);
 
     this.infoString = await getInfoString();
@@ -1754,7 +1754,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       isHTMLPage = this.isHTMLContentType(contentType);
 
-      if (!isHTMLPage) {
+      if (contentType) {
         data.mime = contentType.split(";")[0];
       }
     } catch (e) {
@@ -2484,7 +2484,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   createExtraResourceWarcWriter(resourceName: string, gzip = true) {
-    const filenameBase = `${this.getWarcPrefix()}${resourceName}`;
+    const filenameBase = `${this.getWarcPrefix()}${resourceName}-$ts`;
 
     return this.createWarcWriter(filenameBase, gzip, { resourceName });
   }
