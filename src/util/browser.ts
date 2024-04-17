@@ -227,7 +227,6 @@ export class Browser {
       ...defaultArgs,
       ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
       //"--no-xshm", // needed for Chrome >80 (check if puppeteer adds automatically)
-      "--no-sandbox",
       "--disable-background-media-suspend",
       "--remote-debugging-port=9221",
       "--remote-allow-origins=*",
@@ -235,6 +234,10 @@ export class Browser {
       `--user-agent=${userAgent || this.getDefaultUA()}`,
       ...extraArgs,
     ];
+
+    if (!process.getuid || process.getuid() === 0) {
+      args.push("--no-sandbox");
+    }
 
     if (proxy) {
       args.push("--ignore-certificate-errors");
