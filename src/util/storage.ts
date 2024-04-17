@@ -65,6 +65,7 @@ export class S3StorageSync {
       accessKey,
       secretKey,
       partSize: 100 * 1024 * 1024,
+      region: "auto",
     });
 
     this.bucketName = url.pathname.slice(1).split("/")[0];
