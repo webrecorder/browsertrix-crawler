@@ -8,7 +8,7 @@ QA features described on this page are available in Browsertrix Crawler releases
 
 ## Getting started
 
-To analyze an existing crawl, call Browsertrix Crawler with the `qa` endpoint, passing the original crawl WACZ as the `qaSource`:
+To analyze an existing crawl, call Browsertrix Crawler with the `qa` entrypoint, passing the original crawl WACZ as the `qaSource`:
 
 ```sh
 docker run -v $PWD/crawls/:/crawls/ -it webrecorder/browsertrix-crawler qa --qaSource /crawls/collections/example-crawl/example-crawl.wacz --collection example-qa
