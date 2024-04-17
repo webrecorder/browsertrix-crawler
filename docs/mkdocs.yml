@@ -55,6 +55,7 @@ nav:
     - user-guide/yaml-config.md
     - user-guide/browser-profiles.md
     - user-guide/behaviors.md
+    - user-guide/qa.md
     - user-guide/cli-options.md
 
 markdown_extensions:

@@ -29,6 +29,7 @@ Browsertrix Crawler is a command line application responsible for the core featu
 - Extensible Puppeteer driver script for customizing behavior per crawl or page.
 - Ability to create and reuse browser profiles interactively or via automated user/password login using an embedded browser.
 - Multi-platform support — prebuilt Docker images available for Intel/AMD and Apple Silicon (M1/M2) CPUs.
+- Quality Assurance Crawling - crawl the replay of existing crawls (via WACZ) and produce comparison stats.
 
 ## Documentation
 
