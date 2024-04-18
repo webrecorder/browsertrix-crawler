@@ -8,7 +8,6 @@ Browsertrix Crawler has the capability to "re-crawl" an existing crawl to compar
 
     QA features described on this page are available in Browsertrix Crawler releases 1.1.0 and later.
 
-
 ## Getting started
 
 To be able to run QA on a crawl, we must first have an existing crawl, for example:
@@ -40,18 +39,15 @@ The QA crawl will skip over any non-HTML pages.
 
 ### Screenshot Match
 
-One way to compare crawl and replay is to compare the screenshots of a page while it is being crawled with when it is being replayed.
-To make this simple, the initial viewport screenshots of each page from the crawl and replay are compared on the basis of matching pixel count. This results in a score between 0 and 1.0 representing the percentage match between the crawl and replay screenshots for each page. The screenshots are stored in `urn:view:<url>` WARC resource records.
+One way to compare crawl and replay is to compare the screenshots of a page while it is being crawled with when it is being replayed. To make this simple, the initial viewport screenshots of each page from the crawl and replay are compared on the basis of matching pixel count. This results in a score between 0 and 1.0 representing the percentage match between the crawl and replay screenshots for each page. The screenshots are stored in `urn:view:<url>` WARC resource records.
 
 To enable comparison on this dimension, the crawl must be run with at least the `--screenshot view` option. (Additional screenshot options can be added as well).
 
 ### Text Match
 
-Another way to compare the crawl and replay results is to compare the extracted text that appeears on the page, extracted from the HTML.
-This is currently done by comparing the extracted text from crawl and replay on the basis of [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance). This results in a score between 0 and 1.0 representing the percentage match between the crawl and replay text for each page. The extracted text is stored in `urn:text:<url>` WARC resource records.
+Another way to compare the crawl and replay results is to compare the extracted text that appeears on the page, extracted from the HTML. This is currently done by comparing the extracted text from crawl and replay on the basis of [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance). This results in a score between 0 and 1.0 representing the percentage match between the crawl and replay text for each page. The extracted text is stored in `urn:text:<url>` WARC resource records.
 
 To enable comparison on this dimension, the original crawl must be run with at least the `--text to-warc` option. (Additional text options can be added as well)
-
 
 ### Resources and Page Info
 
@@ -64,7 +60,6 @@ Since `pageinfo` records are produced for all crawls, this data is always availa
 Comparison data is also added to the QA crawl's `pageinfo` records. The comparison data may look as follows:
 
 ```json
-
 "comparison": {
   "screenshotMatch": 0.95,
   "textMatch": 0.9,
@@ -78,7 +73,7 @@ Comparison data is also added to the QA crawl's `pageinfo` records. The comparis
 ```
 
 This data indicates that:
+
 - When comparing `urn:view:<url>` records for crawl and replay, the screenshots are 95% similar.
 - When comparing `urn:text:<url>` records from crawl and replay WACZs, the text is 90% similar.
-- When comparing `urn:pageinfo:<url>` resource entries from crawl and replay, the crawl record
-had 10 good responses (2xx/3xx status code) and 0 bad responses (4xx/5xx status code), while replay had 9 good and 1 bad.
+- When comparing `urn:pageinfo:<url>` resource entries from crawl and replay, the crawl record had 10 good responses (2xx/3xx status code) and 0 bad responses (4xx/5xx status code), while replay had 9 good and 1 bad.
