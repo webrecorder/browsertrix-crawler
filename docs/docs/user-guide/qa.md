@@ -25,7 +25,7 @@ This assumes an existing crawl that was created in the `example-crawl` collectio
 
 A new WACZ for the analysis run will be created in the resulting `example-qa` collection.
 
-By default, the QA crawl will visit all of the pages (as read from the source WACZ file(s)), however pages can further be limited by adding `--include` and `--exclude` regexes. The `--limit` flag will also limit how pages are tested.
+By default, the QA crawl will visit all of the pages (as read from the source WACZ file(s)), however pages can further be limited by adding `--include` and `--exclude` regexes. The `--limit` flag will also limit how many pages are tested.
 
 The QA crawl will skip over any non-HTML pages.
 
