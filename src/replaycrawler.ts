@@ -648,9 +648,6 @@ export class ReplayCrawler extends Crawler {
       if (!url.startsWith("http")) {
         continue;
       }
-      if (url.indexOf("__wb_method") !== -1) {
-        continue;
-      }
       if (status >= 400) {
         bad++;
       } else {
