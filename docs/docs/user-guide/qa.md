@@ -2,7 +2,7 @@
 
 ## Overview
 
-Browsertrix Crawler has the capability to "re-crawl" an existing crawl to compare what the browser encountered on a website during crawling against the replay of the crawl WACZ. The WACZ produced by this analysis run includes additional comparison data (stored as WARC `resource` records) for the pages found during crawling against their replay in ReplayWeb.page along several dimensions, including screenshot, text comparisons and resource compar
+Browsertrix Crawler has the capability to "re-crawl" an existing crawl to compare what the browser encountered on a website during crawling against the replay of the crawl WACZ. The WACZ produced by this analysis run includes additional comparison data (stored as WARC `resource` records) for the pages found during crawling against their replay in ReplayWeb.page along several dimensions, including screenshot, text comparisons and resource comparison.
 
 QA features described on this page are available in Browsertrix Crawler releases 1.1.0 and later.
 
