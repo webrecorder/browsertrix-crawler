@@ -18,8 +18,8 @@ docker run -v $PWD/crawls/:/crawls/ -it webrecorder/browsertrix-crawler qa --qaS
 ```
 
 The `qaSource` can be:
-- a local WACZ file path or a URL
-- a single WACZ or a JSON file containing a list of WACZ files in the `resources` json (Multi-WACZ)
+- A local WACZ file path or a URL
+- A single WACZ or a JSON file containing a list of WACZ files in the `resources` json (Multi-WACZ)
 
 This assumes an existing crawl that was created in the `example-crawl` collection.
 
@@ -47,7 +47,7 @@ Since `pageinfo` records are produced for all crawls, this data is always availa
 
 ### Comparison Data
 
-The comparison data is also added to the QA crawl's `pageinfo` records. The comparison data may look as follows:
+Comparison data is also added to the QA crawl's `pageinfo` records. The comparison data may look as follows:
 
 ```json
 
@@ -64,7 +64,7 @@ The comparison data is also added to the QA crawl's `pageinfo` records. The comp
 ```
 
 This data indicates that:
-- when comparing `urn:view:<url>` records for crawl and replay, the screenshots are 95% similar,
-- when comparing `urn:text:<url>` records from crawl and replay WACZs, the text is 90% similar,
-- when comparing `urn:pageinfo:<url>` resource entries from crawl and replay, the crawl record
+- When comparing `urn:view:<url>` records for crawl and replay, the screenshots are 95% similar.
+- When comparing `urn:text:<url>` records from crawl and replay WACZs, the text is 90% similar.
+- When comparing `urn:pageinfo:<url>` resource entries from crawl and replay, the crawl record
 had 10 good responses (2xx/3xx status code) and 0 bad responses (4xx/5xx status code), while replay had 9 good and 1 bad.
