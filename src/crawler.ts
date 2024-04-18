@@ -1835,6 +1835,17 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.netIdle(page, logDetails);
 
+    logger.debug(
+      "Waiting for custom page load via behavior",
+      logDetails,
+      "behavior",
+    );
+    try {
+      await page.evaluate("self.__bx_behaviors.initialPageLoad();");
+    } catch (e) {
+      logger.warn("Waiting for custom page load failed", e, "behavior");
+    }
+
     if (this.params.postLoadDelay) {
       logger.info("Awaiting post load delay", {
         seconds: this.params.postLoadDelay,
