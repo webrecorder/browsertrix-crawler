@@ -2,7 +2,7 @@
 
 ## Overview
 
-Browsertrix Crawler has the capability to "re-crawl" an existing crawl to compare what the browser encountered on a website during crawling against the replay of the crawl WACZ. The WACZ produced by this analysis run includes additional comparison data (stored as WARC `resource` records) for the pages found during crawling against their replay in ReplayWeb.page along several dimensions, including screenshot, extracted text, and page resource comparisons.
+Browsertrix Crawler can analyze an existing crawl to compare what the browser encountered on a website during crawling against the replay of the crawl WACZ. The WACZ produced by this analysis run includes additional comparison data (stored as WARC `resource` records) for the pages found during crawling against their replay in ReplayWeb.page. This works along several dimensions, including screenshot, extracted text, and page resource comparisons.
 
 !!! note
 
@@ -10,14 +10,14 @@ Browsertrix Crawler has the capability to "re-crawl" an existing crawl to compar
 
 ## Getting started
 
-To be able to run QA on a crawl, we must first have an existing crawl, for example:
+To be able to run QA on a crawl, you must first have an existing crawl, for example:
 
 ```sh
 docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --collection example-crawl --text to-warc --screenshot view --generateWACZ```
 
 Note that this crawl must be run with `--generateWACZ` flag as QA requires a WACZ to work with, and also ideally the `--text to-warc` and `--screenshot view` flags as well (see below for more details on comparison dimensions).
 
-To analyze this crawl, call Browsertrix Crawler can be run with the `qa` entrypoint, passing the original crawl WACZ as the `qaSource`:
+To analyze this crawl, call Browsertrix Crawler with the `qa` entrypoint, passing the original crawl WACZ as the `qaSource`:
 
 ```sh
 docker run -v $PWD/crawls/:/crawls/ -it webrecorder/browsertrix-crawler qa --qaSource /crawls/collections/example-crawl/example-crawl.wacz --collection example-qa --generateWACZ
@@ -31,21 +31,21 @@ This assumes an existing crawl that was created in the `example-crawl` collectio
 
 A new WACZ for the analysis run will be created in the resulting `example-qa` collection.
 
-By default, the QA crawl will visit all of the pages (as read from the source WACZ file(s)), however pages can further be limited by adding `--include` and `--exclude` regexes. The `--limit` flag will also limit how many pages are tested.
+By default, the analysis crawl will visit all of the pages (as read from the source WACZ file(s)), however pages can further be limited by adding `--include` and `--exclude` regexes. The `--limit` flag will also limit how many pages are tested.
 
-The QA crawl will skip over any non-HTML pages.
+The analysis crawl will skip over any non-HTML pages such as PDFs which can be relied upon to be bit-for-bit identical as long as the resource was fully fetched.
 
 ## Comparison Dimensions
 
 ### Screenshot Match
 
-One way to compare crawl and replay is to compare the screenshots of a page while it is being crawled with when it is being replayed. To make this simple, the initial viewport screenshots of each page from the crawl and replay are compared on the basis of matching pixel count. This results in a score between 0 and 1.0 representing the percentage match between the crawl and replay screenshots for each page. The screenshots are stored in `urn:view:<url>` WARC resource records.
+One way to compare crawl and replay is to compare the screenshots of a page while it is being crawled with when it is being replayed. The initial viewport screenshots of each page from the crawl and replay are compared on the basis of pixel value similarity. This results in a score between 0 and 1.0 representing the percentage match between the crawl and replay screenshots for each page. The screenshots are stored in `urn:view:<url>` WARC resource records.
 
 To enable comparison on this dimension, the crawl must be run with at least the `--screenshot view` option. (Additional screenshot options can be added as well).
 
 ### Text Match
 
-Another way to compare the crawl and replay results is to compare the extracted text that appeears on the page, extracted from the HTML. This is currently done by comparing the extracted text from crawl and replay on the basis of [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance). This results in a score between 0 and 1.0 representing the percentage match between the crawl and replay text for each page. The extracted text is stored in `urn:text:<url>` WARC resource records.
+Another way to compare the crawl and replay results is to use the text extracted from the HTML. This is done by comparing the extracted text from crawl and replay on the basis of [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance). This results in a score between 0 and 1.0 representing the percentage match between the crawl and replay text for each page. The extracted text is stored in `urn:text:<url>` WARC resource records.
 
 To enable comparison on this dimension, the original crawl must be run with at least the `--text to-warc` option. (Additional text options can be added as well)
 
