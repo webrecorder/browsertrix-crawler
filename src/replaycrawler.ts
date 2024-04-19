@@ -401,7 +401,9 @@ export class ReplayCrawler extends Crawler {
 
     const timestamp = date.toISOString().slice(0, 19).replace(/[T:-]/g, "");
 
-    logger.info("Loading Replay", { url, timestamp }, "replay");
+    const logDetails = { url, timestamp, id: workerid, pageid };
+
+    logger.info("Loading Replay", logDetails, "replay");
 
     const pageInfo = {
       pageid,
@@ -416,11 +418,7 @@ export class ReplayCrawler extends Crawler {
     let replayFrame;
 
     if (page.frames().length <= SKIP_FRAMES) {
-      logger.warn(
-        "RWP possibly crashed, reloading page",
-        { url, timestamp, id: workerid, pageid },
-        "replay",
-      );
+      logger.warn("RWP possibly crashed, reloading page", logDetails, "replay");
       //throw new Error("logged");
       replayFrame = await this.awaitRWPLoad(page);
     } else {
@@ -435,7 +433,7 @@ export class ReplayCrawler extends Crawler {
     } catch (e) {
       logger.warn(
         "Loading replay timed out",
-        { url, timestamp, id: workerid, pageid, ...formatErr(e) },
+        { ...logDetails, ...formatErr(e) },
         "replay",
       );
     }
@@ -443,12 +441,7 @@ export class ReplayCrawler extends Crawler {
     // optionally reload (todo: reevaluate if this is needed)
     // await page.reload();
 
-    if (this.params.postLoadDelay) {
-      logger.info("Awaiting post load delay", {
-        seconds: this.params.postLoadDelay,
-      });
-      await sleep(this.params.postLoadDelay);
-    }
+    await this.awaitPageLoad(replayFrame, logDetails);
 
     data.isHTMLPage = true;
 

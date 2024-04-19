@@ -1835,12 +1835,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.netIdle(page, logDetails);
 
-    if (this.params.postLoadDelay) {
-      logger.info("Awaiting post load delay", {
-        seconds: this.params.postLoadDelay,
-      });
-      await sleep(this.params.postLoadDelay);
-    }
+    await this.awaitPageLoad(page.mainFrame(), logDetails);
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
@@ -1868,6 +1863,26 @@ self.__bx_behaviors.selectMainBehavior();
     } catch (e) {
       logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
+    }
+  }
+
+  async awaitPageLoad(frame: Frame, logDetails: LogDetails) {
+    logger.debug(
+      "Waiting for custom page load via behavior",
+      logDetails,
+      "behavior",
+    );
+    try {
+      await frame.evaluate("self.__bx_behaviors.awaitPageLoad();");
+    } catch (e) {
+      logger.warn("Waiting for custom page load failed", e, "behavior");
+    }
+
+    if (this.params.postLoadDelay) {
+      logger.info("Awaiting post load delay", {
+        seconds: this.params.postLoadDelay,
+      });
+      await sleep(this.params.postLoadDelay);
     }
   }
 
