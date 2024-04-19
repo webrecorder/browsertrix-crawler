@@ -119,7 +119,7 @@ export class WARCWriter implements IndexerOffsetLength {
       );
     }
 
-    fh.write(createWARCInfo(this.filename));
+    fh.write(await createWARCInfo(this.filename));
 
     return fh;
   }
