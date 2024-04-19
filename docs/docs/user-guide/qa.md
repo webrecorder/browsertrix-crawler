@@ -13,7 +13,8 @@ Browsertrix Crawler can analyze an existing crawl to compare what the browser en
 To be able to run QA on a crawl, you must first have an existing crawl, for example:
 
 ```sh
-docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --collection example-crawl --text to-warc --screenshot view --generateWACZ```
+docker run -v $PWD/crawls:/crawls/ -it webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --collection example-crawl --text to-warc --screenshot view --generateWACZ
+```
 
 Note that this crawl must be run with `--generateWACZ` flag as QA requires a WACZ to work with, and also ideally the `--text to-warc` and `--screenshot view` flags as well (see below for more details on comparison dimensions).
 
