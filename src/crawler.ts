@@ -1090,12 +1090,12 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async createWARCInfo(filename: string) {
-    const warcVersion = "WARC/1.0";
+    const warcVersion = "WARC/1.1";
     const type = "warcinfo";
 
     const info = {
       software: this.infoString,
-      format: "WARC File Format 1.0",
+      format: "WARC File Format 1.1",
     };
 
     const warcInfo = { ...info, ...this.params.warcInfo };
