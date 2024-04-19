@@ -16,8 +16,6 @@ import { parseArgs } from "./util/argParser.js";
 
 import yaml from "js-yaml";
 
-import * as warcio from "warcio";
-
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
 import {
@@ -60,7 +58,7 @@ import { CDPSession, Frame, HTTPRequest, Page, Protocol } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
-import { WARCWriter } from "./util/warcwriter.js";
+import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 
 const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
@@ -458,6 +456,7 @@ export class Crawler {
     logger.setExternalLogStream(this.logFH);
 
     this.infoString = await getInfoString();
+    setWARCInfo(this.infoString, this.params.warcInfo);
     logger.info(this.infoString);
 
     logger.info("Seeds", this.params.scopedSeeds);
@@ -1087,26 +1086,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     return res ? frame : null;
-  }
-
-  async createWARCInfo(filename: string) {
-    const warcVersion = "WARC/1.0";
-    const type = "warcinfo";
-
-    const info = {
-      software: this.infoString,
-      format: "WARC File Format 1.0",
-    };
-
-    const warcInfo = { ...info, ...this.params.warcInfo };
-    const record = await warcio.WARCRecord.createWARCInfo(
-      { filename, type, warcVersion },
-      warcInfo,
-    );
-    const buffer = await warcio.WARCSerializer.serialize(record, {
-      gzip: true,
-    });
-    return buffer;
   }
 
   async checkLimits() {
@@ -2386,7 +2365,7 @@ self.__bx_behaviors.selectMainBehavior();
 
         generatedCombinedWarcs.push(combinedWarcName);
 
-        const warcBuffer = await this.createWARCInfo(combinedWarcName);
+        const warcBuffer = await createWARCInfo(combinedWarcName);
         fh.write(warcBuffer);
       }
 
