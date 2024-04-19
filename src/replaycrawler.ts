@@ -438,27 +438,10 @@ export class ReplayCrawler extends Crawler {
       );
     }
 
-    logger.debug(
-      "Waiting for custom page load via behavior",
-      logDetails,
-      "behavior",
-    );
-    try {
-      await replayFrame.evaluate("self.__bx_behaviors.initialPageLoad();");
-    } catch (e) {
-      logger.warn("Waiting for custom page load failed", e, "behavior");
-    }
-
     // optionally reload (todo: reevaluate if this is needed)
     // await page.reload();
 
-    if (this.params.postLoadDelay) {
-      logger.info("Awaiting post load delay", {
-        ...logDetails,
-        seconds: this.params.postLoadDelay,
-      });
-      await sleep(this.params.postLoadDelay);
-    }
+    await this.awaitPageLoad(replayFrame, logDetails);
 
     data.isHTMLPage = true;
 

@@ -19,7 +19,7 @@
     "@novnc/novnc": "^1.4.0",
     "@types/sax": "^1.2.7",
     "@webrecorder/wabac": "^2.16.12",
-    "browsertrix-behaviors": "^0.5.3",
+    "browsertrix-behaviors": "^0.6.0",
     "crc": "^4.3.2",
     "get-folder-size": "^4.0.0",
     "husky": "^8.0.3",
