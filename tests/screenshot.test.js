@@ -3,17 +3,27 @@ import fs from "fs";
 
 // screenshot
 
+function screenshotWarcExists(name) {
+  const warcList = fs.readdirSync(`test-crawls/collections/${name}/archive/`);
+
+  for (const warc of warcList) {
+    if (warc.startsWith("screenshots-")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
 test("ensure basic crawl run with --screenshot passes", async () => {
   child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --collection test --url http://www.example.com/ --screenshot view --workers 2",
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --collection test-with-screenshots --url http://www.example.com/ --screenshot view --workers 2",
   );
 });
 
 test("check that a screenshots warc file exists in the test collection", () => {
-  const screenshotWarcExists = fs.existsSync(
-    "test-crawls/collections/test/archive/screenshots.warc.gz",
-  );
-  expect(screenshotWarcExists).toBe(true);
+  expect(screenshotWarcExists("test-with-screenshots")).toBe(true);
 });
 
 // fullPageScreenshot
@@ -25,10 +35,7 @@ test("ensure basic crawl run with --fullPageScreenshot passes", async () => {
 });
 
 test("check that a screenshots warc file exists in the fullpage collection", () => {
-  const screenshotWarcExists = fs.existsSync(
-    "test-crawls/collections/fullpage/archive/screenshots.warc.gz",
-  );
-  expect(screenshotWarcExists).toBe(true);
+  expect(screenshotWarcExists("fullpage")).toBe(true);
 });
 
 // thumbnail
@@ -40,10 +47,7 @@ test("ensure basic crawl run with --thumbnail passes", async () => {
 });
 
 test("check that a screenshots warc file exists in the thumbnail collection", () => {
-  const screenshotWarcExists = fs.existsSync(
-    "test-crawls/collections/thumbnail/archive/screenshots.warc.gz",
-  );
-  expect(screenshotWarcExists).toBe(true);
+  expect(screenshotWarcExists("thumbnail")).toBe(true);
 });
 
 // combination
@@ -55,10 +59,7 @@ test("ensure basic crawl run with multiple screenshot types and --generateWACZ p
 });
 
 test("check that a screenshots warc file exists in the combined collection", () => {
-  const screenshotWarcExists = fs.existsSync(
-    "test-crawls/collections/combined/archive/screenshots.warc.gz",
-  );
-  expect(screenshotWarcExists).toBe(true);
+  expect(screenshotWarcExists("combined")).toBe(true);
 });
 
 test("check that a wacz file exists in the combined collection", () => {

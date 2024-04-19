@@ -9,6 +9,9 @@ Object.defineProperty(RegExp.prototype, "toJSON", {
   value: RegExp.prototype.toString,
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type LogDetails = Record<string, any>;
+
 // ===========================================================================
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function formatErr(e: unknown): Record<string, any> {

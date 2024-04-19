@@ -28,5 +28,5 @@ test("check that the warcinfo file works as expected on the command line", async
   expect(
     string.match(/Browsertrix-Crawler \d[\w.-]+ \(with warcio.js \d[\w.-]+\)/),
   ).not.toEqual(null);
-  expect(string.indexOf("format: WARC File Format 1.0")).toBeGreaterThan(-1);
+  expect(string.indexOf("format: WARC File Format 1.1")).toBeGreaterThan(-1);
 });

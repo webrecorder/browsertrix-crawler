@@ -725,12 +725,16 @@ export class Recorder {
 
     const url = this.pageUrl;
 
-    this.writer.writeNewResourceRecord({
-      buffer: new TextEncoder().encode(text),
-      resourceType: "pageinfo",
-      contentType: "application/json",
-      url,
-    });
+    this.writer.writeNewResourceRecord(
+      {
+        buffer: new TextEncoder().encode(text),
+        resourceType: "pageinfo",
+        contentType: "application/json",
+        url,
+      },
+      { type: "pageinfo", url },
+      "recorder",
+    );
 
     return this.pageInfo.ts;
   }

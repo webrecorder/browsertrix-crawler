@@ -35,7 +35,7 @@ import {
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
-import { logger, formatErr, WACZLogger } from "./util/logger.js";
+import { logger, formatErr, LogDetails, WACZLogger } from "./util/logger.js";
 import {
   WorkerOpts,
   WorkerState,
@@ -92,9 +92,6 @@ const POST_CRAWL_STATES = [
   "generate-cdx",
   "generate-warc",
 ];
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type LogDetails = Record<string, any>;
 
 type PageEntry = {
   id: string;
@@ -461,7 +458,7 @@ export class Crawler {
     await fsp.mkdir(this.tempdir, { recursive: true });
     await fsp.mkdir(this.tempCdxDir, { recursive: true });
 
-    this.logFH = fs.createWriteStream(this.logFilename);
+    this.logFH = fs.createWriteStream(this.logFilename, { flags: "a" });
     logger.setExternalLogStream(this.logFH);
 
     this.infoString = await getInfoString();
@@ -1097,12 +1094,12 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async createWARCInfo(filename: string) {
-    const warcVersion = "WARC/1.0";
+    const warcVersion = "WARC/1.1";
     const type = "warcinfo";
 
     const info = {
       software: this.infoString,
-      format: "WARC File Format 1.0",
+      format: "WARC File Format 1.1",
     };
 
     const warcInfo = { ...info, ...this.params.warcInfo };
@@ -1285,12 +1282,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.crawlState.setStatus("running");
 
-    this.pagesFH = await this.initPages(true);
-    this.extraPagesFH = await this.initPages(false);
-
-    this.adBlockRules = new AdBlockRules(
-      this.captureBasePrefix,
-      this.params.adBlockMessage,
+    this.pagesFH = await this.initPages(this.seedPagesFile, "Seed Pages");
+    this.extraPagesFH = await this.initPages(
+      this.otherPagesFile,
+      "Non-Seed Pages",
     );
 
     if (this.params.blockRules && this.params.blockRules.length) {
@@ -1739,6 +1734,10 @@ self.__bx_behaviors.selectMainBehavior();
       const contentType = resp.headers()["content-type"];
 
       isHTMLPage = this.isHTMLContentType(contentType);
+
+      if (contentType) {
+        data.mime = contentType.split(";")[0];
+      }
     } catch (e) {
       if (!(e instanceof Error)) {
         throw e;
@@ -1817,12 +1816,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.netIdle(page, logDetails);
 
-    if (this.params.postLoadDelay) {
-      logger.info("Awaiting post load delay", {
-        seconds: this.params.postLoadDelay,
-      });
-      await sleep(this.params.postLoadDelay);
-    }
+    await this.awaitPageLoad(page.mainFrame(), logDetails);
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
@@ -1850,6 +1844,26 @@ self.__bx_behaviors.selectMainBehavior();
     } catch (e) {
       logger.debug("waitForNetworkIdle timed out, ignoring", details);
       // ignore, continue
+    }
+  }
+
+  async awaitPageLoad(frame: Frame, logDetails: LogDetails) {
+    logger.debug(
+      "Waiting for custom page load via behavior",
+      logDetails,
+      "behavior",
+    );
+    try {
+      await frame.evaluate("self.__bx_behaviors.awaitPageLoad();");
+    } catch (e) {
+      logger.warn("Waiting for custom page load failed", e, "behavior");
+    }
+
+    if (this.params.postLoadDelay) {
+      logger.info("Awaiting post load delay", {
+        seconds: this.params.postLoadDelay,
+      });
+      await sleep(this.params.postLoadDelay);
     }
   }
 
@@ -2042,8 +2056,7 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async initPages(seedPages: boolean) {
-    const filename = seedPages ? this.seedPagesFile : this.otherPagesFile;
+  async initPages(filename: string, title: string) {
     let fh = null;
 
     try {
@@ -2057,7 +2070,7 @@ self.__bx_behaviors.selectMainBehavior();
         const header: Record<string, string> = {
           format: "json-pages-1.0",
           id: "pages",
-          title: seedPages ? "Seed Pages" : "Non-Seed Pages",
+          title,
         };
         header.hasText = this.params.text.includes("to-pages");
         if (this.params.text.length) {
@@ -2099,7 +2112,11 @@ self.__bx_behaviors.selectMainBehavior();
     let { ts } = state;
     if (!ts) {
       ts = new Date();
-      logger.warn("Page date missing, setting to now", { url, ts });
+      logger.warn(
+        "Page date missing, setting to now",
+        { url, ts },
+        "pageStatus",
+      );
     }
 
     row.ts = ts.toISOString();
@@ -2135,14 +2152,18 @@ self.__bx_behaviors.selectMainBehavior();
     const pagesFH = depth > 0 ? this.extraPagesFH : this.pagesFH;
 
     if (!pagesFH) {
-      logger.error("Can't write pages, missing stream");
+      logger.error("Can't write pages, missing stream", {}, "pageStatus");
       return;
     }
 
     try {
       await pagesFH.write(processedRow);
     } catch (err) {
-      logger.warn("pages/pages.jsonl append failed");
+      logger.warn(
+        "Page append failed",
+        { pagesFile: depth > 0 ? this.otherPagesFile : this.seedPagesFile },
+        "pageStatus",
+      );
     }
   }
 
@@ -2459,7 +2480,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   createExtraResourceWarcWriter(resourceName: string, gzip = true) {
-    const filenameBase = `${this.getWarcPrefix()}${resourceName}`;
+    const filenameBase = `${this.getWarcPrefix()}${resourceName}-$ts`;
 
     return this.createWarcWriter(filenameBase, gzip, { resourceName });
   }

@@ -4,7 +4,7 @@ import path from "path";
 
 import { CDXIndexer, WARCRecord } from "warcio";
 import { WARCSerializer } from "warcio/node";
-import { logger, formatErr } from "./logger.js";
+import { logger, formatErr, LogDetails, LogContext } from "./logger.js";
 import type { IndexerOffsetLength } from "warcio";
 import { timestampNow } from "./timing.js";
 import PQueue from "p-queue";
@@ -81,18 +81,22 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   private async initFH() {
-    if (this.offset >= this.rolloverSize) {
+    if (this.filename && this.offset >= this.rolloverSize) {
+      const oldFilename = this.filename;
+      const size = this.offset;
+      this.filename = this._initNewFile();
       logger.info(
         `Rollover size exceeded, creating new WARC`,
         {
+          size,
+          oldFilename,
+          newFilename: this.filename,
           rolloverSize: this.rolloverSize,
-          size: this.offset,
           ...this.logDetails,
         },
         "writer",
       );
-      this.filename = this._initNewFile();
-      this.cdxFH = null;
+      await this._close();
     } else if (!this.filename) {
       this.filename = this._initNewFile();
     }
@@ -100,11 +104,14 @@ export class WARCWriter implements IndexerOffsetLength {
     let fh = this.fh;
 
     if (!fh) {
-      fh = fs.createWriteStream(path.join(this.archivesDir, this.filename));
+      fh = fs.createWriteStream(path.join(this.archivesDir, this.filename), {
+        flags: "a",
+      });
     }
     if (!this.cdxFH && this.tempCdxDir) {
       this.cdxFH = fs.createWriteStream(
         path.join(this.tempCdxDir, this.filename + ".cdx"),
+        { flags: "a" },
       );
     }
 
@@ -116,7 +123,7 @@ export class WARCWriter implements IndexerOffsetLength {
     requestRecord: WARCRecord,
     responseSerializer: WARCSerializer | undefined = undefined,
   ) {
-    this.warcQ.add(() =>
+    this.addToQueue(() =>
       this._writeRecordPair(responseRecord, requestRecord, responseSerializer),
     );
   }
@@ -148,8 +155,29 @@ export class WARCWriter implements IndexerOffsetLength {
     this._writeCDX(requestRecord);
   }
 
+  private addToQueue(
+    func: () => Promise<void>,
+    details: LogDetails | null = null,
+    logContext: LogContext = "writer",
+  ) {
+    this.warcQ.add(async () => {
+      try {
+        await func();
+        if (details) {
+          logger.debug("WARC Record Written", details, logContext);
+        }
+      } catch (e) {
+        logger.error(
+          "WARC Record Write Failed",
+          { ...details, ...formatErr(e) },
+          logContext,
+        );
+      }
+    });
+  }
+
   writeSingleRecord(record: WARCRecord) {
-    this.warcQ.add(() => this._writeSingleRecord(record));
+    this.addToQueue(() => this._writeSingleRecord(record));
   }
 
   private async _writeSingleRecord(record: WARCRecord) {
@@ -162,8 +190,16 @@ export class WARCWriter implements IndexerOffsetLength {
     this._writeCDX(record);
   }
 
-  writeNewResourceRecord(record: ResourceRecordData) {
-    this.warcQ.add(() => this._writeNewResourceRecord(record));
+  writeNewResourceRecord(
+    record: ResourceRecordData,
+    details: LogDetails,
+    logContext: LogContext,
+  ) {
+    this.addToQueue(
+      () => this._writeNewResourceRecord(record),
+      details,
+      logContext,
+    );
   }
 
   private async _writeNewResourceRecord({
@@ -212,7 +248,7 @@ export class WARCWriter implements IndexerOffsetLength {
     let total = 0;
     const url = record.warcTargetURI;
 
-    if (!this.fh) {
+    if (!this.fh || this.offset >= this.rolloverSize) {
       this.fh = await this.initFH();
     }
 
@@ -249,9 +285,7 @@ export class WARCWriter implements IndexerOffsetLength {
     this.offset += this.recordLength;
   }
 
-  async flush() {
-    await this.warcQ.onIdle();
-
+  private async _close() {
     if (this.fh) {
       await streamFinish(this.fh);
       this.fh = null;
@@ -263,6 +297,12 @@ export class WARCWriter implements IndexerOffsetLength {
       await streamFinish(this.cdxFH);
       this.cdxFH = null;
     }
+  }
+
+  async flush() {
+    await this.warcQ.onIdle();
+
+    await this._close();
 
     this.done = true;
   }
