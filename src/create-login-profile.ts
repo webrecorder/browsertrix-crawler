@@ -228,7 +228,14 @@ async function main() {
     const target = await cdp.send("Target.getTargetInfo");
     const targetId = target.targetInfo.targetId;
 
-    new InteractiveBrowser(params, browser, page, cdp, targetId, waitUntil);
+    const ibrowser = new InteractiveBrowser(
+      params,
+      browser,
+      page,
+      cdp,
+      targetId,
+    );
+    await ibrowser.startLoad(waitUntil);
   } else {
     await automatedProfile(params, browser, page, cdp, waitUntil);
   }
@@ -384,7 +391,6 @@ class InteractiveBrowser {
     page: Page,
     cdp: CDPSession,
     targetId: string,
-    waitUntil: PuppeteerLifeCycleEvent = "load",
   ) {
     logger.info("Creating Profile Interactively...");
     child_process.spawn("socat", [
@@ -446,12 +452,17 @@ class InteractiveBrowser {
     } else {
       logger.info("Screencasting with CDP on port 9222");
     }
+  }
 
-    logger.info(`Loading page: ${params.url}`);
+  async startLoad(waitUntil: PuppeteerLifeCycleEvent = "load") {
+    logger.info(`Loading page: ${this.params.url}`);
 
-    page.goto(params.url, { waitUntil, timeout: 0 }).finally(() => {
+    try {
+      await this.page.goto(this.params.url, { waitUntil, timeout: 0 });
       logger.info("Loaded!");
-    });
+    } catch (e) {
+      logger.warn("Page Load Failed/Interrupted", e);
+    }
   }
 
   handlePageLoad() {
