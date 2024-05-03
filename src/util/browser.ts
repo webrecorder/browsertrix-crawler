@@ -504,14 +504,14 @@ export class Browser {
           recorder.swFrameIds.add(frameId);
         }
 
-        if (recorder.swFrameIds && recorder.swFrameIds.has(frameId)) {
+        if (recorder.hasFrame(frameId)) {
           foundRecorder = recorder;
           break;
         }
       }
 
       if (!foundRecorder) {
-        logger.debug(
+        logger.warn(
           "Skipping URL from unknown frame",
           { url: request.url, frameId },
           "recorder",

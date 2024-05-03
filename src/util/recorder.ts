@@ -117,6 +117,8 @@ export class Recorder {
   pageUrl!: string;
   pageid!: string;
 
+  frameIdToExecId: Map<string, number> | null;
+
   constructor({
     workerid,
     writer,
@@ -137,9 +139,19 @@ export class Recorder {
     this.tempdir = tempdir;
 
     this.fetcherQ = new PQueue({ concurrency: 1 });
+
+    this.frameIdToExecId = null;
   }
 
-  async onCreatePage({ cdp }: { cdp: CDPSession }) {
+  async onCreatePage({
+    cdp,
+    frameIdToExecId,
+  }: {
+    cdp: CDPSession;
+    frameIdToExecId: Map<string, number>;
+  }) {
+    this.frameIdToExecId = frameIdToExecId;
+
     // Fetch
     cdp.on("Fetch.requestPaused", async (params) => {
       this.handleRequestPaused(params, cdp);
@@ -217,6 +229,10 @@ export class Recorder {
     });
 
     await cdp.send("Console.enable");
+  }
+
+  hasFrame(frameId: string) {
+    return this.swFrameIds.has(frameId) || this.frameIdToExecId?.has(frameId);
   }
 
   handleResponseReceived(params: Protocol.Network.ResponseReceivedEvent) {
@@ -783,6 +799,7 @@ export class Recorder {
 
   async onClosePage() {
     // Any page-specific handling before page is closed.
+    this.frameIdToExecId = null;
   }
 
   async onDone(timeout: number) {
