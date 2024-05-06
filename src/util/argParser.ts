@@ -498,7 +498,8 @@ class ArgParser {
 
       failOnFailedSeed: {
         describe:
-          "If set, crawler will fail with exit code 1 if any seed fails",
+          "If set, crawler will fail with exit code 1 if any seed fails. Crawl will fail if any seeds have a" +
+          "4xx or 5xx response regardless of whether failOnInvalidStatus is set",
         type: "boolean",
         default: false,
       },
@@ -512,7 +513,7 @@ class ArgParser {
 
       failOnInvalidStatus: {
         describe:
-          "If set, will treat pages with non-200 response as failures. When combined with --failOnFailedLimit or --failOnFailedSeed" +
+          "If set, will treat pages with non-200 response as failures. When combined with --failOnFailedLimit" +
           "may result in crawl failing due to non-200 responses",
         type: "boolean",
         default: false,

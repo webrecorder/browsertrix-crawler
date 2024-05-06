@@ -1734,10 +1734,15 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (failed) {
         if (failCrawlOnError) {
-          logger.fatal("Seed Page Load Error, failing crawl", {
-            status,
-            ...logDetails,
-          });
+          logger.fatal(
+            "Seed Page Load Error, failing crawl",
+            {
+              status,
+              ...logDetails,
+            },
+            "general",
+            1,
+          );
         } else {
           logger.error(
             isChromeError ? "Page Crashed on Load" : "Page Invalid Status",
@@ -1775,10 +1780,15 @@ self.__bx_behaviors.selectMainBehavior();
           data.skipBehaviors = true;
         } else if (failCrawlOnError) {
           // if fail on error, immediately fail here
-          logger.fatal("Page Load Timeout, failing crawl", {
-            msg,
-            ...logDetails,
-          });
+          logger.fatal(
+            "Page Load Timeout, failing crawl",
+            {
+              msg,
+              ...logDetails,
+            },
+            "general",
+            1,
+          );
         } else {
           // log if not already log and rethrow
           if (msg !== "logged") {
