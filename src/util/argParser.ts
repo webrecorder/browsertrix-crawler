@@ -554,6 +554,12 @@ class ArgParser {
           "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
         type: "boolean",
       },
+
+      httpBasicAuth: {
+        describe:
+          "The colon separated username and password to use when prompted for HTTP Basic Authentication credentials, e.g. jane:abc123",
+        type: "string",
+      },
     };
   }
 

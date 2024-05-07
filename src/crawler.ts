@@ -319,6 +319,10 @@ export class Crawler {
       this.emulateDevice.userAgent += " " + this.params.userAgentSuffix;
     }
 
+    if (this.params.httpBasicAuth) {
+      this.emulateDevice.httpBasicAuth = this.params.httpBasicAuth;
+    }
+
     return this.emulateDevice.userAgent;
   }
 

@@ -144,6 +144,11 @@ Options:
                                             age behavior will run on each page.
                                             If 0, a behavior can run until finis
                                             h.            [number] [default: 90]
+      --postLoadDelay                       If >0, amount of time to sleep (in s
+                                            econds) after page has loaded, befor
+                                            e taking screenshots / getting text
+                                            / running behaviors
+                                                           [number] [default: 0]
       --pageExtraDelay, --delay             If >0, amount of time to sleep (in s
                                             econds) after behaviors before movin
                                             g on to next page
@@ -255,6 +260,10 @@ Options:
       --qaDebugImageDiff                    if specified, will write crawl.png,
                                             replay.png and diff.png for each pag
                                             e where they're different  [boolean]
+      --httpBasicAuth                       The colon separated username and pas
+                                            sword to use when prompted for HTTP
+                                            Basic Authentication credentials, e.
+                                            g. jane:abc123              [string]
       --config                              Path to YAML config file
 ```
 
@@ -269,7 +278,8 @@ Options:
                      ted
   --password         The password for the login. If not specified, will be promp
                      ted (recommended)
-  --filename         The filename for the profile tarball
+  --filename         The filename for the profile tarball, stored within /crawls
+                     /profiles if absolute path not provided
                                     [default: "/crawls/profiles/profile.tar.gz"]
   --debugScreenshot  If specified, take a screenshot after login and save as thi
                      s filename

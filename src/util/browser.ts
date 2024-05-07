@@ -465,6 +465,13 @@ export class Browser {
       } else if (device.userAgent) {
         await page.setUserAgent(device.userAgent);
       }
+
+      if (device.httpBasicAuth) {
+        // ideally we'd use page.authenticate here but it doesn't seem to work?
+        page.setExtraHTTPHeaders({
+          Authorization: "Basic " + btoa(device.httpBasicAuth),
+        });
+      }
     }
 
     const cdp = await target.createCDPSession();
