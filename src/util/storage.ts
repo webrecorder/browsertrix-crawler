@@ -13,6 +13,7 @@ import * as Minio from "minio";
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 
+// @ts-expect-error (incorrect types on get-folder-size)
 import getFolderSize from "get-folder-size";
 
 const DEFAULT_REGION = "us-east-1";
@@ -193,7 +194,7 @@ export async function getFileSize(filename: string) {
 }
 
 export async function getDirSize(dir: string) {
-  const { size, errors } = await getFolderSize.default(dir);
+  const { size, errors } = await getFolderSize(dir);
   if (errors && errors.length) {
     logger.warn("Size check errors", { errors }, "storage");
   }

@@ -1095,13 +1095,6 @@
   dependencies:
     "@babel/types" "^7.3.0"
 
-"@types/get-folder-size@^3.0.4":
-  version "3.0.4"
-  resolved "https://registry.yarnpkg.com/@types/get-folder-size/-/get-folder-size-3.0.4.tgz#2eeaf947e27ec6c6dc716982dc28fa18ed6a19f5"
-  integrity sha512-tSf/k7Undx6jKRwpChR9tl+0ZPf0BVwkjBRtJ5qSnz6iWm2ZRYMAS2MktC2u7YaTAFHmxpL/LBxI85M7ioJCSg==
-  dependencies:
-    "@types/node" "*"
-
 "@types/graceful-fs@^4.1.3":
   version "4.1.5"
   resolved "https://registry.yarnpkg.com/@types/graceful-fs/-/graceful-fs-4.1.5.tgz#21ffba0d98da4350db64891f92a9e5db3cdb4e15"
