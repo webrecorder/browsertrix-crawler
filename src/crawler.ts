@@ -1061,9 +1061,20 @@ self.__bx_behaviors.selectMainBehavior();
 
     // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
     // if there's no tag or an iframe tag, then assume its a regular frame
-    const tagName = await frame.evaluate(
-      "self && self.frameElement && self.frameElement.tagName",
-    );
+    let tagName = "";
+
+    try {
+      tagName = await timedRun(
+        frame.evaluate(
+          "self && self.frameElement && self.frameElement.tagName",
+        ),
+        PAGE_OP_TIMEOUT_SECS,
+        "Frame check timed out",
+        logDetails,
+      );
+    } catch (e) {
+      // ignore
+    }
 
     if (tagName && tagName !== "IFRAME" && tagName !== "FRAME") {
       logger.debug(
