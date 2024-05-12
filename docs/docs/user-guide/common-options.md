@@ -104,6 +104,7 @@ Environment variables for S3-uploads include:
 - `STORE_PATH` — optional path appended to endpoint, if provided
 - `STORE_FILENAME` — filename or template for filename to put on S3
 - `STORE_USER` — optional username to pass back as part of the webhook callback
+- `STORE_REGION` - optional region to pass to S3 endpoint. Defaults to `us-east-1` if unspecified.
 - `CRAWL_ID` — unique crawl id (defaults to container hostname)
 - `WEBHOOK_URL` — the URL of the webhook (can be http://, https://, or redis://)
 
