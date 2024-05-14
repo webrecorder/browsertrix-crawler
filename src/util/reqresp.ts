@@ -236,7 +236,7 @@ export class RequestResponseInfo {
           headersDict[headerName] = "" + actualContentLength;
           continue;
         }
-        headersDict[headerName] = header.value.replace(/\n/g, ", ");
+        headersDict[headerName] = this._encodeHeaderValue(header.value);
       }
     }
 
@@ -259,7 +259,7 @@ export class RequestResponseInfo {
         headersDict[key] = "" + actualContentLength;
         continue;
       }
-      headersDict[key] = headersDict[key].replace(/\n/g, ", ");
+      headersDict[key] = this._encodeHeaderValue(headersDict[key]);
     }
 
     return headersDict;
@@ -350,5 +350,15 @@ export class RequestResponseInfo {
     }
 
     return this.url;
+  }
+
+  _encodeHeaderValue(value: string) {
+    value = value.replace(/\n/g, ", ");
+    // check if not ASCII, then encode
+    // eslint-disable-next-line no-control-regex
+    if (!/^[\x00-\x7F]*$/.test(value)) {
+      value = encodeURI(value);
+    }
+    return value;
   }
 }
