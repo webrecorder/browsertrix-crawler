@@ -392,7 +392,9 @@ export class Recorder {
         // the abort is just for page, but download will succeed
         if (type === "Document" && reqresp.isValidBinary()) {
           this.serializeToWARC(reqresp);
-          //} else if (url) {
+          this.addPageRecord(reqresp);
+          this.removeReqResp(requestId);
+          return;
         } else if (
           url &&
           reqresp.requestHeaders &&
