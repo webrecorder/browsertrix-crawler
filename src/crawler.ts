@@ -1727,8 +1727,13 @@ self.__bx_behaviors.selectMainBehavior();
 
       let failed = isChromeError;
 
-      if (this.params.failOnInvalidStatus && (status === 0 || status >= 400)) {
+      if (
+        (this.params.failOnInvalidStatus || failCrawlOnError) &&
+        (!status || status < 100 || status >= 400)
+      ) {
         // Handle 0, 4xx, or 5xx response as a page load error
+        // Regardless of whether failOnInvalidStatus is set, fail crawl if seed is
+        // 0/4xx/5xx and failOnFailedSeed is set to prevent breaking change from 0.x
         failed = true;
       }
 
