@@ -353,12 +353,12 @@ export class RequestResponseInfo {
   }
 
   _encodeHeaderValue(value: string) {
-    value = value.replace(/\n/g, ", ");
-    // check if not ASCII, then encode
+    // check if not ASCII, then encode, replace encoded newlines
     // eslint-disable-next-line no-control-regex
     if (!/^[\x00-\x7F]*$/.test(value)) {
-      value = encodeURI(value);
+      return encodeURI(value).replace(/%0A/g, ", ");
     }
-    return value;
+    // replace newlines with spaces
+    return value.replace(/\n/g, ", ");
   }
 }
