@@ -1727,8 +1727,8 @@ self.__bx_behaviors.selectMainBehavior();
 
       let failed = isChromeError;
 
-      if (this.params.failOnInvalidStatus && status >= 400) {
-        // Handle 4xx or 5xx response as a page load error
+      if (this.params.failOnInvalidStatus && (status === 0 || status >= 400)) {
+        // Handle 0, 4xx, or 5xx response as a page load error
         failed = true;
       }
 

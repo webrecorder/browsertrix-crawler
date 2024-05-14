@@ -29,7 +29,7 @@ test("ensure one invalid seed fails crawl if failOnFailedSeed is set", async () 
   expect(passed).toBe(false);
 });
 
-test("ensure seed with 4xx/5xx response fails crawl if failOnFailedSeed and failOnInvalidStatus is set", async () => {
+test("ensure seed with 0/4xx/5xx response fails crawl if failOnFailedSeed and failOnInvalidStatus is set", async () => {
   let passed = true;
   try {
     await exec(
