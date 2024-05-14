@@ -1697,7 +1697,7 @@ self.__bx_behaviors.selectMainBehavior();
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
     // if so, don't report as an error
     page.once("requestfailed", (req: HTTPRequest) => {
-      ignoreAbort = shouldIgnoreAbort(req);
+      ignoreAbort = shouldIgnoreAbort(req, data);
     });
 
     let isHTMLPage = data.isHTMLPage;
@@ -2559,7 +2559,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 }
 
-function shouldIgnoreAbort(req: HTTPRequest) {
+function shouldIgnoreAbort(req: HTTPRequest, data: PageState) {
   try {
     const failure = req.failure();
     const failureText = (failure && failure.errorText) || "";
@@ -2581,6 +2581,8 @@ function shouldIgnoreAbort(req: HTTPRequest) {
       headers["content-disposition"] ||
       (headers["content-type"] && !headers["content-type"].startsWith("text/"))
     ) {
+      data.status = resp.status();
+      data.mime = headers["content-type"].split(";")[0];
       return true;
     }
   } catch (e) {
