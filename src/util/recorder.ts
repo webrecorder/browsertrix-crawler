@@ -391,10 +391,8 @@ export class Recorder {
         // check if this is a false positive -- a valid download that's already been fetched
         // the abort is just for page, but download will succeed
         if (type === "Document" && reqresp.isValidBinary()) {
-          this.serializeToWARC(reqresp);
-          this.addPageRecord(reqresp);
           this.removeReqResp(requestId);
-          return;
+          return this.serializeToWARC(reqresp);
         } else if (
           url &&
           reqresp.requestHeaders &&
@@ -426,8 +424,8 @@ export class Recorder {
     }
     reqresp.status = 0;
     reqresp.errorText = errorText;
-
     this.addPageRecord(reqresp);
+
     this.removeReqResp(requestId);
   }
 
