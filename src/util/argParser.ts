@@ -678,7 +678,10 @@ class ArgParser {
         } catch (e) {
           if (argv.failOnFailedSeed) {
             logger.fatal(
-              `Invalid Seed "${seed.url}" specified, aborting crawl.`,
+              "Invalid Seed specified, aborting crawl.",
+              { url: seed.url },
+              "general",
+              1,
             );
           }
         }
