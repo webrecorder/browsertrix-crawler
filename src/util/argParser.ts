@@ -513,8 +513,8 @@ class ArgParser {
 
       failOnInvalidStatus: {
         describe:
-          "If set, will treat pages with non-200 response as failures. When combined with --failOnFailedLimit" +
-          "may result in crawl failing due to non-200 responses",
+          "If set, will treat pages with 4xx or 5xx response as failures. When combined with --failOnFailedLimit" +
+          " or --failOnFailedSeed may result in crawl failing due to non-200 responses",
         type: "boolean",
         default: false,
       },
