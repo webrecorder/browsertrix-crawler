@@ -40,16 +40,17 @@ test("ensure seed with 0/4xx/5xx response fails crawl if failOnFailedSeed and fa
   expect(passed).toBe(false);
 });
 
-test("ensure seed with 0/4xx/5xx response fails crawl even if only failOnFailedSeed is set", async () => {
+test("ensure seed with 4xx/5xx response succeeds if failOnInvalidStatus is not set", async () => {
   let passed = true;
   try {
     await exec(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --url https://example.invalid --generateWACZ --limit 2 --failOnFailedSeed --collection failseedstatussolo",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --url https://webrecorder.net/404 --generateWACZ --limit 2 --failOnFailedSeed --collection failseedwithoutinvalidstatus",
     );
   } catch (error) {
+    console.log(error);
     passed = false;
   }
-  expect(passed).toBe(false);
+  expect(passed).toBe(true);
 });
 
 test("ensure crawl fails if no valid seeds are passed", async () => {
