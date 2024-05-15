@@ -27,8 +27,14 @@ export class RequestResponseInfo {
   mimeType?: string;
 
   // request data
-  requestHeaders?: Record<string, string>;
-  requestHeadersText?: string;
+  private requestHeadersDict?: Record<string, string>;
+  //requestHeadersText?: string;
+  requestHeaders = new Headers();
+
+  private responseHeadersDict?: Record<string, string>;
+  private responseHeadersList?: { name: string; value: string }[];
+  responseHeaders = new Headers();
+  //responseHeadersText?: string;
 
   postData?: string;
   hasPostData: boolean = false;
@@ -38,10 +44,6 @@ export class RequestResponseInfo {
   statusText?: string;
 
   errorText?: string;
-
-  responseHeaders?: Record<string, string>;
-  responseHeadersList?: { name: string; value: string }[];
-  responseHeadersText?: string;
 
   payload?: Uint8Array;
 
@@ -76,10 +78,10 @@ export class RequestResponseInfo {
   fillFetchRequestPaused(params: Protocol.Fetch.RequestPausedEvent) {
     this.fillRequest(params.request, params.resourceType);
 
+    this.responseHeadersList = params.responseHeaders;
+    this.responseHeaders = this.getResponseHeaders();
     this.status = params.responseStatusCode || 0;
     this.statusText = params.responseStatusText || getStatusText(this.status);
-
-    this.responseHeadersList = params.responseHeaders;
 
     this.fetch = true;
 
@@ -89,9 +91,10 @@ export class RequestResponseInfo {
   fillRequest(request: Protocol.Network.Request, resourceType: string) {
     this.url = request.url;
     this.method = request.method;
-    if (!this.requestHeaders) {
-      this.requestHeaders = request.headers;
+    if (!this.requestHeadersDict) {
+      this.requestHeadersDict = request.headers;
     }
+    this.requestHeaders = this.getRequestHeaders();
     this.postData = request.postData;
     this.hasPostData = request.hasPostData || false;
 
@@ -113,8 +116,11 @@ export class RequestResponseInfo {
 
     this.url = response.url.split("#")[0];
 
-    this.status = response.status;
-    this.statusText = response.statusText || getStatusText(this.status);
+    this.setResponseHeaders(
+      response.headers,
+      response.status,
+      response.statusText,
+    );
 
     this.protocol = response.protocol;
 
@@ -123,16 +129,8 @@ export class RequestResponseInfo {
     }
 
     if (response.requestHeaders) {
-      this.requestHeaders = response.requestHeaders;
-    }
-    if (response.requestHeadersText) {
-      this.requestHeadersText = response.requestHeadersText;
-    }
-
-    this.responseHeaders = response.headers;
-
-    if (response.headersText) {
-      this.responseHeadersText = response.headersText;
+      this.requestHeadersDict = response.requestHeaders;
+      this.requestHeaders = this.getRequestHeaders();
     }
 
     this.fromServiceWorker = !!response.fromServiceWorker;
@@ -153,8 +151,7 @@ export class RequestResponseInfo {
       return false;
     }
     try {
-      const headers = new Headers(this.getResponseHeadersDict());
-      const location = headers.get("location") || "";
+      const location = this.responseHeaders.get("location") || "";
       const redirUrl = new URL(location, this.url).href;
       return this.url === redirUrl;
     } catch (e) {
@@ -165,54 +162,51 @@ export class RequestResponseInfo {
   fillResponseReceivedExtraInfo(
     params: Protocol.Network.ResponseReceivedExtraInfoEvent,
   ) {
-    // this.responseHeaders = params.headers;
-    // if (params.headersText) {
-    //   this.responseHeadersText = params.headersText;
-    // }
     this.extraOpts.ipType = params.resourceIPAddressSpace;
   }
 
   fillFetchResponse(response: Response) {
-    this.responseHeaders = Object.fromEntries(response.headers);
-    this.status = response.status;
-    this.statusText = response.statusText || getStatusText(this.status);
+    this.setResponseHeaders(
+      Object.fromEntries(response.headers),
+      response.status,
+      response.statusText,
+    );
   }
 
   fillRequestExtraInfo(
     params: Protocol.Network.RequestWillBeSentExtraInfoEvent,
   ) {
-    this.requestHeaders = params.headers;
-  }
-
-  getResponseHeadersText() {
-    let headers = `${this.protocol} ${this.status} ${this.statusText}\r\n`;
-
-    if (this.responseHeaders) {
-      for (const header of Object.keys(this.responseHeaders)) {
-        headers += `${header}: ${this.responseHeaders[header].replace(
-          /\n/g,
-          ", ",
-        )}\r\n`;
-      }
-    }
-    headers += "\r\n";
-    return headers;
+    this.requestHeadersDict = params.headers;
+    this.requestHeaders = this.getRequestHeaders();
   }
 
   hasRequest() {
-    return this.method && (this.requestHeaders || this.requestHeadersText);
+    return this.method && this.requestHeaders;
   }
 
-  getRequestHeadersDict() {
-    return this._getHeadersDict(this.requestHeaders);
+  getRequestHeaders() {
+    return new Headers(this._getHeadersDict(this.requestHeadersDict));
   }
 
-  getResponseHeadersDict(length = 0) {
-    return this._getHeadersDict(
-      this.responseHeaders,
-      this.responseHeadersList,
-      length,
+  getResponseHeaders(length = 0) {
+    return new Headers(
+      this._getHeadersDict(
+        this.responseHeadersDict,
+        this.responseHeadersList,
+        length,
+      ),
     );
+  }
+
+  setResponseHeaders(
+    headersDict: Record<string, string>,
+    status: number,
+    statusText?: string,
+  ) {
+    this.responseHeadersDict = headersDict;
+    this.responseHeaders = this.getResponseHeaders();
+    this.status = status;
+    this.statusText = statusText || getStatusText(this.status);
   }
 
   _getHeadersDict(
@@ -270,8 +264,7 @@ export class RequestResponseInfo {
       return this.mimeType;
     }
 
-    const headers = new Headers(this.getResponseHeadersDict());
-    const contentType = headers.get(CONTENT_TYPE);
+    const contentType = this.responseHeaders.get(CONTENT_TYPE);
 
     if (!contentType) {
       return;
@@ -287,9 +280,8 @@ export class RequestResponseInfo {
 
     const length = this.payload.length;
 
-    const headers = new Headers(this.getResponseHeadersDict());
-    const contentType = headers.get(CONTENT_TYPE);
-    const contentLength = headers.get(CONTENT_LENGTH);
+    const contentType = this.responseHeaders.get(CONTENT_TYPE);
+    const contentLength = this.responseHeaders.get(CONTENT_LENGTH);
 
     if (Number(contentLength) !== length) {
       return false;
@@ -327,7 +319,7 @@ export class RequestResponseInfo {
 
     const convData = {
       url: this.url,
-      headers: new Headers(this.getRequestHeadersDict()),
+      headers: this.requestHeaders,
       method: this.method,
       postData: this.postData || "",
     };

@@ -393,12 +393,8 @@ export class Recorder {
         if (type === "Document" && reqresp.isValidBinary()) {
           this.serializeToWARC(reqresp);
           //} else if (url) {
-        } else if (
-          url &&
-          reqresp.requestHeaders &&
-          reqresp.requestHeaders["x-browsertrix-fetch"]
-        ) {
-          delete reqresp.requestHeaders["x-browsertrix-fetch"];
+        } else if (url && reqresp.requestHeaders.has("x-browsertrix-fetch")) {
+          reqresp.requestHeaders.delete("x-browsertrix-fetch");
           logger.warn(
             "Attempt direct fetch of failed request",
             { url, ...this.logDetails },
@@ -1090,11 +1086,9 @@ export class Recorder {
     });
     const res = await fetcher.load();
 
-    const mime =
-      (reqresp.responseHeaders &&
-        reqresp.responseHeaders["content-type"] &&
-        reqresp.responseHeaders["content-type"].split(";")[0]) ||
-      "";
+    const mime = (reqresp.responseHeaders.get("content-type") || "").split(
+      ";",
+    )[0];
 
     return { fetched: res === "fetched", mime };
   }
@@ -1292,7 +1286,7 @@ class AsyncFetcher {
     const { method, url } = reqresp;
     logger.debug("Async started: fetch", { url }, "recorder");
 
-    const headers = reqresp.getRequestHeadersDict();
+    const headers = reqresp.getRequestHeaders();
 
     let signal = null;
     let abort = null;
@@ -1484,8 +1478,7 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
       return;
     }
 
-    reqresp.status = httpStatusCode || 0;
-    reqresp.responseHeaders = headers || {};
+    reqresp.setResponseHeaders(headers || {}, httpStatusCode || 0);
 
     return this.takeStreamIter(cdp, stream);
   }
@@ -1503,7 +1496,7 @@ function createResponse(
   const statusline = `HTTP/1.1 ${reqresp.status} ${reqresp.statusText}`;
   const date = new Date(reqresp.ts).toISOString();
 
-  const httpHeaders = reqresp.getResponseHeadersDict(
+  const httpHeaders = reqresp.getResponseHeaders(
     reqresp.payload ? reqresp.payload.length : 0,
   );
 
@@ -1556,7 +1549,7 @@ function createRequest(
     ? [encoder.encode(reqresp.postData)]
     : [];
 
-  const httpHeaders = reqresp.getRequestHeadersDict();
+  const httpHeaders = reqresp.getRequestHeaders();
 
   const warcHeaders: Record<string, string> = {
     "WARC-Concurrent-To": responseRecord.warcHeader("WARC-Record-ID")!,
