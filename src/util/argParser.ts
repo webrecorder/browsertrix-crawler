@@ -499,7 +499,7 @@ class ArgParser {
       failOnFailedSeed: {
         describe:
           "If set, crawler will fail with exit code 1 if any seed fails. When combined with --failOnInvalidStatus," +
-          "will result in crawl failling with exit code 1 if any seed has a 4xx/5xx response",
+          "will result in crawl failing with exit code 1 if any seed has a 4xx/5xx response",
         type: "boolean",
         default: false,
       },
