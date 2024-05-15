@@ -678,7 +678,7 @@ class ArgParser {
         } catch (e) {
           if (argv.failOnFailedSeed) {
             logger.fatal(
-              "Invalid Seed specified, aborting crawl.",
+              "Invalid seed specified, aborting crawl",
               { url: seed.url },
               "general",
               1,
@@ -688,10 +688,10 @@ class ArgParser {
       }
 
       if (!argv.scopedSeeds.length) {
-        logger.fatal("No valid seeds specified, aborting crawl.");
+        logger.fatal("No valid seeds specified, aborting crawl");
       }
     } else if (!argv.qaSource) {
-      logger.fatal("--qaSource required for QA mode!");
+      logger.fatal("--qaSource required for QA mode");
     }
 
     // Resolve statsFilename
