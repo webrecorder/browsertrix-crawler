@@ -212,6 +212,7 @@ export class SitemapReader extends EventEmitter {
 
   async parseSitemap(url: string) {
     this.seenSitemapSet.add(url);
+    this.pending.add(url);
 
     const resp = await this._fetchWithRetry(url, "Sitemap parse failed");
     if (!resp) {
@@ -225,6 +226,7 @@ export class SitemapReader extends EventEmitter {
 
     const { body } = resp;
     if (!body) {
+      this.pending.delete(url);
       throw new Error("missing response body");
     }
     // decompress .gz sitemaps
@@ -264,6 +266,28 @@ export class SitemapReader extends EventEmitter {
     let errCount = 0;
 
     let otherTags = 0;
+
+    const processText = (text: string) => {
+      if (parsingLoc) {
+        currUrl = text;
+      } else if (parsingLastmod) {
+        try {
+          lastmod = new Date(text);
+        } catch (e) {
+          lastmod = null;
+        }
+      } else if (!otherTags) {
+        if (parsingUrl) {
+          console.warn("text in url, ignoring");
+        } else if (parsingUrlset) {
+          console.warn("text in urlset, ignoring");
+        } else if (parsingSitemap) {
+          console.warn("text in sitemap, ignoring");
+        } else if (parsingSitemapIndex) {
+          console.warn("text in sitemapindex, ignoring");
+        }
+      }
+    };
 
     parserStream.on("end", async () => {
       this.pending.delete(url);
@@ -350,27 +374,8 @@ export class SitemapReader extends EventEmitter {
       }
     });
 
-    parserStream.on("text", (text: string) => {
-      if (parsingLoc) {
-        currUrl = text;
-      } else if (parsingLastmod) {
-        try {
-          lastmod = new Date(text);
-        } catch (e) {
-          lastmod = null;
-        }
-      } else if (!otherTags) {
-        if (parsingUrl) {
-          console.warn("text in url, ignoring");
-        } else if (parsingUrlset) {
-          console.warn("text in urlset, ignoring");
-        } else if (parsingSitemap) {
-          console.warn("text in sitemap, ignoring");
-        } else if (parsingSitemapIndex) {
-          console.warn("text in sitemapindex, ignoring");
-        }
-      }
-    });
+    parserStream.on("text", (text: string) => processText(text));
+    parserStream.on("cdata", (text: string) => processText(text));
 
     parserStream.on("error", (err: Error) => {
       if (this.atLimit()) {
