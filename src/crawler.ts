@@ -1652,18 +1652,18 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const realSize = await this.crawlState.queueSize();
-    const pendingList = await this.crawlState.getPendingList();
+    const pendingPages = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
-    const total = realSize + pendingList.length + done;
+    const total = realSize + pendingPages.length + done;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled: done,
       total: total,
-      pending: pendingList.length,
+      pending: pendingPages.length,
       failed: failed,
       limit: limit,
-      pendingPages: pendingList.map((x) => JSON.stringify(x)),
+      pendingPages,
     };
 
     logger.info("Crawl statistics", stats, "crawlStatus");
