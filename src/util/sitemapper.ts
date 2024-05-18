@@ -185,7 +185,7 @@ export class SitemapReader extends EventEmitter {
         { fullUrl, seedUrl },
         "sitemap",
       );
-      await this._parseSitemapFromResponse(fullUrl, resp);
+      this._parseSitemapFromResponse(fullUrl, resp);
     }
   }
 
@@ -218,19 +218,24 @@ export class SitemapReader extends EventEmitter {
     if (!resp) {
       return;
     }
-    await this._parseSitemapFromResponse(url, resp);
+
+    this._parseSitemapFromResponse(url, resp);
   }
 
-  private async _parseSitemapFromResponse(url: string, resp: Response) {
+  private _parseSitemapFromResponse(url: string, resp: Response) {
     let stream;
 
     const { body } = resp;
     if (!body) {
-      this.pending.delete(url);
+      this.closeSitemap(url);
       throw new Error("missing response body");
     }
     // decompress .gz sitemaps
-    if (url.endsWith(".gz")) {
+    // if content-encoding is gzip, then likely already being decompressed by fetch api
+    if (
+      url.endsWith(".gz") &&
+      resp.headers.get("content-encoding") !== "gzip"
+    ) {
       const ds = new DecompressionStream("gzip");
       stream = body.pipeThrough(ds);
     } else {
@@ -240,7 +245,21 @@ export class SitemapReader extends EventEmitter {
     const readableNodeStream = Readable.fromWeb(
       stream as ReadableStream<Uint8Array>,
     );
+
+    readableNodeStream.on("error", (e: Error) => {
+      logger.warn("Error parsing sitemap", formatErr(e), "sitemap");
+      this.closeSitemap(url);
+    });
+
     this.initSaxParser(url, readableNodeStream);
+  }
+
+  private async closeSitemap(url: string) {
+    this.pending.delete(url);
+    if (!this.pending.size) {
+      await this.queue.onIdle();
+      this.emit("end");
+    }
   }
 
   initSaxParser(url: string, sourceStream: Readable) {
@@ -289,13 +308,7 @@ export class SitemapReader extends EventEmitter {
       }
     };
 
-    parserStream.on("end", async () => {
-      this.pending.delete(url);
-      if (!this.pending.size) {
-        await this.queue.onIdle();
-        this.emit("end");
-      }
-    });
+    parserStream.on("end", () => this.closeSitemap(url));
 
     parserStream.on("opentag", (node: sax.Tag) => {
       switch (node.name) {
