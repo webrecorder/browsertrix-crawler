@@ -1159,10 +1159,11 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.failOnFailedLimit) {
-      const numFailed = this.crawlState.numFailed();
-      if (numFailed >= this.params.failOnFailedLimit) {
+      const numFailed = await this.crawlState.numFailed();
+      const failedLimit = this.params.failOnFailedLimit;
+      if (numFailed >= failedLimit) {
         logger.fatal(
-          `Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`,
+          `Failed threshold reached ${numFailed} >= ${failedLimit}, failing crawl`,
         );
       }
     }
