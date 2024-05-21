@@ -146,7 +146,7 @@ export class SitemapReader extends EventEmitter {
       // if specific URL provided, check if its a .xml file or a robots.txt file
       fullUrl = new URL(sitemap, seedUrl).href;
       let expected = null;
-      if (fullUrl.endsWith(".xml")) {
+      if (fullUrl.endsWith(".xml") || fullUrl.endsWith(".xml.gz")) {
         expected = XML_CONTENT_TYPES;
         isSitemap = true;
       } else if (fullUrl.endsWith(".txt")) {
