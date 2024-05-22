@@ -69,6 +69,26 @@ function validateResourcesIndex(json) {
       mime: "text/html",
       type: "document",
     },
+    "https://webrecorder.net/assets/brand/archivewebpage-icon-color.svg": Object {
+      mime: "image/svg+xml",
+      status: 200,
+      type: "image",
+    },
+    "https://webrecorder.net/assets/brand/browsertrix-icon-color.svg": Object {
+      mime: "image/svg+xml",
+      status: 200,
+      type: "image",
+    },
+    "https://webrecorder.net/assets/brand/browsertrixcrawler-icon-color.svg": Object {
+      mime: "image/svg+xml",
+      status: 200,
+      type: "image",
+    },
+    "https://webrecorder.net/assets/brand/replaywebpage-icon-color.svg": Object {
+      mime: "image/svg+xml",
+      status: 200,
+      type: "image",
+    },
     "https://webrecorder.net/assets/fontawesome/all.css": {
       status: 200,
       mime: "text/css",
@@ -77,31 +97,6 @@ function validateResourcesIndex(json) {
     "https://webrecorder.net/assets/wr-logo.svg": {
       status: 200,
       mime: "image/svg+xml",
-      type: "image",
-    },
-    "https://webrecorder.net/assets/tools/awp-icon.png": {
-      status: 200,
-      mime: "image/png",
-      type: "image",
-    },
-    "https://webrecorder.net/assets/tools/logo-pywb.png": {
-      status: 200,
-      mime: "image/png",
-      type: "image",
-    },
-    "https://webrecorder.net/assets/tools/browsertrixcrawler.png": {
-      status: 200,
-      mime: "image/png",
-      type: "image",
-    },
-    "https://webrecorder.net/assets/tools/rwp-icon.png": {
-      status: 200,
-      mime: "image/png",
-      type: "image",
-    },
-    "https://webrecorder.net/assets/images/btrix-cloud.png": {
-      status: 200,
-      mime: "image/png",
       type: "image",
     },
     "https://webrecorder.net/assets/main.css": {
