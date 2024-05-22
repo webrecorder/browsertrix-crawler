@@ -69,22 +69,22 @@ function validateResourcesIndex(json) {
       mime: "text/html",
       type: "document",
     },
-    "https://webrecorder.net/assets/brand/archivewebpage-icon-color.svg": Object {
+    "https://webrecorder.net/assets/brand/archivewebpage-icon-color.svg": {
       mime: "image/svg+xml",
       status: 200,
       type: "image",
     },
-    "https://webrecorder.net/assets/brand/browsertrix-icon-color.svg": Object {
+    "https://webrecorder.net/assets/brand/browsertrix-icon-color.svg": {
       mime: "image/svg+xml",
       status: 200,
       type: "image",
     },
-    "https://webrecorder.net/assets/brand/browsertrixcrawler-icon-color.svg": Object {
+    "https://webrecorder.net/assets/brand/browsertrixcrawler-icon-color.svg": {
       mime: "image/svg+xml",
       status: 200,
       type: "image",
     },
-    "https://webrecorder.net/assets/brand/replaywebpage-icon-color.svg": Object {
+    "https://webrecorder.net/assets/brand/replaywebpage-icon-color.svg": {
       mime: "image/svg+xml",
       status: 200,
       type: "image",
