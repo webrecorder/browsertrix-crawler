@@ -16,7 +16,7 @@ jobs:
 
       - name: Get Version
         run: |
-          echo "version=$(cat version.txt)" >> "$GITHUB_ENV"
+          echo "version=$(jq -r .version package.json)" >> "$GITHUB_ENV"
 
       - name: Make Draft Release
         uses: softprops/action-gh-release@v1
