@@ -1,0 +1,30 @@
+name: Generate Draft Release
+
+on:
+  push:
+    #branches:
+    #  - main
+    #  - "*-release"
+
+jobs:
+  package_chart:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v3
+
+      - name: Get Version
+        run: |
+          echo "version=$(cat version.txt)" >> "$GITHUB_ENV"
+
+      - name: Make Draft Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Browsertrix Crawler v{{ env.version }}"
+          body: |
+            ## Browsertrix Crawler
+
+          tag_name: v${{ env.version }}
+          draft: true
+          generate_release_notes: true
