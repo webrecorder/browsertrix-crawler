@@ -153,7 +153,7 @@ export class RequestResponseInfo {
       return false;
     }
     try {
-      const headers = new Headers(this.responseHeaders);
+      const headers = new Headers(this.getResponseHeadersDict());
       const location = headers.get("location") || "";
       const redirUrl = new URL(location, this.url).href;
       return this.url === redirUrl;
@@ -225,6 +225,9 @@ export class RequestResponseInfo {
 
       for (const header of headersList) {
         let headerName = header.name.toLowerCase();
+        if (header.name.startsWith(":")) {
+          continue;
+        }
         if (EXCLUDE_HEADERS.includes(headerName)) {
           headerName = "x-orig-" + headerName;
           continue;
@@ -233,7 +236,7 @@ export class RequestResponseInfo {
           headersDict[headerName] = "" + actualContentLength;
           continue;
         }
-        headersDict[headerName] = header.value.replace(/\n/g, ", ");
+        headersDict[headerName] = this._encodeHeaderValue(header.value);
       }
     }
 
@@ -256,7 +259,7 @@ export class RequestResponseInfo {
         headersDict[key] = "" + actualContentLength;
         continue;
       }
-      headersDict[key] = headersDict[key].replace(/\n/g, ", ");
+      headersDict[key] = this._encodeHeaderValue(headersDict[key]);
     }
 
     return headersDict;
@@ -324,7 +327,7 @@ export class RequestResponseInfo {
 
     const convData = {
       url: this.url,
-      headers: new Headers(this.requestHeaders),
+      headers: new Headers(this.getRequestHeadersDict()),
       method: this.method,
       postData: this.postData || "",
     };
@@ -347,5 +350,15 @@ export class RequestResponseInfo {
     }
 
     return this.url;
+  }
+
+  _encodeHeaderValue(value: string) {
+    // check if not ASCII, then encode, replace encoded newlines
+    // eslint-disable-next-line no-control-regex
+    if (!/^[\x00-\x7F]*$/.test(value)) {
+      return encodeURI(value).replace(/%0A/g, ", ");
+    }
+    // replace newlines with spaces
+    return value.replace(/\n/g, ", ");
   }
 }

@@ -104,6 +104,7 @@ Environment variables for S3-uploads include:
 - `STORE_PATH` — optional path appended to endpoint, if provided
 - `STORE_FILENAME` — filename or template for filename to put on S3
 - `STORE_USER` — optional username to pass back as part of the webhook callback
+- `STORE_REGION` - optional region to pass to S3 endpoint. Defaults to `us-east-1` if unspecified.
 - `CRAWL_ID` — unique crawl id (defaults to container hostname)
 - `WEBHOOK_URL` — the URL of the webhook (can be http://, https://, or redis://)
 
@@ -126,7 +127,7 @@ A crawl can be gracefully interrupted with Ctrl-C (SIGINT) or a SIGTERM (see bel
 
 When a crawl is interrupted, the current crawl state is written to the `crawls` subdirectory inside the collection directory. The crawl state includes the current YAML config, if any, plus the current state of the crawl.
 
-This crawl state YAML file can then be used as `--config` option to restart the crawl from where it was left of previously.
+This crawl state YAML file can then be used as `--config` option to restart the crawl from where it was left of previously. When restarting a crawl you will need to include any command line options you used to start the original crawl (e.g. `--url`), since these are not persisted to the crawl state.
 
 By default, the crawl interruption waits for current pages to finish. A subsequent SIGINT will cause the crawl to stop immediately. Any unfinished pages are recorded in the `pending` section of the crawl state (if gracefully finished, the section will be empty).
 

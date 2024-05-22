@@ -19,8 +19,10 @@ import {
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 
-// @ts-expect-error TODO fill in why error is expected
+// @ts-expect-error (incorrect types on get-folder-size)
 import getFolderSize from "get-folder-size";
+
+const DEFAULT_REGION = "us-east-1";
 
 // ===========================================================================
 export class S3StorageSync {
@@ -64,13 +66,15 @@ export class S3StorageSync {
       this.fullPrefix = url.href;
     }
 
+    const region = process.env.STORE_REGION || DEFAULT_REGION;
+
     this.client = new S3Client({
       credentials: {
         accessKeyId: accessKey,
         secretAccessKey: secretKey,
       },
       endpoint: url.href,
-      region: "auto",
+      region,
     });
 
     this.bucketName = url.pathname.slice(1).split("/")[0];
