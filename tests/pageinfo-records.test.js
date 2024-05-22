@@ -69,6 +69,11 @@ function validateResourcesIndex(json) {
       mime: "text/html",
       type: "document",
     },
+    "https://webrecorder.net/assets/tools/logo-pywb.png": {
+      mime: "image/png",
+      status: 200,
+      type: "image",
+    },
     "https://webrecorder.net/assets/brand/archivewebpage-icon-color.svg": {
       mime: "image/svg+xml",
       status: 200,
