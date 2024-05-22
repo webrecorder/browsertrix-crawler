@@ -16,6 +16,7 @@
     "prepare": "husky install"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.554.0",
     "@novnc/novnc": "^1.4.0",
     "@types/sax": "^1.2.7",
     "@webrecorder/wabac": "^2.16.12",
@@ -26,7 +27,6 @@
     "ioredis": "^5.3.2",
     "js-levenshtein": "^1.1.6",
     "js-yaml": "^4.1.0",
-    "minio": "^7.1.3",
     "p-queue": "^7.3.4",
     "pixelmatch": "^5.3.0",
     "pngjs": "^7.0.0",
@@ -60,5 +60,6 @@
   "jest": {
     "transform": {},
     "testTimeout": 90000
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha1.ac34549e6aa8e7ead463a7407e1c7390f61a6610"
 }
