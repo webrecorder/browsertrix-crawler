@@ -2,9 +2,9 @@ name: Generate Draft Release
 
 on:
   push:
-    #branches:
-    #  - main
-    #  - "*-release"
+    branches:
+      - main
+      - "*-release"
 
 jobs:
   package_chart:
