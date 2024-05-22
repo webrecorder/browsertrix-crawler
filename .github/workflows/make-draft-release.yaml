@@ -21,10 +21,9 @@ jobs:
       - name: Make Draft Release
         uses: softprops/action-gh-release@v1
         with:
-          name: "Browsertrix Crawler v{{ env.version }}"
+          name: "Browsertrix Crawler v${{ env.version }}"
           body: |
             ## Browsertrix Crawler
 
           tag_name: v${{ env.version }}
           draft: true
-          generate_release_notes: true
