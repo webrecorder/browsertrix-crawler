@@ -16,8 +16,6 @@ import { parseArgs } from "./util/argParser.js";
 
 import yaml from "js-yaml";
 
-import * as warcio from "warcio";
-
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
 import {
@@ -60,7 +58,7 @@ import { CDPSession, Frame, HTTPRequest, Page, Protocol } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
-import { WARCWriter } from "./util/warcwriter.js";
+import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 
 const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
@@ -458,6 +456,7 @@ export class Crawler {
     logger.setExternalLogStream(this.logFH);
 
     this.infoString = await getInfoString();
+    setWARCInfo(this.infoString, this.params.warcInfo);
     logger.info(this.infoString);
 
     logger.info("Seeds", this.params.scopedSeeds);
@@ -1104,26 +1103,6 @@ self.__bx_behaviors.selectMainBehavior();
     return res ? frame : null;
   }
 
-  async createWARCInfo(filename: string) {
-    const warcVersion = "WARC/1.1";
-    const type = "warcinfo";
-
-    const info = {
-      software: this.infoString,
-      format: "WARC File Format 1.1",
-    };
-
-    const warcInfo = { ...info, ...this.params.warcInfo };
-    const record = await warcio.WARCRecord.createWARCInfo(
-      { filename, type, warcVersion },
-      warcInfo,
-    );
-    const buffer = await warcio.WARCSerializer.serialize(record, {
-      gzip: true,
-    });
-    return buffer;
-  }
-
   async checkLimits() {
     let interrupt = false;
 
@@ -1159,10 +1138,11 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.failOnFailedLimit) {
-      const numFailed = this.crawlState.numFailed();
-      if (numFailed >= this.params.failOnFailedLimit) {
+      const numFailed = await this.crawlState.numFailed();
+      const failedLimit = this.params.failOnFailedLimit;
+      if (numFailed >= failedLimit) {
         logger.fatal(
-          `Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`,
+          `Failed threshold reached ${numFailed} >= ${failedLimit}, failing crawl`,
         );
       }
     }
@@ -1652,18 +1632,18 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const realSize = await this.crawlState.queueSize();
-    const pendingList = await this.crawlState.getPendingList();
+    const pendingPages = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
-    const total = realSize + pendingList.length + done;
+    const total = realSize + pendingPages.length + done;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled: done,
       total: total,
-      pending: pendingList.length,
+      pending: pendingPages.length,
       failed: failed,
       limit: limit,
-      pendingPages: pendingList.map((x) => JSON.stringify(x)),
+      pendingPages,
     };
 
     logger.info("Crawl statistics", stats, "crawlStatus");
@@ -1697,7 +1677,7 @@ self.__bx_behaviors.selectMainBehavior();
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
     // if so, don't report as an error
     page.once("requestfailed", (req: HTTPRequest) => {
-      ignoreAbort = shouldIgnoreAbort(req);
+      ignoreAbort = shouldIgnoreAbort(req, data);
     });
 
     let isHTMLPage = data.isHTMLPage;
@@ -1749,10 +1729,15 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (failed) {
         if (failCrawlOnError) {
-          logger.fatal("Seed Page Load Error, failing crawl", {
-            status,
-            ...logDetails,
-          });
+          logger.fatal(
+            "Seed Page Load Error, failing crawl",
+            {
+              status,
+              ...logDetails,
+            },
+            "general",
+            1,
+          );
         } else {
           logger.error(
             isChromeError ? "Page Crashed on Load" : "Page Invalid Status",
@@ -1790,10 +1775,15 @@ self.__bx_behaviors.selectMainBehavior();
           data.skipBehaviors = true;
         } else if (failCrawlOnError) {
           // if fail on error, immediately fail here
-          logger.fatal("Page Load Timeout, failing crawl", {
-            msg,
-            ...logDetails,
-          });
+          logger.fatal(
+            "Page Load Timeout, failing crawl",
+            {
+              msg,
+              ...logDetails,
+            },
+            "general",
+            1,
+          );
         } else {
           // log if not already log and rethrow
           if (msg !== "logged") {
@@ -2401,7 +2391,7 @@ self.__bx_behaviors.selectMainBehavior();
 
         generatedCombinedWarcs.push(combinedWarcName);
 
-        const warcBuffer = await this.createWARCInfo(combinedWarcName);
+        const warcBuffer = await createWARCInfo(combinedWarcName);
         fh.write(warcBuffer);
       }
 
@@ -2559,7 +2549,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 }
 
-function shouldIgnoreAbort(req: HTTPRequest) {
+function shouldIgnoreAbort(req: HTTPRequest, data: PageState) {
   try {
     const failure = req.failure();
     const failureText = (failure && failure.errorText) || "";
@@ -2581,6 +2571,8 @@ function shouldIgnoreAbort(req: HTTPRequest) {
       headers["content-disposition"] ||
       (headers["content-type"] && !headers["content-type"].startsWith("text/"))
     ) {
+      data.status = resp.status();
+      data.mime = headers["content-type"].split(";")[0];
       return true;
     }
   } catch (e) {
