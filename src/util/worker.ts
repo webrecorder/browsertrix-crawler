@@ -20,8 +20,11 @@ export type WorkerOpts = {
   workerid: WorkerId;
   // eslint-disable-next-line @typescript-eslint/ban-types
   callbacks: Record<string, Function>;
-  directFetchCapture?:
-    | ((url: string) => Promise<{ fetched: boolean; mime: string }>)
+  directFetchCapture:
+    | ((
+        url: string,
+        headers: Record<string, string>,
+      ) => Promise<{ fetched: boolean; mime: string; ts: Date }>)
     | null;
   frameIdToExecId: Map<string, number>;
 };
@@ -171,7 +174,8 @@ export class PageWorker {
         this.cdp = cdp;
         this.callbacks = {};
         const directFetchCapture = this.recorder
-          ? (x: string) => this.recorder!.directFetchCapture(x)
+          ? (x: string, h: Record<string, string>) =>
+              this.recorder!.directFetchCapture(x, h)
           : null;
         this.opts = {
           page,

@@ -6,7 +6,7 @@ import PQueue from "p-queue";
 
 import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun, timestampNow } from "./timing.js";
-import { RequestResponseInfo } from "./reqresp.js";
+import { RequestResponseInfo, isHTMLContentType } from "./reqresp.js";
 
 // @ts-expect-error TODO fill in why error is expected
 import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
@@ -1064,10 +1064,15 @@ export class Recorder {
 
   async directFetchCapture(
     url: string,
-  ): Promise<{ fetched: boolean; mime: string }> {
+    headers: Record<string, string>,
+  ): Promise<{ fetched: boolean; mime: string; ts: Date }> {
     const reqresp = new RequestResponseInfo("0");
+    const ts = new Date();
+
     reqresp.url = url;
     reqresp.method = "GET";
+    reqresp.requestHeaders = headers;
+    reqresp.ts = ts;
 
     logger.debug(
       "Directly fetching page URL without browser",
@@ -1075,8 +1080,16 @@ export class Recorder {
       "recorder",
     );
 
-    const filter = (resp: Response) =>
-      resp.status === 200 && !resp.headers.get("set-cookie");
+    let mime: string = "";
+
+    const filter = (resp: Response) => {
+      const ct = resp.headers.get("content-type");
+      if (ct) {
+        mime = ct.split(";")[0];
+      }
+
+      return !isHTMLContentType(mime);
+    };
 
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
     // should not get here, as dupe pages tracked via seen list
@@ -1090,13 +1103,14 @@ export class Recorder {
     });
     const res = await fetcher.load();
 
-    const mime =
-      (reqresp.responseHeaders &&
-        reqresp.responseHeaders["content-type"] &&
-        reqresp.responseHeaders["content-type"].split(";")[0]) ||
-      "";
+    this.addPageRecord(reqresp);
 
-    return { fetched: res === "fetched", mime };
+    if (url === this.pageUrl && !this.pageInfo.ts) {
+      logger.debug("Setting page timestamp", { ts, url });
+      this.pageInfo.ts = ts;
+    }
+
+    return { fetched: res === "fetched", mime, ts };
   }
 }
 

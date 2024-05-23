@@ -44,27 +44,18 @@ import { Browser } from "./util/browser.js";
 import {
   ADD_LINK_FUNC,
   BEHAVIOR_LOG_FUNC,
-  HTML_TYPES,
   DEFAULT_SELECTORS,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
 import { OriginOverride } from "./util/originoverride.js";
 
-// to ignore HTTPS error for HEAD check
-import { Agent as HTTPAgent } from "http";
-import { Agent as HTTPSAgent } from "https";
 import { CDPSession, Frame, HTTPRequest, Page, Protocol } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
 import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
-
-const HTTPS_AGENT = new HTTPSAgent({
-  rejectUnauthorized: false,
-});
-
-const HTTP_AGENT = new HTTPAgent();
+import { isHTMLContentType } from "./util/reqresp.js";
 
 const behaviors = fs.readFileSync(
   new URL(
@@ -781,7 +772,7 @@ self.__bx_behaviors.selectMainBehavior();
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
-    const { page, data, workerid, callbacks, directFetchCapture } = opts;
+    const { page, cdp, data, workerid, callbacks, directFetchCapture } = opts;
     data.callbacks = callbacks;
 
     const { url } = data;
@@ -790,32 +781,26 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    data.isHTMLPage = await timedRun(
-      this.isHTML(url, logDetails),
-      FETCH_TIMEOUT_SECS,
-      "HEAD request to determine if URL is HTML page timed out",
-      logDetails,
-      "fetch",
-      true,
-    );
+    if (directFetchCapture) {
+      const cookie = await this.getCookieString(cdp, url);
 
-    if (!data.isHTMLPage && directFetchCapture) {
       try {
-        const { fetched, mime } = await timedRun(
-          directFetchCapture(url),
+        const { fetched, mime, ts } = await timedRun(
+          directFetchCapture(url, { Cookie: cookie, ...this.headers }),
           FETCH_TIMEOUT_SECS,
           "Direct fetch capture attempt timed out",
           logDetails,
           "fetch",
           true,
         );
+        if (mime) {
+          data.mime = mime;
+          data.isHTMLPage = isHTMLContentType(mime);
+        }
         if (fetched) {
           data.loadState = LoadState.FULL_PAGE_LOADED;
-          if (mime) {
-            data.mime = mime;
-          }
           data.status = 200;
-          data.ts = new Date();
+          data.ts = ts || new Date();
           logger.info(
             "Direct fetch successful",
             { url, ...logDetails },
@@ -840,6 +825,16 @@ self.__bx_behaviors.selectMainBehavior();
     data.favicon = await this.getFavicon(page, logDetails);
 
     await this.doPostLoadActions(opts);
+  }
+
+  async getCookieString(cdp: CDPSession, url: string) {
+    const cookieList: string[] = [];
+    const { cookies } = await cdp.send("Network.getCookies", { urls: [url] });
+    for (const { name, value } of cookies) {
+      cookieList.push(`${name}=${value}`);
+    }
+
+    return cookieList.join(";");
   }
 
   async doPostLoadActions(opts: WorkerState, saveOutput = false) {
@@ -1752,7 +1747,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       const contentType = resp.headers()["content-type"];
 
-      isHTMLPage = this.isHTMLContentType(contentType);
+      isHTMLPage = isHTMLContentType(contentType);
 
       if (contentType) {
         data.mime = contentType.split(";")[0];
@@ -2189,49 +2184,6 @@ self.__bx_behaviors.selectMainBehavior();
         "pageStatus",
       );
     }
-  }
-
-  resolveAgent(urlParsed: URL) {
-    return urlParsed.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT;
-  }
-
-  async isHTML(url: string, logDetails: LogDetails) {
-    try {
-      const resp = await fetch(url, {
-        method: "HEAD",
-        headers: this.headers,
-        agent: this.resolveAgent,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
-      if (resp.status !== 200) {
-        logger.debug("HEAD response code != 200, loading in browser", {
-          status: resp.status,
-          ...logDetails,
-        });
-        return true;
-      }
-
-      return this.isHTMLContentType(resp.headers.get("Content-Type"));
-    } catch (e) {
-      // can't confirm not html, so try in browser
-      logger.debug("HEAD request failed", { ...formatErr(e), ...logDetails });
-      return true;
-    }
-  }
-
-  isHTMLContentType(contentType: string | null) {
-    // just load if no content-type
-    if (!contentType) {
-      return true;
-    }
-
-    const mime = contentType.split(";")[0];
-
-    if (HTML_TYPES.includes(mime)) {
-      return true;
-    }
-
-    return false;
   }
 
   async parseSitemap({ url, sitemap }: ScopedSeed, seedId: number) {
