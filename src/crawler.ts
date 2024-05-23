@@ -782,11 +782,9 @@ self.__bx_behaviors.selectMainBehavior();
     data.workerid = workerid;
 
     if (directFetchCapture) {
-      const cookie = await this.getCookieString(cdp, url);
-
       try {
         const { fetched, mime, ts } = await timedRun(
-          directFetchCapture(url, { Cookie: cookie, ...this.headers }),
+          directFetchCapture({ url, headers: this.headers, cdp }),
           FETCH_TIMEOUT_SECS,
           "Direct fetch capture attempt timed out",
           logDetails,
@@ -825,16 +823,6 @@ self.__bx_behaviors.selectMainBehavior();
     data.favicon = await this.getFavicon(page, logDetails);
 
     await this.doPostLoadActions(opts);
-  }
-
-  async getCookieString(cdp: CDPSession, url: string) {
-    const cookieList: string[] = [];
-    const { cookies } = await cdp.send("Network.getCookies", { urls: [url] });
-    for (const { name, value } of cookies) {
-      cookieList.push(`${name}=${value}`);
-    }
-
-    return cookieList.join(";");
   }
 
   async doPostLoadActions(opts: WorkerState, saveOutput = false) {
@@ -1873,7 +1861,9 @@ self.__bx_behaviors.selectMainBehavior();
       "behavior",
     );
     try {
-      await frame.evaluate("self.__bx_behaviors.awaitPageLoad();");
+      await frame.evaluate(
+        "self.__bx_behaviors && self.__bx_behaviors.awaitPageLoad();",
+      );
     } catch (e) {
       logger.warn("Waiting for custom page load failed", e, "behavior");
     }

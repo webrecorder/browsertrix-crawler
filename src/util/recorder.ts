@@ -78,8 +78,19 @@ export type AsyncFetchOptions = {
 };
 
 // =================================================================
-export type ResponseStreamAsyncFetchOptions = AsyncFetchOptions & {
+export type DirectFetchRequest = {
+  url: string;
+  headers: Record<string, string>;
   cdp: CDPSession;
+};
+
+// =================================================================
+export type NetworkLoadAsyncFetchOptions = AsyncFetchOptions & {
+  cdp: CDPSession;
+};
+
+// =================================================================
+export type ResponseStreamAsyncFetchOptions = NetworkLoadAsyncFetchOptions & {
   requestId: string;
 };
 
@@ -1062,12 +1073,18 @@ export class Recorder {
     this.writer.writeRecordPair(responseRecord, requestRecord);
   }
 
-  async directFetchCapture(
-    url: string,
-    headers: Record<string, string>,
-  ): Promise<{ fetched: boolean; mime: string; ts: Date }> {
+  async directFetchCapture({ url, headers, cdp }: DirectFetchRequest): Promise<{
+    fetched: boolean;
+    mime: string;
+    ts: Date;
+  }> {
     const reqresp = new RequestResponseInfo("0");
     const ts = new Date();
+
+    const cookie = await this.getCookieString(cdp, url);
+    if (cookie) {
+      headers["Cookie"] = cookie;
+    }
 
     reqresp.url = url;
     reqresp.method = "GET";
@@ -1083,12 +1100,17 @@ export class Recorder {
     let mime: string = "";
 
     const filter = (resp: Response) => {
+      // just in case, attempt to load invalid responses via browser
+      if (resp.status >= 400) {
+        return false;
+      }
+
       const ct = resp.headers.get("content-type");
       if (ct) {
         mime = ct.split(";")[0];
       }
 
-      return !isHTMLContentType(mime);
+      return reqresp.isRedirectStatus(resp.status) || !isHTMLContentType(mime);
     };
 
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
@@ -1110,7 +1132,22 @@ export class Recorder {
       this.pageInfo.ts = ts;
     }
 
+    if (reqresp.isRedirectStatus(reqresp.status) && reqresp.responseHeaders) {
+      const url = reqresp.responseHeaders["location"];
+      await this.directFetchCapture({ url, headers, cdp });
+    }
+
     return { fetched: res === "fetched", mime, ts };
+  }
+
+  async getCookieString(cdp: CDPSession, url: string) {
+    const cookieList: string[] = [];
+    const { cookies } = await cdp.send("Network.getCookies", { urls: [url] });
+    for (const { name, value } of cookies) {
+      cookieList.push(`${name}=${value}`);
+    }
+
+    return cookieList.join(";");
   }
 }
 
@@ -1321,6 +1358,7 @@ class AsyncFetcher {
       headers,
       body: reqresp.postData || undefined,
       signal,
+      redirect: "manual",
     });
 
     if (this.filter && !this.filter(resp) && abort) {
@@ -1337,6 +1375,7 @@ class AsyncFetcher {
     }
 
     if (reqresp.expectedSize === 0) {
+      reqresp.fillFetchResponse(resp);
       reqresp.payload = new Uint8Array();
       return;
     } else if (!resp.body) {
@@ -1436,7 +1475,7 @@ class ResponseStreamAsyncFetcher extends AsyncFetcher {
 class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
   cdp: CDPSession;
 
-  constructor(opts: ResponseStreamAsyncFetchOptions) {
+  constructor(opts: NetworkLoadAsyncFetchOptions) {
     super(opts);
     this.cdp = opts.cdp;
   }

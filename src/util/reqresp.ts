@@ -149,10 +149,15 @@ export class RequestResponseInfo {
     }
   }
 
+  isRedirectStatus(status: number) {
+    return status >= 300 && status < 400 && status !== 304;
+  }
+
   isSelfRedirect() {
-    if (this.status < 300 || this.status >= 400 || this.status === 304) {
+    if (!this.isRedirectStatus(this.status)) {
       return false;
     }
+
     try {
       const headers = new Headers(this.getResponseHeadersDict());
       const location = headers.get("location") || "";

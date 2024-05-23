@@ -2,7 +2,7 @@ import os from "os";
 
 import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
-import { Recorder } from "./recorder.js";
+import { DirectFetchRequest, Recorder } from "./recorder.js";
 import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
 import { PageState, WorkerId } from "./state.js";
@@ -22,8 +22,7 @@ export type WorkerOpts = {
   callbacks: Record<string, Function>;
   directFetchCapture:
     | ((
-        url: string,
-        headers: Record<string, string>,
+        request: DirectFetchRequest,
       ) => Promise<{ fetched: boolean; mime: string; ts: Date }>)
     | null;
   frameIdToExecId: Map<string, number>;
@@ -174,8 +173,7 @@ export class PageWorker {
         this.cdp = cdp;
         this.callbacks = {};
         const directFetchCapture = this.recorder
-          ? (x: string, h: Record<string, string>) =>
-              this.recorder!.directFetchCapture(x, h)
+          ? (req: DirectFetchRequest) => this.recorder!.directFetchCapture(req)
           : null;
         this.opts = {
           page,
