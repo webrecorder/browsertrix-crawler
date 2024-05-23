@@ -75,6 +75,7 @@ export type AsyncFetchOptions = {
   filter?: (resp: Response) => boolean;
   ignoreDupe?: boolean;
   maxFetchSize?: number;
+  manualRedirect?: boolean;
 };
 
 // =================================================================
@@ -1122,10 +1123,9 @@ export class Recorder {
       networkId: "0",
       filter,
       ignoreDupe: true,
+      manualRedirect: true,
     });
     const res = await fetcher.load();
-
-    this.addPageRecord(reqresp);
 
     if (url === this.pageUrl && !this.pageInfo.ts) {
       logger.debug("Setting page timestamp", { ts, url });
@@ -1166,6 +1166,8 @@ class AsyncFetcher {
   tempdir: string;
   filename: string;
 
+  manualRedirect = false;
+
   constructor({
     tempdir,
     reqresp,
@@ -1175,6 +1177,7 @@ class AsyncFetcher {
     filter = undefined,
     ignoreDupe = false,
     maxFetchSize = MAX_BROWSER_DEFAULT_FETCH_SIZE,
+    manualRedirect = false,
   }: AsyncFetchOptions) {
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
@@ -1193,6 +1196,8 @@ class AsyncFetcher {
     );
 
     this.maxFetchSize = maxFetchSize;
+
+    this.manualRedirect = manualRedirect;
   }
 
   async load() {
@@ -1328,9 +1333,9 @@ class AsyncFetcher {
       reqresp.status = 0;
       reqresp.errorText = e.message;
     } finally {
+      recorder.addPageRecord(reqresp);
       // exclude direct fetch request with fake id
       if (networkId !== "0") {
-        recorder.addPageRecord(reqresp);
         recorder.removeReqResp(networkId);
       }
     }
@@ -1358,7 +1363,7 @@ class AsyncFetcher {
       headers,
       body: reqresp.postData || undefined,
       signal,
-      redirect: "manual",
+      redirect: this.manualRedirect ? "manual" : "follow",
     });
 
     if (this.filter && !this.filter(resp) && abort) {
