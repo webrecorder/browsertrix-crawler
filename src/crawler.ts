@@ -801,7 +801,7 @@ self.__bx_behaviors.selectMainBehavior();
           data.ts = ts || new Date();
           logger.info(
             "Direct fetch successful",
-            { url, ...logDetails },
+            { url, mime, ...logDetails },
             "fetch",
           );
           return;
