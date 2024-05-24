@@ -149,12 +149,12 @@ export class RequestResponseInfo {
     }
   }
 
-  isRedirectStatus(status: number) {
-    return status >= 300 && status < 400 && status !== 304;
+  isRedirectStatus() {
+    return this.status >= 300 && this.status < 400 && this.status !== 304;
   }
 
   isSelfRedirect() {
-    if (!this.isRedirectStatus(this.status)) {
+    if (!this.isRedirectStatus()) {
       return false;
     }
 

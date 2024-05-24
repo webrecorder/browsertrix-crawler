@@ -1101,8 +1101,8 @@ export class Recorder {
     let mime: string = "";
 
     const filter = (resp: Response) => {
-      // just in case, attempt to load invalid responses via browser
-      if (resp.status >= 400) {
+      // only direct load 200 responses
+      if (resp.status !== 200) {
         return false;
       }
 
@@ -1111,7 +1111,7 @@ export class Recorder {
         mime = ct.split(";")[0];
       }
 
-      return !isHTMLContentType(mime) || reqresp.isRedirectStatus(resp.status);
+      return !isHTMLContentType(mime);
     };
 
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
@@ -1127,19 +1127,7 @@ export class Recorder {
     });
     const res = await fetcher.load();
 
-    // recursively attempt to handle redirect
-    if (reqresp.isRedirectStatus(reqresp.status) && reqresp.responseHeaders) {
-      const newUrl = new URL(reqresp.responseHeaders["location"], url).href;
-      const res = await this.directFetchCapture({ url: newUrl, headers, cdp });
-      if (res.fetched) {
-        mime = res.mime;
-      }
-    }
-
-    // get here if got a non-redirect response successfully
     this.addPageRecord(reqresp);
-
-    await this.crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url);
 
     if (url === this.pageUrl && !this.pageInfo.ts) {
       logger.debug("Setting page timestamp", { ts, url });
@@ -1221,7 +1209,6 @@ class AsyncFetcher {
       if (
         reqresp.method === "GET" &&
         url &&
-        networkId !== "0" &&
         !(await crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url))
       ) {
         if (!this.ignoreDupe) {
@@ -1343,9 +1330,9 @@ class AsyncFetcher {
       reqresp.status = 0;
       reqresp.errorText = e.message;
     } finally {
+      recorder.addPageRecord(reqresp);
       // exclude direct fetch request with fake id
       if (networkId !== "0") {
-        recorder.addPageRecord(reqresp);
         recorder.removeReqResp(networkId);
       }
     }
