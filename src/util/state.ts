@@ -66,7 +66,7 @@ export class PageState {
 
   callbacks: PageCallbacks = {};
 
-  isHTMLPage?: boolean;
+  isHTMLPage = true;
   text?: string;
   screenshotView?: Buffer;
   favicon?: string;
