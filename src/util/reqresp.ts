@@ -90,12 +90,7 @@ export class RequestResponseInfo {
   }
 
   fillRequest(request: Protocol.Network.Request, resourceType: string) {
-    this.url = request.url;
-    this.method = request.method;
-    if (!this.requestHeadersDict) {
-      this.requestHeadersDict = request.headers;
-    }
-    this.requestHeaders = this.getRequestHeaders();
+    this.setRequestHeaders(request.url, request.method, request.headers);
     this.postData = request.postData;
     this.hasPostData = request.hasPostData || false;
 
@@ -202,6 +197,19 @@ export class RequestResponseInfo {
         length,
       ),
     );
+  }
+
+  setRequestHeaders(
+    url: string,
+    method: string,
+    headers: Record<string, string>,
+  ) {
+    this.url = url;
+    this.method = method;
+    if (!this.requestHeadersDict) {
+      this.requestHeadersDict = headers;
+    }
+    this.requestHeaders = this.getRequestHeaders();
   }
 
   setResponseHeaders(

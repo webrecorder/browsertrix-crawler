@@ -1083,11 +1083,7 @@ export class Recorder {
       headers["Cookie"] = cookie;
     }
 
-    reqresp.url = url;
-    reqresp.method = "GET";
-    reqresp.requestHeaders = headers;
-    reqresp.ts = ts;
-
+    reqresp.setRequestHeaders(url, "GET", headers);
     logger.debug(
       "Directly fetching page URL without browser",
       { url, ...this.logDetails },
@@ -1122,10 +1118,6 @@ export class Recorder {
       manualRedirect: true,
     });
     const res = await fetcher.load();
-
-    const mime = (reqresp.responseHeaders.get("content-type") || "").split(
-      ";",
-    )[0];
 
     if (url === this.pageUrl && !this.pageInfo.ts) {
       logger.debug("Setting page timestamp", { ts, url });
