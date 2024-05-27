@@ -2,6 +2,8 @@ import { logger } from "./logger.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { WARCWriter } from "./warcwriter.js";
 
+const encoder = new TextEncoder();
+
 // ============================================================================
 type TextExtractOpts = {
   url: string;
@@ -45,7 +47,7 @@ export abstract class BaseTextExtract {
       if (saveToWarc) {
         this.writer.writeNewResourceRecord(
           {
-            buffer: new TextEncoder().encode(text),
+            buffer: encoder.encode(text),
             resourceType,
             contentType: "text/plain",
             url: this.url,
