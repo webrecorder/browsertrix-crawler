@@ -1116,52 +1116,51 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.domSnapshot && this.domSnapshotWriter) {
-      //const { data } = await cdp.send("Page.captureSnapshot", {});
-      // const { root } = await cdp.send("DOM.getDocument", {
-      //   depth: -1,
-      //   pierce: true,
-      // });
-
-      const result = await cdp.send("DOMSnapshot.captureSnapshot", {
-        computedStyles: [],
-      });
-
-      fs.createWriteStream(this.collDir + "/dom.json").write(
-        JSON.stringify(result),
-      );
-
-      //const data = dom2html(root, true, "console");
-      const data = snapshotToDom(result);
-
-      this.domSnapshotWriter.writeNewResourceRecord(
-        {
-          buffer: new TextEncoder().encode(data),
-          resourceType: "",
-          contentType: "text/html",
-          url,
-        },
-        logDetails,
-        "general",
-      );
-    }
-
     let textextract = null;
 
-    if (this.textWriter) {
-      textextract = new TextExtractViaSnapshot(cdp, {
-        writer: this.textWriter,
-        url,
-        skipDocs: this.skipTextDocs,
-      });
-      const { text } = await textextract.extractAndStoreText(
-        "text",
-        false,
-        this.params.text.includes("to-warc"),
-      );
+    if (data.isHTMLPage) {
+      let snapshot = null;
 
-      if (text !== null && (this.textInPages || saveOutput)) {
-        data.text = text;
+      if (this.textWriter || this.domSnapshotWriter) {
+        snapshot = await cdp.send("DOMSnapshot.captureSnapshot", {
+          computedStyles: [],
+        });
+      }
+
+      if (this.domSnapshotWriter && snapshot) {
+        const data = snapshotToDom(snapshot);
+
+        this.domSnapshotWriter.writeNewResourceRecord(
+          {
+            buffer: new TextEncoder().encode(data),
+            resourceType: "",
+            contentType: "text/html",
+            url,
+          },
+          logDetails,
+          "general",
+        );
+      }
+
+      if (this.textWriter) {
+        textextract = new TextExtractViaSnapshot(
+          cdp,
+          {
+            writer: this.textWriter,
+            url,
+            skipDocs: this.skipTextDocs,
+          },
+          snapshot,
+        );
+        const { text } = await textextract.extractAndStoreText(
+          "text",
+          false,
+          this.params.text.includes("to-warc"),
+        );
+
+        if (text && (this.textInPages || saveOutput)) {
+          data.text = text;
+        }
       }
     }
 

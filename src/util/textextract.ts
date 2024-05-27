@@ -75,10 +75,23 @@ export abstract class BaseTextExtract {
 
 // ============================================================================
 export class TextExtractViaSnapshot extends BaseTextExtract {
+  snapshot: Protocol.DOMSnapshot.CaptureSnapshotResponse | null;
+
+  constructor(
+    cdp: CDPSession,
+    opts: TextExtractOpts,
+    snapshot: Protocol.DOMSnapshot.CaptureSnapshotResponse | null = null,
+  ) {
+    super(cdp, opts);
+    this.snapshot = snapshot;
+  }
+
   async doGetText(): Promise<string> {
-    const result = await this.cdp.send("DOMSnapshot.captureSnapshot", {
-      computedStyles: [],
-    });
+    const result = this.snapshot
+      ? this.snapshot
+      : await this.cdp.send("DOMSnapshot.captureSnapshot", {
+          computedStyles: [],
+        });
     return this.parseTextFromDOMSnapshot(result);
   }
 
