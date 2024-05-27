@@ -39,6 +39,7 @@ import {
 } from "./constants.js";
 import { Readable } from "stream";
 import { createHash } from "crypto";
+import { snapshotToDom } from "./domsnapshot.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -166,6 +167,7 @@ export class Recorder extends EventEmitter {
   pageFinished = false;
 
   lastErrorText = "";
+  useDomSnapshot = false;
 
   gzip = true;
 
@@ -1199,6 +1201,30 @@ export class Recorder extends EventEmitter {
 
   addPageFailedRecord(status: number, error: string) {
     this.pageInfo.urls[this.pageInfo.url] = { status, error };
+  }
+
+  async addDOMSnapshot(cdp: CDPSession): Promise<void> {
+    const url = this.pageInfo.url;
+
+    const snapshot = await cdp.send("DOMSnapshot.captureSnapshot", {
+      computedStyles: [],
+    });
+
+    const dom = snapshotToDom(snapshot);
+
+    this.writer.writeNewResourceRecord(
+      {
+        buffer: new TextEncoder().encode(dom),
+        resourceType: "domsnapshot",
+        contentType: "text/html",
+        url,
+        date: this.pageInfo.ts,
+      },
+      this.logDetails,
+      "recorder",
+    );
+
+    await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, 200);
   }
 
   writePageInfoRecord() {
