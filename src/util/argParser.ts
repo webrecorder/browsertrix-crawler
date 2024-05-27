@@ -229,6 +229,13 @@ class ArgParser {
           default: false,
         },
 
+        domSnapshot: {
+          describe:
+            "If set, will generate DOM snapshots of HTML after page load",
+          type: "boolean",
+          default: false,
+        },
+
         driver: {
           describe: "Custom driver for the crawler, if any",
           type: "string",

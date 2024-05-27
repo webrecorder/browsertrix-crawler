@@ -28,6 +28,7 @@ import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
 import { DEFAULT_MAX_RETRIES } from "./constants.js";
 import { Readable } from "stream";
+import { snapshotToDom } from "./domsnapshot.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -134,6 +135,7 @@ export class Recorder extends EventEmitter {
   pageFinished = false;
 
   lastErrorText = "";
+  useDomSnapshot = false;
 
   gzip = true;
 
@@ -979,6 +981,30 @@ export class Recorder extends EventEmitter {
     }
   }
 
+  async addDOMSnapshot(cdp: CDPSession): Promise<void> {
+    const url = this.pageInfo.url;
+
+    const snapshot = await cdp.send("DOMSnapshot.captureSnapshot", {
+      computedStyles: [],
+    });
+
+    const dom = snapshotToDom(snapshot);
+
+    this.writer.writeNewResourceRecord(
+      {
+        buffer: new TextEncoder().encode(dom),
+        resourceType: "",
+        contentType: "text/html",
+        url,
+        date: this.pageInfo.ts,
+      },
+      this.logDetails,
+      "recorder",
+    );
+
+    await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, 200);
+  }
+
   writePageInfoRecord() {
     if (this.skipPageInfo) {
       logger.debug(
@@ -1582,6 +1608,11 @@ export class Recorder extends EventEmitter {
     reqresp: RequestResponseInfo,
     iter?: AsyncIterable<Uint8Array>,
   ): Promise<boolean> {
+
+    if (this.useDomSnapshot && url === this.pageInfo.url) {
+      return;
+    }
+
     // always include in pageinfo record if going to serialize to WARC
     // even if serialization does not happen, indicates this URL was on the page
     this.addPageRecord(reqresp);
