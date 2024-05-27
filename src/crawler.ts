@@ -4,9 +4,6 @@ import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp from "fs/promises";
 
-// ts-expect-error no types
-//import dom2html from "dom2html";
-
 import {
   RedisCrawlState,
   LoadState,
