@@ -21,6 +21,7 @@ ENV PROXY_HOST=localhost \
 WORKDIR /app
 
 ADD requirements.txt /app/
+RUN apt update && apt -y upgrade && apt -y install python3-venv
 RUN python3 -m venv /app/python-venv && \
     /app/python-venv/bin/pip install -U setuptools && \
     /app/python-venv/bin/pip install -r requirements.txt && \
