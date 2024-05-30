@@ -11,6 +11,8 @@ import PQueue from "p-queue";
 
 const DEFAULT_ROLLOVER_SIZE = 1_000_000_000;
 
+let warcInfo = {};
+
 export type ResourceRecordData = {
   buffer: Uint8Array;
   resourceType: string;
@@ -114,6 +116,8 @@ export class WARCWriter implements IndexerOffsetLength {
         { flags: "a" },
       );
     }
+
+    fh.write(await createWARCInfo(this.filename));
 
     return fh;
   }
@@ -306,6 +310,33 @@ export class WARCWriter implements IndexerOffsetLength {
 
     this.done = true;
   }
+}
+
+// =================================================================
+export function setWARCInfo(
+  software: string,
+  otherParams?: Record<string, string>,
+) {
+  warcInfo = {
+    software,
+    format: "WARC File Format 1.1",
+    ...otherParams,
+  };
+}
+
+// =================================================================
+export async function createWARCInfo(filename: string) {
+  const warcVersion = "WARC/1.1";
+  const type = "warcinfo";
+
+  const record = await WARCRecord.createWARCInfo(
+    { filename, type, warcVersion },
+    warcInfo,
+  );
+  const buffer = await WARCSerializer.serialize(record, {
+    gzip: true,
+  });
+  return buffer;
 }
 
 // =================================================================

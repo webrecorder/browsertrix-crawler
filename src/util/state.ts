@@ -66,7 +66,7 @@ export class PageState {
 
   callbacks: PageCallbacks = {};
 
-  isHTMLPage?: boolean;
+  isHTMLPage = true;
   text?: string;
   screenshotView?: Buffer;
   favicon?: string;
@@ -670,8 +670,20 @@ return 0;
       seen.push(data.url);
     }
 
-    for (const json of state.pending) {
-      const data = JSON.parse(json);
+    for (let json of state.pending) {
+      let data;
+
+      // if the data is string, parse
+      if (typeof json === "string") {
+        data = JSON.parse(json);
+        // otherwise, use as is, set json to json version
+      } else if (typeof json === "object") {
+        data = json;
+        json = JSON.stringify(data);
+      } else {
+        continue;
+      }
+
       if (checkScope) {
         if (!this.recheckScope(data, seeds)) {
           continue;
@@ -741,8 +753,7 @@ return 0;
   }
 
   async getPendingList() {
-    const list = await this.redis.hvals(this.pkey);
-    return list.map((x) => JSON.parse(x));
+    return await this.redis.hvals(this.pkey);
   }
 
   async getErrorList() {

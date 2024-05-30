@@ -50,27 +50,18 @@ import { Browser } from "./util/browser.js";
 import {
   ADD_LINK_FUNC,
   BEHAVIOR_LOG_FUNC,
-  HTML_TYPES,
   DEFAULT_SELECTORS,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
 import { OriginOverride } from "./util/originoverride.js";
 
-// to ignore HTTPS error for HEAD check
-import { Agent as HTTPAgent } from "http";
-import { Agent as HTTPSAgent } from "https";
 import { CDPSession, Frame, HTTPRequest, Page, Protocol } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
-import { WARCWriter } from "./util/warcwriter.js";
-
-const HTTPS_AGENT = new HTTPSAgent({
-  rejectUnauthorized: false,
-});
-
-const HTTP_AGENT = new HTTPAgent();
+import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
+import { isHTMLContentType } from "./util/reqresp.js";
 
 const behaviors = fs.readFileSync(
   new URL(
@@ -462,6 +453,7 @@ export class Crawler {
     logger.setExternalLogStream(this.logFH);
 
     this.infoString = await getInfoString();
+    setWARCInfo(this.infoString, this.params.warcInfo);
     logger.info(this.infoString);
 
     logger.info("Seeds", this.params.scopedSeeds);
@@ -786,7 +778,7 @@ self.__bx_behaviors.selectMainBehavior();
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
-    const { page, data, workerid, callbacks, directFetchCapture } = opts;
+    const { page, cdp, data, workerid, callbacks, directFetchCapture } = opts;
     data.callbacks = callbacks;
 
     const { url } = data;
@@ -795,35 +787,27 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    data.isHTMLPage = await timedRun(
-      this.isHTML(url, logDetails),
-      FETCH_TIMEOUT_SECS,
-      "HEAD request to determine if URL is HTML page timed out",
-      logDetails,
-      "fetch",
-      true,
-    );
-
-    if (!data.isHTMLPage && directFetchCapture) {
+    if (directFetchCapture) {
       try {
-        const { fetched, mime } = await timedRun(
-          directFetchCapture(url),
+        const { fetched, mime, ts } = await timedRun(
+          directFetchCapture({ url, headers: this.headers, cdp }),
           FETCH_TIMEOUT_SECS,
           "Direct fetch capture attempt timed out",
           logDetails,
           "fetch",
           true,
         );
+        if (mime) {
+          data.mime = mime;
+          data.isHTMLPage = isHTMLContentType(mime);
+        }
         if (fetched) {
           data.loadState = LoadState.FULL_PAGE_LOADED;
-          if (mime) {
-            data.mime = mime;
-          }
           data.status = 200;
-          data.ts = new Date();
+          data.ts = ts || new Date();
           logger.info(
             "Direct fetch successful",
-            { url, ...logDetails },
+            { url, mime, ...logDetails },
             "fetch",
           );
           return;
@@ -1059,11 +1043,26 @@ self.__bx_behaviors.selectMainBehavior();
 
     const frameUrl = frame.url();
 
+    if (!frameUrl) {
+      return null;
+    }
+
     // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
     // if there's no tag or an iframe tag, then assume its a regular frame
-    const tagName = await frame.evaluate(
-      "self && self.frameElement && self.frameElement.tagName",
-    );
+    let tagName = "";
+
+    try {
+      tagName = await timedRun(
+        frame.evaluate(
+          "self && self.frameElement && self.frameElement.tagName",
+        ),
+        PAGE_OP_TIMEOUT_SECS,
+        "Frame check timed out",
+        logDetails,
+      );
+    } catch (e) {
+      // ignore
+    }
 
     if (tagName && tagName !== "IFRAME" && tagName !== "FRAME") {
       logger.debug(
@@ -1091,26 +1090,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     return res ? frame : null;
-  }
-
-  async createWARCInfo(filename: string) {
-    const warcVersion = "WARC/1.1";
-    const type = "warcinfo";
-
-    const info = {
-      software: this.infoString,
-      format: "WARC File Format 1.1",
-    };
-
-    const warcInfo = { ...info, ...this.params.warcInfo };
-    const record = await warcio.WARCRecord.createWARCInfo(
-      { filename, type, warcVersion },
-      warcInfo,
-    );
-    const buffer = await warcio.WARCSerializer.serialize(record, {
-      gzip: true,
-    });
-    return buffer;
   }
 
   async checkLimits() {
@@ -1148,10 +1127,11 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.failOnFailedLimit) {
-      const numFailed = this.crawlState.numFailed();
-      if (numFailed >= this.params.failOnFailedLimit) {
+      const numFailed = await this.crawlState.numFailed();
+      const failedLimit = this.params.failOnFailedLimit;
+      if (numFailed >= failedLimit) {
         logger.fatal(
-          `Failed threshold reached ${numFailed} >= ${this.params.failedLimit}, failing crawl`,
+          `Failed threshold reached ${numFailed} >= ${failedLimit}, failing crawl`,
         );
       }
     }
@@ -1618,18 +1598,18 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const realSize = await this.crawlState.queueSize();
-    const pendingList = await this.crawlState.getPendingList();
+    const pendingPages = await this.crawlState.getPendingList();
     const done = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
-    const total = realSize + pendingList.length + done;
+    const total = realSize + pendingPages.length + done;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled: done,
       total: total,
-      pending: pendingList.length,
+      pending: pendingPages.length,
       failed: failed,
       limit: limit,
-      pendingPages: pendingList.map((x) => JSON.stringify(x)),
+      pendingPages,
     };
 
     logger.info("Crawl statistics", stats, "crawlStatus");
@@ -1663,7 +1643,7 @@ self.__bx_behaviors.selectMainBehavior();
     // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
     // if so, don't report as an error
     page.once("requestfailed", (req: HTTPRequest) => {
-      ignoreAbort = shouldIgnoreAbort(req);
+      ignoreAbort = shouldIgnoreAbort(req, data);
     });
 
     let isHTMLPage = data.isHTMLPage;
@@ -1715,10 +1695,15 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (failed) {
         if (failCrawlOnError) {
-          logger.fatal("Seed Page Load Error, failing crawl", {
-            status,
-            ...logDetails,
-          });
+          logger.fatal(
+            "Seed Page Load Error, failing crawl",
+            {
+              status,
+              ...logDetails,
+            },
+            "general",
+            1,
+          );
         } else {
           logger.error(
             isChromeError ? "Page Crashed on Load" : "Page Invalid Status",
@@ -1733,7 +1718,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       const contentType = resp.headers()["content-type"];
 
-      isHTMLPage = this.isHTMLContentType(contentType);
+      isHTMLPage = isHTMLContentType(contentType);
 
       if (contentType) {
         data.mime = contentType.split(";")[0];
@@ -1756,10 +1741,15 @@ self.__bx_behaviors.selectMainBehavior();
           data.skipBehaviors = true;
         } else if (failCrawlOnError) {
           // if fail on error, immediately fail here
-          logger.fatal("Page Load Timeout, failing crawl", {
-            msg,
-            ...logDetails,
-          });
+          logger.fatal(
+            "Page Load Timeout, failing crawl",
+            {
+              msg,
+              ...logDetails,
+            },
+            "general",
+            1,
+          );
         } else {
           // log if not already log and rethrow
           if (msg !== "logged") {
@@ -1854,7 +1844,9 @@ self.__bx_behaviors.selectMainBehavior();
       "behavior",
     );
     try {
-      await frame.evaluate("self.__bx_behaviors.awaitPageLoad();");
+      await frame.evaluate(
+        "self.__bx_behaviors && self.__bx_behaviors.awaitPageLoad();",
+      );
     } catch (e) {
       logger.warn("Waiting for custom page load failed", e, "behavior");
     }
@@ -2167,49 +2159,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  resolveAgent(urlParsed: URL) {
-    return urlParsed.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT;
-  }
-
-  async isHTML(url: string, logDetails: LogDetails) {
-    try {
-      const resp = await fetch(url, {
-        method: "HEAD",
-        headers: this.headers,
-        agent: this.resolveAgent,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
-      if (resp.status !== 200) {
-        logger.debug("HEAD response code != 200, loading in browser", {
-          status: resp.status,
-          ...logDetails,
-        });
-        return true;
-      }
-
-      return this.isHTMLContentType(resp.headers.get("Content-Type"));
-    } catch (e) {
-      // can't confirm not html, so try in browser
-      logger.debug("HEAD request failed", { ...formatErr(e), ...logDetails });
-      return true;
-    }
-  }
-
-  isHTMLContentType(contentType: string | null) {
-    // just load if no content-type
-    if (!contentType) {
-      return true;
-    }
-
-    const mime = contentType.split(";")[0];
-
-    if (HTML_TYPES.includes(mime)) {
-      return true;
-    }
-
-    return false;
-  }
-
   async parseSitemap({ url, sitemap }: ScopedSeed, seedId: number) {
     if (!sitemap) {
       return;
@@ -2367,7 +2316,7 @@ self.__bx_behaviors.selectMainBehavior();
 
         generatedCombinedWarcs.push(combinedWarcName);
 
-        const warcBuffer = await this.createWARCInfo(combinedWarcName);
+        const warcBuffer = await createWARCInfo(combinedWarcName);
         fh.write(warcBuffer);
       }
 
@@ -2525,7 +2474,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 }
 
-function shouldIgnoreAbort(req: HTTPRequest) {
+function shouldIgnoreAbort(req: HTTPRequest, data: PageState) {
   try {
     const failure = req.failure();
     const failureText = (failure && failure.errorText) || "";
@@ -2547,6 +2496,8 @@ function shouldIgnoreAbort(req: HTTPRequest) {
       headers["content-disposition"] ||
       (headers["content-type"] && !headers["content-type"].startsWith("text/"))
     ) {
+      data.status = resp.status();
+      data.mime = headers["content-type"].split(";")[0];
       return true;
     }
   } catch (e) {

@@ -13,8 +13,10 @@ import * as Minio from "minio";
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 
-// @ts-expect-error TODO fill in why error is expected
+// @ts-expect-error (incorrect types on get-folder-size)
 import getFolderSize from "get-folder-size";
+
+const DEFAULT_REGION = "us-east-1";
 
 // ===========================================================================
 export class S3StorageSync {
@@ -58,6 +60,8 @@ export class S3StorageSync {
       this.fullPrefix = url.href;
     }
 
+    const region = process.env.STORE_REGION || DEFAULT_REGION;
+
     this.client = new Minio.Client({
       endPoint: url.hostname,
       port: Number(url.port) || (url.protocol === "https:" ? 443 : 80),
@@ -65,7 +69,7 @@ export class S3StorageSync {
       accessKey,
       secretKey,
       partSize: 100 * 1024 * 1024,
-      region: "auto",
+      region,
     });
 
     this.bucketName = url.pathname.slice(1).split("/")[0];

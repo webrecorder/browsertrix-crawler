@@ -228,7 +228,14 @@ async function main() {
     const target = await cdp.send("Target.getTargetInfo");
     const targetId = target.targetInfo.targetId;
 
-    new InteractiveBrowser(params, browser, page, cdp, targetId, waitUntil);
+    const ibrowser = new InteractiveBrowser(
+      params,
+      browser,
+      page,
+      cdp,
+      targetId,
+    );
+    await ibrowser.startLoad(waitUntil);
   } else {
     await automatedProfile(params, browser, page, cdp, waitUntil);
   }
@@ -247,7 +254,11 @@ async function automatedProfile(
 
   logger.info(`Loading page: ${params.url}`);
 
-  await page.goto(params.url, { waitUntil });
+  try {
+    await page.goto(params.url, { waitUntil });
+  } catch (e) {
+    logger.error("Page Load Failed/Interrupted", e);
+  }
 
   logger.debug("Looking for username and password entry fields on page...");
 
@@ -380,7 +391,6 @@ class InteractiveBrowser {
     page: Page,
     cdp: CDPSession,
     targetId: string,
-    waitUntil: PuppeteerLifeCycleEvent = "load",
   ) {
     logger.info("Creating Profile Interactively...");
     child_process.spawn("socat", [
@@ -404,9 +414,15 @@ class InteractiveBrowser {
       cdp.send("Page.enable");
 
       cdp.on("Page.windowOpen", async (resp) => {
-        if (resp.url) {
+        if (!resp.url) {
+          return;
+        }
+
+        try {
           await cdp.send("Target.activateTarget", { targetId: this.targetId });
           await page.goto(resp.url);
+        } catch (e) {
+          logger.error("Page Load Failed/Interrupted", e);
         }
       });
     }
@@ -436,12 +452,17 @@ class InteractiveBrowser {
     } else {
       logger.info("Screencasting with CDP on port 9222");
     }
+  }
 
-    logger.info(`Loading page: ${params.url}`);
+  async startLoad(waitUntil: PuppeteerLifeCycleEvent = "load") {
+    logger.info(`Loading page: ${this.params.url}`);
 
-    page.goto(params.url, { waitUntil, timeout: 0 }).finally(() => {
+    try {
+      await this.page.goto(this.params.url, { waitUntil, timeout: 0 });
       logger.info("Loaded!");
-    });
+    } catch (e) {
+      logger.warn("Page Load Failed/Interrupted", e);
+    }
   }
 
   handlePageLoad() {
@@ -568,7 +589,12 @@ class InteractiveBrowser {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true }));
 
-          this.page.goto(url);
+          logger.info("Loading Page", { page: url });
+
+          this.page
+            .goto(url)
+            .catch((e) => logger.warn("Page Load Failed/Interrupted", e));
+
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
           res.writeHead(400, { "Content-Type": "application/json" });
