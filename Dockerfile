@@ -21,15 +21,16 @@ ENV PROXY_HOST=localhost \
 WORKDIR /app
 
 ADD requirements.txt /app/
-RUN pip install -U setuptools; pip install -r requirements.txt
+RUN python3 -m venv /app/python-venv && \
+    /app/python-venv/bin/pip install -U setuptools && \
+    /app/python-venv/bin/pip install -r requirements.txt && \
+    ln -s /app/python-venv/bin/wacz /usr/bin/wacz && \
+    ln -s /app/python-venv/bin/cdxj-indexer /usr/bin/cdxj-indexer
 
 ADD package.json /app/
 
 # to allow forcing rebuilds from this stage
 ARG REBUILD
-
-# Prefetch tldextract so pywb is able to boot in environments with limited internet access
-RUN tldextract --update 
 
 # Download and format ad host blocklist as JSON
 RUN mkdir -p /tmp/ads && cd /tmp/ads && \
