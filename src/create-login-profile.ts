@@ -179,7 +179,6 @@ async function main() {
     headless: params.headless,
     signals: false,
     chromeOptions: {
-      proxy: false,
       extraArgs: [
         "--window-position=0,0",
         `--window-size=${params.windowSize}`,

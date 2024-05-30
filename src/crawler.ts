@@ -1289,7 +1289,10 @@ self.__bx_behaviors.selectMainBehavior();
       emulateDevice: this.emulateDevice,
       swOpt: this.params.serviceWorker,
       chromeOptions: {
-        proxy: false,
+        proxy:
+          process.env.PROXY_HOST && process.env.PROXY_PORT
+            ? `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`
+            : "",
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs(),
       },
