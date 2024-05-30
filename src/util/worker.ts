@@ -22,6 +22,7 @@ export type WorkerState = {
   callbacks: Record<string, Function>;
   recorder: Recorder | null;
   markPageUsed: () => void;
+  addDOMSnapshot: (cdp: CDPSession) => void;
   frameIdToExecId: Map<string, number>;
   isAuthSet?: boolean;
   pageBlockUnload?: boolean;
@@ -175,7 +176,13 @@ export class PageWorker {
           cdp,
           workerid,
           callbacks: this.callbacks,
+<<<<<<< HEAD
           recorder: this.recorder,
+=======
+          directFetchCapture,
+          addDOMSnapshot: (cdp: CDPSession) =>
+            this.recorder?.addDOMSnapshot(cdp),
+>>>>>>> 1f9fa7a7 (move domsnapshot to recorder with 'useDomSnapshot':)
           frameIdToExecId: new Map<string, number>(),
           markPageUsed: () => {
             if (!this.alwaysReuse) {

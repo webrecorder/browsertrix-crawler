@@ -157,7 +157,6 @@ export class Crawler {
 
   screenshotWriter: WARCWriter | null;
   textWriter: WARCWriter | null;
-  domSnapshotWriter: WARCWriter | null;
 
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
@@ -301,7 +300,6 @@ export class Crawler {
 
     this.screenshotWriter = null;
     this.textWriter = null;
-    this.domSnapshotWriter = null;
 
     this.blockRules = null;
     this.adBlockRules = null;
@@ -569,10 +567,6 @@ export class Crawler {
     }
     if (this.params.text && !this.params.dryRun) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
-    }
-    if (this.params.domSnapshot) {
-      this.domSnapshotWriter =
-        this.createExtraResourceWarcWriter("domsnapshot");
     }
   }
 
@@ -1086,7 +1080,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async doPostLoadActions(opts: WorkerState, saveOutput = false) {
-    const { page, cdp, data, workerid } = opts;
+    const { page, cdp, data, workerid, addDOMSnapshot } = opts;
     const { url } = data;
 
     if (!data.isHTMLPage) {
@@ -1115,49 +1109,20 @@ self.__bx_behaviors.selectMainBehavior();
 
     let textextract = null;
 
-    if (data.isHTMLPage) {
-      let snapshot = null;
+    if (data.isHTMLPage && this.textWriter) {
+      textextract = new TextExtractViaSnapshot(cdp, {
+        writer: this.textWriter,
+        url,
+        skipDocs: this.skipTextDocs,
+      });
+      const { text } = await textextract.extractAndStoreText(
+        "text",
+        false,
+        this.params.text.includes("to-warc"),
+      );
 
-      if (this.textWriter || this.domSnapshotWriter) {
-        snapshot = await cdp.send("DOMSnapshot.captureSnapshot", {
-          computedStyles: [],
-        });
-      }
-
-      if (this.domSnapshotWriter && snapshot) {
-        const data = snapshotToDom(snapshot);
-
-        this.domSnapshotWriter.writeNewResourceRecord(
-          {
-            buffer: new TextEncoder().encode(data),
-            resourceType: "",
-            contentType: "text/html",
-            url,
-          },
-          logDetails,
-          "general",
-        );
-      }
-
-      if (this.textWriter) {
-        textextract = new TextExtractViaSnapshot(
-          cdp,
-          {
-            writer: this.textWriter,
-            url,
-            skipDocs: this.skipTextDocs,
-          },
-          snapshot,
-        );
-        const { text } = await textextract.extractAndStoreText(
-          "text",
-          false,
-          this.params.text.includes("to-warc"),
-        );
-
-        if (text && (this.textInPages || saveOutput)) {
-          data.text = text;
-        }
+      if (text && (this.textInPages || saveOutput)) {
+        data.text = text;
       }
     }
 
@@ -1232,6 +1197,10 @@ self.__bx_behaviors.selectMainBehavior();
         logDetails,
       );
       await sleep(this.params.pageExtraDelay);
+    }
+
+    if (this.params.domSnapshot) {
+      await addDOMSnapshot(cdp);
     }
   }
 
@@ -2864,14 +2833,18 @@ self.__bx_behaviors.selectMainBehavior();
       id: id.toString(),
     });
 
-    const res = new Recorder({
+    const recorder = new Recorder({
       workerid: id,
       crawler: this,
       writer,
     });
 
-    this.browser.recorders.push(res);
-    return res;
+    if (this.params.domSnapshot) {
+      recorder.useDomSnapshot = true;
+    }
+
+    this.browser.recorders.push(recorder);
+    return recorder;
   }
 }
 

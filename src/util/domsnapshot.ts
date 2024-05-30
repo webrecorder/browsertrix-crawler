@@ -19,12 +19,10 @@ export function snapshotToDom(
     doctype: "",
   };
 
-  const root = doc.children[0];
-  // clear the root node (head and body are automatically created by JSDom)
-  Array.from(root.children).forEach((child) => {
-    root.removeChild(child);
-  });
-  snapshot.nodes.push(doc.documentElement);
+  // will be re-created below
+  doc.removeChild(doc.documentElement);
+
+  snapshot.nodes.push(doc);
 
   const { documents, strings } = response;
   if (!documents.length) {
@@ -112,7 +110,7 @@ function createNode(
 
     case doc.DOCUMENT_TYPE_NODE:
       node = null;
-      snapshot.doctype = `<!doctype ${nodeName}>`;
+      snapshot.doctype = `<!doctype ${nodeName}>\n`;
       break;
 
     default:
