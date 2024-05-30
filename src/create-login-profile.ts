@@ -99,9 +99,10 @@ function cliOpts(): { [key: string]: Options } {
       default: getDefaultWindowSize(),
     },
 
-    proxy: {
-      type: "boolean",
-      default: false,
+    proxyServer: {
+      describe:
+        "if set, will use specified proxy server. Takes precedence over any env var proxy settings",
+      type: "string",
     },
 
     cookieDays: {
@@ -179,6 +180,7 @@ async function main() {
     headless: params.headless,
     signals: false,
     chromeOptions: {
+      proxy: params.proxyServer,
       extraArgs: [
         "--window-position=0,0",
         `--window-size=${params.windowSize}`,

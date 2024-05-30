@@ -545,6 +545,12 @@ class ArgParser {
         default: "disabled",
       },
 
+      proxyServer: {
+        describe:
+          "if set, will use specified proxy server. Takes precedence over any env var proxy settings",
+        type: "string",
+      },
+
       qaSource: {
         describe: "Required for QA mode. Source (WACZ or multi WACZ) for QA",
         type: "string",

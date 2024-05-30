@@ -236,6 +236,8 @@ export class Browser {
       ...extraArgs,
     ];
 
+    proxy = proxy || this.getProxy();
+
     if (proxy) {
       args.push("--ignore-certificate-errors");
       args.push(`--proxy-server=${proxy}`);
@@ -263,6 +265,19 @@ export class Browser {
     }
 
     return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
+  }
+
+  getProxy() {
+    if (process.env.PROXY_SERVER) {
+      return process.env.PROXY_SERVER;
+    }
+
+    // for backwards compatibility with 0.x proxy settings
+    if (process.env.PROXY_HOST && process.env.PROXY_PORT) {
+      return `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`;
+    }
+
+    return "";
   }
 
   getBrowserExe() {
