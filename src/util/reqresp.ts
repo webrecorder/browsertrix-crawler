@@ -5,6 +5,8 @@ import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
 import { HTML_TYPES } from "./constants.js";
 
+import { Response } from "node-fetch";
+
 const CONTENT_LENGTH = "content-length";
 const CONTENT_TYPE = "content-type";
 const EXCLUDE_HEADERS = ["content-encoding", "transfer-encoding"];

@@ -8,6 +8,13 @@ import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun, timestampNow } from "./timing.js";
 import { RequestResponseInfo, isHTMLContentType } from "./reqresp.js";
 
+import { SocksProxyAgent } from "socks-proxy-agent";
+
+import fetch, { Response } from "node-fetch";
+
+import { default as stream } from "node:stream";
+import type { ReadableStream } from "node:stream/web";
+
 // @ts-expect-error TODO fill in why error is expected
 import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
 import {
@@ -1165,6 +1172,8 @@ class AsyncFetcher {
 
   manualRedirect = false;
 
+  socksAgent: SocksProxyAgent | null = null;
+
   constructor({
     tempdir,
     reqresp,
@@ -1195,6 +1204,10 @@ class AsyncFetcher {
     this.maxFetchSize = maxFetchSize;
 
     this.manualRedirect = manualRedirect;
+
+    if (process.env.PROXY_SERVER) {
+      this.socksAgent = new SocksProxyAgent(process.env.PROXY_SERVER);
+    }
   }
 
   async load() {
@@ -1361,6 +1374,7 @@ class AsyncFetcher {
       body: reqresp.postData || undefined,
       signal,
       redirect: this.manualRedirect ? "manual" : "follow",
+      agent: this.socksAgent || undefined,
     });
 
     if (this.filter && !this.filter(resp) && abort) {
@@ -1386,10 +1400,14 @@ class AsyncFetcher {
 
     reqresp.fillFetchResponse(resp);
 
-    return this.takeReader(resp.body.getReader());
+    const reader = stream.Readable.fromWeb(
+      resp.body as unknown as ReadableStream<Uint8Array>,
+    );
+
+    return this.takeReader(reader);
   }
 
-  async *takeReader(reader: ReadableStreamDefaultReader<Uint8Array>) {
+  async *takeReader(reader: stream.Readable) {
     let size = 0;
     try {
       while (true) {
