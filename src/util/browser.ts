@@ -115,7 +115,6 @@ export class Browser {
         ? undefined
         : (target) => this.targetFilter(target),
     };
-    logger.info("Launching browser", launchOpts);
     await this._init(launchOpts, ondisconnect, recording);
   }
 
@@ -237,7 +236,9 @@ export class Browser {
     ];
 
     proxy = proxy || getProxy();
-    logger.info(`Proxy settings: ${proxy}`);
+    if (proxy) {
+      logger.info("Using proxy", { proxy }, "browser");
+    }
 
     if (proxy) {
       args.push("--ignore-certificate-errors");

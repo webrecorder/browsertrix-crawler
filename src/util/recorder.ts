@@ -1663,7 +1663,7 @@ function createDispatcher(): Dispatcher | undefined {
     const type: SocksProxyType = url.protocol === "socks4:" ? 4 : 5;
     const params = {
       type,
-      host: url.host,
+      host: url.hostname,
       port: parseInt(url.port),
       userId: url.username || undefined,
       password: url.password || undefined,
