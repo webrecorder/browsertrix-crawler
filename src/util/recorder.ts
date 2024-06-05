@@ -8,12 +8,12 @@ import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun, timestampNow } from "./timing.js";
 import { RequestResponseInfo, isHTMLContentType } from "./reqresp.js";
 
-import { SocksProxyAgent } from "socks-proxy-agent";
+import { fetch, Response, Dispatcher, ProxyAgent } from "undici";
 
-import fetch, { Response } from "node-fetch";
+import { socksDispatcher } from "fetch-socks";
+import type { SocksProxyType } from "socks/typings/common/constants.js";
 
-import { default as stream } from "node:stream";
-import type { ReadableStream } from "node:stream/web";
+import { getProxy } from "./browser.js";
 
 // @ts-expect-error TODO fill in why error is expected
 import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
@@ -138,6 +138,8 @@ export class Recorder {
 
   frameIdToExecId: Map<string, number> | null;
 
+  dispatcher?: Dispatcher;
+
   constructor({
     workerid,
     writer,
@@ -160,6 +162,8 @@ export class Recorder {
     this.fetcherQ = new PQueue({ concurrency: 1 });
 
     this.frameIdToExecId = null;
+
+    this.dispatcher = createDispatcher();
   }
 
   async onCreatePage({
@@ -1172,8 +1176,6 @@ class AsyncFetcher {
 
   manualRedirect = false;
 
-  socksAgent: SocksProxyAgent | null = null;
-
   constructor({
     tempdir,
     reqresp,
@@ -1204,10 +1206,6 @@ class AsyncFetcher {
     this.maxFetchSize = maxFetchSize;
 
     this.manualRedirect = manualRedirect;
-
-    if (process.env.PROXY_SERVER) {
-      this.socksAgent = new SocksProxyAgent(process.env.PROXY_SERVER);
-    }
   }
 
   async load() {
@@ -1374,7 +1372,7 @@ class AsyncFetcher {
       body: reqresp.postData || undefined,
       signal,
       redirect: this.manualRedirect ? "manual" : "follow",
-      agent: this.socksAgent || undefined,
+      dispatcher: this.recorder.dispatcher,
     });
 
     if (this.filter && !this.filter(resp) && abort) {
@@ -1400,14 +1398,10 @@ class AsyncFetcher {
 
     reqresp.fillFetchResponse(resp);
 
-    const reader = stream.Readable.fromWeb(
-      resp.body as unknown as ReadableStream<Uint8Array>,
-    );
-
-    return this.takeReader(reader);
+    return this.takeReader(resp.body.getReader());
   }
 
-  async *takeReader(reader: stream.Readable) {
+  async *takeReader(reader: ReadableStreamDefaultReader<Uint8Array>) {
     let size = 0;
     try {
       while (true) {
@@ -1654,4 +1648,28 @@ function createRequest(
     },
     requestBody,
   );
+}
+
+function createDispatcher(): Dispatcher | undefined {
+  const proxyUrl = getProxy();
+  if (proxyUrl.startsWith("http://") || proxyUrl.startsWith("https://")) {
+    return new ProxyAgent({ uri: proxyUrl });
+  } else if (
+    proxyUrl.startsWith("socks://") ||
+    proxyUrl.startsWith("socks5://") ||
+    proxyUrl.startsWith("socks4://")
+  ) {
+    const url = new URL(proxyUrl);
+    const type: SocksProxyType = url.protocol === "socks4:" ? 4 : 5;
+    const params = {
+      type,
+      host: url.host,
+      port: parseInt(url.port),
+      userId: url.username || undefined,
+      password: url.password || undefined,
+    };
+    return socksDispatcher(params);
+  } else {
+    return undefined;
+  }
 }
