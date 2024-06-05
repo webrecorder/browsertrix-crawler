@@ -54,7 +54,7 @@ export function snapshotToDom(
     );
   }
 
-  return snapshot.doctype + dom.serialize();
+  return snapshot.doctype + dom.serialize().replaceAll("stylex", "style");
 }
 
 function createNode(
@@ -75,6 +75,9 @@ function createNode(
         if (nodeName === "SCRIPT" || nodeName.startsWith("::")) {
           node = null;
           break;
+        }
+        if (nodeName === "STYLE") {
+          nodeName = "STYLEX";
         }
         const elem = doc.createElement(nodeName);
         for (let i = 0; i < attrs.length; i += 2) {
