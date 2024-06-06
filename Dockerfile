@@ -28,9 +28,6 @@ ADD package.json /app/
 # to allow forcing rebuilds from this stage
 ARG REBUILD
 
-# Prefetch tldextract so pywb is able to boot in environments with limited internet access
-RUN tldextract --update
-
 # Download and format ad host blocklist as JSON
 RUN mkdir -p /tmp/ads && cd /tmp/ads && \
     curl -vs -o ad-hosts.txt https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts && \
