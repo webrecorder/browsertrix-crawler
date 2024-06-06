@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { WARCParser } from "warcio";
 
-const PDF = "http://bibnum.bnf.fr/WARC/WARC_ISO_28500_version1_latestdraft.pdf";
+const PDF = "https://specs.webrecorder.net/wacz/1.1.1/wacz-2021.pdf";
 
 test("ensure pdf is crawled", async () => {
   child_process.execSync(
