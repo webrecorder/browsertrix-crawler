@@ -753,10 +753,6 @@ export class Recorder {
   writePageInfoRecord() {
     const text = JSON.stringify(this.pageInfo, null, 2);
 
-    if (!Object.keys(this.pageInfo.urls).length) {
-      logger.debug("No entries, skipping pageinfo record");
-    }
-
     const url = this.pageUrl;
 
     this.writer.writeNewResourceRecord(
