@@ -56,7 +56,7 @@ import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
 import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 import { isHTMLContentType } from "./util/reqresp.js";
-import { initDispatcher } from "./util/proxy.js";
+import { initProxy } from "./util/proxy.js";
 
 const behaviors = fs.readFileSync(
   new URL(
@@ -170,6 +170,8 @@ export class Crawler {
 
   maxHeapUsed = 0;
   maxHeapTotal = 0;
+
+  proxyServer?: string;
 
   driver!: (opts: {
     page: Page;
@@ -437,7 +439,7 @@ export class Crawler {
   async bootstrap() {
     const subprocesses: ChildProcess[] = [];
 
-    await initDispatcher();
+    this.proxyServer = initProxy(this.params.proxyServer);
 
     subprocesses.push(this.launchRedis());
 
@@ -1292,7 +1294,7 @@ self.__bx_behaviors.selectMainBehavior();
       emulateDevice: this.emulateDevice,
       swOpt: this.params.serviceWorker,
       chromeOptions: {
-        proxy: this.params.proxyServer,
+        proxy: this.proxyServer,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs(),
       },

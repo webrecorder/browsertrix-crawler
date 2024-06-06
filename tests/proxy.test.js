@@ -94,11 +94,22 @@ test("http proxy, PDF, separate env vars", () => {
   }
 });
 
-test("http proxy, error, not running, separate env vars", () => {
+test("http proxy set, but not running, separate env vars", () => {
   let status = 0;
 
   try {
     child_process.execSync(`docker run -e PROXY_HOST=host.docker.internal -e PROXY_PORT=${++globalPort} --rm webrecorder/browsertrix-crawler crawl --url ${PDF} ${extraArgs}`, {encoding: "utf-8"});
+  } catch (e) {
+    status = e.status;
+  }
+  expect(status).toBe(1);
+});
+
+test("http proxy set, but not running, cli arg", () => {
+  let status = 0;
+
+  try {
+    child_process.execSync(`docker run --rm webrecorder/browsertrix-crawler crawl --proxyServer http://host.docker.internal:${++globalPort} --url ${PDF} ${extraArgs}`, {encoding: "utf-8"});
   } catch (e) {
     status = e.status;
   }

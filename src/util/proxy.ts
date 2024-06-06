@@ -3,7 +3,7 @@ import { Dispatcher, ProxyAgent, setGlobalDispatcher } from "undici";
 import { socksDispatcher } from "fetch-socks";
 import type { SocksProxyType } from "socks/typings/common/constants.js";
 
-export function getProxy() {
+export function getEnvProxyUrl() {
   if (process.env.PROXY_SERVER) {
     return process.env.PROXY_SERVER;
   }
@@ -16,15 +16,21 @@ export function getProxy() {
   return "";
 }
 
-export function initDispatcher() {
-  const dispatcher = createDispatcher();
-  if (dispatcher) {
-    setGlobalDispatcher(dispatcher);
+export function initProxy(proxy?: string): string {
+  if (!proxy) {
+    proxy = getEnvProxyUrl();
   }
+  if (proxy) {
+    const dispatcher = createDispatcher(proxy);
+    if (dispatcher) {
+      setGlobalDispatcher(dispatcher);
+      return proxy;
+    }
+  }
+  return "";
 }
 
-export function createDispatcher(): Dispatcher | undefined {
-  const proxyUrl = getProxy();
+export function createDispatcher(proxyUrl: string): Dispatcher | undefined {
   if (proxyUrl.startsWith("http://") || proxyUrl.startsWith("https://")) {
     // HTTP PROXY does not support auth, as it's not supported in the browser
     // so must drop username/password for consistency

@@ -20,7 +20,6 @@ import puppeteer, {
 } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 import { Recorder } from "./recorder.js";
-import { getProxy } from "./proxy.js";
 
 type BtrixChromeOpts = {
   proxy?: string;
@@ -236,7 +235,6 @@ export class Browser {
       ...extraArgs,
     ];
 
-    proxy = proxy || getProxy();
     if (proxy) {
       logger.info("Using proxy", { proxy }, "browser");
     }
