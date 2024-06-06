@@ -9,6 +9,8 @@ import { logger, formatErr } from "./logger.js";
 import { DETECT_SITEMAP } from "./constants.js";
 import { sleep } from "./timing.js";
 
+import { fetch, Response } from "undici";
+
 const SITEMAP_CONCURRENCY = 5;
 
 const TEXT_CONTENT_TYPE = ["text/plain"];
@@ -237,7 +239,8 @@ export class SitemapReader extends EventEmitter {
       resp.headers.get("content-encoding") !== "gzip"
     ) {
       const ds = new DecompressionStream("gzip");
-      stream = body.pipeThrough(ds);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      stream = body.pipeThrough(ds as any);
     } else {
       stream = body;
     }

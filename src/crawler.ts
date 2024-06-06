@@ -56,6 +56,7 @@ import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
 import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 import { isHTMLContentType } from "./util/reqresp.js";
+import { initDispatcher } from "./util/proxy.js";
 
 const behaviors = fs.readFileSync(
   new URL(
@@ -435,6 +436,8 @@ export class Crawler {
 
   async bootstrap() {
     const subprocesses: ChildProcess[] = [];
+
+    await initDispatcher();
 
     subprocesses.push(this.launchRedis());
 

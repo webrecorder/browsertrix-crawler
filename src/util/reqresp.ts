@@ -4,7 +4,6 @@ import { getStatusText } from "@webrecorder/wabac/src/utils.js";
 import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
 import { HTML_TYPES } from "./constants.js";
-
 import { Response } from "undici";
 
 const CONTENT_LENGTH = "content-length";

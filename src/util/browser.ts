@@ -20,6 +20,7 @@ import puppeteer, {
 } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 import { Recorder } from "./recorder.js";
+import { getProxy } from "./proxy.js";
 
 type BtrixChromeOpts = {
   proxy?: string;
@@ -602,16 +603,3 @@ export const defaultArgs = [
   "--export-tagged-pdf",
   "--apps-keep-chrome-alive-in-tests",
 ];
-
-export function getProxy() {
-  if (process.env.PROXY_SERVER) {
-    return process.env.PROXY_SERVER;
-  }
-
-  // for backwards compatibility with 0.x proxy settings
-  if (process.env.PROXY_HOST && process.env.PROXY_PORT) {
-    return `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`;
-  }
-
-  return "";
-}

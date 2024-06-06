@@ -8,12 +8,7 @@ import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun, timestampNow } from "./timing.js";
 import { RequestResponseInfo, isHTMLContentType } from "./reqresp.js";
 
-import { fetch, Response, Dispatcher, ProxyAgent } from "undici";
-
-import { socksDispatcher } from "fetch-socks";
-import type { SocksProxyType } from "socks/typings/common/constants.js";
-
-import { getProxy } from "./browser.js";
+import { fetch, Response } from "undici";
 
 // @ts-expect-error TODO fill in why error is expected
 import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
@@ -138,8 +133,6 @@ export class Recorder {
 
   frameIdToExecId: Map<string, number> | null;
 
-  dispatcher?: Dispatcher;
-
   constructor({
     workerid,
     writer,
@@ -162,8 +155,6 @@ export class Recorder {
     this.fetcherQ = new PQueue({ concurrency: 1 });
 
     this.frameIdToExecId = null;
-
-    this.dispatcher = createDispatcher();
   }
 
   async onCreatePage({
@@ -761,6 +752,10 @@ export class Recorder {
 
   writePageInfoRecord() {
     const text = JSON.stringify(this.pageInfo, null, 2);
+
+    if (!Object.keys(this.pageInfo.urls).length) {
+      logger.debug("No entries, skipping pageinfo record");
+    }
 
     const url = this.pageUrl;
 
@@ -1372,7 +1367,6 @@ class AsyncFetcher {
       body: reqresp.postData || undefined,
       signal,
       redirect: this.manualRedirect ? "manual" : "follow",
-      dispatcher: this.recorder.dispatcher,
     });
 
     if (this.filter && !this.filter(resp) && abort) {
@@ -1648,28 +1642,4 @@ function createRequest(
     },
     requestBody,
   );
-}
-
-function createDispatcher(): Dispatcher | undefined {
-  const proxyUrl = getProxy();
-  if (proxyUrl.startsWith("http://") || proxyUrl.startsWith("https://")) {
-    return new ProxyAgent({ uri: proxyUrl });
-  } else if (
-    proxyUrl.startsWith("socks://") ||
-    proxyUrl.startsWith("socks5://") ||
-    proxyUrl.startsWith("socks4://")
-  ) {
-    const url = new URL(proxyUrl);
-    const type: SocksProxyType = url.protocol === "socks4:" ? 4 : 5;
-    const params = {
-      type,
-      host: url.hostname,
-      port: parseInt(url.port),
-      userId: url.username || undefined,
-      password: url.password || undefined,
-    };
-    return socksDispatcher(params);
-  } else {
-    return undefined;
-  }
 }
