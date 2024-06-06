@@ -26,12 +26,18 @@ export function initDispatcher() {
 export function createDispatcher(): Dispatcher | undefined {
   const proxyUrl = getProxy();
   if (proxyUrl.startsWith("http://") || proxyUrl.startsWith("https://")) {
-    return new ProxyAgent({ uri: proxyUrl });
+    // HTTP PROXY does not support auth, as it's not supported in the browser
+    // so must drop username/password for consistency
+    const url = new URL(proxyUrl);
+    url.username = "";
+    url.password = "";
+    return new ProxyAgent({ uri: url.href });
   } else if (
     proxyUrl.startsWith("socks://") ||
     proxyUrl.startsWith("socks5://") ||
     proxyUrl.startsWith("socks4://")
   ) {
+    // support auth as SOCKS5 auth *is* supported in Brave (though not in Chromium)
     const url = new URL(proxyUrl);
     const type: SocksProxyType = url.protocol === "socks4:" ? 4 : 5;
     const params = {
