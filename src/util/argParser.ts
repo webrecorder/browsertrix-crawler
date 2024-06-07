@@ -547,7 +547,7 @@ class ArgParser {
 
       dryRun: {
         describe:
-          "If true, no archive data is written to disk, only logs (and optionally saved state).",
+          "If true, no archive data is written to disk, only pages and logs (and optionally saved state).",
         type: "boolean",
       },
 

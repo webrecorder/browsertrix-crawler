@@ -214,7 +214,7 @@ export class Crawler {
     this.recording = !this.params.dryRun;
     if (this.params.dryRun) {
       logger.warn(
-        "Dry run mode: no archived data stored, only logging. Storage and archive creation related options will be ignored.",
+        "Dry run mode: no archived data stored, only pages and logging. Storage and archive creation related options will be ignored.",
       );
     }
 
