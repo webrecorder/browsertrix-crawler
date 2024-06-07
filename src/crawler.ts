@@ -1122,7 +1122,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.diskUtilization && !this.params.dryRun) {
+    if (this.params.diskUtilization) {
       // Check that disk usage isn't already or soon to be above threshold
       const diskUtil = await checkDiskUtilization(this.params, size);
       if (diskUtil.stop === true) {
@@ -2079,10 +2079,6 @@ self.__bx_behaviors.selectMainBehavior();
   async initPages(filename: string, title: string) {
     let fh = null;
 
-    if (this.params.dryRun) {
-      return;
-    }
-
     try {
       await fsp.mkdir(this.pagesDir, { recursive: true });
 
@@ -2178,9 +2174,7 @@ self.__bx_behaviors.selectMainBehavior();
     const pagesFH = depth > 0 ? this.extraPagesFH : this.pagesFH;
 
     if (!pagesFH) {
-      if (!this.params.dryRun) {
-        logger.error("Can't write pages, missing stream", {}, "pageStatus");
-      }
+      logger.error("Can't write pages, missing stream", {}, "pageStatus");
       return;
     }
 
