@@ -545,6 +545,12 @@ class ArgParser {
         default: "disabled",
       },
 
+      dryRun: {
+        describe:
+          "If true, no archive data is written to disk, only pages and logs (and optionally saved state).",
+        type: "boolean",
+      },
+
       qaSource: {
         describe: "Required for QA mode. Source (WACZ or multi WACZ) for QA",
         type: "string",
