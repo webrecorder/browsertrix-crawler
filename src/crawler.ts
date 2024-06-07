@@ -1114,7 +1114,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.diskUtilization) {
       // Check that disk usage isn't already or soon to be above threshold
-      const diskUtil = await checkDiskUtilization(this.params, size);
+      const diskUtil = await checkDiskUtilization(
+        this.collDir,
+        this.params,
+        size,
+      );
       if (diskUtil.stop === true) {
         interrupt = true;
       }
