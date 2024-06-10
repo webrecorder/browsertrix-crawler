@@ -2333,8 +2333,8 @@ self.__bx_behaviors.selectMainBehavior();
 
         generatedCombinedWarcs.push(combinedWarcName);
 
-        const warcBuffer = await createWARCInfo(combinedWarcName);
-        fh.write(warcBuffer);
+        const { buffer } = await createWARCInfo(combinedWarcName);
+        fh.write(buffer);
       }
 
       logger.debug(`Appending WARC ${fileSizeObjects[j].fileName}`);
