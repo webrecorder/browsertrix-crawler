@@ -117,7 +117,12 @@ export class WARCWriter implements IndexerOffsetLength {
       );
     }
 
-    fh.write(await createWARCInfo(this.filename));
+    const { buffer, record } = await createWARCInfo(this.filename);
+
+    fh.write(buffer);
+    this.recordLength = buffer.length;
+
+    await this._writeCDX(record);
 
     return fh;
   }
@@ -336,7 +341,7 @@ export async function createWARCInfo(filename: string) {
   const buffer = await WARCSerializer.serialize(record, {
     gzip: true,
   });
-  return buffer;
+  return { buffer, record };
 }
 
 // =================================================================
