@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=1.64.109
+ARG BROWSER_VERSION=1.66.115
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
 FROM ${BROWSER_IMAGE_BASE}
@@ -23,9 +23,6 @@ ADD package.json /app/
 
 # to allow forcing rebuilds from this stage
 ARG REBUILD
-
-# Prefetch tldextract so pywb is able to boot in environments with limited internet access
-RUN tldextract --update 
 
 # Download and format ad host blocklist as JSON
 RUN mkdir -p /tmp/ads && cd /tmp/ads && \
@@ -60,8 +57,11 @@ WORKDIR /crawls
 # enable to test custom behaviors build (from browsertrix-behaviors)
 # COPY behaviors.js /app/node_modules/browsertrix-behaviors/dist/behaviors.js
 
+# add brave/chromium group policies
+RUN mkdir -p /etc/brave/policies/managed/
+ADD config/policies /etc/brave/policies/managed/
+
 ADD docker-entrypoint.sh /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
 CMD ["crawl"]
-

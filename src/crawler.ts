@@ -180,7 +180,7 @@ export class Crawler {
     crawler: Crawler;
   }) => NonNullable<unknown>;
 
-  recording = true;
+  recording: boolean;
 
   constructor() {
     const args = this.parseArgs();
@@ -213,6 +213,13 @@ export class Crawler {
     }
 
     logger.debug("Writing log to: " + this.logFilename, {}, "general");
+
+    this.recording = !this.params.dryRun;
+    if (this.params.dryRun) {
+      logger.warn(
+        "Dry run mode: no archived data stored, only pages and logging. Storage and archive creation related options will be ignored.",
+      );
+    }
 
     this.headers = {};
 
@@ -444,9 +451,12 @@ export class Crawler {
     subprocesses.push(this.launchRedis());
 
     await fsp.mkdir(this.logDir, { recursive: true });
-    await fsp.mkdir(this.archivesDir, { recursive: true });
-    await fsp.mkdir(this.tempdir, { recursive: true });
-    await fsp.mkdir(this.tempCdxDir, { recursive: true });
+
+    if (!this.params.dryRun) {
+      await fsp.mkdir(this.archivesDir, { recursive: true });
+      await fsp.mkdir(this.tempdir, { recursive: true });
+      await fsp.mkdir(this.tempCdxDir, { recursive: true });
+    }
 
     this.logFH = fs.createWriteStream(this.logFilename, { flags: "a" });
     logger.setExternalLogStream(this.logFH);
@@ -508,10 +518,10 @@ export class Crawler {
       );
     }
 
-    if (this.params.screenshot) {
+    if (this.params.screenshot && !this.params.dryRun) {
       this.screenshotWriter = this.createExtraResourceWarcWriter("screenshots");
     }
-    if (this.params.text) {
+    if (this.params.text && !this.params.dryRun) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
     }
   }
@@ -1094,7 +1104,7 @@ self.__bx_behaviors.selectMainBehavior();
   async checkLimits() {
     let interrupt = false;
 
-    const size = await getDirSize(this.archivesDir);
+    const size = this.params.dryRun ? 0 : await getDirSize(this.archivesDir);
 
     await this.crawlState.setArchiveSize(size);
 
@@ -1119,7 +1129,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.diskUtilization) {
       // Check that disk usage isn't already or soon to be above threshold
-      const diskUtil = await checkDiskUtilization(this.params, size);
+      const diskUtil = await checkDiskUtilization(
+        this.collDir,
+        this.params,
+        size,
+      );
       if (diskUtil.stop === true) {
         interrupt = true;
       }
@@ -1390,11 +1404,11 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async postCrawl() {
-    if (this.params.combineWARC) {
+    if (this.params.combineWARC && !this.params.dryRun) {
       await this.combineWARC();
     }
 
-    if (this.params.generateCDX) {
+    if (this.params.generateCDX && !this.params.dryRun) {
       logger.info("Generating CDX");
       await fsp.mkdir(path.join(this.collDir, "indexes"), { recursive: true });
       await this.crawlState.setStatus("generate-cdx");
@@ -1426,6 +1440,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (
       this.params.generateWACZ &&
+      !this.params.dryRun &&
       (!this.interrupted || this.finalExit || this.uploadAndDeleteLocal)
     ) {
       const uploaded = await this.generateWACZ();
@@ -2126,11 +2141,13 @@ self.__bx_behaviors.selectMainBehavior();
     let { ts } = state;
     if (!ts) {
       ts = new Date();
-      logger.warn(
-        "Page date missing, setting to now",
-        { url, ts },
-        "pageStatus",
-      );
+      if (!this.params.dryRun) {
+        logger.warn(
+          "Page date missing, setting to now",
+          { url, ts },
+          "pageStatus",
+        );
+      }
     }
 
     row.ts = ts.toISOString();

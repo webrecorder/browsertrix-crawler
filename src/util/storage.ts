@@ -202,6 +202,7 @@ export async function getDirSize(dir: string) {
 }
 
 export async function checkDiskUtilization(
+  collDir: string,
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   params: Record<string, any>,
@@ -209,7 +210,7 @@ export async function checkDiskUtilization(
   dfOutput = null,
 ) {
   const diskUsage: Record<string, string> = await getDiskUsage(
-    "/crawls",
+    collDir,
     dfOutput,
   );
   const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
