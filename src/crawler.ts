@@ -1268,6 +1268,11 @@ self.__bx_behaviors.selectMainBehavior();
       "Non-Seed Pages",
     );
 
+    this.adBlockRules = new AdBlockRules(
+      this.captureBasePrefix,
+      this.params.adBlockMessage,
+    );
+
     if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(
         this.params.blockRules,
