@@ -545,6 +545,12 @@ class ArgParser {
         default: "disabled",
       },
 
+      proxyServer: {
+        describe:
+          "if set, will use specified proxy server. Takes precedence over any env var proxy settings",
+        type: "string",
+      },
+
       dryRun: {
         describe:
           "If true, no archive data is written to disk, only pages and logs (and optionally saved state).",
