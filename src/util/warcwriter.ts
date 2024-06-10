@@ -122,7 +122,7 @@ export class WARCWriter implements IndexerOffsetLength {
     fh.write(buffer);
     this.recordLength = buffer.length;
 
-    await this._writeCDX(record);
+    this._writeCDX(record);
 
     return fh;
   }
