@@ -12,7 +12,7 @@ test("pass config file via stdin", async () => {
       { input: configYaml, stdin: "inherit", encoding: "utf8" },
     );
 
-    console.log(proc);
+    //console.log(proc);
   } catch (error) {
     console.log(error);
   }

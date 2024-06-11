@@ -11,8 +11,6 @@ test("set rollover to 500K and ensure individual WARCs rollover, including scree
   let main = 0;
   let screenshots = 0;
 
-  console.log(warcLists);
-
   for (const name of warcLists) {
     if (name.startsWith("rec-")) {
       main++;
