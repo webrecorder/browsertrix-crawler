@@ -4,6 +4,8 @@ import { logger, formatErr } from "./logger.js";
 import { HTTPRequest, Page } from "puppeteer-core";
 import { Browser } from "./browser.js";
 
+import { fetch } from "undici";
+
 const RULE_TYPES = ["block", "allowOnly"];
 
 const ALWAYS_ALLOW = ["https://pywb.proxy/", "http://pywb.proxy/"];

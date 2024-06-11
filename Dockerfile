@@ -6,11 +6,7 @@ FROM ${BROWSER_IMAGE_BASE}
 # needed to add args to main build stage
 ARG BROWSER_VERSION
 
-ENV PROXY_HOST=localhost \
-    PROXY_PORT=8080 \
-    PROXY_CA_URL=http://wsgiprox/download/pem \
-    PROXY_CA_FILE=/tmp/proxy-ca.pem \
-    DISPLAY=:99 \
+ENV DISPLAY=:99 \
     GEOMETRY=1360x1020x16 \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=google-chrome \

@@ -8,6 +8,8 @@ import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun, timestampNow } from "./timing.js";
 import { RequestResponseInfo, isHTMLContentType } from "./reqresp.js";
 
+import { fetch, Response } from "undici";
+
 // @ts-expect-error TODO fill in why error is expected
 import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
 import {

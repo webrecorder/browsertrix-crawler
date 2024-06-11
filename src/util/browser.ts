@@ -22,7 +22,7 @@ import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 import { Recorder } from "./recorder.js";
 
 type BtrixChromeOpts = {
-  proxy?: boolean;
+  proxy?: string;
   userAgent?: string | null;
   extraArgs?: string[];
 };
@@ -115,7 +115,6 @@ export class Browser {
         ? undefined
         : (target) => this.targetFilter(target),
     };
-
     await this._init(launchOpts, ondisconnect, recording);
   }
 
@@ -217,7 +216,7 @@ export class Browser {
   }
 
   chromeArgs({
-    proxy = true,
+    proxy = "",
     userAgent = null,
     extraArgs = [],
   }: BtrixChromeOpts) {
@@ -237,10 +236,12 @@ export class Browser {
     ];
 
     if (proxy) {
+      logger.info("Using proxy", { proxy }, "browser");
+    }
+
+    if (proxy) {
       args.push("--ignore-certificate-errors");
-      args.push(
-        `--proxy-server=http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`,
-      );
+      args.push(`--proxy-server=${proxy}`);
     }
 
     return args;
