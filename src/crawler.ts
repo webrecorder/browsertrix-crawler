@@ -913,6 +913,7 @@ self.__bx_behaviors.selectMainBehavior();
           "Behaviors timed out",
           logDetails,
           "behavior",
+          true,
         );
 
         await this.netIdle(page, logDetails);
