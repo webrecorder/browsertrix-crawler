@@ -137,6 +137,14 @@ declare module "ioredis" {
       maxRetryPending: number,
       maxRegularDepth: number,
     ): Result<number, Context>;
+
+    addnewseed(
+      esKey: string,
+      esMap: string,
+      skey: string,
+      url: string,
+      seedData: string,
+    ): Result<number, Context>;
   }
 }
 
@@ -169,6 +177,7 @@ export class RedisCrawlState {
   ekey: string;
   pageskey: string;
   esKey: string;
+  esMap: string;
 
   sitemapDoneKey: string;
 
@@ -192,6 +201,7 @@ export class RedisCrawlState {
     this.pageskey = this.key + ":pages";
 
     this.esKey = this.key + ":extraSeeds";
+    this.esMap = this.key + ":esMap";
 
     this.sitemapDoneKey = this.key + ":sitemapDone";
 
@@ -297,6 +307,20 @@ if not res then
   end
 end
 return 0;
+`,
+    });
+
+    redis.defineCommand("addnewseed", {
+      numberOfKeys: 3,
+      lua: `
+local res = redis.call('hget', KEYS[2], ARGV[2]);
+if res:
+    return tonumber(res);
+
+local inx = redis.call('lpush', KEYS[1], ARGV[1]) - 1;
+redis.call('hset', KEYS[2], ARGV[2], tostring(inx));
+redis.call('sadd', KEYS[3], ARGV[2]);
+return inx;
 `,
     });
   }
@@ -825,12 +849,41 @@ return 0;
         "state",
       );
     }
-    seeds.push(seeds[origSeedId].newScopedSeed(newUrl));
-    const newSeedId = seeds.length - 1;
     const redirectSeed: ExtraRedirectSeed = { origSeedId, newUrl };
-    await this.redis.sadd(this.skey, newUrl);
-    await this.redis.lpush(this.esKey, JSON.stringify(redirectSeed));
+    const seedData = JSON.stringify(redirectSeed);
+    const newSeedId = await this.redis.addnewseed(
+      this.esKey,
+      this.esMap,
+      this.skey,
+      seedData,
+      newUrl,
+    );
+    seeds[newSeedId] = seeds[origSeedId].newScopedSeed(newUrl);
+
+    //const newSeedId = seeds.length - 1;
+    //await this.redis.sadd(this.skey, newUrl);
+    //await this.redis.lpush(this.esKey, JSON.stringify(redirectSeed));
     return newSeedId;
+  }
+
+  async getSeedAt(seeds: ScopedSeed[], newSeedId: number) {
+    if (seeds[newSeedId]) {
+      return seeds[newSeedId];
+    }
+
+    const newSeedDataList = await this.redis.lrange(
+      this.esKey,
+      newSeedId,
+      newSeedId,
+    );
+    if (newSeedDataList.length) {
+      const { origSeedId, newUrl } = JSON.parse(
+        newSeedDataList[0],
+      ) as ExtraRedirectSeed;
+      seeds[newSeedId] = seeds[origSeedId].newScopedSeed(newUrl);
+    }
+
+    return seeds[newSeedId];
   }
 
   async getExtraSeeds() {

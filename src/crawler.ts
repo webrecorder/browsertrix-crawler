@@ -1860,7 +1860,18 @@ self.__bx_behaviors.selectMainBehavior();
 
     const { seedId } = data;
 
-    const seed = this.params.scopedSeeds[seedId];
+    const seed = await this.crawlState.getSeedAt(
+      this.params.scopedSeeds,
+      seedId,
+    );
+
+    if (!seed) {
+      logger.error(
+        "Seed Id not found, likely invalid crawl state - skipping link extraction and behaviors",
+        { seedId, ...logDetails },
+      );
+      return;
+    }
 
     await this.checkCF(page, logDetails);
 
