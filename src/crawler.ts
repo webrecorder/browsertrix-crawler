@@ -133,6 +133,9 @@ export class Crawler {
 
   maxPageTime: number;
 
+  seeds: ScopedSeed[];
+  numOriginalSeeds = 0;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   emulateDevice: any = {};
 
@@ -244,6 +247,9 @@ export class Crawler {
 
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
+
+    this.seeds = this.params.scopedSeeds as ScopedSeed[];
+    this.numOriginalSeeds = this.seeds.length;
 
     // sum of page load + behavior timeouts + 2 x fetch + cloudflare + link extraction timeouts + extra page delay
     // if exceeded, will interrupt and move on to next page (likely behaviors or some other operation is stuck)
@@ -361,11 +367,7 @@ export class Crawler {
 
     // load full state from config
     if (this.params.state) {
-      await this.crawlState.load(
-        this.params.state,
-        this.params.scopedSeeds,
-        true,
-      );
+      await this.crawlState.load(this.params.state, this.seeds, true);
       // otherwise, just load extra seeds
     } else {
       await this.loadExtraSeeds();
@@ -394,8 +396,8 @@ export class Crawler {
     const extraSeeds = await this.crawlState.getExtraSeeds();
 
     for (const { origSeedId, newUrl } of extraSeeds) {
-      const seed = this.params.scopedSeeds[origSeedId];
-      this.params.scopedSeeds.push(seed.newScopedSeed(newUrl));
+      const seed = this.seeds[origSeedId];
+      this.seeds.push(seed.newScopedSeed(newUrl));
     }
   }
 
@@ -460,7 +462,7 @@ export class Crawler {
     this.infoString = await getInfoString();
     logger.info(this.infoString);
 
-    logger.info("Seeds", this.params.scopedSeeds);
+    logger.info("Seeds", this.seeds);
 
     if (this.params.profile) {
       logger.info("With Browser Profile", { url: this.params.profile });
@@ -604,7 +606,7 @@ export class Crawler {
     }
   }
 
-  isInScope(
+  async isInScope(
     {
       seedId,
       url,
@@ -613,7 +615,11 @@ export class Crawler {
     }: { seedId: number; url: string; depth: number; extraHops: number },
     logDetails = {},
   ) {
-    const seed = this.params.scopedSeeds[seedId];
+    const seed = await this.crawlState.getSeedAt(
+      this.seeds,
+      this.numOriginalSeeds,
+      seedId,
+    );
 
     return seed.isIncluded(url, depth, extraHops, logDetails);
   }
@@ -1397,8 +1403,8 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   protected async _addInitialSeeds() {
-    for (let i = 0; i < this.params.scopedSeeds.length; i++) {
-      const seed = this.params.scopedSeeds[i];
+    for (let i = 0; i < this.seeds.length; i++) {
+      const seed = this.seeds[i];
       if (!(await this.queueUrl(i, seed.url, 0, 0))) {
         if (this.limitHit) {
           break;
@@ -1722,7 +1728,8 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (depth === 0 && !isChromeError && respUrl !== url) {
         data.seedId = await this.crawlState.addExtraSeed(
-          this.params.scopedSeeds,
+          this.seeds,
+          this.numOriginalSeeds,
           data.seedId,
           respUrl,
         );
@@ -1861,13 +1868,14 @@ self.__bx_behaviors.selectMainBehavior();
     const { seedId } = data;
 
     const seed = await this.crawlState.getSeedAt(
-      this.params.scopedSeeds,
+      this.seeds,
+      this.numOriginalSeeds,
       seedId,
     );
 
     if (!seed) {
       logger.error(
-        "Seed Id not found, likely invalid crawl state - skipping link extraction and behaviors",
+        "Seed not found, likely invalid crawl state - skipping link extraction and behaviors",
         { seedId, ...logDetails },
       );
       return;
@@ -2022,12 +2030,17 @@ self.__bx_behaviors.selectMainBehavior();
       const newExtraHops = extraHops + 1;
 
       for (const possibleUrl of urls) {
-        const res = this.isInScope(
+        const res = await this.isInScope(
           { url: possibleUrl, extraHops: newExtraHops, depth, seedId },
           logDetails,
         );
 
         if (!res) {
+          continue;
+        }
+
+        if (res === true) {
+          logger.warn("Invalid scope response: true", logDetails, "links");
           continue;
         }
 

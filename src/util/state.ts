@@ -314,8 +314,9 @@ return 0;
       numberOfKeys: 3,
       lua: `
 local res = redis.call('hget', KEYS[2], ARGV[2]);
-if res:
+if res then
     return tonumber(res);
+end
 
 local inx = redis.call('lpush', KEYS[1], ARGV[1]) - 1;
 redis.call('hset', KEYS[2], ARGV[2], tostring(inx));
@@ -676,9 +677,11 @@ return inx;
     }
 
     if (state.extraSeeds) {
+      const origLen = seeds.length;
+
       for (const extraSeed of state.extraSeeds) {
         const { newUrl, origSeedId }: ExtraRedirectSeed = JSON.parse(extraSeed);
-        await this.addExtraSeed(seeds, origSeedId, newUrl);
+        await this.addExtraSeed(seeds, origLen, origSeedId, newUrl);
       }
     }
 
@@ -841,7 +844,12 @@ return inx;
   }
 
   // add extra seeds from redirect
-  async addExtraSeed(seeds: ScopedSeed[], origSeedId: number, newUrl: string) {
+  async addExtraSeed(
+    seeds: ScopedSeed[],
+    origLength: number,
+    origSeedId: number,
+    newUrl: string,
+  ) {
     if (!seeds[origSeedId]) {
       logger.fatal(
         "State load, original seed missing",
@@ -851,13 +859,15 @@ return inx;
     }
     const redirectSeed: ExtraRedirectSeed = { origSeedId, newUrl };
     const seedData = JSON.stringify(redirectSeed);
-    const newSeedId = await this.redis.addnewseed(
-      this.esKey,
-      this.esMap,
-      this.skey,
-      seedData,
-      newUrl,
-    );
+    const newSeedId =
+      origLength +
+      (await this.redis.addnewseed(
+        this.esKey,
+        this.esMap,
+        this.skey,
+        seedData,
+        newUrl,
+      ));
     seeds[newSeedId] = seeds[origSeedId].newScopedSeed(newUrl);
 
     //const newSeedId = seeds.length - 1;
@@ -866,15 +876,15 @@ return inx;
     return newSeedId;
   }
 
-  async getSeedAt(seeds: ScopedSeed[], newSeedId: number) {
+  async getSeedAt(seeds: ScopedSeed[], origLength: number, newSeedId: number) {
     if (seeds[newSeedId]) {
       return seeds[newSeedId];
     }
 
     const newSeedDataList = await this.redis.lrange(
       this.esKey,
-      newSeedId,
-      newSeedId,
+      newSeedId - origLength,
+      newSeedId - origLength,
     );
     if (newSeedDataList.length) {
       const { origSeedId, newUrl } = JSON.parse(

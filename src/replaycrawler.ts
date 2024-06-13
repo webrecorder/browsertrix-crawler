@@ -166,7 +166,7 @@ export class ReplayCrawler extends Crawler {
     await this.loadPages(this.qaSource);
   }
 
-  isInScope() {
+  async isInScope() {
     return true;
   }
 
