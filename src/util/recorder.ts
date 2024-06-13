@@ -1272,7 +1272,7 @@ class AsyncFetcher {
       if (e.message === "response-filtered-out") {
         throw e;
       }
-      logger.error(
+      logger.debug(
         "Streaming Fetch Error",
         { url, networkId, filename, ...formatErr(e), ...logDetails },
         "recorder",

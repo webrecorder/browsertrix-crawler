@@ -913,6 +913,7 @@ self.__bx_behaviors.selectMainBehavior();
           "Behaviors timed out",
           logDetails,
           "behavior",
+          true,
         );
 
         await this.netIdle(page, logDetails);
@@ -952,12 +953,6 @@ self.__bx_behaviors.selectMainBehavior();
         this.healthChecker.resetErrors();
       }
     } else {
-      logger.warn(
-        "Page Load Failed",
-        { loadState, ...logDetails },
-        "pageStatus",
-      );
-
       await this.crawlState.markFailed(data.url);
 
       if (this.healthChecker) {
@@ -1808,10 +1803,20 @@ self.__bx_behaviors.selectMainBehavior();
         } else {
           // log if not already log and rethrow
           if (msg !== "logged") {
-            logger.error("Page Load Timeout, skipping page", {
-              msg,
-              ...logDetails,
-            });
+            const loadState = data.loadState;
+            if (loadState >= LoadState.CONTENT_LOADED) {
+              logger.warn("Page Load Timeout, skipping further processing", {
+                msg,
+                loadState,
+                ...logDetails,
+              });
+            } else {
+              logger.error("Page Load Failed, skipping page", {
+                msg,
+                loadState,
+                ...logDetails,
+              });
+            }
             e.message = "logged";
           }
           throw e;

@@ -276,6 +276,7 @@ export class PageWorker {
           "Page Worker Timeout",
           this.logDetails,
           "worker",
+          true,
         ),
         this.crashBreak,
       ]);
