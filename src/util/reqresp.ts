@@ -359,7 +359,7 @@ export class RequestResponseInfo {
     // check if not ASCII, then encode, replace encoded newlines
     // eslint-disable-next-line no-control-regex
     if (!/^[\x00-\x7F]*$/.test(value)) {
-      return encodeURI(value).replace(/%0A/g, ", ");
+      value = encodeURI(value).replace(/%0A/g, ", ");
     }
     // replace newlines with spaces
     return value.replace(/\n/g, ", ");
