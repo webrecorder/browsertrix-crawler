@@ -230,13 +230,12 @@ export class RequestResponseInfo {
         if (header.name.startsWith(":")) {
           continue;
         }
-        if (EXCLUDE_HEADERS.includes(headerName)) {
-          headerName = "x-orig-" + headerName;
-          continue;
-        }
         if (actualContentLength && headerName === CONTENT_LENGTH) {
           headersDict[headerName] = "" + actualContentLength;
           continue;
+        }
+        if (EXCLUDE_HEADERS.includes(headerName)) {
+          headerName = "x-orig-" + headerName;
         }
         headersDict[headerName] = this._encodeHeaderValue(header.value);
       }
@@ -252,13 +251,15 @@ export class RequestResponseInfo {
         continue;
       }
       const keyLower = key.toLowerCase();
-      if (EXCLUDE_HEADERS.includes(keyLower)) {
-        headersDict["x-orig-" + key] = headersDict[key];
-        delete headersDict[key];
-        continue;
-      }
       if (actualContentLength && keyLower === CONTENT_LENGTH) {
         headersDict[key] = "" + actualContentLength;
+        continue;
+      }
+      if (EXCLUDE_HEADERS.includes(keyLower)) {
+        headersDict["x-orig-" + key] = this._encodeHeaderValue(
+          headersDict[key],
+        );
+        delete headersDict[key];
         continue;
       }
       headersDict[key] = this._encodeHeaderValue(headersDict[key]);
