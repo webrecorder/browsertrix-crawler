@@ -255,14 +255,14 @@ export class RequestResponseInfo {
         headersDict[key] = "" + actualContentLength;
         continue;
       }
+      const value = this._encodeHeaderValue(headersDict[key]);
+
       if (EXCLUDE_HEADERS.includes(keyLower)) {
-        headersDict["x-orig-" + key] = this._encodeHeaderValue(
-          headersDict[key],
-        );
+        headersDict["x-orig-" + key] = value;
         delete headersDict[key];
-        continue;
+      } else {
+        headersDict[key] = value;
       }
-      headersDict[key] = this._encodeHeaderValue(headersDict[key]);
     }
 
     return headersDict;
