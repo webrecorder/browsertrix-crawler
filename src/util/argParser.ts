@@ -377,7 +377,7 @@ class ArgParser {
 
       redisStoreUrl: {
         describe:
-          "If set, url for remote redis server to store state. Otherwise, using in-memory store",
+          "If set, url for remote redis server to store state. Otherwise, using local redis instance",
         type: "string",
         default: "redis://localhost:6379/0",
       },

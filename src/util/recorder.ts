@@ -252,7 +252,7 @@ export class Recorder {
   handleResponseReceived(params: Protocol.Network.ResponseReceivedEvent) {
     const { requestId, response, type } = params;
 
-    const { mimeType, url } = response;
+    const { mimeType, url, headers } = response;
 
     logNetwork("Network.responseReceived", {
       requestId,
@@ -261,6 +261,10 @@ export class Recorder {
     });
 
     if (mimeType === MIME_EVENT_STREAM) {
+      return;
+    }
+
+    if (this.shouldSkip(headers, url, undefined, type)) {
       return;
     }
 
@@ -1323,7 +1327,7 @@ class AsyncFetcher {
       if (e.message === "response-filtered-out") {
         throw e;
       }
-      logger.error(
+      logger.debug(
         "Streaming Fetch Error",
         { url, networkId, filename, ...formatErr(e), ...logDetails },
         "recorder",
