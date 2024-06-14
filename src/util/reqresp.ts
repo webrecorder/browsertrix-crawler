@@ -230,13 +230,12 @@ export class RequestResponseInfo {
         if (header.name.startsWith(":")) {
           continue;
         }
-        if (EXCLUDE_HEADERS.includes(headerName)) {
-          headerName = "x-orig-" + headerName;
-          continue;
-        }
         if (actualContentLength && headerName === CONTENT_LENGTH) {
           headersDict[headerName] = "" + actualContentLength;
           continue;
+        }
+        if (EXCLUDE_HEADERS.includes(headerName)) {
+          headerName = "x-orig-" + headerName;
         }
         headersDict[headerName] = this._encodeHeaderValue(header.value);
       }
@@ -252,16 +251,18 @@ export class RequestResponseInfo {
         continue;
       }
       const keyLower = key.toLowerCase();
-      if (EXCLUDE_HEADERS.includes(keyLower)) {
-        headersDict["x-orig-" + key] = headersDict[key];
-        delete headersDict[key];
-        continue;
-      }
       if (actualContentLength && keyLower === CONTENT_LENGTH) {
         headersDict[key] = "" + actualContentLength;
         continue;
       }
-      headersDict[key] = this._encodeHeaderValue(headersDict[key]);
+      const value = this._encodeHeaderValue(headersDict[key]);
+
+      if (EXCLUDE_HEADERS.includes(keyLower)) {
+        headersDict["x-orig-" + key] = value;
+        delete headersDict[key];
+      } else {
+        headersDict[key] = value;
+      }
     }
 
     return headersDict;
@@ -358,7 +359,7 @@ export class RequestResponseInfo {
     // check if not ASCII, then encode, replace encoded newlines
     // eslint-disable-next-line no-control-regex
     if (!/^[\x00-\x7F]*$/.test(value)) {
-      return encodeURI(value).replace(/%0A/g, ", ");
+      value = encodeURI(value).replace(/%0A/g, ", ");
     }
     // replace newlines with spaces
     return value.replace(/\n/g, ", ");
