@@ -144,6 +144,11 @@ Options:
                                             age behavior will run on each page.
                                             If 0, a behavior can run until finis
                                             h.            [number] [default: 90]
+      --postLoadDelay                       If >0, amount of time to sleep (in s
+                                            econds) after page has loaded, befor
+                                            e taking screenshots / getting text
+                                            / running behaviors
+                                                           [number] [default: 0]
       --pageExtraDelay, --delay             If >0, amount of time to sleep (in s
                                             econds) after behaviors before movin
                                             g on to next page
@@ -227,16 +232,19 @@ Options:
       --writePagesToRedis                   If set, write page objects to redis
                                                       [boolean] [default: false]
       --failOnFailedSeed                    If set, crawler will fail with exit
-                                            code 1 if any seed fails
-                                                      [boolean] [default: false]
+                                            code 1 if any seed fails. When combi
+                                            ned with --failOnInvalidStatus,will
+                                            result in crawl failing with exit co
+                                            de 1 if any seed has a 4xx/5xx respo
+                                            nse       [boolean] [default: false]
       --failOnFailedLimit                   If set, save state and exit if numbe
                                             r of failed pages exceeds this value
                                                            [number] [default: 0]
-      --failOnInvalidStatus                 If set, will treat pages with non-20
-                                            0 response as failures. When combine
-                                            d with --failOnFailedLimit or --fail
-                                            OnFailedSeedmay result in crawl fail
-                                            ing due to non-200 responses
+      --failOnInvalidStatus                 If set, will treat pages with 4xx or
+                                             5xx response as failures. When comb
+                                            ined with --failOnFailedLimit or --f
+                                            ailOnFailedSeed may result in crawl
+                                            failing due to non-200 responses
                                                       [boolean] [default: false]
       --customBehaviors                     injects a custom behavior file or se
                                             t of behavior files in a directory
@@ -250,6 +258,8 @@ Options:
                                             nabled, or disabled with custom prof
                                             ile
    [choices: "disabled", "disabled-if-profile", "enabled"] [default: "disabled"]
+      --dryRun                              If true, no data is written to disk,
+                                             only logs                 [boolean]
       --qaSource                            Required for QA mode. Source (WACZ o
                                             r multi WACZ) for QA        [string]
       --qaDebugImageDiff                    if specified, will write crawl.png,
@@ -269,7 +279,8 @@ Options:
                      ted
   --password         The password for the login. If not specified, will be promp
                      ted (recommended)
-  --filename         The filename for the profile tarball
+  --filename         The filename for the profile tarball, stored within /crawls
+                     /profiles if absolute path not provided
                                     [default: "/crawls/profiles/profile.tar.gz"]
   --debugScreenshot  If specified, take a screenshot after login and save as thi
                      s filename

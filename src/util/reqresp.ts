@@ -3,7 +3,7 @@ import { getStatusText } from "@webrecorder/wabac/src/utils.js";
 
 import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
-
+import { HTML_TYPES } from "./constants.js";
 import { Response } from "undici";
 
 const CONTENT_LENGTH = "content-length";
@@ -150,10 +150,15 @@ export class RequestResponseInfo {
     }
   }
 
+  isRedirectStatus() {
+    return this.status >= 300 && this.status < 400 && this.status !== 304;
+  }
+
   isSelfRedirect() {
-    if (this.status < 300 || this.status >= 400 || this.status === 304) {
+    if (!this.isRedirectStatus()) {
       return false;
     }
+
     try {
       const headers = new Headers(this.getResponseHeadersDict());
       const location = headers.get("location") || "";
@@ -364,4 +369,19 @@ export class RequestResponseInfo {
     // replace newlines with spaces
     return value.replace(/\n/g, ", ");
   }
+}
+
+export function isHTMLContentType(contentType: string | null) {
+  // just load if no content-type
+  if (!contentType) {
+    return true;
+  }
+
+  const mime = contentType.split(";")[0];
+
+  if (HTML_TYPES.includes(mime)) {
+    return true;
+  }
+
+  return false;
 }

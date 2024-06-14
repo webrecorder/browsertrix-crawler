@@ -1,0 +1,8 @@
+{
+    "IncognitoModeAvailability": 1,
+    "TorDisabled": true,
+    "AllowFileSelectionDialogs": false,
+    "URLBlocklist": [
+        "file://*"
+    ]
+}
