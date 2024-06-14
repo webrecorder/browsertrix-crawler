@@ -28,6 +28,10 @@ function doesCDXContain(coll, value) {
   return data.indexOf(value) >= 0;
 }
 
+function checkVideo(coll) {
+  return doesCDXContain(coll, '"video/mp4"') || doesCDXContain(coll, '"application/vnd.yt-ump"');
+}
+
 // Test Disabled for Brave -- should always be blocked, but seeing inconsistent ci behavior
 /*
 test("test crawl without block for specific URL", () => {
@@ -74,7 +78,7 @@ test("test block rule based on iframe text, content included due to match", () =
 
   runCrawl("block-2", config);
 
-  expect(doesCDXContain("block-2", '"video/mp4"')).toBe(true);
+  expect(checkVideo("block-2")).toBe(true);
 });
 
 test("test block rule based on iframe text, wrong text, content should be excluded", () => {
@@ -92,7 +96,7 @@ test("test block rule based on iframe text, wrong text, content should be exclud
 
   runCrawl("block-3", config);
 
-  expect(doesCDXContain("block-3", '"video/mp4"')).toBe(false);
+  expect(checkVideo("block-3")).toBe(false);
 });
 
 test("test block rule based on iframe text, block matched", () => {
@@ -109,7 +113,7 @@ test("test block rule based on iframe text, block matched", () => {
 
   runCrawl("block-4", config);
 
-  expect(doesCDXContain("block-4", '"video/mp4"')).toBe(false);
+  expect(checkVideo("block-4")).toBe(false);
 });
 
 test("test rule based on iframe text not matching, plus allowOnly iframe", () => {
@@ -132,7 +136,7 @@ test("test rule based on iframe text not matching, plus allowOnly iframe", () =>
 
   runCrawl("non-block-5", config);
 
-  expect(doesCDXContain("non-block-5", '"video/mp4"')).toBe(true);
+  expect(checkVideo("non-block-5")).toBe(true);
 });
 
 test("test block url in frame url", () => {
@@ -192,5 +196,5 @@ test("test block rules complex example, block external urls on main frame, but n
       '"https://archiveweb.page/assets/js/vendor/lunr.min.js"',
     ),
   ).toBe(false);
-  expect(doesCDXContain("block-7", '"video/mp4"')).toBe(true);
+  expect(checkVideo("block-7")).toBe(true);
 });

@@ -278,6 +278,7 @@ export class PageWorker {
           "Page Worker Timeout",
           this.logDetails,
           "worker",
+          true,
         ),
         this.crashBreak,
       ]);
@@ -352,7 +353,7 @@ export class PageWorker {
       // see if any work data in the queue
       if (data) {
         // filter out any out-of-scope pages right away
-        if (!this.crawler.isInScope(data, this.logDetails)) {
+        if (!(await this.crawler.isInScope(data, this.logDetails))) {
           logger.info("Page no longer in scope", data);
           await crawlState.markExcluded(data.url);
           continue;
