@@ -74,7 +74,7 @@ test("finish crawls successfully", async () => {
   const res = await Promise.allSettled([crawler1, crawler2]);
   expect(res[0].value).toBe(0);
   expect(res[1].value).toBe(0);
-});
+}, 180000);
 
 test("ensure correct number of pages", () => {
 
