@@ -611,7 +611,7 @@ export class Crawler {
     }
   }
 
-  async isInScope(
+  protected getScope(
     {
       seedId,
       url,
@@ -620,13 +620,25 @@ export class Crawler {
     }: { seedId: number; url: string; depth: number; extraHops: number },
     logDetails = {},
   ) {
+    return this.seeds[seedId].isIncluded(url, depth, extraHops, logDetails);
+  }
+
+  async isInScope(
+    {
+      seedId,
+      url,
+      depth,
+      extraHops,
+    }: { seedId: number; url: string; depth: number; extraHops: number },
+    logDetails = {},
+  ): Promise<boolean> {
     const seed = await this.crawlState.getSeedAt(
       this.seeds,
       this.numOriginalSeeds,
       seedId,
     );
 
-    return seed.isIncluded(url, depth, extraHops, logDetails);
+    return !!seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
   async setupPage({
@@ -2014,17 +2026,12 @@ self.__bx_behaviors.selectMainBehavior();
       const newExtraHops = extraHops + 1;
 
       for (const possibleUrl of urls) {
-        const res = await this.isInScope(
+        const res = this.getScope(
           { url: possibleUrl, extraHops: newExtraHops, depth, seedId },
           logDetails,
         );
 
         if (!res) {
-          continue;
-        }
-
-        if (res === true) {
-          logger.warn("Invalid scope response: true", logDetails, "links");
           continue;
         }
 

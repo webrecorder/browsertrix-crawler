@@ -213,7 +213,12 @@ export class ScopedSeed {
     return depth >= this.maxDepth;
   }
 
-  isIncluded(url: string, depth: number, extraHops = 0, logDetails = {}) {
+  isIncluded(
+    url: string,
+    depth: number,
+    extraHops = 0,
+    logDetails = {},
+  ): { url: string; isOOS: boolean } | false {
     if (depth > this.maxDepth) {
       return false;
     }
@@ -231,7 +236,7 @@ export class ScopedSeed {
     url = urlParsed.href;
 
     if (url === this.url) {
-      return true;
+      return { url, isOOS: false };
     }
 
     // skip already crawled
