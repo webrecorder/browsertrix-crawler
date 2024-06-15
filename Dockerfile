@@ -14,6 +14,8 @@ ENV DISPLAY=:99 \
     VNC_PASS=vncpassw0rd! \
     DETACHED_CHILD_PROC=1
 
+EXPOSE 9222 9223 6080
+
 WORKDIR /app
 
 #ADD requirements.txt /app/

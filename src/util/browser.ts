@@ -42,6 +42,10 @@ type LaunchOpts = {
   recording: boolean;
 };
 
+// fixed height of the browser UI (may need to be adjusted in the future)
+// todo: a way to determine this?
+const BROWSER_HEIGHT_OFFSET = 81;
+
 // ==================================================================
 export class Browser {
   profileDir: string;
@@ -94,7 +98,10 @@ export class Browser {
     if (process.env.GEOMETRY) {
       const geom = process.env.GEOMETRY.split("x");
 
-      defaultViewport = { width: Number(geom[0]), height: Number(geom[1]) };
+      defaultViewport = {
+        width: Number(geom[0]),
+        height: Number(geom[1]) - (recording ? 0 : BROWSER_HEIGHT_OFFSET),
+      };
     }
 
     const launchOpts: PuppeteerLaunchOptions = {
