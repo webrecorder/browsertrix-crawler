@@ -796,7 +796,19 @@ self.__bx_behaviors.selectMainBehavior();
     const { page, cdp, data, workerid, callbacks, directFetchCapture } = opts;
     data.callbacks = callbacks;
 
-    const { url } = data;
+    const { url, seedId } = data;
+
+    const auth = this.seeds[seedId].auth;
+
+    if (auth) {
+      logger.debug("Setting auth for seed", {
+        seedId,
+        seedUrl: this.seeds[seedId].url,
+      });
+      await page.setExtraHTTPHeaders({ Authorization: "Basic " + auth });
+    } else {
+      await page.setExtraHTTPHeaders({});
+    }
 
     const logDetails = { page: url, workerid };
     data.logDetails = logDetails;

@@ -18,6 +18,7 @@ export class ScopedSeed {
   allowHash = false;
   depth = -1;
   sitemap?: string | null;
+  auth: string | null;
 
   maxExtraHops = 0;
   maxDepth = 0;
@@ -34,6 +35,7 @@ export class ScopedSeed {
     depth = -1,
     sitemap = false,
     extraHops = 0,
+    auth = undefined,
   }: {
     url: string;
     scopeType: ScopeType;
@@ -43,11 +45,20 @@ export class ScopedSeed {
     depth?: number;
     sitemap?: string | boolean | null;
     extraHops?: number;
+    auth?: string | null;
   }) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");
     }
+    if (auth || (parsedUrl.username && parsedUrl.password)) {
+      this.auth = auth || btoa(parsedUrl.username + ":" + parsedUrl.password);
+      parsedUrl.username = "";
+      parsedUrl.password = "";
+    } else {
+      this.auth = null;
+    }
+
     this.url = parsedUrl.href;
     this.include = parseRx(include);
     this.exclude = parseRx(exclude);
@@ -90,6 +101,7 @@ export class ScopedSeed {
       allowHash: this.allowHash,
       depth: this.maxDepth,
       extraHops: this.maxExtraHops,
+      auth: this.auth,
     });
   }
 
