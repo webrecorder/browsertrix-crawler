@@ -801,12 +801,13 @@ self.__bx_behaviors.selectMainBehavior();
     const auth = this.seeds[seedId].auth;
 
     if (auth) {
-      logger.debug("Setting auth for seed", {
+      logger.debug("Setting HTTP basic auth for seed", {
         seedId,
         seedUrl: this.seeds[seedId].url,
       });
       await page.setExtraHTTPHeaders({ Authorization: "Basic " + auth });
-    } else {
+      opts.isAuthSet = true;
+    } else if (opts.isAuthSet) {
       await page.setExtraHTTPHeaders({});
     }
 
