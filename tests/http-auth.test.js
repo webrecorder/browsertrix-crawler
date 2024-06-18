@@ -3,7 +3,7 @@ import { execSync, spawn } from "child_process";
 let proc = null;
 
 beforeAll(() => {
-  console.log(`Server Host: ${SERVER_HOST}`);
+  console.log(`Server Host: ${process.env.SERVER_HOST}`);
   proc = spawn("../../node_modules/.bin/http-server", ["-p", "31501", "--username", "user", "--password", "pass"], {cwd: "./docs/site"});
 });
 
@@ -16,7 +16,7 @@ afterAll(() => {
 test("run crawl without auth", () => {
   let status = 0;
   try {
-    execSync(`docker run --rm webrecorder/browsertrix-crawler crawl --url http://${SERVER_HOST}:31501 --limit 2 --failOnFailedSeed`);
+    execSync(`docker run --rm webrecorder/browsertrix-crawler crawl --url http://${process.env.SERVER_HOST}:31501 --limit 2 --failOnFailedSeed`);
   } catch (e) {
     status = e.status;
   }
@@ -26,7 +26,7 @@ test("run crawl without auth", () => {
 test("run crawl with auth", () => {
   let status = 0;
   try {
-    execSync(`docker run --rm webrecorder/browsertrix-crawler crawl --url http://user:pass@${SERVER_HOST}:31501 --limit 2 --failOnFailedSeed`, {stdio: "inherit"});
+    execSync(`docker run --rm webrecorder/browsertrix-crawler crawl --url http://user:pass@${process.env.SERVER_HOST}:31501 --limit 2 --failOnFailedSeed`, {stdio: "inherit"});
   } catch (e) {
     status = e.status;
   }
