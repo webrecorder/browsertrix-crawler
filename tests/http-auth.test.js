@@ -3,7 +3,7 @@ import fs from "fs";
 
 let proc = null;
 
-const DOCKER_HOST_NAME = "host.docker.internal";
+const DOCKER_HOST_NAME = process.env.DOCKER_HOST_NAME || "host.docker.internal";
 
 beforeAll(() => {
   proc = spawn("../../node_modules/.bin/http-server", ["-p", "31501", "--username", "user", "--password", "pass"], {cwd: "./docs/site"});
