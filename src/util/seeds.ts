@@ -52,7 +52,7 @@ export class ScopedSeed {
       throw new Error("Invalid URL");
     }
     if (auth || (parsedUrl.username && parsedUrl.password)) {
-      this.auth = auth || btoa(parsedUrl.username + ":" + parsedUrl.password);
+      this.auth = btoa(auth || (parsedUrl.username + ":" + parsedUrl.password));
       parsedUrl.username = "";
       parsedUrl.password = "";
     } else {
