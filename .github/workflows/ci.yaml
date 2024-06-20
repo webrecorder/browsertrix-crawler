@@ -32,18 +32,37 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
       - name: install requirements
         run: yarn install
+
       - name: build js
         run: yarn run tsc
+
       - name: build docker
         run: docker-compose build
+
+      - name: install python deps for docs
+        run: pip install mkdocs-material
+
+      - name: build docs for crawl test
+        run: cd docs/ && mkdocs build
+
+      - name: add http-server for tests
+        run: yarn add -D http-server
+
       - name: run all tests as root
-        run: sudo yarn test
+        run: sudo DOCKER_HOST_NAME=172.17.0.1 yarn test
+
       - name: run saved state + qa compare test as non-root - with volume owned by current user
         run: |
           sudo rm -rf ./test-crawls
