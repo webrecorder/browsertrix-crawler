@@ -1,5 +1,6 @@
 import { execSync, spawn } from "child_process";
 import fs from "fs";
+import yaml from "js-yaml";
 
 let proc = null;
 
@@ -53,4 +54,48 @@ test("run crawl with auth", () => {
     .split("\n")
     .length).toBe(2);
 
+});
+
+test("run crawl with auth config.yaml", () => {
+  const config = {
+    seeds: [{
+      url: `http://${DOCKER_HOST_NAME}:31501`,
+      auth: "user:pass"
+    }],
+    limit: "2",
+    collection: "http-auth-test-2",
+    failOnFailedSeed: "true"
+  }
+
+  const configYaml = yaml.dump(config);
+
+  let status = 0;
+  try {
+    execSync("docker run -i --rm -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin",
+      { input: configYaml, stdin: "inherit", encoding: "utf8" });
+
+  } catch (e) {
+    console.log(e);
+    status = e.status;
+  }
+
+  expect(status).toBe(0);
+
+   expect(fs
+    .readFileSync(
+      "test-crawls/collections/http-auth-test-2/pages/pages.jsonl",
+      "utf8",
+    )
+    .trim()
+    .split("\n")
+    .length).toBe(2);
+
+  expect(fs
+    .readFileSync(
+      "test-crawls/collections/http-auth-test-2/pages/extraPages.jsonl",
+      "utf8",
+    )
+    .trim()
+    .split("\n")
+    .length).toBe(2);
 });

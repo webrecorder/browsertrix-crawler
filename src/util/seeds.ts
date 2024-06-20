@@ -18,7 +18,8 @@ export class ScopedSeed {
   allowHash = false;
   depth = -1;
   sitemap?: string | null;
-  auth: string | null;
+  auth: string | null = null;
+  private _authEncoded: string | null = null;
 
   maxExtraHops = 0;
   maxDepth = 0;
@@ -35,7 +36,7 @@ export class ScopedSeed {
     depth = -1,
     sitemap = false,
     extraHops = 0,
-    auth = undefined,
+    auth = null,
   }: {
     url: string;
     scopeType: ScopeType;
@@ -45,19 +46,18 @@ export class ScopedSeed {
     depth?: number;
     sitemap?: string | boolean | null;
     extraHops?: number;
-    auth?: string | null;
+    auth: string | null;
   }) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");
     }
     if (auth || (parsedUrl.username && parsedUrl.password)) {
-      this.auth = btoa(auth || parsedUrl.username + ":" + parsedUrl.password);
-      parsedUrl.username = "";
-      parsedUrl.password = "";
-    } else {
-      this.auth = null;
+      this.auth = auth || parsedUrl.username + ":" + parsedUrl.password;
+      this._authEncoded = btoa(this.auth);
     }
+    parsedUrl.username = "";
+    parsedUrl.password = "";
 
     this.url = parsedUrl.href;
     this.include = parseRx(include);
@@ -90,6 +90,10 @@ export class ScopedSeed {
     this.allowHash = allowHash;
     this.maxExtraHops = extraHops;
     this.maxDepth = depth < 0 ? MAX_DEPTH : depth;
+  }
+
+  authHeader() {
+    return this._authEncoded ? "Basic " + this._authEncoded : null;
   }
 
   newScopedSeed(url: string) {

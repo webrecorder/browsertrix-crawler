@@ -798,14 +798,14 @@ self.__bx_behaviors.selectMainBehavior();
 
     const { url, seedId } = data;
 
-    const auth = this.seeds[seedId].auth;
+    const auth = this.seeds[seedId].authHeader();
 
     if (auth) {
       logger.debug("Setting HTTP basic auth for seed", {
         seedId,
         seedUrl: this.seeds[seedId].url,
       });
-      await page.setExtraHTTPHeaders({ Authorization: "Basic " + auth });
+      await page.setExtraHTTPHeaders({ Authorization: auth });
       opts.isAuthSet = true;
     } else if (opts.isAuthSet) {
       await page.setExtraHTTPHeaders({});
