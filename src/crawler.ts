@@ -502,11 +502,13 @@ export class Crawler {
       }
     });
 
-    child_process.spawn(
-      "socat",
-      ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"],
-      { detached: RUN_DETACHED },
-    );
+    if (this.params.debugAccessBrowser) {
+      child_process.spawn(
+        "socat",
+        ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"],
+        { detached: RUN_DETACHED },
+      );
+    }
 
     if (!this.params.headless && !process.env.NO_XVFB) {
       child_process.spawn(
@@ -617,7 +619,7 @@ export class Crawler {
     }
   }
 
-  async isInScope(
+  protected getScope(
     {
       seedId,
       url,
@@ -626,13 +628,25 @@ export class Crawler {
     }: { seedId: number; url: string; depth: number; extraHops: number },
     logDetails = {},
   ) {
+    return this.seeds[seedId].isIncluded(url, depth, extraHops, logDetails);
+  }
+
+  async isInScope(
+    {
+      seedId,
+      url,
+      depth,
+      extraHops,
+    }: { seedId: number; url: string; depth: number; extraHops: number },
+    logDetails = {},
+  ): Promise<boolean> {
     const seed = await this.crawlState.getSeedAt(
       this.seeds,
       this.numOriginalSeeds,
       seedId,
     );
 
-    return seed.isIncluded(url, depth, extraHops, logDetails);
+    return !!seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
   async setupPage({
@@ -802,7 +816,20 @@ self.__bx_behaviors.selectMainBehavior();
     const { page, cdp, data, workerid, callbacks, directFetchCapture } = opts;
     data.callbacks = callbacks;
 
-    const { url } = data;
+    const { url, seedId } = data;
+
+    const auth = this.seeds[seedId].authHeader();
+
+    if (auth) {
+      logger.debug("Setting HTTP basic auth for seed", {
+        seedId,
+        seedUrl: this.seeds[seedId].url,
+      });
+      await page.setExtraHTTPHeaders({ Authorization: auth });
+      opts.isAuthSet = true;
+    } else if (opts.isAuthSet) {
+      await page.setExtraHTTPHeaders({});
+    }
 
     const logDetails = { page: url, workerid };
     data.logDetails = logDetails;
@@ -2002,17 +2029,12 @@ self.__bx_behaviors.selectMainBehavior();
       const newExtraHops = extraHops + 1;
 
       for (const possibleUrl of urls) {
-        const res = await this.isInScope(
+        const res = this.getScope(
           { url: possibleUrl, extraHops: newExtraHops, depth, seedId },
           logDetails,
         );
 
         if (!res) {
-          continue;
-        }
-
-        if (res === true) {
-          logger.warn("Invalid scope response: true", logDetails, "links");
           continue;
         }
 

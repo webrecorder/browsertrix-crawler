@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=1.66.115
+ARG BROWSER_VERSION=1.67.119
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
 FROM ${BROWSER_IMAGE_BASE}
@@ -21,7 +21,7 @@ WORKDIR /app
 #ADD requirements.txt /app/
 #RUN pip install -U setuptools; pip install -r requirements.txt
 
-ADD package.json /app/
+ADD package.json yarn.lock /app/
 
 # to allow forcing rebuilds from this stage
 ARG REBUILD
