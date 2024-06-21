@@ -21,7 +21,7 @@ WORKDIR /app
 ADD requirements.txt /app/
 RUN pip install -U setuptools; pip install -r requirements.txt
 
-ADD package.json /app/
+ADD package.json yarn.lock /app/
 
 # to allow forcing rebuilds from this stage
 ARG REBUILD
