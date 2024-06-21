@@ -10,8 +10,11 @@ import { RequestResponseInfo, isHTMLContentType } from "./reqresp.js";
 
 import { fetch, Response } from "undici";
 
-// @ts-expect-error TODO fill in why error is expected
-import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
+import {
+  baseRules as baseDSRules,
+  htmlRules as htmlDSRules,
+  // @ts-expect-error TODO fill in why error is expected
+} from "@webrecorder/wabac/src/rewrite/index.js";
 import {
   rewriteDASH,
   rewriteHLS,
@@ -916,9 +919,10 @@ export class Recorder {
       case "text/javascript":
       case "application/javascript":
       case "application/x-javascript": {
-        const rw = baseDSRules.getRewriter(url);
+        const rules = contentType === "text/html" ? htmlDSRules : baseDSRules;
+        const rw = rules.getRewriter(url);
 
-        if (rw !== baseDSRules.defaultRewriter) {
+        if (rw !== rules.defaultRewriter) {
           string = payload.toString();
           newString = rw.rewrite(string, { live: true, save: extraOpts });
         }
