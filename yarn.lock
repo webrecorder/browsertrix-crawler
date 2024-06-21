@@ -1300,10 +1300,10 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@webrecorder/wabac@^2.19.0":
-  version "2.19.0"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.19.0.tgz#8a03dbb0b876817fb8aca7cb8c946f5d7e1589c4"
-  integrity sha512-e1UJGlAU3TiS9aOlsgUfwnp2WAKG5HvEZcw9db9Z0QWDuA6mu0xlQaVhZFmCrwUBkT+8dealzhp9eMWeGpNcVA==
+"@webrecorder/wabac@^2.19.1":
+  version "2.19.1"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.19.1.tgz#ce0d609f9e90c708af99945e1fa338be0ba2b5f9"
+  integrity sha512-m8Fi70OkhzkicbcbN5TrrBpj5D/EZKzVp5905kGPoC2F2zLqxUDMzx1FOHt2sTO/1b9NMvBmw9Pk1JQyYEm6rA==
   dependencies:
     "@peculiar/asn1-ecc" "^2.3.4"
     "@peculiar/asn1-schema" "^2.3.3"
