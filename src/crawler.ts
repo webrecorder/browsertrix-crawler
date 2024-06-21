@@ -1543,7 +1543,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (process.env.WACZ_SIGN_URL) {
       waczOpts.signingUrl = process.env.WACZ_SIGN_URL;
       if (process.env.WACZ_SIGN_TOKEN) {
-        waczOpts.signingToken = process.env.WACZ_SIGN_TOKEN;
+        waczOpts.signingToken = "bearer " + process.env.WACZ_SIGN_TOKEN;
       }
     }
 
