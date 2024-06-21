@@ -531,6 +531,11 @@ class ArgParser {
         type: "boolean",
       },
 
+      debugAccessBrowser: {
+        describe: "if set, allow debugging browser on port 9222 via CDP",
+        type: "boolean",
+      },
+
       warcPrefix: {
         describe:
           "prefix for WARC files generated, including WARCs added to WACZ",

@@ -394,10 +394,13 @@ class InteractiveBrowser {
     targetId: string,
   ) {
     logger.info("Creating Profile Interactively...");
-    child_process.spawn("socat", [
-      "tcp-listen:9222,reuseaddr,fork",
-      "tcp:localhost:9221",
-    ]);
+
+    if (params.headless) {
+      child_process.spawn("socat", [
+        "tcp-listen:9222,reuseaddr,fork",
+        "tcp:localhost:9221",
+      ]);
+    }
 
     this.params = params;
     this.browser = browser;
