@@ -496,11 +496,13 @@ export class Crawler {
       }
     });
 
-    child_process.spawn(
-      "socat",
-      ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"],
-      { detached: RUN_DETACHED },
-    );
+    if (this.params.debugAccessBrowser) {
+      child_process.spawn(
+        "socat",
+        ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"],
+        { detached: RUN_DETACHED },
+      );
+    }
 
     if (!this.params.headless && !process.env.NO_XVFB) {
       child_process.spawn(
