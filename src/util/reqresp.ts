@@ -371,17 +371,6 @@ export class RequestResponseInfo {
   }
 }
 
-export function isHTMLContentType(contentType: string | null) {
-  // just load if no content-type
-  if (!contentType) {
-    return true;
-  }
-
-  const mime = contentType.split(";")[0];
-
-  if (HTML_TYPES.includes(mime)) {
-    return true;
-  }
-
-  return false;
+export function isHTMLMime(mime: string) {
+  return HTML_TYPES.includes(mime);
 }

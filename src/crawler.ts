@@ -55,7 +55,7 @@ import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
 import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
-import { isHTMLContentType } from "./util/reqresp.js";
+import { isHTMLMime } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 
 const behaviors = fs.readFileSync(
@@ -841,7 +841,7 @@ self.__bx_behaviors.selectMainBehavior();
         );
         if (mime) {
           data.mime = mime;
-          data.isHTMLPage = isHTMLContentType(mime);
+          data.isHTMLPage = isHTMLMime(mime);
         }
         if (fetched) {
           data.loadState = LoadState.FULL_PAGE_LOADED;
@@ -877,12 +877,12 @@ self.__bx_behaviors.selectMainBehavior();
     const { page, cdp, data, workerid } = opts;
     const { url } = data;
 
+    if (!data.isHTMLPage) {
+      return;
+    }
     const logDetails = { page: url, workerid };
 
     if (this.params.screenshot && this.screenshotWriter) {
-      if (!data.isHTMLPage) {
-        logger.debug("Skipping screenshots for non-HTML page", logDetails);
-      }
       const screenshots = new Screenshots({
         browser: this.browser,
         page,
@@ -902,7 +902,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     let textextract = null;
 
-    if (data.isHTMLPage && this.textWriter) {
+    if (this.textWriter) {
       textextract = new TextExtractViaSnapshot(cdp, {
         writer: this.textWriter,
         url,
@@ -922,13 +922,7 @@ self.__bx_behaviors.selectMainBehavior();
     data.loadState = LoadState.EXTRACTION_DONE;
 
     if (this.params.behaviorOpts && data.status < 400) {
-      if (!data.isHTMLPage) {
-        logger.debug(
-          "Skipping behaviors for non-HTML page",
-          logDetails,
-          "behavior",
-        );
-      } else if (data.skipBehaviors) {
+      if (data.skipBehaviors) {
         logger.info("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
         const res = await timedRun(
@@ -1784,17 +1778,18 @@ self.__bx_behaviors.selectMainBehavior();
 
       const contentType = resp.headers()["content-type"];
 
-      isHTMLPage = isHTMLContentType(contentType);
-
       if (contentType) {
         data.mime = contentType.split(";")[0];
+        isHTMLPage = isHTMLMime(data.mime);
+      } else {
+        isHTMLPage = true;
       }
     } catch (e) {
       if (!(e instanceof Error)) {
         throw e;
       }
       const msg = e.message || "";
-      if (!msg.startsWith("net::ERR_ABORTED") || !ignoreAbort) {
+      if (!ignoreAbort) {
         // if timeout error, and at least got to content loaded, continue on
         if (
           e.name === "TimeoutError" &&
@@ -1837,6 +1832,13 @@ self.__bx_behaviors.selectMainBehavior();
           }
           throw e;
         }
+      } else {
+        logger.info(
+          "Non-HTML Page URL loaded, skipping extraction + behaviors",
+          { mime: data.mime, ...logDetails },
+          "pageStatus",
+        );
+        isHTMLPage = false;
       }
     }
 
@@ -1867,9 +1869,7 @@ self.__bx_behaviors.selectMainBehavior();
       //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
     } else {
       data.filteredFrames = [];
-    }
 
-    if (!isHTMLPage) {
       logger.debug("Skipping link extraction for non-HTML page", logDetails);
       return;
     }
@@ -2566,6 +2566,10 @@ self.__bx_behaviors.selectMainBehavior();
 
 function shouldIgnoreAbort(req: HTTPRequest, data: PageState) {
   try {
+    if (!req.isNavigationRequest()) {
+      return false;
+    }
+
     const failure = req.failure();
     const failureText = (failure && failure.errorText) || "";
     if (

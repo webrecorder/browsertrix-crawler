@@ -1,4 +1,5 @@
 {
+    "AlwaysOpenPdfExternally": true,
     "IncognitoModeAvailability": 1,
     "TorDisabled": true,
     "AllowFileSelectionDialogs": false,
