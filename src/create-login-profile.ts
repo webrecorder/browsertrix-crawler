@@ -15,6 +15,7 @@ import { Browser } from "./util/browser.js";
 import { initStorage } from "./util/storage.js";
 import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
 import { getInfoString } from "./util/file_reader.js";
+import { DISPLAY } from "./util/constants.js";
 
 const profileHTML = fs.readFileSync(
   new URL("../html/createProfile.html", import.meta.url),
@@ -143,7 +144,7 @@ async function main() {
   if (!params.headless) {
     logger.debug("Launching XVFB");
     child_process.spawn("Xvfb", [
-      process.env.DISPLAY || "",
+      DISPLAY,
       "-listen",
       "tcp",
       "-screen",
@@ -169,7 +170,7 @@ async function main() {
       "-passwd",
       process.env.VNC_PASS || "",
       "-display",
-      process.env.DISPLAY || "",
+      DISPLAY,
     ]);
   }
 

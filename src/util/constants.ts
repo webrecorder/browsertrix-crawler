@@ -33,3 +33,5 @@ export const DEFAULT_SELECTORS = [
     isAttribute: false,
   },
 ];
+
+export const DISPLAY = ":99";
