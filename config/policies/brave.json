@@ -2,5 +2,6 @@
     "BraveRewardsDisabled": true,
     "BraveWalletDisabled": true,
     "BraveVPNDisabled": 1,
-    "BraveAIChatEnabled": false
+    "BraveAIChatEnabled": false,
+    "TorDisabled": true
 }
