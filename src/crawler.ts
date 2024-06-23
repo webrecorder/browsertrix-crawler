@@ -62,7 +62,7 @@ import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
 import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
-import { isHTMLMime } from "./util/reqresp.js";
+import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 
 const behaviors = fs.readFileSync(
@@ -1717,7 +1717,7 @@ self.__bx_behaviors.selectMainBehavior();
     let firstResponse: HTTPResponse | null = null;
     let fullLoadedResponse: HTTPResponse | null = null;
 
-    // Detect if ERR_ABORTED is actually caused by trying to load a non-page (eg. downloadable PDF),
+    // Detect if failure is actually caused by trying to load a non-page (eg. downloadable PDF),
     // store the downloadResponse, if any
     page.once("requestfailed", (req: HTTPRequest) => {
       downloadResponse = getDownloadResponse(req);
@@ -1726,8 +1726,8 @@ self.__bx_behaviors.selectMainBehavior();
     // store the first successful non-redirect response, even if page doesn't load fully
     const waitFirstResponse = (resp: HTTPResponse) => {
       firstResponse = resp;
-      const status = firstResponse.status();
-      if (!(status >= 300 && status <= 310 && status !== 304)) {
+      if (!isRedirectStatus(firstResponse.status())) {
+        // don't listen to any additional responses
         page.off("response", waitFirstResponse);
       }
     };

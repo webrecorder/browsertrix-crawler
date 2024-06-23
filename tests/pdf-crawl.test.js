@@ -4,6 +4,7 @@ import path from "path";
 import { WARCParser } from "warcio";
 
 const PDF = "https://specs.webrecorder.net/wacz/1.1.1/wacz-2021.pdf";
+const PDF_HTTP = PDF.replace("https", "http");
 
 test("ensure pdf is crawled", async () => {
   child_process.execSync(
@@ -37,6 +38,11 @@ test("check that individual WARCs have PDF written as 200 response", async () =>
   expect(statusCode).toBe(200);
 });
 
+test("ensure pdf with redirect is crawled", async () => {
+  child_process.execSync(
+    `docker run -v $PWD/test-crawls:/crawls  webrecorder/browsertrix-crawler crawl --url "${PDF_HTTP}" --collection crawl-pdf`
+  );
+});
 
 test("check that the pages.jsonl file entry contains status code and mime type", () => {
   expect(
@@ -52,10 +58,17 @@ test("check that the pages.jsonl file entry contains status code and mime type",
     .trim()
     .split("\n");
 
-  expect(pages.length).toBe(2);
+  expect(pages.length).toBe(3);
 
   const page = JSON.parse(pages[1]);
   expect(page.url).toBe(PDF);
   expect(page.status).toBe(200);
   expect(page.mime).toBe("application/pdf");
+  expect(page.loadState).toBe(2);
+
+  const pageH = JSON.parse(pages[2]);
+  expect(pageH.url).toBe(PDF_HTTP);
+  expect(pageH.status).toBe(200);
+  expect(pageH.mime).toBe("application/pdf");
+  expect(pageH.loadState).toBe(2);
 });
