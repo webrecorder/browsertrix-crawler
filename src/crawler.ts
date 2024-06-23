@@ -1704,6 +1704,15 @@ self.__bx_behaviors.selectMainBehavior();
 
     const failCrawlOnError = depth === 0 && this.params.failOnFailedSeed;
 
+    // Attempt to load the page
+    // - If page.load() fails, but downloadResponse is set, then its a download, consider successful
+    //   set page status to FULL_PAGE_LOADED (2)
+    // - If page.load() fails, but firstResponse is set, check if CONTENT_LOADED (1) state was reached,
+    //   and the error is a TimeoutError, consider a slow page, proceed to link extraction, but skip behaviors
+    // - If page.load() fails otherwise, consider a failure, fail page (and or crawl if failOnFailedSeed and seed)
+    // - If page.load() succeeds, check if page url is a chrome-error:// page, fail page (and or crawl if failOnFailedSeed and seed)
+    // - If at least one response, check if HTML, proceed with post-crawl actions only if HTML.
+
     let downloadResponse: HTTPResponse | null = null;
     let firstResponse: HTTPResponse | null = null;
     let fullLoadedResponse: HTTPResponse | null = null;
