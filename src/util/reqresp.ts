@@ -324,7 +324,8 @@ export class RequestResponseInfo {
       return true;
     }
 
-    if (!this.payload && !isRedirectStatus(this.status)) {
+    // skip no payload response only if its not a redirect
+    if (!this.payload && !this.isRedirectStatus()) {
       return true;
     }
 
