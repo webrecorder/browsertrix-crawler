@@ -1,5 +1,7 @@
 {
     "AlwaysOpenPdfExternally": true,
+    "NewTabPageLocation": "about:blank",
+    "RestoreOnStartup": 5,
     "IncognitoModeAvailability": 1,
     "AllowFileSelectionDialogs": false,
     "URLBlocklist": [

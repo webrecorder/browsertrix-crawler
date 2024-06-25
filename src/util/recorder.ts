@@ -1066,13 +1066,17 @@ export class Recorder {
       );
       return;
     } else if (reqresp.shouldSkipSave()) {
-      logNetwork("Skipping writing request/response", {
-        requestId,
-        url,
-        method,
-        status,
-        payloadLength: (payload && payload.length) || 0,
-      });
+      logger.debug(
+        "Skipping writing request/response",
+        {
+          requestId,
+          url,
+          method,
+          status,
+          payloadLength: (payload && payload.length) || 0,
+        },
+        "recorder",
+      );
       return;
     }
 
@@ -1575,9 +1579,11 @@ function createResponse(
   const statusline = `HTTP/1.1 ${reqresp.status} ${reqresp.statusText}`;
   const date = new Date(reqresp.ts).toISOString();
 
-  const httpHeaders = reqresp.getResponseHeadersDict(
-    reqresp.payload ? reqresp.payload.length : 0,
-  );
+  if (!reqresp.payload) {
+    reqresp.payload = new Uint8Array();
+  }
+
+  const httpHeaders = reqresp.getResponseHeadersDict(reqresp.payload.length);
 
   const warcHeaders: Record<string, string> = {
     "WARC-Page-ID": pageid,
