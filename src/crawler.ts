@@ -1708,9 +1708,9 @@ self.__bx_behaviors.selectMainBehavior();
     // Attempt to load the page
     // - If page.load() fails, but downloadResponse is set, then its a download, consider successful
     //   set page status to FULL_PAGE_LOADED (2)
-    // - If page.load() fails, but firstResponse is set, check if CONTENT_LOADED (1) state was reached,
-    //   and the error is a TimeoutError, consider a slow page, proceed to link extraction, but skip behaviors
-    // - If page.load() fails otherwise, consider a failure, fail page (and or crawl if failOnFailedSeed and seed)
+    // - If page.load() fails, but firstResponse is set to CONTENT_LOADED (1) state,
+    //   consider a slow page, proceed to link extraction, but skip behaviors, issue warning
+    // - If page.load() fails otherwise and if failOnFailedSeed is set, fail crawl, otherwise fail page
     // - If page.load() succeeds, check if page url is a chrome-error:// page, fail page (and or crawl if failOnFailedSeed and seed)
     // - If at least one response, check if HTML, proceed with post-crawl actions only if HTML.
 
@@ -1756,16 +1756,15 @@ self.__bx_behaviors.selectMainBehavior();
       const msg = e.message || "";
 
       // got firstResponse and content loaded, not a failure
-      if (
-        firstResponse &&
-        e.name === "TimeoutError" &&
-        data.loadState == LoadState.CONTENT_LOADED
-      ) {
+      if (firstResponse && data.loadState == LoadState.CONTENT_LOADED) {
         // if timeout error, and at least got to content loaded, continue on
-        logger.warn("Page Loading Slowly, skipping behaviors", {
-          msg,
-          ...logDetails,
-        });
+        logger.warn(
+          "Page Load Timedout, loading but slowly, skipping behaviors",
+          {
+            msg,
+            ...logDetails,
+          },
+        );
         data.skipBehaviors = true;
       } else if (!downloadResponse) {
         if (failCrawlOnError) {
@@ -1779,25 +1778,14 @@ self.__bx_behaviors.selectMainBehavior();
             "general",
             1,
           );
-        } else {
-          // log if not already log and rethrow
-          if (msg !== "logged") {
-            const loadState = data.loadState;
-            if (loadState >= LoadState.CONTENT_LOADED) {
-              logger.warn("Page Load Timeout, skipping further processing", {
-                msg,
-                loadState,
-                ...logDetails,
-              });
-            } else {
-              logger.error("Page Load Failed, skipping page", {
-                msg,
-                loadState,
-                ...logDetails,
-              });
-            }
-            e.message = "logged";
-          }
+          // log if not already log and rethrow, consider page failed
+        } else if (msg !== "logged") {
+          logger.error("Page Load Failed, skipping page", {
+            msg,
+            loadState: data.loadState,
+            ...logDetails,
+          });
+          e.message = "logged";
         }
         throw e;
       }
@@ -1869,7 +1857,14 @@ self.__bx_behaviors.selectMainBehavior();
       data.isHTMLPage = !!fullLoadedResponse;
     }
 
-    data.loadState = LoadState.FULL_PAGE_LOADED;
+    // Full Page Loaded if:
+    // - it was a download response
+    // - page.load() succeeded
+    // but not:
+    // - if first response was received, but not fully loaded
+    if (fullLoadedResponse || downloadResponse) {
+      data.loadState = LoadState.FULL_PAGE_LOADED;
+    }
 
     if (data.isHTMLPage) {
       const frames = await page.frames();
