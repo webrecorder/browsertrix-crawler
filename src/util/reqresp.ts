@@ -318,10 +318,13 @@ export class RequestResponseInfo {
     // skip cached, OPTIONS/HEAD responses, and 304 or 206 responses
     if (
       this.fromCache ||
-      !this.payload ||
       (this.method && ["OPTIONS", "HEAD"].includes(this.method)) ||
       [206, 304].includes(this.status)
     ) {
+      return true;
+    }
+
+    if (!this.payload && !isRedirectStatus(this.status)) {
       return true;
     }
 
