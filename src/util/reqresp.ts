@@ -151,7 +151,7 @@ export class RequestResponseInfo {
   }
 
   isRedirectStatus() {
-    return this.status >= 300 && this.status < 400 && this.status !== 304;
+    return isRedirectStatus(this.status);
   }
 
   isSelfRedirect() {
@@ -375,17 +375,10 @@ export class RequestResponseInfo {
   }
 }
 
-export function isHTMLContentType(contentType: string | null) {
-  // just load if no content-type
-  if (!contentType) {
-    return true;
-  }
+export function isHTMLMime(mime: string) {
+  return HTML_TYPES.includes(mime);
+}
 
-  const mime = contentType.split(";")[0];
-
-  if (HTML_TYPES.includes(mime)) {
-    return true;
-  }
-
-  return false;
+export function isRedirectStatus(status: number) {
+  return status >= 300 && status < 400 && status !== 304;
 }

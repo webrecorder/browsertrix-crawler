@@ -6,7 +6,7 @@ import PQueue from "p-queue";
 
 import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun, timestampNow } from "./timing.js";
-import { RequestResponseInfo, isHTMLContentType } from "./reqresp.js";
+import { RequestResponseInfo, isHTMLMime } from "./reqresp.js";
 
 import { fetch, Response } from "undici";
 
@@ -88,6 +88,13 @@ export type DirectFetchRequest = {
   url: string;
   headers: Record<string, string>;
   cdp: CDPSession;
+};
+
+// =================================================================
+export type DirectFetchResponse = {
+  fetched: boolean;
+  mime: string;
+  ts: Date;
 };
 
 // =================================================================
@@ -1088,11 +1095,11 @@ export class Recorder {
     this.writer.writeRecordPair(responseRecord, requestRecord);
   }
 
-  async directFetchCapture({ url, headers, cdp }: DirectFetchRequest): Promise<{
-    fetched: boolean;
-    mime: string;
-    ts: Date;
-  }> {
+  async directFetchCapture({
+    url,
+    headers,
+    cdp,
+  }: DirectFetchRequest): Promise<DirectFetchResponse> {
     const reqresp = new RequestResponseInfo("0");
     const ts = new Date();
 
@@ -1125,7 +1132,7 @@ export class Recorder {
         mime = ct.split(";")[0];
       }
 
-      return !isHTMLContentType(mime);
+      return !isHTMLMime(mime);
     };
 
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
