@@ -3,6 +3,7 @@ import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp from "fs/promises";
+import readline from "readline";
 
 import {
   RedisCrawlState,
@@ -15,6 +16,11 @@ import {
 import { parseArgs } from "./util/argParser.js";
 
 import yaml from "js-yaml";
+
+import * as warcio from "warcio";
+
+// @ts-expect-error TODO fill in why error is expected
+import { WACZ } from "@harvard-lil/js-wacz";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
@@ -29,7 +35,7 @@ import {
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
-import { logger, formatErr, LogDetails } from "./util/logger.js";
+import { logger, formatErr, LogDetails, WACZLogger } from "./util/logger.js";
 import {
   WorkerOpts,
   WorkerState,
@@ -1451,31 +1457,31 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.generateCDX && !this.params.dryRun) {
+      // just move cdx files from tmp-cdx -> indexes at this point
       logger.info("Generating CDX");
-      await fsp.mkdir(path.join(this.collDir, "indexes"), { recursive: true });
+
+      const indexer = new warcio.CDXIndexer({ format: "cdxj" });
+
       await this.crawlState.setStatus("generate-cdx");
 
-      const warcList = await fsp.readdir(this.archivesDir);
-      const warcListFull = warcList.map((filename) =>
-        path.join(this.archivesDir, filename),
-      );
+      const indexesDir = path.join(this.collDir, "indexes");
+      await fsp.mkdir(indexesDir, { recursive: true });
 
-      //const indexResult = await this.awaitProcess(child_process.spawn("wb-manager", ["reindex", this.params.collection], {cwd: this.params.cwd}));
-      const params = [
-        "-o",
-        path.join(this.collDir, "indexes", "index.cdxj"),
-        ...warcListFull,
-      ];
-      const indexResult = await this.awaitProcess(
-        child_process.spawn("cdxj-indexer", params, { cwd: this.params.cwd }),
-      );
-      if (indexResult === 0) {
-        logger.debug("Indexing complete, CDX successfully created");
-      } else {
-        logger.error("Error indexing and generating CDX", {
-          "status code": indexResult,
-        });
-      }
+      const indexFile = path.join(indexesDir, "index.cdxj");
+      const destFh = fs.createWriteStream(indexFile);
+
+      const archiveDir = path.join(this.collDir, "archive");
+      const archiveFiles = await fsp.readdir(archiveDir);
+      const warcFiles = archiveFiles.filter((f) => f.endsWith(".warc.gz"));
+
+      const files = warcFiles.map((warcFile) => {
+        return {
+          reader: fs.createReadStream(path.join(archiveDir, warcFile)),
+          filename: warcFile,
+        };
+      });
+
+      await indexer.writeAll(files, destFh);
     }
 
     logger.info("Crawling done");
@@ -1498,6 +1504,13 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
     }
+
+    // remove tmp-cdx, now that it's already been added to the WACZ and/or
+    // copied to indexes
+    await fsp.rm(this.tempCdxDir, {
+      recursive: true,
+      force: true,
+    });
 
     if (this.params.waitOnDone && (!this.interrupted || this.finalExit)) {
       this.done = true;
@@ -1555,69 +1568,45 @@ self.__bx_behaviors.selectMainBehavior();
     const waczFilename = this.params.collection.concat(".wacz");
     const waczPath = path.join(this.collDir, waczFilename);
 
-    const createArgs = [
-      "create",
-      "-o",
-      waczPath,
-      "--pages",
-      this.seedPagesFile,
-      "--extra-pages",
-      this.otherPagesFile,
-      "--copy-pages",
-      "--log-directory",
-      this.logDir,
-    ];
+    const waczLogger = new WACZLogger(logger);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const waczOpts: Record<string, any> = {
+      input: warcFileList.map((x) => path.join(this.archivesDir, x)),
+      output: waczPath,
+      pages: this.pagesDir,
+      detectPages: false,
+      indexFromWARCs: false,
+      logDirectory: this.logDir,
+      log: waczLogger,
+    };
 
     if (process.env.WACZ_SIGN_URL) {
-      createArgs.push("--signing-url");
-      createArgs.push(process.env.WACZ_SIGN_URL);
+      waczOpts.signingUrl = process.env.WACZ_SIGN_URL;
       if (process.env.WACZ_SIGN_TOKEN) {
-        createArgs.push("--signing-token");
-        createArgs.push(process.env.WACZ_SIGN_TOKEN);
+        waczOpts.signingToken = "bearer " + process.env.WACZ_SIGN_TOKEN;
       }
     }
 
     if (this.params.title) {
-      createArgs.push("--title");
-      createArgs.push(this.params.title);
+      waczOpts.title = this.params.title;
     }
 
     if (this.params.description) {
-      createArgs.push("--desc");
-      createArgs.push(this.params.description);
+      waczOpts.description = this.params.description;
     }
 
-    createArgs.push("-f");
-
-    warcFileList.forEach((val) =>
-      createArgs.push(path.join(this.archivesDir, val)),
-    );
-
-    // create WACZ
-    const waczResult = await this.awaitProcess(
-      child_process.spawn("wacz", createArgs, { detached: RUN_DETACHED }),
-    );
-
-    if (waczResult !== 0) {
-      logger.error("Error creating WACZ", { "status code": waczResult });
+    try {
+      const wacz = new WACZ(waczOpts);
+      await this._addCDXJ(wacz);
+      await wacz.process();
+    } catch (e) {
+      logger.error("Error creating WACZ", e);
       logger.fatal("Unable to write WACZ successfully");
     }
 
     logger.debug(`WACZ successfully generated and saved to: ${waczPath}`);
 
-    // Verify WACZ
-    /*
-    const validateArgs = ["validate"];
-    validateArgs.push("-f");
-    validateArgs.push(waczPath);
-
-    const waczVerifyResult = await this.awaitProcess(child_process.spawn("wacz", validateArgs));
-
-    if (waczVerifyResult !== 0) {
-      console.log("validate", waczVerifyResult);
-      logger.fatal("Unable to verify WACZ created successfully");
-    }
-*/
     if (this.storage) {
       await this.crawlState.setStatus("uploading-wacz");
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
@@ -1630,29 +1619,28 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  awaitProcess(proc: ChildProcess) {
-    const stdout: string[] = [];
-    const stderr: string[] = [];
+  // todo: replace with js-wacz impl eventually
+  async _addCDXJ(wacz: WACZ) {
+    const dirPath = this.tempCdxDir;
 
-    proc.stdout!.on("data", (data) => {
-      stdout.push(data.toString());
-    });
+    try {
+      const cdxjFiles = await fsp.readdir(dirPath);
 
-    proc.stderr!.on("data", (data) => {
-      stderr.push(data.toString());
-    });
+      for (let i = 0; i < cdxjFiles.length; i++) {
+        const cdxjFile = path.join(dirPath, cdxjFiles[i]);
 
-    return new Promise((resolve) => {
-      proc.on("close", (code) => {
-        if (stdout.length) {
-          logger.debug(stdout.join("\n"));
+        logger.debug(`CDXJ: Reading entries from ${cdxjFile}`);
+        const rl = readline.createInterface({
+          input: fs.createReadStream(cdxjFile),
+        });
+
+        for await (const line of rl) {
+          wacz.addCDXJ(line + "\n");
         }
-        if (stderr.length && this.params.logging.includes("debug")) {
-          logger.debug(stderr.join("\n"));
-        }
-        resolve(code);
-      });
-    });
+      }
+    } catch (err) {
+      logger.error("CDXJ Indexing Error", err);
+    }
   }
 
   logMemory() {

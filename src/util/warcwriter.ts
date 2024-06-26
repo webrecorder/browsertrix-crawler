@@ -60,8 +60,6 @@ export class WARCWriter implements IndexerOffsetLength {
   }) {
     this.archivesDir = archivesDir;
     this.tempCdxDir = tempCdxDir;
-    // for now, disabling CDX
-    this.tempCdxDir = undefined;
     this.logDetails = logDetails;
     this.gzip = gzip;
     this.rolloverSize = rolloverSize;
@@ -119,7 +117,12 @@ export class WARCWriter implements IndexerOffsetLength {
       );
     }
 
-    fh.write(await createWARCInfo(this.filename));
+    const buffer = await createWARCInfo(this.filename);
+    fh.write(buffer);
+
+    // account for size of warcinfo record, (don't index as warcinfo never added to cdx)
+    this.recordLength = buffer.length;
+    this.offset += buffer.length;
 
     return fh;
   }

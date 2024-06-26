@@ -17,8 +17,8 @@ EXPOSE 9222 9223 6080
 
 WORKDIR /app
 
-ADD requirements.txt /app/
-RUN pip install -U setuptools; pip install -r requirements.txt
+#ADD requirements.txt /app/
+#RUN pip install -U setuptools; pip install -r requirements.txt
 
 ADD package.json yarn.lock /app/
 
