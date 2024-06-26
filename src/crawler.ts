@@ -51,6 +51,7 @@ import {
   ADD_LINK_FUNC,
   BEHAVIOR_LOG_FUNC,
   DEFAULT_SELECTORS,
+  DISPLAY,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
@@ -514,7 +515,7 @@ export class Crawler {
       child_process.spawn(
         "Xvfb",
         [
-          process.env.DISPLAY || "",
+          DISPLAY,
           "-listen",
           "tcp",
           "-screen",

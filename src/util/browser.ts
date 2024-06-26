@@ -9,7 +9,7 @@ import path from "path";
 import { LogContext, logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
-import type { ServiceWorkerOpt } from "./constants.js";
+import { DISPLAY, type ServiceWorkerOpt } from "./constants.js";
 
 import puppeteer, {
   Frame,
@@ -91,6 +91,10 @@ export class Browser {
 
     if (recording) {
       args.push("--disable-site-isolation-trials");
+    }
+
+    if (!headless) {
+      args.push(`--display=${DISPLAY}`);
     }
 
     let defaultViewport = null;
