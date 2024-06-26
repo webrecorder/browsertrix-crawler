@@ -1,10 +1,11 @@
 {
+    "AlwaysOpenPdfExternally": true,
     "NewTabPageLocation": "about:blank",
     "RestoreOnStartup": 5,
     "IncognitoModeAvailability": 1,
-    "TorDisabled": true,
     "AllowFileSelectionDialogs": false,
     "URLBlocklist": [
         "file://*"
-    ]
+    ],
+    "DownloadDirectory": "/dev/null"
 }
