@@ -33,6 +33,7 @@ grpcfuse       1000000      285000    715000  28% /crawls`;
     params,
     5000 * 1024,
     mockDfOutput,
+    false
   );
   expect(returnValue).toEqual({
     stop: false,
@@ -60,6 +61,7 @@ grpcfuse       100000    85000     15000  85% /crawls`;
     params,
     3000 * 1024,
     mockDfOutput,
+    false
   );
   expect(returnValue).toEqual({
     stop: true,

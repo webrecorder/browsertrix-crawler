@@ -208,6 +208,7 @@ export async function checkDiskUtilization(
   params: Record<string, any>,
   archiveDirSize: number,
   dfOutput = null,
+  doLog = true,
 ) {
   const diskUsage: Record<string, string> = await getDiskUsage(
     collDir,
@@ -217,9 +218,11 @@ export async function checkDiskUtilization(
 
   // Check that disk usage isn't already above threshold
   if (usedPercentage >= params.diskUtilization) {
-    logger.info(
-      `Disk utilization threshold reached ${usedPercentage}% > ${params.diskUtilization}%, stopping`,
-    );
+    if (doLog) {
+      logger.info(
+        `Disk utilization threshold reached ${usedPercentage}% > ${params.diskUtilization}%, stopping`,
+      );
+    }
     return {
       stop: true,
       used: usedPercentage,
@@ -246,9 +249,11 @@ export async function checkDiskUtilization(
   );
 
   if (projectedUsedPercentage >= params.diskUtilization) {
-    logger.info(
-      `Disk utilization projected to reach threshold ${projectedUsedPercentage}% > ${params.diskUtilization}%, stopping`,
-    );
+    if (doLog) {
+      logger.info(
+        `Disk utilization projected to reach threshold ${projectedUsedPercentage}% > ${params.diskUtilization}%, stopping`,
+      );
+    }
     return {
       stop: true,
       used: usedPercentage,

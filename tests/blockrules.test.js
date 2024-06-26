@@ -15,7 +15,7 @@ function runCrawl(name, config, commandExtra = "") {
       { input: configYaml, stdin: "inherit", encoding: "utf8" },
     );
 
-    console.log(proc);
+    //console.log(proc);
   } catch (error) {
     console.log(error);
   }
