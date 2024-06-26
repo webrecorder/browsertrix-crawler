@@ -1773,7 +1773,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (firstResponse && data.loadState == LoadState.CONTENT_LOADED) {
         // if timeout error, and at least got to content loaded, continue on
         logger.warn(
-          "Page Load Timedout, loading but slowly, skipping behaviors",
+          "Page load timed out, loading but slowly, skipping behaviors",
           {
             msg,
             ...logDetails,
