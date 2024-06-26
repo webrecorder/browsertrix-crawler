@@ -46,3 +46,16 @@ seeds:
     depth: 1
     scopeType: "prefix"
 ```
+
+## HTTP Auth
+
+Browsertrix Crawler supports HTTP Basic Auth, which can be provide on a per-seed basis as part of the URL, for example:
+`--url https://username:password@example.com/`.
+
+Alternatively, credentials can be added to the `auth` field for each seed:
+
+```yaml
+seeds:
+  - url: https://example.com/
+    auth: username:password
+```

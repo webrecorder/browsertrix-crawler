@@ -10,8 +10,11 @@ import { RequestResponseInfo, isHTMLContentType } from "./reqresp.js";
 
 import { fetch, Response } from "undici";
 
-// @ts-expect-error TODO fill in why error is expected
-import { baseRules as baseDSRules } from "@webrecorder/wabac/src/rewrite/index.js";
+import {
+  baseRules as baseDSRules,
+  htmlRules as htmlDSRules,
+  // @ts-expect-error TODO fill in why error is expected
+} from "@webrecorder/wabac/src/rewrite/index.js";
 import {
   rewriteDASH,
   rewriteHLS,
@@ -916,9 +919,10 @@ export class Recorder {
       case "text/javascript":
       case "application/javascript":
       case "application/x-javascript": {
-        const rw = baseDSRules.getRewriter(url);
+        const rules = contentType === "text/html" ? htmlDSRules : baseDSRules;
+        const rw = rules.getRewriter(url);
 
-        if (rw !== baseDSRules.defaultRewriter) {
+        if (rw !== rules.defaultRewriter) {
           string = payload.toString();
           newString = rw.rewrite(string, { live: true, save: extraOpts });
         }
@@ -1055,13 +1059,17 @@ export class Recorder {
       );
       return;
     } else if (reqresp.shouldSkipSave()) {
-      logNetwork("Skipping writing request/response", {
-        requestId,
-        url,
-        method,
-        status,
-        payloadLength: (payload && payload.length) || 0,
-      });
+      logger.debug(
+        "Skipping writing request/response",
+        {
+          requestId,
+          url,
+          method,
+          status,
+          payloadLength: (payload && payload.length) || 0,
+        },
+        "recorder",
+      );
       return;
     }
 
@@ -1564,9 +1572,11 @@ function createResponse(
   const statusline = `HTTP/1.1 ${reqresp.status} ${reqresp.statusText}`;
   const date = new Date(reqresp.ts).toISOString();
 
-  const httpHeaders = reqresp.getResponseHeadersDict(
-    reqresp.payload ? reqresp.payload.length : 0,
-  );
+  if (!reqresp.payload) {
+    reqresp.payload = new Uint8Array();
+  }
+
+  const httpHeaders = reqresp.getResponseHeadersDict(reqresp.payload.length);
 
   const warcHeaders: Record<string, string> = {
     "WARC-Page-ID": pageid,

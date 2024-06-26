@@ -9,7 +9,7 @@ import path from "path";
 import { LogContext, logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
-import type { ServiceWorkerOpt } from "./constants.js";
+import { DISPLAY, type ServiceWorkerOpt } from "./constants.js";
 
 import puppeteer, {
   Frame,
@@ -41,6 +41,10 @@ type LaunchOpts = {
 
   recording: boolean;
 };
+
+// fixed height of the browser UI (may need to be adjusted in the future)
+// todo: a way to determine this?
+const BROWSER_HEIGHT_OFFSET = 81;
 
 // ==================================================================
 export class Browser {
@@ -89,12 +93,19 @@ export class Browser {
       args.push("--disable-site-isolation-trials");
     }
 
+    if (!headless) {
+      args.push(`--display=${DISPLAY}`);
+    }
+
     let defaultViewport = null;
 
     if (process.env.GEOMETRY) {
       const geom = process.env.GEOMETRY.split("x");
 
-      defaultViewport = { width: Number(geom[0]), height: Number(geom[1]) };
+      defaultViewport = {
+        width: Number(geom[0]),
+        height: Number(geom[1]) - (recording ? 0 : BROWSER_HEIGHT_OFFSET),
+      };
     }
 
     const launchOpts: PuppeteerLaunchOptions = {

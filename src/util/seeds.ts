@@ -18,6 +18,8 @@ export class ScopedSeed {
   allowHash = false;
   depth = -1;
   sitemap?: string | null;
+  auth: string | null = null;
+  private _authEncoded: string | null = null;
 
   maxExtraHops = 0;
   maxDepth = 0;
@@ -34,6 +36,7 @@ export class ScopedSeed {
     depth = -1,
     sitemap = false,
     extraHops = 0,
+    auth = null,
   }: {
     url: string;
     scopeType: ScopeType;
@@ -43,11 +46,19 @@ export class ScopedSeed {
     depth?: number;
     sitemap?: string | boolean | null;
     extraHops?: number;
+    auth: string | null;
   }) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");
     }
+    if (auth || (parsedUrl.username && parsedUrl.password)) {
+      this.auth = auth || parsedUrl.username + ":" + parsedUrl.password;
+      this._authEncoded = btoa(this.auth);
+    }
+    parsedUrl.username = "";
+    parsedUrl.password = "";
+
     this.url = parsedUrl.href;
     this.include = parseRx(include);
     this.exclude = parseRx(exclude);
@@ -81,6 +92,10 @@ export class ScopedSeed {
     this.maxDepth = depth < 0 ? MAX_DEPTH : depth;
   }
 
+  authHeader() {
+    return this._authEncoded ? "Basic " + this._authEncoded : null;
+  }
+
   newScopedSeed(url: string) {
     return new ScopedSeed({
       url,
@@ -90,6 +105,7 @@ export class ScopedSeed {
       allowHash: this.allowHash,
       depth: this.maxDepth,
       extraHops: this.maxExtraHops,
+      auth: this.auth,
     });
   }
 
@@ -213,7 +229,12 @@ export class ScopedSeed {
     return depth >= this.maxDepth;
   }
 
-  isIncluded(url: string, depth: number, extraHops = 0, logDetails = {}) {
+  isIncluded(
+    url: string,
+    depth: number,
+    extraHops = 0,
+    logDetails = {},
+  ): { url: string; isOOS: boolean } | false {
     if (depth > this.maxDepth) {
       return false;
     }
@@ -231,7 +252,7 @@ export class ScopedSeed {
     url = urlParsed.href;
 
     if (url === this.url) {
-      return true;
+      return { url, isOOS: false };
     }
 
     // skip already crawled

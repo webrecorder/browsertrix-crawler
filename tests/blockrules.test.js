@@ -29,7 +29,7 @@ function doesCDXContain(coll, value) {
 }
 
 function checkVideo(coll) {
-  return doesCDXContain(coll, '"video/mp4"') || doesCDXContain(coll, '"application/vnd.yt-ump"');
+  return doesCDXContain(coll, '"video/mp4"');
 }
 
 // Test Disabled for Brave -- should always be blocked, but seeing inconsistent ci behavior

@@ -26,6 +26,7 @@ export type WorkerOpts = {
       ) => Promise<{ fetched: boolean; mime: string; ts: Date }>)
     | null;
   frameIdToExecId: Map<string, number>;
+  isAuthSet?: boolean;
 };
 
 // ===========================================================================

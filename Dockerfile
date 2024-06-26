@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=1.66.115
+ARG BROWSER_VERSION=1.67.119
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
 FROM ${BROWSER_IMAGE_BASE}
@@ -6,20 +6,21 @@ FROM ${BROWSER_IMAGE_BASE}
 # needed to add args to main build stage
 ARG BROWSER_VERSION
 
-ENV DISPLAY=:99 \
-    GEOMETRY=1360x1020x16 \
+ENV GEOMETRY=1360x1020x16 \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=google-chrome \
     OPENSSL_CONF=/app/openssl.conf \
     VNC_PASS=vncpassw0rd! \
     DETACHED_CHILD_PROC=1
 
+EXPOSE 9222 9223 6080
+
 WORKDIR /app
 
 ADD requirements.txt /app/
 RUN pip install -U setuptools; pip install -r requirements.txt
 
-ADD package.json /app/
+ADD package.json yarn.lock /app/
 
 # to allow forcing rebuilds from this stage
 ARG REBUILD
@@ -41,7 +42,7 @@ ADD config/ /app/
 
 ADD html/ /app/html/
 
-ARG RWP_VERSION=2.0.1
+ARG RWP_VERSION=2.1.0
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/ui.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/sw.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/adblock/adblock.gz /app/html/rwp/adblock.gz
