@@ -457,6 +457,8 @@ export class ReplayCrawler extends Crawler {
 
     await this.doPostLoadActions(opts, true);
 
+    await this.awaitPageExtraDelay(opts);
+
     await this.compareScreenshots(page, data, url, date, workerid);
 
     await this.compareText(page, data, url, date);

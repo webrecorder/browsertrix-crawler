@@ -879,6 +879,8 @@ self.__bx_behaviors.selectMainBehavior();
     data.favicon = await this.getFavicon(page, logDetails);
 
     await this.doPostLoadActions(opts);
+
+    await this.awaitPageExtraDelay(opts);
   }
 
   async doPostLoadActions(opts: WorkerState, saveOutput = false) {
@@ -888,6 +890,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (!data.isHTMLPage) {
       return;
     }
+
     const logDetails = { page: url, workerid };
 
     if (this.params.screenshot && this.screenshotWriter) {
@@ -959,8 +962,17 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
     }
+  }
 
+  async awaitPageExtraDelay(opts: WorkerState) {
     if (this.params.pageExtraDelay) {
+      const {
+        data: { url: page },
+        workerid,
+      } = opts;
+
+      const logDetails = { page, workerid };
+
       logger.info(
         `Waiting ${this.params.pageExtraDelay} seconds before moving on to next page`,
         logDetails,
@@ -1705,7 +1717,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     const failCrawlOnError = depth === 0 && this.params.failOnFailedSeed;
 
-    // Attempt to load the page
+    // Attempt to load the page:
+    // - Already tried direct fetch w/o browser before getting here, and that resulted in an HTML page or non-200 response
+    //   so now loading using the browser
     // - If page.load() fails, but downloadResponse is set, then its a download, consider successful
     //   set page status to FULL_PAGE_LOADED (2)
     // - If page.load() fails, but firstResponse is set to CONTENT_LOADED (1) state,
@@ -1866,28 +1880,7 @@ self.__bx_behaviors.selectMainBehavior();
       data.loadState = LoadState.FULL_PAGE_LOADED;
     }
 
-    if (data.isHTMLPage) {
-      const frames = await page.frames();
-
-      const filteredFrames = await Promise.allSettled(
-        frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)),
-      );
-
-      data.filteredFrames = filteredFrames
-        .filter((x: PromiseSettledResult<Frame | null>) => {
-          if (x.status === "fulfilled") {
-            return !!x.value;
-          }
-          logger.warn("Error in iframe check", {
-            reason: x.reason,
-            ...logDetails,
-          });
-          return false;
-        })
-        .map((x) => (x as PromiseFulfilledResult<Frame>).value);
-
-      //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
-    } else {
+    if (!data.isHTMLPage) {
       data.filteredFrames = [];
 
       logger.info(
@@ -1897,6 +1890,28 @@ self.__bx_behaviors.selectMainBehavior();
       );
       return;
     }
+
+    // HTML Pages Only here
+    const frames = await page.frames();
+
+    const filteredFrames = await Promise.allSettled(
+      frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)),
+    );
+
+    data.filteredFrames = filteredFrames
+      .filter((x: PromiseSettledResult<Frame | null>) => {
+        if (x.status === "fulfilled") {
+          return !!x.value;
+        }
+        logger.warn("Error in iframe check", {
+          reason: x.reason,
+          ...logDetails,
+        });
+        return false;
+      })
+      .map((x) => (x as PromiseFulfilledResult<Frame>).value);
+
+    //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
 
     const { seedId } = data;
 
