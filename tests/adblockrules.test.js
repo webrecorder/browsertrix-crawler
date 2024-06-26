@@ -2,32 +2,22 @@ import child_process from "child_process";
 import fs from "fs";
 import yaml from "js-yaml";
 
-function runCrawl(name, config, value, expectedValue) {
+function runCrawl(name, config, commandExtra = "") {
   config.generateCDX = true;
   config.depth = 0;
   config.collection = name;
 
   const configYaml = yaml.dump(config);
 
-  let log = "";
-
   try {
     const proc = child_process.execSync(
-      "docker run -i -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --headless --config stdin",
+      `docker run -i -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin ${commandExtra}`,
       { input: configYaml, stdin: "inherit", encoding: "utf8" },
     );
 
-    log = proc;
+    //console.log(proc);
   } catch (error) {
-    log = error;
-  }
-
-  try {
-    expect(doesCDXContain(name, value)).toBe(expectedValue);
-  } catch (e) {
-    e.message += "\nCrawl Log\n";
-    e.message += log;
-    throw e;
+    console.log(error);
   }
 }
 
@@ -59,6 +49,9 @@ test("testcrawl with ad block for specific URL", () => {
     blockAds: true,
   };
 
-  runCrawl("adblock-block", config, "www.googletagmanager.com", false);
+  runCrawl("adblock-block", config);
 
+  expect(doesCDXContain("adblock-block", "www.googletagmanager.com")).toBe(
+    false,
+  );
 });
