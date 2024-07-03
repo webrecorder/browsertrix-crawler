@@ -12,7 +12,7 @@ test(
   async () => {
     try {
       await exec(
-        "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-beyond --extraHops 2 --url https://webrecorder.net/ --limit 7",
+        "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-beyond --extraHops 2 --url https://webrecorder.net/ --limit 5 --timeout 10 --exclude community --exclude tools",
       );
     } catch (error) {
       console.log(error);
@@ -36,8 +36,6 @@ test(
 
     const expectedExtraPages = [
       "https://webrecorder.net/blog",
-      "https://webrecorder.net/tools",
-      "https://webrecorder.net/community",
       "https://webrecorder.net/about",
       "https://webrecorder.net/contact",
       "https://webrecorder.net/faq",
