@@ -6,7 +6,11 @@ import PQueue from "p-queue";
 
 import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun, timestampNow } from "./timing.js";
-import { RequestResponseInfo, isHTMLMime } from "./reqresp.js";
+import {
+  RequestResponseInfo,
+  isHTMLMime,
+  isRedirectStatus,
+} from "./reqresp.js";
 
 import { fetch, Response } from "undici";
 
@@ -591,7 +595,11 @@ export class Recorder {
       return false;
     }
 
-    if (url === this.pageUrl && !this.pageInfo.ts) {
+    if (
+      url === this.pageUrl &&
+      !this.pageInfo.ts &&
+      !isRedirectStatus(responseStatusCode!)
+    ) {
       logger.debug("Setting page timestamp", { ts: reqresp.ts, url });
       this.pageInfo.ts = reqresp.ts;
     }
@@ -1083,7 +1091,8 @@ export class Recorder {
     if (
       url &&
       method === "GET" &&
-      !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url))
+      !isRedirectStatus(status) &&
+      !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, status))
     ) {
       logNetwork("Skipping dupe", { url });
       return;
@@ -1150,12 +1159,14 @@ export class Recorder {
 
     this.addPageRecord(reqresp);
 
-    if (url === this.pageUrl && !this.pageInfo.ts) {
+    const fetched = res === "fetched";
+
+    if (url === this.pageUrl && fetched && !this.pageInfo.ts) {
       logger.debug("Setting page timestamp", { ts, url });
       this.pageInfo.ts = ts;
     }
 
-    return { fetched: res === "fetched", mime, ts };
+    return { fetched, mime, ts };
   }
 
   async getCookieString(cdp: CDPSession, url: string) {
@@ -1220,7 +1231,7 @@ class AsyncFetcher {
 
   async load() {
     const { reqresp, recorder, networkId, filename } = this;
-    const { url } = reqresp;
+    const { url, status } = reqresp;
 
     const { pageid, crawlState, gzip, logDetails } = recorder;
 
@@ -1230,7 +1241,7 @@ class AsyncFetcher {
       if (
         reqresp.method === "GET" &&
         url &&
-        !(await crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url))
+        !(await crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url, status))
       ) {
         if (!this.ignoreDupe) {
           this.reqresp.asyncLoading = false;
@@ -1338,7 +1349,7 @@ class AsyncFetcher {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
-      await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url!);
+      await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url!, status);
       if (e.message === "response-filtered-out") {
         throw e;
       }
