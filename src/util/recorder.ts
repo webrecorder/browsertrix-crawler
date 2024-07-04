@@ -68,6 +68,7 @@ export type PageInfoRecord = {
   urls: Record<string, PageInfoValue>;
   url: string;
   ts?: Date;
+  tsStatus: number;
   counts: {
     jsErrors: number;
   };
@@ -597,11 +598,16 @@ export class Recorder {
 
     if (
       url === this.pageUrl &&
-      !this.pageInfo.ts &&
-      !isRedirectStatus(responseStatusCode!)
+      (!this.pageInfo.ts ||
+        (responseStatusCode && responseStatusCode < this.pageInfo.tsStatus))
     ) {
-      logger.debug("Setting page timestamp", { ts: reqresp.ts, url });
+      logger.debug("Setting page timestamp", {
+        ts: reqresp.ts,
+        url,
+        status: responseStatusCode,
+      });
       this.pageInfo.ts = reqresp.ts;
+      this.pageInfo.tsStatus = responseStatusCode!;
     }
 
     reqresp.fillFetchRequestPaused(params);
@@ -753,7 +759,13 @@ export class Recorder {
     this.pendingRequests = new Map();
     this.skipIds = new Set();
     this.skipping = false;
-    this.pageInfo = { pageid, urls: {}, url, counts: { jsErrors: 0 } };
+    this.pageInfo = {
+      pageid,
+      urls: {},
+      url,
+      counts: { jsErrors: 0 },
+      tsStatus: 999,
+    };
   }
 
   addPageRecord(reqresp: RequestResponseInfo) {
@@ -1157,13 +1169,20 @@ export class Recorder {
     });
     const res = await fetcher.load();
 
+    // if we get here, resource was not filtered out, has status code of 200
+
     this.addPageRecord(reqresp);
 
     const fetched = res === "fetched";
 
-    if (url === this.pageUrl && fetched && !this.pageInfo.ts) {
-      logger.debug("Setting page timestamp", { ts, url });
+    if (
+      url === this.pageUrl &&
+      fetched &&
+      (!this.pageInfo.ts || 200 < this.pageInfo.tsStatus)
+    ) {
+      logger.debug("Setting page timestamp", { ts, url, status: 200 });
       this.pageInfo.ts = ts;
+      this.pageInfo.tsStatus = 200;
     }
 
     return { fetched, mime, ts };
