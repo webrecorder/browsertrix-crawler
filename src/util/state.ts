@@ -827,12 +827,12 @@ return inx;
     return await this.redis.zcard(this.qkey);
   }
 
-  async addIfNoDupe(key: string, value: string) {
-    return (await this.redis.sadd(key, value)) === 1;
+  async addIfNoDupe(key: string, url: string, status: number) {
+    return (await this.redis.sadd(key, status + "|" + url)) === 1;
   }
 
-  async removeDupe(key: string, value: string) {
-    return await this.redis.srem(key, value);
+  async removeDupe(key: string, url: string, status: number) {
+    return await this.redis.srem(key, status + "|" + url);
   }
 
   async logError(error: string) {
