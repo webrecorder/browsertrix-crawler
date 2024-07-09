@@ -53,8 +53,6 @@ export class RequestResponseInfo {
 
   frameId?: string;
 
-  fetch = false;
-
   resourceType?: string;
 
   // TODO: Fix this the next time the file is edited.
@@ -64,6 +62,9 @@ export class RequestResponseInfo {
   // stats
   readSize: number = 0;
   expectedSize: number = 0;
+
+  // set to true to indicate request intercepted via Fetch.requestPaused
+  intercepting = false;
 
   // set to true to indicate async loading in progress
   asyncLoading: boolean = false;
@@ -83,7 +84,7 @@ export class RequestResponseInfo {
 
     this.responseHeadersList = params.responseHeaders;
 
-    this.fetch = true;
+    this.intercepting = true;
 
     this.frameId = params.frameId;
   }

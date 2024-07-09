@@ -328,18 +328,19 @@ export class Recorder {
   }
 
   handleRequestWillBeSent(params: Protocol.Network.RequestWillBeSentEvent) {
-    // only handling redirect here, committing last response in redirect chain
-    // request data stored from requestPaused
     const { redirectResponse, requestId, request, type } = params;
 
     const { headers, method, url } = request;
 
     logNetwork("Network.requestWillBeSent", {
       requestId,
+      url,
       redirectResponse,
       ...this.logDetails,
     });
 
+    // handling redirect here, committing last response in redirect chain
+    // request data stored from requestPaused
     if (redirectResponse) {
       this.handleRedirectResponse(params);
     } else {
@@ -808,8 +809,17 @@ export class Recorder {
       if (reqresp.payload) {
         this.removeReqResp(requestId);
         await this.serializeToWARC(reqresp);
-        // no url, likely invalid
-      } else if (!reqresp.url) {
+        // if no url, and not fetch intercept or async loading,
+        // drop this request, as it was not being loaded
+      } else if (
+        !reqresp.url ||
+        (!reqresp.intercepting && !reqresp.asyncLoading)
+      ) {
+        logger.debug(
+          "Removing pending request that was never fetched",
+          { requestId, url: reqresp.url, ...this.logDetails },
+          "recorder",
+        );
         this.removeReqResp(requestId);
       }
     }
@@ -825,12 +835,16 @@ export class Recorder {
           url: string;
           expectedSize?: number;
           readSize?: number;
+          resourceType?: string;
         } = { requestId, url };
         if (reqresp.expectedSize) {
           entry.expectedSize = reqresp.expectedSize;
         }
         if (reqresp.readSize) {
           entry.readSize = reqresp.readSize;
+        }
+        if (reqresp.resourceType) {
+          entry.resourceType = reqresp.resourceType;
         }
         pending.push(entry);
       }
