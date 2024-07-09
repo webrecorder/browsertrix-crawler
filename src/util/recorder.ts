@@ -791,7 +791,10 @@ export class Recorder {
         await this.serializeToWARC(reqresp);
         // if no url, and not fetch intercept or async loading,
         // drop this request, as it was not being loaded
-      } else if (!reqresp.url || (!reqresp.fetch && !reqresp.asyncLoading)) {
+      } else if (
+        !reqresp.url ||
+        (!reqresp.intercepting && !reqresp.asyncLoading)
+      ) {
         logger.debug(
           "Removing pending request that was never fetched",
           { requestId, url: reqresp.url, ...this.logDetails },

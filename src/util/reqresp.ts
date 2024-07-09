@@ -64,7 +64,7 @@ export class RequestResponseInfo {
   expectedSize: number = 0;
 
   // set to true to indicate request intercepted via Fetch.requestPaused
-  fetch = false;
+  intercepting = false;
 
   // set to true to indicate async loading in progress
   asyncLoading: boolean = false;
@@ -84,7 +84,7 @@ export class RequestResponseInfo {
 
     this.responseHeadersList = params.responseHeaders;
 
-    this.fetch = true;
+    this.intercepting = true;
 
     this.frameId = params.frameId;
   }
