@@ -79,6 +79,7 @@ test("test sitemap with application/xml content-type", async () => {
   await runCrawl(10, "https://bitarchivist.net/", "", 0);
 });
 
-test("test sitemap with narrow scope, extraHops, sitemap URLs still added", async () => {
-  await runCrawl(1, "https://www.mozilla.org/", "", 500, 500, "--scopeType page --extraHops 1");
+
+test("test sitemap with narrow scope, extraHops, to ensure out-of-scope sitemap URLs do not count as extraHops", async () => {
+  await runCrawl(1, "https://www.mozilla.org/", "", 2000, 100, "--extraHops 1 --scopeType page");
 });

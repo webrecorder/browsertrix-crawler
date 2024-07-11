@@ -627,10 +627,23 @@ export class Crawler {
       url,
       depth,
       extraHops,
-    }: { seedId: number; url: string; depth: number; extraHops: number },
+      noOOS,
+    }: {
+      seedId: number;
+      url: string;
+      depth: number;
+      extraHops: number;
+      noOOS: boolean;
+    },
     logDetails = {},
   ) {
-    return this.seeds[seedId].isIncluded(url, depth, extraHops, logDetails);
+    return this.seeds[seedId].isIncluded(
+      url,
+      depth,
+      extraHops,
+      logDetails,
+      noOOS,
+    );
   }
 
   async isInScope(
@@ -1995,7 +2008,14 @@ self.__bx_behaviors.selectMainBehavior();
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
     callbacks.addLink = async (url: string) => {
-      await this.queueInScopeUrls(seedId, [url], depth, extraHops, logDetails);
+      await this.queueInScopeUrls(
+        seedId,
+        [url],
+        depth,
+        extraHops,
+        false,
+        logDetails,
+      );
     };
 
     const loadLinks = (options: {
@@ -2071,6 +2091,7 @@ self.__bx_behaviors.selectMainBehavior();
     urls: string[],
     depth: number,
     extraHops = 0,
+    noOOS = false,
     logDetails: LogDetails = {},
   ) {
     try {
@@ -2081,7 +2102,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       for (const possibleUrl of urls) {
         const res = this.getScope(
-          { url: possibleUrl, extraHops: newExtraHops, depth, seedId },
+          { url: possibleUrl, extraHops: newExtraHops, depth, seedId, noOOS },
           logDetails,
         );
 
@@ -2357,7 +2378,7 @@ self.__bx_behaviors.selectMainBehavior();
             "sitemap",
           );
         }
-        this.queueInScopeUrls(seedId, [url], 0, 0);
+        this.queueInScopeUrls(seedId, [url], 0, 0, true);
         if (count >= 100 && !resolved) {
           logger.info(
             "Sitemap partially parsed, continue parsing large sitemap in the background",
