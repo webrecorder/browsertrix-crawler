@@ -113,7 +113,7 @@ function validateResourcesIndex(json) {
       { status: 200, mime: "text/css", type: "stylesheet" },
     "https://fonts.googleapis.com/css?family=Source+Code+Pro|Source+Sans+Pro&display=swap":
       { status: 200, mime: "text/css", type: "stylesheet" },
-    "https://stats.browsertrix.com/js/script.js": {
+    "https://stats.browsertrix.com/js/script.tagged-events.js": {
       status: 200,
       mime: "application/javascript",
       type: "script",
@@ -158,7 +158,7 @@ function validateResourcesAbout(json) {
       { status: 200, mime: "text/css", type: "stylesheet" },
     "https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@700;900&display=swap":
       { status: 200, mime: "text/css", type: "stylesheet" },
-    "https://stats.browsertrix.com/js/script.js": {
+    "https://stats.browsertrix.com/js/script.tagged-events.js": {
       status: 200,
       mime: "application/javascript",
       type: "script",
