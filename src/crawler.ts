@@ -2330,10 +2330,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     let finished = false;
 
-    // disable extraHops for sitemap found URLs by setting to extraHops limit + 1
-    // otherwise, all sitemap found URLs would be eligible for additional hops
-    const extraHopsDisabled = this.params.extraHops + 1;
-
     await new Promise<void>((resolve) => {
       sitemapper.on("end", () => {
         resolve();
@@ -2361,7 +2357,7 @@ self.__bx_behaviors.selectMainBehavior();
             "sitemap",
           );
         }
-        this.queueInScopeUrls(seedId, [url], 0, extraHopsDisabled);
+        this.queueInScopeUrls(seedId, [url], 0, 0);
         if (count >= 100 && !resolved) {
           logger.info(
             "Sitemap partially parsed, continue parsing large sitemap in the background",
