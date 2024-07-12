@@ -80,6 +80,6 @@ test("test sitemap with application/xml content-type", async () => {
 });
 
 
-test("test sitemap with narrow scope, extraHops, to ensure extraHops don't apply to sitemap", async () => {
+test("test sitemap with narrow scope, extraHops, to ensure out-of-scope sitemap URLs do not count as extraHops", async () => {
   await runCrawl(1, "https://www.mozilla.org/", "", 2000, 100, "--extraHops 1 --scopeType page");
 });
