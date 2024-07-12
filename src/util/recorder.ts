@@ -1683,6 +1683,14 @@ function createResponse(
     "WARC-Page-ID": pageid,
   };
 
+  if (reqresp.protocols.length) {
+    warcHeaders["WARC-Protocol"] = reqresp.protocols.join(", ");
+  }
+
+  if (reqresp.cipher) {
+    warcHeaders["WARC-Cipher-Suite"] = reqresp.cipher;
+  }
+
   if (reqresp.resourceType) {
     warcHeaders["WARC-Resource-Type"] = reqresp.resourceType;
   }
