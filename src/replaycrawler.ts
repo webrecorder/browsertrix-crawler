@@ -412,6 +412,7 @@ export class ReplayCrawler extends Crawler {
       ts: date,
       comparison: { resourceCounts: {} },
       counts: { jsErrors: 0 },
+      tsStatus: 999,
     };
     this.pageInfos.set(page, pageInfo);
 

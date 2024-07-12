@@ -266,10 +266,10 @@ async function automatedProfile(
 
   try {
     u = await page.waitForSelector(
-      "//input[contains(@name, 'user') or contains(@name, 'email')]",
+      "input[name='user'],input[name='username'],input[name='email']",
     );
     p = await page.waitForSelector(
-      "//input[contains(@name, 'pass') and @type='password']",
+      "input[type='password'].input[name='pass'],input[name='password']",
     );
   } catch (e) {
     if (params.debugScreenshot) {

@@ -234,6 +234,7 @@ export class ScopedSeed {
     depth: number,
     extraHops = 0,
     logDetails = {},
+    noOOS = false,
   ): { url: string; isOOS: boolean } | false {
     if (depth > this.maxDepth) {
       return false;
@@ -272,7 +273,7 @@ export class ScopedSeed {
     let isOOS = false;
 
     if (!inScope) {
-      if (this.maxExtraHops && extraHops <= this.maxExtraHops) {
+      if (!noOOS && this.maxExtraHops && extraHops <= this.maxExtraHops) {
         isOOS = true;
       } else {
         //console.log(`Not in scope ${url} ${this.include}`);
