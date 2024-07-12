@@ -25,7 +25,9 @@ export class RequestResponseInfo {
 
   method?: string;
   url!: string;
-  protocol?: string = "HTTP/1.1";
+
+  protocols: string[] = [];
+  cipher?: string;
 
   mimeType?: string;
 
@@ -132,7 +134,9 @@ export class RequestResponseInfo {
 
     this.setStatus(response.status, response.statusText);
 
-    this.protocol = response.protocol;
+    if (response.protocol) {
+      this.protocols.push(response.protocol);
+    }
 
     if (resourceType) {
       this.resourceType = resourceType.toLowerCase();
@@ -153,11 +157,16 @@ export class RequestResponseInfo {
 
     this.fromServiceWorker = !!response.fromServiceWorker;
 
-    if (response.securityDetails) {
-      const issuer: string = response.securityDetails.issuer || "";
+    const { securityDetails } = response;
+
+    if (securityDetails) {
+      this.protocols.push(
+        securityDetails.protocol.replaceAll(" ", "/").toLowerCase(),
+      );
+      this.cipher = getCipher(securityDetails);
+      const issuer: string = securityDetails.issuer || "";
       const ctc: string =
-        response.securityDetails.certificateTransparencyCompliance ===
-        "compliant"
+        securityDetails.certificateTransparencyCompliance === "compliant"
           ? "1"
           : "0";
       this.extraOpts.cert = { issuer, ctc };
@@ -202,21 +211,6 @@ export class RequestResponseInfo {
     params: Protocol.Network.RequestWillBeSentExtraInfoEvent,
   ) {
     this.requestHeaders = params.headers;
-  }
-
-  getResponseHeadersText() {
-    let headers = `${this.protocol} ${this.status} ${this.statusText}\r\n`;
-
-    if (this.responseHeaders) {
-      for (const header of Object.keys(this.responseHeaders)) {
-        headers += `${header}: ${this.responseHeaders[header].replace(
-          /\n/g,
-          ", ",
-        )}\r\n`;
-      }
-    }
-    headers += "\r\n";
-    return headers;
   }
 
   hasRequest() {
@@ -423,4 +417,21 @@ export function isHTMLMime(mime: string) {
 
 export function isRedirectStatus(status: number) {
   return status >= 300 && status < 400 && status !== 304;
+}
+
+function getCipher({
+  keyExchange,
+  keyExchangeGroup,
+  cipher,
+}: Protocol.Network.SecurityDetails): string {
+  const key = `${keyExchange} ${keyExchangeGroup} ${cipher}`;
+  const mapping: Record<string, string> = {
+    " X25519Kyber768Draft00 AES_128_GCM": "TLS_AES_128_GCM_SHA256",
+    " X25519 AES_128_GCM": "TLS_AES_128_GCM_SHA256",
+    "ECDHE_RSA X25519 AES_128_GCM": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+    " X25519Kyber768Draft00 AES_256_GCM": "TLS_AES_256_GCM_SHA384",
+    " X25519 AES_256_GCM": "TLS_AES_256_GCM_SHA384",
+    "ECDHE_RSA X25519 AES_256_GCM": "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+  };
+  return mapping[key] || "";
 }
