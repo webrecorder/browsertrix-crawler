@@ -76,7 +76,6 @@ export type PageInfoRecord = {
 
 // =================================================================
 export type AsyncFetchOptions = {
-  tempdir: string;
   reqresp: RequestResponseInfo;
   expectedSize?: number;
   // eslint-disable-next-line no-use-before-define
@@ -134,8 +133,6 @@ export class Recorder {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logDetails: Record<string, any> = {};
   skipping = false;
-
-  allowFull206 = false;
 
   tempdir: string;
 
@@ -439,7 +436,6 @@ export class Recorder {
             "recorder",
           );
           const fetcher = new AsyncFetcher({
-            tempdir: this.tempdir,
             reqresp,
             recorder: this,
             networkId: requestId,
@@ -572,23 +568,42 @@ export class Recorder {
 
     if (responseStatusCode === 206) {
       const range = this._getContentRange(responseHeaders);
-      if (
-        this.allowFull206 &&
-        range === `bytes 0-${contentLen - 1}/${contentLen}`
-      ) {
+      if (range === `bytes 0-${contentLen - 1}/${contentLen}`) {
         logger.debug(
           "Keep 206 Response, Full Range",
           { range, contentLen, url, networkId, ...this.logDetails },
           "recorder",
         );
+      } else if (range?.startsWith("bytes 0-")) {
+        logger.debug(
+          "Re-request 206 Response without range",
+          { range, contentLen, url, ...this.logDetails },
+          "recorder",
+        );
+        this.removeReqResp(networkId);
+
+        const reqresp = new RequestResponseInfo("0");
+        reqresp.fillRequest(params.request, params.resourceType);
+        reqresp.frameId = params.frameId;
+
+        this.addAsyncFetch(
+          {
+            reqresp,
+            expectedSize: parseInt(range.split("/")[1]),
+            recorder: this,
+            networkId: "0",
+            cdp,
+          },
+          contentLen,
+        );
+
+        return false;
       } else {
         logger.debug(
           "Skip 206 Response",
           { range, contentLen, url, ...this.logDetails },
           "recorder",
         );
-        this.removeReqResp(networkId);
-        return false;
       }
     }
 
@@ -633,7 +648,6 @@ export class Recorder {
       !this.isEssentialResource(reqresp.resourceType)
     ) {
       const opts: ResponseStreamAsyncFetchOptions = {
-        tempdir: this.tempdir,
         reqresp,
         expectedSize: contentLen,
         recorder: this,
@@ -659,14 +673,7 @@ export class Recorder {
 
       // if not consumed via takeStream, attempt async loading
       if (!streamingConsume) {
-        let fetcher: AsyncFetcher;
-
-        if (reqresp.method !== "GET" || contentLen > MAX_NETWORK_LOAD_SIZE) {
-          fetcher = new AsyncFetcher(opts);
-        } else {
-          fetcher = new NetworkLoadStreamAsyncFetcher(opts);
-        }
-        this.fetcherQ.add(() => fetcher.load());
+        this.addAsyncFetch(opts, contentLen);
         return false;
       }
     } else {
@@ -744,6 +751,17 @@ export class Recorder {
     }
 
     return true;
+  }
+
+  addAsyncFetch(opts: NetworkLoadAsyncFetchOptions, contentLen: number) {
+    let fetcher: AsyncFetcher;
+
+    if (opts.reqresp.method !== "GET" || contentLen > MAX_NETWORK_LOAD_SIZE) {
+      fetcher = new AsyncFetcher(opts);
+    } else {
+      fetcher = new NetworkLoadStreamAsyncFetcher(opts);
+    }
+    this.fetcherQ.add(() => fetcher.load());
   }
 
   startPage({ pageid, url }: { pageid: string; url: string }) {
@@ -1173,7 +1191,6 @@ export class Recorder {
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
     // should not get here, as dupe pages tracked via seen list
     const fetcher = new AsyncFetcher({
-      tempdir: this.tempdir,
       reqresp,
       recorder: this,
       networkId: "0",
@@ -1231,7 +1248,6 @@ class AsyncFetcher {
   manualRedirect = false;
 
   constructor({
-    tempdir,
     reqresp,
     expectedSize = -1,
     recorder,
@@ -1251,7 +1267,7 @@ class AsyncFetcher {
 
     this.recorder = recorder;
 
-    this.tempdir = tempdir;
+    this.tempdir = recorder.tempdir;
     this.filename = path.join(
       this.tempdir,
       `${timestampNow()}-${uuidv4()}.data`,

@@ -7,6 +7,7 @@ import { HTML_TYPES } from "./constants.js";
 import { Response } from "undici";
 
 const CONTENT_LENGTH = "content-length";
+const CONTENT_RANGE = "content-range";
 const CONTENT_TYPE = "content-type";
 const EXCLUDE_HEADERS = ["content-encoding", "transfer-encoding"];
 
@@ -316,11 +317,11 @@ export class RequestResponseInfo {
   }
 
   shouldSkipSave() {
-    // skip cached, OPTIONS/HEAD responses, and 304 or 206 responses
+    // skip cached, OPTIONS/HEAD responses, and 304 responses
     if (
       this.fromCache ||
       (this.method && ["OPTIONS", "HEAD"].includes(this.method)) ||
-      [206, 304].includes(this.status)
+      this.status == 304
     ) {
       return true;
     }
@@ -328,6 +329,17 @@ export class RequestResponseInfo {
     // skip no payload response only if its not a redirect
     if (!this.payload && !this.isRedirectStatus()) {
       return true;
+    }
+
+    if (this.status === 206) {
+      const headers = new Headers(this.getResponseHeadersDict());
+      const contentLength: number = parseInt(
+        headers.get(CONTENT_LENGTH) || "0",
+      );
+      const contentRange = headers.get(CONTENT_RANGE);
+      if (contentRange !== `bytes 0-${contentLength - 1}/${contentLength}`) {
+        return false;
+      }
     }
 
     return false;
