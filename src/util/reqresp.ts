@@ -77,11 +77,17 @@ export class RequestResponseInfo {
     this.requestId = requestId;
   }
 
+  setStatus(status: number, statusText?: string) {
+    this.status = status;
+    this.statusText = statusText || getStatusText(this.status);
+  }
+
   fillFetchRequestPaused(params: Protocol.Fetch.RequestPausedEvent) {
     this.fillRequest(params.request, params.resourceType);
 
-    this.status = params.responseStatusCode || 0;
-    this.statusText = params.responseStatusText || getStatusText(this.status);
+    if (params.responseStatusCode) {
+      this.setStatus(params.responseStatusCode, params.responseStatusText);
+    }
 
     this.responseHeadersList = params.responseHeaders;
 
@@ -117,8 +123,7 @@ export class RequestResponseInfo {
 
     this.url = response.url.split("#")[0];
 
-    this.status = response.status;
-    this.statusText = response.statusText || getStatusText(this.status);
+    this.setStatus(response.status, response.statusText);
 
     this.protocol = response.protocol;
 
@@ -183,8 +188,7 @@ export class RequestResponseInfo {
 
   fillFetchResponse(response: Response) {
     this.responseHeaders = Object.fromEntries(response.headers);
-    this.status = response.status;
-    this.statusText = response.statusText || getStatusText(this.status);
+    this.setStatus(response.status, response.statusText);
   }
 
   fillRequestExtraInfo(

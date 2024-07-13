@@ -584,6 +584,10 @@ export class Recorder {
 
         const reqresp = new RequestResponseInfo("0");
         reqresp.fillRequest(params.request, params.resourceType);
+        if (reqresp.requestHeaders) {
+          delete reqresp.requestHeaders["range"];
+          delete reqresp.requestHeaders["Range"];
+        }
         reqresp.frameId = params.frameId;
 
         this.addAsyncFetch(
@@ -604,6 +608,8 @@ export class Recorder {
           { range, contentLen, url, ...this.logDetails },
           "recorder",
         );
+        this.removeReqResp(networkId);
+        return false;
       }
     }
 
@@ -1620,7 +1626,7 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
       return;
     }
 
-    reqresp.status = httpStatusCode || 0;
+    reqresp.setStatus(httpStatusCode || 200);
     reqresp.responseHeaders = headers || {};
 
     return this.takeStreamIter(cdp, stream);
