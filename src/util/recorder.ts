@@ -1007,6 +1007,7 @@ export class Recorder {
         "recorder",
       );
       reqresp.payload = encoder.encode(newString);
+      reqresp.isRemoveRange = true;
       return true;
     } else {
       return false;
@@ -1640,6 +1641,10 @@ function createResponse(
   pageid: string,
   contentIter?: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
 ) {
+  if (reqresp.isRemoveRange && reqresp.status === 206) {
+    reqresp.setStatus(200);
+  }
+
   const url = reqresp.url;
   const warcVersion = "WARC/1.1";
   const statusline = `HTTP/1.1 ${reqresp.status} ${reqresp.statusText}`;

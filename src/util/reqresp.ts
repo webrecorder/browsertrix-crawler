@@ -8,6 +8,7 @@ import { Response } from "undici";
 
 const CONTENT_LENGTH = "content-length";
 const CONTENT_RANGE = "content-range";
+const RANGE = "range";
 const CONTENT_TYPE = "content-type";
 const EXCLUDE_HEADERS = ["content-encoding", "transfer-encoding"];
 
@@ -47,6 +48,7 @@ export class RequestResponseInfo {
   responseHeadersText?: string;
 
   payload?: Uint8Array;
+  isRemoveRange = false;
 
   // misc
   fromServiceWorker = false;
@@ -245,7 +247,11 @@ export class RequestResponseInfo {
           headersDict[headerName] = "" + actualContentLength;
           continue;
         }
-        if (EXCLUDE_HEADERS.includes(headerName)) {
+        if (
+          EXCLUDE_HEADERS.includes(headerName) ||
+          (this.isRemoveRange &&
+            (headerName === CONTENT_RANGE || headerName === RANGE))
+        ) {
           headerName = "x-orig-" + headerName;
         }
         headersDict[headerName] = this._encodeHeaderValue(header.value);
@@ -268,7 +274,11 @@ export class RequestResponseInfo {
       }
       const value = this._encodeHeaderValue(headersDict[key]);
 
-      if (EXCLUDE_HEADERS.includes(keyLower)) {
+      if (
+        EXCLUDE_HEADERS.includes(keyLower) ||
+        (this.isRemoveRange &&
+          (keyLower === CONTENT_RANGE || keyLower === RANGE))
+      ) {
         headersDict["x-orig-" + key] = value;
         delete headersDict[key];
       } else {
