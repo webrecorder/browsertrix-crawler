@@ -1145,7 +1145,7 @@ export class Recorder {
       !isRedirectStatus(status) &&
       !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, status))
     ) {
-      logNetwork("Skipping dupe", { url });
+      logNetwork("Skipping dupe", { url, status, ...this.logDetails });
       return;
     }
 
