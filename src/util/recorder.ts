@@ -45,6 +45,17 @@ const WRITE_DUPE_KEY = "s:writedupe";
 
 const MIME_EVENT_STREAM = "text/event-stream";
 
+const RW_MIME_TYPES = [
+  "application/x-mpegURL",
+  "application/vnd.apple.mpegurl",
+  "application/dash+xml",
+  "text/html",
+  "application/json",
+  "text/javascript",
+  "application/javascript",
+  "application/x-javascript",
+];
+
 const encoder = new TextEncoder();
 
 // =================================================================
@@ -645,13 +656,15 @@ export class Recorder {
       return false;
     }
 
+    const mimeType = this.getMimeType(responseHeaders) || "";
+
     let streamingConsume = false;
 
     // if contentLength is large or unknown, do streaming, unless its an essential resource
     // in which case, need to do a full fetch either way
     if (
       (contentLen < 0 || contentLen > MAX_BROWSER_DEFAULT_FETCH_SIZE) &&
-      !this.isEssentialResource(reqresp.resourceType)
+      !this.isEssentialResource(reqresp.resourceType, mimeType)
     ) {
       const opts: ResponseStreamAsyncFetchOptions = {
         reqresp,
@@ -711,7 +724,7 @@ export class Recorder {
       }
     }
 
-    const rewritten = await this.rewriteResponse(reqresp, responseHeaders);
+    const rewritten = await this.rewriteResponse(reqresp, mimeType);
 
     // if in service worker, serialize here
     // as won't be getting a loadingFinished message
@@ -951,10 +964,7 @@ export class Recorder {
     return false;
   }
 
-  async rewriteResponse(
-    reqresp: RequestResponseInfo,
-    responseHeaders?: Protocol.Fetch.HeaderEntry[],
-  ) {
+  async rewriteResponse(reqresp: RequestResponseInfo, contentType: string) {
     const { url, extraOpts, payload } = reqresp;
 
     // don't rewrite if payload is missing or too big
@@ -964,8 +974,6 @@ export class Recorder {
 
     let newString = null;
     let string = null;
-
-    const contentType = this._getContentType(responseHeaders);
 
     switch (contentType) {
       case "application/x-mpegURL":
@@ -1014,11 +1022,19 @@ export class Recorder {
     }
   }
 
-  isEssentialResource(resourceType: string | undefined) {
-    return ["document", "stylesheet", "script"].includes(resourceType || "");
+  isEssentialResource(resourceType: string | undefined, contentType: string) {
+    if (["document", "stylesheet", "script"].includes(resourceType || "")) {
+      return true;
+    }
+
+    if (RW_MIME_TYPES.includes(contentType)) {
+      return true;
+    }
+
+    return false;
   }
 
-  _getContentType(
+  protected getMimeType(
     headers?: Protocol.Fetch.HeaderEntry[] | { name: string; value: string }[],
   ) {
     if (!headers) {
@@ -1033,7 +1049,7 @@ export class Recorder {
     return null;
   }
 
-  _getContentLen(headers?: Protocol.Fetch.HeaderEntry[]) {
+  protected _getContentLen(headers?: Protocol.Fetch.HeaderEntry[]) {
     if (!headers) {
       return -1;
     }
