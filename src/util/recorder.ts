@@ -45,6 +45,17 @@ const WRITE_DUPE_KEY = "s:writedupe";
 
 const MIME_EVENT_STREAM = "text/event-stream";
 
+const RW_MIME_TYPES = [
+  "application/x-mpegURL",
+  "application/vnd.apple.mpegurl",
+  "application/dash+xml",
+  "text/html",
+  "application/json",
+  "text/javascript",
+  "application/javascript",
+  "application/x-javascript",
+];
+
 const encoder = new TextEncoder();
 
 // =================================================================
@@ -76,7 +87,6 @@ export type PageInfoRecord = {
 
 // =================================================================
 export type AsyncFetchOptions = {
-  tempdir: string;
   reqresp: RequestResponseInfo;
   expectedSize?: number;
   // eslint-disable-next-line no-use-before-define
@@ -134,8 +144,6 @@ export class Recorder {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logDetails: Record<string, any> = {};
   skipping = false;
-
-  allowFull206 = false;
 
   tempdir: string;
 
@@ -439,7 +447,6 @@ export class Recorder {
             "recorder",
           );
           const fetcher = new AsyncFetcher({
-            tempdir: this.tempdir,
             reqresp,
             recorder: this,
             networkId: requestId,
@@ -572,15 +579,40 @@ export class Recorder {
 
     if (responseStatusCode === 206) {
       const range = this._getContentRange(responseHeaders);
-      if (
-        this.allowFull206 &&
-        range === `bytes 0-${contentLen - 1}/${contentLen}`
-      ) {
+      if (range === `bytes 0-${contentLen - 1}/${contentLen}`) {
         logger.debug(
           "Keep 206 Response, Full Range",
           { range, contentLen, url, networkId, ...this.logDetails },
           "recorder",
         );
+      } else if (range?.startsWith("bytes 0-")) {
+        logger.debug(
+          "Re-request 206 Response without range",
+          { range, contentLen, url, ...this.logDetails },
+          "recorder",
+        );
+        this.removeReqResp(networkId);
+
+        const reqresp = new RequestResponseInfo("0");
+        reqresp.fillRequest(params.request, params.resourceType);
+        if (reqresp.requestHeaders) {
+          delete reqresp.requestHeaders["range"];
+          delete reqresp.requestHeaders["Range"];
+        }
+        reqresp.frameId = params.frameId;
+
+        this.addAsyncFetch(
+          {
+            reqresp,
+            expectedSize: parseInt(range.split("/")[1]),
+            recorder: this,
+            networkId: "0",
+            cdp,
+          },
+          contentLen,
+        );
+
+        return false;
       } else {
         logger.debug(
           "Skip 206 Response",
@@ -624,16 +656,17 @@ export class Recorder {
       return false;
     }
 
+    const mimeType = this.getMimeType(responseHeaders) || "";
+
     let streamingConsume = false;
 
     // if contentLength is large or unknown, do streaming, unless its an essential resource
     // in which case, need to do a full fetch either way
     if (
       (contentLen < 0 || contentLen > MAX_BROWSER_DEFAULT_FETCH_SIZE) &&
-      !this.isEssentialResource(reqresp.resourceType)
+      !this.isEssentialResource(reqresp.resourceType, mimeType)
     ) {
       const opts: ResponseStreamAsyncFetchOptions = {
-        tempdir: this.tempdir,
         reqresp,
         expectedSize: contentLen,
         recorder: this,
@@ -659,14 +692,7 @@ export class Recorder {
 
       // if not consumed via takeStream, attempt async loading
       if (!streamingConsume) {
-        let fetcher: AsyncFetcher;
-
-        if (reqresp.method !== "GET" || contentLen > MAX_NETWORK_LOAD_SIZE) {
-          fetcher = new AsyncFetcher(opts);
-        } else {
-          fetcher = new NetworkLoadStreamAsyncFetcher(opts);
-        }
-        this.fetcherQ.add(() => fetcher.load());
+        this.addAsyncFetch(opts, contentLen);
         return false;
       }
     } else {
@@ -698,7 +724,7 @@ export class Recorder {
       }
     }
 
-    const rewritten = await this.rewriteResponse(reqresp, responseHeaders);
+    const rewritten = await this.rewriteResponse(reqresp, mimeType);
 
     // if in service worker, serialize here
     // as won't be getting a loadingFinished message
@@ -744,6 +770,17 @@ export class Recorder {
     }
 
     return true;
+  }
+
+  addAsyncFetch(opts: NetworkLoadAsyncFetchOptions, contentLen: number) {
+    let fetcher: AsyncFetcher;
+
+    if (opts.reqresp.method !== "GET" || contentLen > MAX_NETWORK_LOAD_SIZE) {
+      fetcher = new AsyncFetcher(opts);
+    } else {
+      fetcher = new NetworkLoadStreamAsyncFetcher(opts);
+    }
+    this.fetcherQ.add(() => fetcher.load());
   }
 
   startPage({ pageid, url }: { pageid: string; url: string }) {
@@ -927,10 +964,7 @@ export class Recorder {
     return false;
   }
 
-  async rewriteResponse(
-    reqresp: RequestResponseInfo,
-    responseHeaders?: Protocol.Fetch.HeaderEntry[],
-  ) {
+  async rewriteResponse(reqresp: RequestResponseInfo, contentType: string) {
     const { url, extraOpts, payload } = reqresp;
 
     // don't rewrite if payload is missing or too big
@@ -940,8 +974,6 @@ export class Recorder {
 
     let newString = null;
     let string = null;
-
-    const contentType = this._getContentType(responseHeaders);
 
     switch (contentType) {
       case "application/x-mpegURL":
@@ -983,17 +1015,26 @@ export class Recorder {
         "recorder",
       );
       reqresp.payload = encoder.encode(newString);
+      reqresp.isRemoveRange = true;
       return true;
     } else {
       return false;
     }
   }
 
-  isEssentialResource(resourceType: string | undefined) {
-    return ["document", "stylesheet", "script"].includes(resourceType || "");
+  isEssentialResource(resourceType: string | undefined, contentType: string) {
+    if (["document", "stylesheet", "script"].includes(resourceType || "")) {
+      return true;
+    }
+
+    if (RW_MIME_TYPES.includes(contentType)) {
+      return true;
+    }
+
+    return false;
   }
 
-  _getContentType(
+  protected getMimeType(
     headers?: Protocol.Fetch.HeaderEntry[] | { name: string; value: string }[],
   ) {
     if (!headers) {
@@ -1008,7 +1049,7 @@ export class Recorder {
     return null;
   }
 
-  _getContentLen(headers?: Protocol.Fetch.HeaderEntry[]) {
+  protected _getContentLen(headers?: Protocol.Fetch.HeaderEntry[]) {
     if (!headers) {
       return -1;
     }
@@ -1120,7 +1161,7 @@ export class Recorder {
       !isRedirectStatus(status) &&
       !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, status))
     ) {
-      logNetwork("Skipping dupe", { url });
+      logNetwork("Skipping dupe", { url, status, ...this.logDetails });
       return;
     }
 
@@ -1173,7 +1214,6 @@ export class Recorder {
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
     // should not get here, as dupe pages tracked via seen list
     const fetcher = new AsyncFetcher({
-      tempdir: this.tempdir,
       reqresp,
       recorder: this,
       networkId: "0",
@@ -1231,7 +1271,6 @@ class AsyncFetcher {
   manualRedirect = false;
 
   constructor({
-    tempdir,
     reqresp,
     expectedSize = -1,
     recorder,
@@ -1251,7 +1290,7 @@ class AsyncFetcher {
 
     this.recorder = recorder;
 
-    this.tempdir = tempdir;
+    this.tempdir = recorder.tempdir;
     this.filename = path.join(
       this.tempdir,
       `${timestampNow()}-${uuidv4()}.data`,
@@ -1604,7 +1643,7 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
       return;
     }
 
-    reqresp.status = httpStatusCode || 0;
+    reqresp.setStatus(httpStatusCode || 200);
     reqresp.responseHeaders = headers || {};
 
     return this.takeStreamIter(cdp, stream);
@@ -1618,6 +1657,10 @@ function createResponse(
   pageid: string,
   contentIter?: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
 ) {
+  if (reqresp.isRemoveRange && reqresp.status === 206) {
+    reqresp.setStatus(200);
+  }
+
   const url = reqresp.url;
   const warcVersion = "WARC/1.1";
   const statusline = `HTTP/1.1 ${reqresp.status} ${reqresp.statusText}`;

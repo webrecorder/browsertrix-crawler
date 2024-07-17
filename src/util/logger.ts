@@ -20,7 +20,7 @@ export function formatErr(e: unknown): Record<string, any> {
   } else if (typeof e === "object") {
     return e || {};
   } else {
-    return { message: (e as object).toString() };
+    return { message: (e as object) + "" };
   }
 }
 
