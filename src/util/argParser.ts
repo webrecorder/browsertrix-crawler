@@ -341,7 +341,7 @@ class ArgParser {
 
       profile: {
         describe:
-          "Path to tar.gz file which will be extracted and used as the browser profile",
+          "Path or HTTP(S) URL to tar.gz file which will be used as the browser profile",
         type: "string",
       },
 
