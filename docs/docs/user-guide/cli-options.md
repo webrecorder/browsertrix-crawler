@@ -292,8 +292,8 @@ Options:
                                                       [boolean] [default: false]
   --shutdownWait     Shutdown browser in interactive after this many seconds, if
                       no pings received                    [number] [default: 0]
-  --profile          Path or HTTP(S) URL to tar.gz file which will be used as
-                      the browser profile                               [string]
+  --profile          Path or HTTP(S) URL to tar.gz file which contains the brows
+                     er profile directory                               [string]
   --windowSize       Browser window dimensions, specified as: width,height
                                                  [string] [default: "1360,1020"]
   --proxy                                             [boolean] [default: false]
