@@ -90,7 +90,7 @@ function cliOpts(): { [key: string]: Options } {
 
     profile: {
       describe:
-        "Path or HTTP(S) URL to tar.gz file which will be used as the browser profile",
+        "Path or HTTP(S) URL to tar.gz file which contains the browser profile directory",
       type: "string",
     },
 

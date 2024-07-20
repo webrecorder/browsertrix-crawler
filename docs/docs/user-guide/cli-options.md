@@ -155,9 +155,9 @@ Options:
                                                            [number] [default: 0]
       --dedupPolicy                         Deduplication policy
                  [string] [choices: "skip", "revisit", "keep"] [default: "skip"]
-      --profile                             Path to tar.gz file which will be ex
-                                            tracted and used as the browser prof
-                                            ile                         [string]
+      --profile                             Path or HTTP(S) URL to tar.gz file w
+                                            hich contains the browser profile di
+                                            rectory                     [string]
       --screenshot                          Screenshot options for crawler, can
                                             include: view, thumbnail, fullPage
                 [array] [choices: "view", "thumbnail", "fullPage"] [default: []]
