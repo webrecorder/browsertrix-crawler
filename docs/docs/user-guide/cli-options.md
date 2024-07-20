@@ -155,9 +155,9 @@ Options:
                                                            [number] [default: 0]
       --dedupPolicy                         Deduplication policy
                  [string] [choices: "skip", "revisit", "keep"] [default: "skip"]
-      --profile                             Path to tar.gz file which will be ex
-                                            tracted and used as the browser prof
-                                            ile                         [string]
+      --profile                             Path or HTTP(S) URL to tar.gz file w
+                                            hich contains the browser profile di
+                                            rectory                     [string]
       --screenshot                          Screenshot options for crawler, can
                                             include: view, thumbnail, fullPage
                 [array] [choices: "view", "thumbnail", "fullPage"] [default: []]
@@ -292,8 +292,8 @@ Options:
                                                       [boolean] [default: false]
   --shutdownWait     Shutdown browser in interactive after this many seconds, if
                       no pings received                    [number] [default: 0]
-  --profile          Path to tar.gz file which will be extracted and used as the
-                      browser profile                                   [string]
+  --profile          Path or HTTP(S) URL to tar.gz file which contains the brows
+                     er profile directory                               [string]
   --windowSize       Browser window dimensions, specified as: width,height
                                                  [string] [default: "1360,1020"]
   --proxy                                             [boolean] [default: false]

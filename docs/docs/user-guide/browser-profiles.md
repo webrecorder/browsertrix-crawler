@@ -76,7 +76,7 @@ The profile creation script attempts to detect the username and password fields 
 
 ## Using Browser Profile with a Crawl
 
-To use a previously created profile with a crawl, use the `--profile` flag or `profile` option. The `--profile` flag can then be used to specify any Brave Browser profile stored as a tarball. Using profiles created with same or older version of Browsertrix Crawler is recommended to ensure compatibility. This option allows running a crawl with the browser already pre-configured, logged in to certain sites, language settings configured, etc.
+To use a previously created profile with a crawl, use the `--profile` flag or `profile` option. The `--profile` flag can then be used to specify any Brave Browser profile stored as a tarball. Browser profile can be either stored locally and provided as a path, or available online at any HTTP(S) URL which will be downloaded before starting the crawl. Using profiles created with same or older version of Browsertrix Crawler is recommended to ensure compatibility. This option allows running a crawl with the browser already pre-configured, logged in to certain sites, language settings configured, etc.
 
 After running the above command, you can now run a crawl with the profile, as follows:
 
