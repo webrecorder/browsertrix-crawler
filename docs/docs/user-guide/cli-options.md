@@ -155,9 +155,9 @@ Options:
                                                            [number] [default: 0]
       --dedupPolicy                         Deduplication policy
                  [string] [choices: "skip", "revisit", "keep"] [default: "skip"]
-      --profile                             Path to tar.gz file which will be ex
-                                            tracted and used as the browser prof
-                                            ile                         [string]
+      --profile                             Path or HTTP(S) URL to tar.gz file w
+                                            hich contains the browser profile di
+                                            rectory                     [string]
       --screenshot                          Screenshot options for crawler, can
                                             include: view, thumbnail, fullPage
                 [array] [choices: "view", "thumbnail", "fullPage"] [default: []]
@@ -172,8 +172,8 @@ Options:
       --warcInfo, --warcinfo                Optional fields added to the warcinf
                                             o record in combined WARCs
       --redisStoreUrl                       If set, url for remote redis server
-                                            to store state. Otherwise, using in-
-                                            memory store
+                                            to store state. Otherwise, using loc
+                                            al redis instance
                                   [string] [default: "redis://localhost:6379/0"]
       --saveState                           If the crawl state should be seriali
                                             zed to the crawls/ directory. Defaul
@@ -252,14 +252,20 @@ Options:
       --debugAccessRedis                    if set, runs internal redis without
                                             protected mode to allow external acc
                                             ess (for debugging)        [boolean]
+      --debugAccessBrowser                  if set, allow debugging browser on p
+                                            ort 9222 via CDP           [boolean]
       --warcPrefix                          prefix for WARC files generated, inc
                                             luding WARCs added to WACZ  [string]
       --serviceWorker, --sw                 service worker handling: disabled, e
                                             nabled, or disabled with custom prof
                                             ile
    [choices: "disabled", "disabled-if-profile", "enabled"] [default: "disabled"]
-      --dryRun                              If true, no data is written to disk,
-                                             only logs                 [boolean]
+      --proxyServer                         if set, will use specified proxy ser
+                                            ver. Takes precedence over any env v
+                                            ar proxy settings           [string]
+      --dryRun                              If true, no archive data is written
+                                            to disk, only pages and logs (and op
+                                            tionally saved state).     [boolean]
       --qaSource                            Required for QA mode. Source (WACZ o
                                             r multi WACZ) for QA        [string]
       --qaDebugImageDiff                    if specified, will write crawl.png,
@@ -292,11 +298,12 @@ Options:
                                                       [boolean] [default: false]
   --shutdownWait     Shutdown browser in interactive after this many seconds, if
                       no pings received                    [number] [default: 0]
-  --profile          Path to tar.gz file which will be extracted and used as the
-                      browser profile                                   [string]
+  --profile          Path or HTTP(S) URL to tar.gz file which contains the brows
+                     er profile directory                               [string]
   --windowSize       Browser window dimensions, specified as: width,height
                                                  [string] [default: "1360,1020"]
-  --proxy                                             [boolean] [default: false]
+  --proxyServer      if set, will use specified proxy server. Takes precedence o
+                     ver any env var proxy settings                     [string]
   --cookieDays       If >0, set all cookies, including session cookies, to have
                      this duration in days before saving profile
                                                            [number] [default: 7]

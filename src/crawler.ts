@@ -464,7 +464,14 @@ export class Crawler {
 
     this.proxyServer = initProxy(this.params.proxyServer);
 
-    subprocesses.push(this.launchRedis());
+    const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
+
+    if (
+      redisUrl.startsWith("redis://localhost:") ||
+      redisUrl.startsWith("redis://127.0.0.1:")
+    ) {
+      subprocesses.push(this.launchRedis());
+    }
 
     await fsp.mkdir(this.logDir, { recursive: true });
 
@@ -482,6 +489,8 @@ export class Crawler {
     logger.info(this.infoString);
 
     logger.info("Seeds", this.seeds);
+
+    logger.info("Behavior Options", this.params.behaviorOpts);
 
     if (this.params.profile) {
       logger.info("With Browser Profile", { url: this.params.profile });
@@ -1248,10 +1257,12 @@ self.__bx_behaviors.selectMainBehavior();
       await this.browser.close();
       await closeWorkers(0);
       await this.closeFiles();
-      await this.setStatusAndExit(13, "interrupted");
-    } else {
-      await this.setStatusAndExit(0, "done");
+      if (!this.done) {
+        await this.setStatusAndExit(13, "interrupted");
+        return;
+      }
     }
+    await this.setStatusAndExit(0, "done");
   }
 
   async isCrawlRunning() {
