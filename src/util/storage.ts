@@ -6,8 +6,6 @@ import util from "util";
 import os from "os";
 import { createHash } from "crypto";
 
-import crc32 from "crc/crc32";
-
 import * as Minio from "minio";
 
 import { initRedis } from "./redis.js";
@@ -98,13 +96,13 @@ export class S3StorageSync {
       srcFilename,
     );
 
-    const { hash, crc32 } = await checksumFile("sha256", srcFilename);
+    const hash = await checksumFile("sha256", srcFilename);
     const path = targetFilename;
 
     const size = await getFileSize(srcFilename);
 
     // for backwards compatibility, keep 'bytes'
-    return { path, size, hash, crc32, bytes: size };
+    return { path, size, hash, bytes: size };
   }
 
   async downloadFile(srcFilename: string, destFilename: string) {
@@ -296,21 +294,16 @@ export function calculatePercentageUsed(used: number, total: number) {
   return Math.round((used / total) * 100);
 }
 
-function checksumFile(
-  hashName: string,
-  path: string,
-): Promise<{ hash: string; crc32: number }> {
+function checksumFile(hashName: string, path: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = createHash(hashName);
-    let crc: number = 0;
 
     const stream = fs.createReadStream(path);
     stream.on("error", (err) => reject(err));
     stream.on("data", (chunk) => {
       hash.update(chunk);
-      crc = crc32(chunk, crc);
     });
-    stream.on("end", () => resolve({ hash: hash.digest("hex"), crc32: crc }));
+    stream.on("end", () => resolve(hash.digest("hex")));
   });
 }
 
