@@ -456,7 +456,7 @@ export class Crawler {
   async bootstrap() {
     const subprocesses: ChildProcess[] = [];
 
-    this.proxyServer = initProxy(this.params.proxyServer);
+    this.proxyServer = initProxy(this.params);
 
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
 
