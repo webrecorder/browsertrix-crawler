@@ -1677,10 +1677,12 @@ browserslist@^4.22.2:
     node-releases "^2.0.14"
     update-browserslist-db "^1.0.13"
 
-browsertrix-behaviors@^0.6.2:
-  version "0.6.2"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.6.2.tgz#33a5e4acd395724539333873db6eb1977f47540a"
-  integrity sha512-M2qYZ2xx/tLLmpCxtSIQoV4QjxoSpgHfOxXOLHUQt9VEic0muZzLHHQcRfSKOS+6aQvnZ7RM0TirBWVxbpcDYA==
+browsertrix-behaviors@^0.6.3:
+  version "0.6.3"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.6.3.tgz#cdd6457bcc718cc30257fd754a2c12191a6431a2"
+  integrity sha512-fr9w8ANqmxDid4Ile+dYjwcU5nD4+ZhTBVID2zBYWNoSoFkrEILUtpSAbBmLtr5Ujulxjn71uUQwMOfAFAUqzw==
+  dependencies:
+    query-selector-shadow-dom "^1.0.1"
 
 bser@2.1.1:
   version "2.1.1"
@@ -1903,11 +1905,6 @@ corser@^2.0.1:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/corser/-/corser-2.0.1.tgz#8eda252ecaab5840dcd975ceb90d9370c819ff87"
   integrity sha512-utCYNzRSQIZNPIcGZdQc92UVJYAhtGAteCFg0yRaFm8f0P+CPtyGyHXJcGXnffjCybUCEx3FQ2G7U3/o9eIkVQ==
-
-crc@^4.3.2:
-  version "4.3.2"
-  resolved "https://registry.yarnpkg.com/crc/-/crc-4.3.2.tgz#49b7821cbf2cf61dfd079ed93863bbebd5469b9a"
-  integrity sha512-uGDHf4KLLh2zsHa8D8hIQ1H/HtFQhyHrc0uhHBcoKGol/Xnb+MPYfUMw7cvON6ze/GUESTudKayDcJC5HnJv1A==
 
 create-jest@^29.7.0:
   version "29.7.0"
@@ -4382,6 +4379,11 @@ qs@^6.4.0:
   integrity sha512-zWmv4RSuB9r2mYQw3zxQuHWeU+42aKi1wWig/j4ele4ygELZ7PEO6MM7rim9oAQH2A5MWfsAVf/jPvTPgCbvUQ==
   dependencies:
     side-channel "^1.0.6"
+
+query-selector-shadow-dom@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/query-selector-shadow-dom/-/query-selector-shadow-dom-1.0.1.tgz#1c7b0058eff4881ac44f45d8f84ede32e9a2f349"
+  integrity sha512-lT5yCqEBgfoMYpf3F2xQRK7zEr1rhIIZuceDK6+xRkJQ4NMbHTwXqk4NkwDwQMNqXgG9r9fyHnzwNVs6zV5KRw==
 
 query-string@^7.1.3:
   version "7.1.3"
