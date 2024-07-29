@@ -23,14 +23,14 @@ export function getEnvProxyUrl() {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function initProxy(params: Record<string, any>): string {
+export function initProxy(params: Record<string, any>, detached: boolean) {
   let proxy = params.proxyServer;
 
   if (!proxy) {
     proxy = getEnvProxyUrl();
   }
   if (!proxy) {
-    proxy = runSSHD(params);
+    proxy = runSSHD(params, detached);
   }
   if (proxy) {
     const dispatcher = createDispatcher(proxy);
@@ -72,9 +72,7 @@ export function createDispatcher(proxyUrl: string): Dispatcher | undefined {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function runSSHD(params: Record<string, any>) {
-  const RUN_DETACHED = process.env.DETACHED_CHILD_PROC == "1";
-
+export function runSSHD(params: Record<string, any>, detached: boolean) {
   if (!params.sshProxyLogin) {
     return "";
   }
@@ -84,6 +82,8 @@ export function runSSHD(params: Record<string, any>) {
   const port = hostPort.length > 1 ? hostPort[1] : 22;
   const localPort = params.sshProxyLocalPort || SSH_PROXY_LOCAL_PORT;
 
+  logger.info("Checking SSH connection for proxy...");
+
   const coreArgs: string[] = [
     host,
     "-p",
@@ -91,12 +91,17 @@ export function runSSHD(params: Record<string, any>) {
     "-D",
     localPort,
     "-i",
-    params.sshProxyPrivateKey,
+    params.sshProxyPrivateKeyFile,
     "-o",
     "IdentitiesOnly=yes",
     "-o",
-    "StrictHostKeyChecking=no",
   ];
+
+  if (params.sshProxyKnownHostsFile) {
+    coreArgs.push(`UserKnownHostsFile=${params.sshProxyKnownHostsFile}`);
+  } else {
+    coreArgs.push("StrictHostKeyChecking=no");
+  }
 
   const { status, stdout, stderr } = child_process.spawnSync("ssh", [
     ...coreArgs,
@@ -112,17 +117,19 @@ export function runSSHD(params: Record<string, any>) {
   }
 
   const proc = child_process.spawn("ssh", [...coreArgs, "-N", "-T"], {
-    detached: RUN_DETACHED,
+    detached,
   });
 
+  const proxyString = `socks5://localhost:${localPort}`;
+
   logger.info(
-    `Using SSH tunnel for SOCKS5 proxy localhost:${localPort} -> ${params.sshProxyLogin}`,
+    `Using SSH tunnel for proxy ${proxyString} -> ssh://${params.sshProxyLogin}`,
   );
 
   proc.on("exit", (code, signal) => {
     logger.warn(`SSH crashed, restarting`, { code, signal });
-    runSSHD(params);
+    runSSHD(params, detached);
   });
 
-  return `socks5://localhost:${localPort}`;
+  return proxyString;
 }

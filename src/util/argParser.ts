@@ -579,9 +579,15 @@ class ArgParser {
         type: "string",
       },
 
-      sshProxyPrivateKey: {
+      sshProxyPrivateKeyFile: {
         describe:
           "path to SSH private key for SOCKS5 over SSH proxy connection",
+        type: "string",
+      },
+
+      sshProxyKnownHostsFile: {
+        describe:
+          "path to SSH known hosts file for SOCKS5 over SSH proxy connection",
         type: "string",
       },
     };
