@@ -400,6 +400,17 @@ export class Recorder {
       return;
     }
 
+    try {
+      new URL(reqresp.url);
+    } catch (e) {
+      logger.warn(
+        "Skipping invalid URL from redirect",
+        { url: reqresp.url, status: reqresp.status, ...this.logDetails },
+        "recorder",
+      );
+      return;
+    }
+
     this.serializeToWARC(reqresp);
   }
 
