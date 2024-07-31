@@ -482,6 +482,11 @@ export class Crawler {
 
     this.proxyServer = initProxy(this.params, RUN_DETACHED);
 
+    // Additional sleep to ensure proxy connection is ready...
+    if (this.proxyServer) {
+      await sleep(5);
+    }
+
     logger.info("Seeds", this.seeds);
 
     logger.info("Behavior Options", this.params.behaviorOpts);

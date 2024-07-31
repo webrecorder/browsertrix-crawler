@@ -109,10 +109,15 @@ export function runSSHD(params: Record<string, any>, detached: boolean) {
   ]);
 
   if (status !== 0) {
-    logger.fatal("Unable to establish SSH connection for proxy", {
-      stdout: stdout.toString(),
-      stderr: stderr.toString(),
-    });
+    logger.fatal(
+      "Unable to establish SSH connection for proxy",
+      {
+        stdout: stdout.toString(),
+        stderr: stderr.toString(),
+      },
+      "general",
+      21,
+    );
     return;
   }
 

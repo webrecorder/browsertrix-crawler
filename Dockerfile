@@ -15,10 +15,6 @@ ENV GEOMETRY=1360x1020x16 \
 
 EXPOSE 9222 9223 6080
 
-# add extra browsertrix user, e.g. for running it as non-root in k8s
-RUN groupadd -r browsertrix --gid 201407 &&\
-    useradd -r --uid 201407 -g browsertrix browsertrix
-
 WORKDIR /app
 
 ADD requirements.txt /app/
