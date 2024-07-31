@@ -16,6 +16,7 @@ import { initStorage } from "./util/storage.js";
 import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
 import { getInfoString } from "./util/file_reader.js";
 import { DISPLAY } from "./util/constants.js";
+import { initProxy } from "./util/proxy.js";
 
 const profileHTML = fs.readFileSync(
   new URL("../html/createProfile.html", import.meta.url),
@@ -100,17 +101,28 @@ function cliOpts(): { [key: string]: Options } {
       default: getDefaultWindowSize(),
     },
 
+    cookieDays: {
+      type: "number",
+      describe:
+        "If >0, set all cookies, including session cookies, to have this duration in days before saving profile",
+      default: 7,
+    },
+
     proxyServer: {
       describe:
         "if set, will use specified proxy server. Takes precedence over any env var proxy settings",
       type: "string",
     },
 
-    cookieDays: {
-      type: "number",
+    sshProxyPrivateKeyFile: {
+      describe: "path to SSH private key for SOCKS5 over SSH proxy connection",
+      type: "string",
+    },
+
+    sshProxyKnownHostsFile: {
       describe:
-        "If >0, set all cookies, including session cookies, to have this duration in days before saving profile",
-      default: 7,
+        "path to SSH known hosts file for SOCKS5 over SSH proxy connection",
+      type: "string",
     },
   };
 }
@@ -140,6 +152,8 @@ async function main() {
   process.on("SIGINT", () => handleTerminate("SIGINT"));
 
   process.on("SIGTERM", () => handleTerminate("SIGTERM"));
+
+  const proxyServer = initProxy(params, false);
 
   if (!params.headless) {
     logger.debug("Launching XVFB");
@@ -181,7 +195,7 @@ async function main() {
     headless: params.headless,
     signals: false,
     chromeOptions: {
-      proxy: params.proxyServer,
+      proxy: proxyServer,
       extraArgs: [
         "--window-position=0,0",
         `--window-size=${params.windowSize}`,

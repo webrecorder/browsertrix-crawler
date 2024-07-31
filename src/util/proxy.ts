@@ -29,7 +29,7 @@ export function initProxy(params: Record<string, any>, detached: boolean) {
   if (!proxy) {
     proxy = getEnvProxyUrl();
   }
-  if (!proxy) {
+  if (proxy && proxy.startsWith("ssh://")) {
     proxy = runSSHD(params, detached);
   }
   if (proxy) {
@@ -73,11 +73,12 @@ export function createDispatcher(proxyUrl: string): Dispatcher | undefined {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function runSSHD(params: Record<string, any>, detached: boolean) {
-  if (!params.sshProxyLogin) {
+  const { proxyServer } = params;
+  if (!proxyServer || !proxyServer.startsWith("ssh://")) {
     return "";
   }
 
-  const hostPort = params.sshProxyLogin.split(":");
+  const hostPort = proxyServer.slice(6).split(":");
   const host = hostPort[0];
   const port = hostPort.length > 1 ? hostPort[1] : 22;
   const localPort = params.sshProxyLocalPort || SSH_PROXY_LOCAL_PORT;

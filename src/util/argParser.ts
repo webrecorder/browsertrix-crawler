@@ -573,12 +573,6 @@ class ArgParser {
         type: "boolean",
       },
 
-      sshProxyLogin: {
-        describe:
-          "if set, should be user@host[:port] for SOCKS5 over SSH. Port can be omitted to use default ssh port",
-        type: "string",
-      },
-
       sshProxyPrivateKeyFile: {
         describe:
           "path to SSH private key for SOCKS5 over SSH proxy connection",
