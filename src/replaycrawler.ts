@@ -554,26 +554,14 @@ export class ReplayCrawler extends Crawler {
   }
 
   async compareText(page: Page, state: PageState, url: string, date: Date) {
-    const origText = await this.fetchOrigText(
-      page,
-      "text",
-      url,
-      date.toISOString().replace(/[^\d]/g, ""),
-    );
-    const replayText = state.text;
-
-    if (origText === undefined || replayText === undefined) {
-      logger.warn(
-        "Text missing for comparison",
-        {
-          url,
-          origTextLen: origText?.length,
-          replayTextLen: replayText?.length,
-        },
-        "replay",
-      );
-      return;
-    }
+    const origText =
+      (await this.fetchOrigText(
+        page,
+        "text",
+        url,
+        date.toISOString().replace(/[^\d]/g, ""),
+      )) || "";
+    const replayText = state.text || "";
 
     const dist = levenshtein(origText, replayText);
     const maxLen = Math.max(origText.length, replayText.length);
