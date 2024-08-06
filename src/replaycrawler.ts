@@ -565,7 +565,11 @@ export class ReplayCrawler extends Crawler {
 
     const dist = levenshtein(origText, replayText);
     const maxLen = Math.max(origText.length, replayText.length);
-    const matchPercent = (maxLen - dist) / maxLen;
+
+    let matchPercent = 1.0;
+    if (maxLen > 0) {
+      matchPercent = (maxLen - dist) / maxLen;
+    }
     logger.info("Levenshtein Dist", { url, dist, matchPercent, maxLen });
 
     const pageInfo = this.pageInfos.get(page);
