@@ -93,6 +93,14 @@ export function runSSHD(params: Record<string, any>, detached: boolean) {
     localPort,
     "-i",
     params.sshProxyPrivateKeyFile,
+    "-N", // do not execute a remote command
+    "-T", // disable pseudo-tty allocation.
+    "-o",
+    "ServerAliveInterval=10",
+    "-o",
+    "ConnectionAttempts=3",
+    "-o",
+    "ExitOnForwardFailure=yes",
     "-o",
     "IdentitiesOnly=yes",
     "-o",
@@ -122,7 +130,7 @@ export function runSSHD(params: Record<string, any>, detached: boolean) {
     return;
   }
 
-  const proc = child_process.spawn("ssh", [...coreArgs, "-N", "-T"], {
+  const proc = child_process.spawn("ssh", [...coreArgs], {
     detached,
   });
 
