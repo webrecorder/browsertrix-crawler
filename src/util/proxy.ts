@@ -1,3 +1,4 @@
+import net from "net";
 import { Dispatcher, ProxyAgent, setGlobalDispatcher } from "undici";
 
 import child_process from "child_process";
@@ -22,15 +23,18 @@ export function getEnvProxyUrl() {
   return "";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function initProxy(params: Record<string, any>, detached: boolean) {
+export async function initProxy(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: Record<string, any>,
+  detached: boolean,
+) {
   let proxy = params.proxyServer;
 
   if (!proxy) {
     proxy = getEnvProxyUrl();
   }
   if (proxy && proxy.startsWith("ssh://")) {
-    proxy = runSSHD(params, detached);
+    proxy = await runSSHD(params, detached);
   }
   if (proxy) {
     const dispatcher = createDispatcher(proxy);
@@ -72,7 +76,7 @@ export function createDispatcher(proxyUrl: string): Dispatcher | undefined {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function runSSHD(params: Record<string, any>, detached: boolean) {
+export async function runSSHD(params: Record<string, any>, detached: boolean) {
   const { proxyServer } = params;
   if (!proxyServer || !proxyServer.startsWith("ssh://")) {
     return "";
@@ -82,8 +86,7 @@ export function runSSHD(params: Record<string, any>, detached: boolean) {
   const host = hostPort[0];
   const port = hostPort.length > 1 ? hostPort[1] : 22;
   const localPort = params.sshProxyLocalPort || SSH_PROXY_LOCAL_PORT;
-
-  logger.info("Checking SSH connection for proxy...");
+  const proxyString = `socks5://localhost:${localPort}`;
 
   const coreArgs: string[] = [
     host,
@@ -104,17 +107,70 @@ export function runSSHD(params: Record<string, any>, detached: boolean) {
     coreArgs.push("StrictHostKeyChecking=no");
   }
 
-  const { status, stdout, stderr } = child_process.spawnSync("ssh", [
-    ...coreArgs,
-    "exit",
-  ]);
+  logger.info("Checking SSH connection for proxy...");
 
-  if (status !== 0) {
+  const proc = child_process.spawn("ssh", [...coreArgs, "-N", "-T"], {
+    detached,
+  });
+
+  let procStdout = "";
+  let procStderr = "";
+  proc.stdout.on("data", (data) => {
+    procStdout += data.toString();
+    logger.info(data.toString());
+  });
+  proc.stderr.on("data", (data) => {
+    procStderr += data.toString();
+    logger.info(data.toString());
+  });
+
+  const timeout = 5000;
+  const waitForSocksPort = new Promise((resolve, reject) => {
+    const startTime = Date.now();
+    function rejectOrRetry() {
+      if (Date.now() - startTime >= timeout) {
+        reject("Timeout reached");
+      } else {
+        logger.warn("Retrying connection to socks proxy port");
+        setTimeout(testPort, 250);
+      }
+    }
+    function testPort() {
+      if (proc.exitCode) {
+        reject("Process failed");
+      }
+      const conn = net
+        .connect(localPort, "localhost")
+        .on("error", () => {
+          rejectOrRetry();
+        })
+        .on("timeout", () => {
+          conn.end();
+          rejectOrRetry();
+        })
+        .on("connect", () => {
+          conn.end();
+          resolve(true);
+        });
+      const timeRemaining = timeout - (Date.now() - startTime);
+      if (timeRemaining <= 0) {
+        reject("Timeout reached");
+      } else {
+        conn.setTimeout(timeRemaining);
+      }
+    }
+    testPort();
+  });
+  try {
+    await waitForSocksPort;
+  } catch (e) {
     logger.fatal(
       "Unable to establish SSH connection for proxy",
       {
-        stdout: stdout.toString(),
-        stderr: stderr.toString(),
+        error: e,
+        stdout: procStdout,
+        stderr: procStderr,
+        code: proc.exitCode,
       },
       "general",
       21,
@@ -122,18 +178,17 @@ export function runSSHD(params: Record<string, any>, detached: boolean) {
     return;
   }
 
-  const proc = child_process.spawn("ssh", [...coreArgs, "-N", "-T"], {
-    detached,
-  });
-
-  const proxyString = `socks5://localhost:${localPort}`;
-
   logger.info(
-    `Using SSH tunnel for proxy ${proxyString} -> ssh://${params.sshProxyLogin}`,
+    `Established SSH tunnel for proxy ${proxyString} -> ${proxyServer}`,
   );
 
   proc.on("exit", (code, signal) => {
-    logger.warn(`SSH crashed, restarting`, { code, signal });
+    logger.warn(`SSH crashed, restarting`, {
+      code,
+      signal,
+      stdout: procStdout,
+      stderr: procStderr,
+    });
     runSSHD(params, detached);
   });
 

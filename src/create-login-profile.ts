@@ -153,7 +153,7 @@ async function main() {
 
   process.on("SIGTERM", () => handleTerminate("SIGTERM"));
 
-  const proxyServer = initProxy(params, false);
+  const proxyServer = await initProxy(params, false);
 
   if (!params.headless) {
     logger.debug("Launching XVFB");

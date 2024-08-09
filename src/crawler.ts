@@ -480,12 +480,7 @@ export class Crawler {
     setWARCInfo(this.infoString, this.params.warcInfo);
     logger.info(this.infoString);
 
-    this.proxyServer = initProxy(this.params, RUN_DETACHED);
-
-    // Additional sleep to ensure proxy connection is ready...
-    if (this.proxyServer) {
-      await sleep(5);
-    }
+    this.proxyServer = await initProxy(this.params, RUN_DETACHED);
 
     logger.info("Seeds", this.seeds);
 
