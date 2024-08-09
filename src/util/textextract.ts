@@ -77,8 +77,7 @@ export class TextExtractViaSnapshot extends BaseTextExtract {
     const result = await this.cdp.send("DOMSnapshot.captureSnapshot", {
       computedStyles: [],
     });
-    const text = this.parseTextFromDOMSnapshot(result);
-    return text ? text : "";
+    return this.parseTextFromDOMSnapshot(result);
   }
 
   parseTextFromDOMSnapshot(
@@ -139,8 +138,7 @@ export class TextExtractViaDocument extends BaseTextExtract {
       depth: -1,
       pierce: true,
     });
-    const text = this.parseTextFromDOM(result);
-    return text ? text : "";
+    return this.parseTextFromDOM(result);
   }
 
   parseTextFromDOM(dom: Protocol.DOM.GetDocumentResponse): string {

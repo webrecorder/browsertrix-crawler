@@ -947,7 +947,7 @@ self.__bx_behaviors.selectMainBehavior();
         this.params.text.includes("to-warc"),
       );
 
-      if (text && (this.textInPages || saveOutput)) {
+      if (text !== null && (this.textInPages || saveOutput)) {
         data.text = text;
       }
     }
