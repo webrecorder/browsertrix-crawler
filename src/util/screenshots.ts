@@ -70,7 +70,7 @@ export class Screenshots {
         });
       }
       const options = screenshotTypes[screenshotType];
-      const screenshotBuffer = await this.page.screenshot(options);
+      const screenshotBuffer = Buffer.from(await this.page.screenshot(options));
       if (state && screenshotType === "view") {
         state.screenshotView = screenshotBuffer;
       }
