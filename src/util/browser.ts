@@ -140,12 +140,6 @@ export class Browser {
   }
 
   async setupPage({ page }: { page: Page; cdp: CDPSession }) {
-    /*
-    await this.addInitScript(
-      page,
-      'Object.defineProperty(navigator, "webdriver", {value: false});',
-    );
-*/
     switch (this.swOpt) {
       case "disabled":
         logger.debug("Service Workers: always disabled", {}, "browser");
@@ -595,7 +589,6 @@ export const defaultArgs = [
   // Translate - https://github.com/microsoft/playwright/issues/16126
   // Optimization* - https://bugs.chromium.org/p/chromium/issues/detail?id=1311753
   "--disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,OptimizationGuideModelDownloading,OptimizationHintsFetching,OptimizationTargetPrediction,OptimizationHints",
-  "--disable-blink-features=AutomationControlled",
   "--allow-pre-commit-input",
   "--disable-hang-monitor",
   "--disable-ipc-flooding-protection",
@@ -606,7 +599,7 @@ export const defaultArgs = [
   "--force-color-profile=srgb",
   "--metrics-recording-only",
   "--no-first-run",
-  //"--enable-automation",
+  "--enable-automation",
   "--password-store=basic",
   "--use-mock-keychain",
   // See https://chromium-review.googlesource.com/c/chromium/src/+/2436773
