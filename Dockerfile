@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=1.67.123
+ARG BROWSER_VERSION=1.68.141
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
 FROM ${BROWSER_IMAGE_BASE}
@@ -18,7 +18,11 @@ EXPOSE 9222 9223 6080
 WORKDIR /app
 
 ADD requirements.txt /app/
-RUN pip install -U setuptools; pip install -r requirements.txt
+RUN python3 -m venv /app/python-venv && \
+    /app/python-venv/bin/pip install -U setuptools && \
+    /app/python-venv/bin/pip install -r requirements.txt && \
+    ln -s /app/python-venv/bin/wacz /usr/bin/wacz && \
+    ln -s /app/python-venv/bin/cdxj-indexer /usr/bin/cdxj-indexer
 
 ADD package.json yarn.lock /app/
 
