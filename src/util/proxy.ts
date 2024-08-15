@@ -99,6 +99,10 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
     "-o",
     "IdentitiesOnly=yes",
     "-o",
+    "ServerAliveInterval=10", // keep ssh connection open if it becomes inactive
+    "-o",
+    "ExitOnForwardFailure=yes", // exit ssh when it's unable to open a socks proxy port
+    "-o",
   ];
 
   if (params.sshProxyKnownHostsFile) {
