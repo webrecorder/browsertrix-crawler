@@ -14,11 +14,8 @@ import {
 
 import { fetch, Response } from "undici";
 
-import {
-  baseRules as baseDSRules,
-  htmlRules as htmlDSRules,
-  // @ts-expect-error TODO fill in why error is expected
-} from "@webrecorder/wabac/src/rewrite/index.js";
+// @ts-expect-error TODO fill in why error is expected
+import { getCustomRewriter } from "@webrecorder/wabac/src/rewrite/index.js";
 import {
   rewriteDASH,
   rewriteHLS,
@@ -1003,10 +1000,9 @@ export class Recorder {
       case "text/javascript":
       case "application/javascript":
       case "application/x-javascript": {
-        const rules = contentType === "text/html" ? htmlDSRules : baseDSRules;
-        const rw = rules.getRewriter(url);
+        const rw = getCustomRewriter(url, isHTMLMime(contentType));
 
-        if (rw !== rules.defaultRewriter) {
+        if (rw) {
           string = payload.toString();
           newString = rw.rewrite(string, { live: true, save: extraOpts });
         }

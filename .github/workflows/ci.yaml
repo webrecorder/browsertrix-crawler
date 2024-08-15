@@ -49,7 +49,7 @@ jobs:
         run: yarn run tsc
 
       - name: build docker
-        run: docker-compose build
+        run: docker compose build
 
       - name: install python deps for docs
         run: pip install mkdocs-material

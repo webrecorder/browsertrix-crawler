@@ -113,7 +113,7 @@ export class Browser {
       headless,
       executablePath: this.getBrowserExe(),
       ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
-      ignoreHTTPSErrors: true,
+      acceptInsecureCerts: true,
       handleSIGHUP: signals,
       handleSIGINT: signals,
       handleSIGTERM: signals,
@@ -140,11 +140,6 @@ export class Browser {
   }
 
   async setupPage({ page }: { page: Page; cdp: CDPSession }) {
-    await this.addInitScript(
-      page,
-      'Object.defineProperty(navigator, "webdriver", {value: false});',
-    );
-
     switch (this.swOpt) {
       case "disabled":
         logger.debug("Service Workers: always disabled", {}, "browser");
