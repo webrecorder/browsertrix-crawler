@@ -109,9 +109,13 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
 
   logger.info("Checking SSH connection for proxy...");
 
-  const proc = child_process.spawn("ssh", [...coreArgs, "-N", "-T"], {
-    detached,
-  });
+  const proc = child_process.spawn(
+    "autossh",
+    [...coreArgs, "-M", "0", "-N", "-T"],
+    {
+      detached,
+    },
+  );
 
   let procStdout = "";
   let procStderr = "";
