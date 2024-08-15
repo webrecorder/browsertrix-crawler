@@ -18,7 +18,12 @@ EXPOSE 9222 9223 6080
 WORKDIR /app
 
 ADD requirements.txt /app/
-RUN pip install -U setuptools; pip install -r requirements.txt
+RUN apt update && apt -y upgrade && apt -y install python3-venv
+RUN python3 -m venv /app/python-venv && \
+    /app/python-venv/bin/pip install -U setuptools && \
+    /app/python-venv/bin/pip install -r requirements.txt && \
+    ln -s /app/python-venv/bin/wacz /usr/bin/wacz && \
+    ln -s /app/python-venv/bin/cdxj-indexer /usr/bin/cdxj-indexer
 
 ADD package.json yarn.lock /app/
 
