@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=1.67.123
+ARG BROWSER_VERSION=1.68.141
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
 FROM ${BROWSER_IMAGE_BASE}
@@ -16,9 +16,6 @@ ENV GEOMETRY=1360x1020x16 \
 EXPOSE 9222 9223 6080
 
 WORKDIR /app
-
-#ADD requirements.txt /app/
-#RUN pip install -U setuptools; pip install -r requirements.txt
 
 ADD package.json yarn.lock /app/
 
@@ -42,7 +39,7 @@ ADD config/ /app/
 
 ADD html/ /app/html/
 
-ARG RWP_VERSION=2.1.2
+ARG RWP_VERSION=2.1.4
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/ui.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/sw.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/adblock/adblock.gz /app/html/rwp/adblock.gz

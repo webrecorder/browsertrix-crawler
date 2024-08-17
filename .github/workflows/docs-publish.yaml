@@ -19,7 +19,7 @@ jobs:
           python-version: 3.x
 
       - name: build docker image (for getting cli)
-        run: docker-compose build
+        run: docker compose build
 
       - name: generate cli
         run: docs/gen-cli.sh

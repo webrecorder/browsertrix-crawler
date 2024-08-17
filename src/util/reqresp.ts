@@ -1,5 +1,7 @@
 // @ts-expect-error TODO fill in why error is expected
 import { getStatusText } from "@webrecorder/wabac/src/utils.js";
+// @ts-expect-error TODO fill in why error is expected
+import { getCustomRewriter } from "@webrecorder/wabac/src/rewrite/index.js";
 
 import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
@@ -372,8 +374,11 @@ export class RequestResponseInfo {
     };
 
     if (postToGetUrl(convData)) {
-      //this.requestBody = convData.requestBody;
-      // truncate to avoid extra long URLs
+      // if not custom rewrite, truncate to avoid extra long URLs
+      if (getCustomRewriter(this.url, isHTMLMime(this.getMimeType() || ""))) {
+        return convData.url;
+      }
+
       try {
         const url = new URL(convData.url);
         for (const [key, value] of url.searchParams.entries()) {
