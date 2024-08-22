@@ -1,20 +1,28 @@
 import path, { basename } from "node:path";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
-import { Readable } from "node:stream";
+import { Writable, Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import readline from "node:readline";
 import child_process from "node:child_process";
 
 import { createHash, Hash } from "node:crypto";
 
+import { gzip } from "node:zlib";
+
 import { ReadableStream } from "node:stream/web";
 
 import { makeZip, InputWithoutMeta } from "client-zip";
 import { logger, formatErr } from "./logger.js";
+import { streamFinish } from "./warcwriter.js";
+import { getDirSize } from "./storage.js";
 
 const DATAPACKAGE_JSON = "datapackage.json";
 const DATAPACKAGE_DIGEST_JSON = "datapackage-digest.json";
+
+const LINES_PER_BLOCK = 256;
+
+const ZIP_CDX_SIZE = 50_000;
 
 // ============================================================================
 export type WACZInitOpts = {
@@ -129,13 +137,98 @@ export class WACZ {
       }
     }
 
+    async function* generateCompressed(idxFile: Writable) {
+      let offset = 0;
+
+      const encoder = new TextEncoder();
+
+      const filename = "index.cdx.gz";
+
+      let cdxLines: string[] = [];
+
+      let key = "";
+      let count = 0;
+
+      const finishChunk = async () => {
+        const compressed = await new Promise<Uint8Array>((resolve) => {
+          gzip(encoder.encode(cdxLines.join("")), (_, result) => {
+            if (result) {
+              resolve(result);
+            }
+          });
+        });
+
+        const length = compressed.length;
+        const digest =
+          "sha256:" + createHash("sha256").update(compressed).digest("hex");
+
+        const idx =
+          key + " " + JSON.stringify({ offset, length, digest, filename });
+
+        idxFile.write(idx + "\n");
+
+        offset += length;
+
+        count = 1;
+        key = "";
+        cdxLines = [];
+
+        return compressed;
+      };
+
+      for await (const cdx of readAll()) {
+        if (!key) {
+          key = cdx.split(" {", 1)[0];
+        }
+
+        if (++count === LINES_PER_BLOCK) {
+          yield await finishChunk();
+        }
+        cdxLines.push(cdx);
+      }
+
+      if (key) {
+        yield await finishChunk();
+      }
+    }
+
     await fsp.mkdir(this.indexesDir, { recursive: true });
 
-    const output = fs.createWriteStream(
-      path.join(this.indexesDir, "index.cdxj"),
-    );
+    const removeIndexFile = async (filename: string) => {
+      try {
+        await fsp.unlink(path.join(this.indexesDir, filename));
+      } catch (e) {
+        // ignore
+      }
+    };
 
-    await pipeline(Readable.from(readAll()), output);
+    const idxSize = await getDirSize(this.tempCdxDir);
+
+    // if indexes are less than this size, use uncompressed version
+    if (idxSize < ZIP_CDX_SIZE) {
+      const output = fs.createWriteStream(
+        path.join(this.indexesDir, "index.cdx"),
+      );
+
+      await pipeline(Readable.from(readAll()), output);
+
+      await removeIndexFile("index.idx");
+      await removeIndexFile("index.cdx.gz");
+    } else {
+      const output = fs.createWriteStream(
+        path.join(this.indexesDir, "index.cdx.gz"),
+      );
+
+      const outputIdx = fs.createWriteStream(
+        path.join(this.indexesDir, "index.idx"),
+      );
+
+      await pipeline(Readable.from(generateCompressed(outputIdx)), output);
+
+      await streamFinish(outputIdx);
+
+      await removeIndexFile("index.cdx");
+    }
   }
 
   generate(): Readable {
