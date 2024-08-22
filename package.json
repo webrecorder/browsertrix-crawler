@@ -36,7 +36,7 @@
     "tsc": "^2.0.4",
     "undici": "^6.18.2",
     "uuid": "8.3.2",
-    "warcio": "git+https://github.com/webrecorder/warcio.js.git#cdxj-compat",
+    "warcio": "^2.2.1",
     "ws": "^7.4.4",
     "yargs": "^17.7.2"
   },
