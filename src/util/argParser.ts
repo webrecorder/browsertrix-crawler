@@ -201,7 +201,14 @@ class ArgParser {
 
       generateWACZ: {
         alias: ["generatewacz", "generateWacz"],
-        describe: "If set, generate wacz",
+        describe: "If set, generate WACZ on disk",
+        type: "boolean",
+        default: false,
+      },
+
+      generateWACZStream: {
+        describe:
+          "If set, generate WACZ as stream for uploading. For use with external S3 uploads only",
         type: "boolean",
         default: false,
       },

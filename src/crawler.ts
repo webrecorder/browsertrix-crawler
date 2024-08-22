@@ -1323,7 +1323,7 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    if (this.params.generateWACZ) {
+    if (this.params.generateWACZ || this.params.generateWACZStream) {
       this.storage = initStorage();
     }
 
@@ -1509,7 +1509,7 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info("Crawling done");
 
     if (
-      this.params.generateWACZ &&
+      (this.params.generateWACZ || this.params.generateWACZStream) &&
       !this.params.dryRun &&
       (!this.interrupted || this.finalExit || this.uploadAndDeleteLocal)
     ) {
@@ -1586,6 +1586,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     logger.debug("End of log file, storing logs in WACZ");
 
+    await this.closeLog();
+
     // Build the argument list to pass to the wacz create command
     const waczFilename = this.params.collection.concat(".wacz");
     const waczPath = path.join(this.collDir, waczFilename);
@@ -1616,23 +1618,37 @@ self.__bx_behaviors.selectMainBehavior();
       waczOpts.description = this.params.description;
     }
 
+    let wacz: WACZ;
+
     try {
-      const wacz = new WACZ(waczOpts, this.collDir);
+      wacz = new WACZ(waczOpts, this.collDir);
       await wacz.generate();
-      await wacz.writeToFile(waczPath);
+      if (this.params.generateWACZ) {
+        await wacz.writeToFile(waczPath);
+      }
     } catch (e) {
       logger.error("Error creating WACZ", e);
-      logger.fatal("Unable to write WACZ successfully");
+      if (this.params.generateWACZ) {
+        logger.fatal("Unable to write WACZ successfully");
+      }
     }
 
-    logger.debug(`WACZ successfully generated and saved to: ${waczPath}`);
+    if (this.params.generateWACZ) {
+      logger.debug(`WACZ successfully generated and saved to: ${waczPath}`);
+    } else {
+      logger.debug("WACZ stream generated");
+    }
 
     if (this.storage) {
       await this.crawlState.setStatus("uploading-wacz");
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
       const targetFilename = interpolateFilename(filename, this.crawlId);
 
-      await this.storage.uploadCollWACZ(waczPath, targetFilename, isFinished);
+      await this.storage.uploadCollWACZ(
+        this.params.generateWACZ ? waczPath : wacz!,
+        targetFilename,
+        isFinished,
+      );
       return true;
     }
 

@@ -14,6 +14,8 @@ import { logger } from "./logger.js";
 // @ts-expect-error (incorrect types on get-folder-size)
 import getFolderSize from "get-folder-size";
 
+import { WACZ } from "./wacz.js";
+
 const DEFAULT_REGION = "us-east-1";
 
 // ===========================================================================
@@ -81,6 +83,32 @@ export class S3StorageSync {
     this.webhookUrl = webhookUrl;
   }
 
+  async uploadStreamingWACZ(wacz: WACZ, targetFilename: string) {
+    const fileUploadInfo = {
+      bucket: this.bucketName,
+      crawlId: this.crawlId,
+      prefix: this.objectPrefix,
+      targetFilename,
+    };
+    logger.info("S3 file upload information", fileUploadInfo, "storage");
+
+    const waczStream = wacz.getReadable();
+
+    await this.client.putObject(
+      this.bucketName,
+      this.objectPrefix + targetFilename,
+      waczStream,
+    );
+
+    const hash = wacz.getHash();
+    const path = targetFilename;
+
+    const size = wacz.getSize();
+
+    // for backwards compatibility, keep 'bytes'
+    return { path, size, hash, bytes: size };
+  }
+
   async uploadFile(srcFilename: string, targetFilename: string) {
     const fileUploadInfo = {
       bucket: this.bucketName,
@@ -114,11 +142,15 @@ export class S3StorageSync {
   }
 
   async uploadCollWACZ(
-    srcFilename: string,
+    srcOrWACZ: string | WACZ,
     targetFilename: string,
     completed = true,
   ) {
-    const resource = await this.uploadFile(srcFilename, targetFilename);
+    const resource =
+      typeof srcOrWACZ === "string"
+        ? await this.uploadFile(srcOrWACZ, targetFilename)
+        : await this.uploadStreamingWACZ(srcOrWACZ, targetFilename);
+
     logger.info(
       "WACZ S3 file upload resource",
       { targetFilename, resource },

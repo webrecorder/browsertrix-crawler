@@ -1,5 +1,4 @@
-import path from "path";
-import { makeZip, InputWithoutMeta } from "client-zip";
+import path from "node:path";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import { Readable } from "node:stream";
@@ -10,7 +9,11 @@ import child_process from "node:child_process";
 import { createHash, Hash } from "node:crypto";
 
 import { ReadableStream } from "node:stream/web";
+
+import { makeZip, InputWithoutMeta } from "client-zip";
+
 import { getInfoString } from "./file_reader.js";
+import { logger } from "./logger.js";
 
 // ============================================================================
 export type WACZInitOpts = {
@@ -76,8 +79,12 @@ export class WACZ {
   resources: WACZResourceEntry[] = [];
   datapackage: WACZDataPackage | null = null;
 
-  chunkOrFile: (Uint8Array | string)[] = [];
-  hasher: Hash = createHash("sha256");
+  private chunkOrFile: (Uint8Array | string)[] = [];
+
+  private size = 0;
+  private hasher: Hash = createHash("sha256");
+
+  private hash: string = "";
 
   constructor(config: WACZInitOpts, collDir: string) {
     this.warcs = config.input;
@@ -119,6 +126,9 @@ export class WACZ {
   async generate() {
     await this.mergeCDXJ();
 
+    this.hasher = createHash("sha256");
+    this.size = 0;
+
     this.datapackage = {
       resources: this.resources,
       created: new Date().toISOString(),
@@ -131,7 +141,6 @@ export class WACZ {
       ...this.addDirFiles(this.indexesDir),
       ...this.addDirFiles(this.pagesDir),
       ...this.addDirFiles(this.logsDir),
-      path.join(this.collDir, "datapackage.json"),
     ];
 
     let isInFile = false;
@@ -168,32 +177,56 @@ export class WACZ {
           }
           currMarker.hasher.update(chunk);
           this.hasher.update(chunk);
+          this.size += chunk.length;
         }
       } else {
         this.chunkOrFile.push(chunk);
         this.hasher.update(chunk);
+        this.size += chunk.length;
       }
     }
+
+    this.hash = this.hasher.digest("hex");
+    return this.hash;
   }
 
-  async getReadable(): Promise<Readable> {
+  getReadable(): Readable {
     async function* iterWACZ(
       chunkOrFile: (Uint8Array | string)[],
+      origHash: string,
     ): AsyncIterable<Uint8Array> {
+      const rehasher = createHash("sha256");
       for (const entry of chunkOrFile) {
         if (typeof entry === "string") {
-          yield* fs.createReadStream(entry);
+          for await (const chunk of fs.createReadStream(entry)) {
+            rehasher.update(chunk);
+            yield chunk;
+          }
         } else {
+          rehasher.update(entry);
           yield entry;
         }
       }
+
+      const hash = rehasher.digest("hex");
+      if (hash !== origHash) {
+        logger.error("Hash mismatch, WACZ may not be valid");
+      }
     }
 
-    return Readable.from(iterWACZ(this.chunkOrFile));
+    return Readable.from(iterWACZ(this.chunkOrFile, this.hash));
+  }
+
+  getHash() {
+    return this.hash;
+  }
+
+  getSize() {
+    return this.size;
   }
 
   async writeToFile(filename: string) {
-    await pipeline(await this.getReadable(), fs.createWriteStream(filename));
+    await pipeline(this.getReadable(), fs.createWriteStream(filename));
   }
 
   async *iterDirForZip(files: string[]): AsyncGenerator<InputWithoutMeta> {
@@ -214,12 +247,6 @@ export class WACZ {
     }
 
     for (const filename of files) {
-      if (filename.endsWith("datapackage.json")) {
-        fs.writeFileSync(filename, JSON.stringify(this.datapackage, null, 2), {
-          encoding: "utf-8",
-        });
-      }
-
       const input = fs.createReadStream(filename);
 
       const stat = await fsp.stat(filename);
@@ -235,5 +262,18 @@ export class WACZ {
 
       yield { input: wrapMarkers(start, input, end), lastModified, name, size };
     }
+
+    const data = encoder.encode(JSON.stringify(this.datapackage, null, 2));
+
+    async function* getData(data: Uint8Array) {
+      yield data;
+    }
+
+    yield {
+      input: getData(data),
+      lastModified: new Date(),
+      name: "datapackage.json",
+      size: data.length,
+    };
   }
 }
