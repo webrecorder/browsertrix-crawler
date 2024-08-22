@@ -127,7 +127,7 @@ function validateResourcesIndex(json) {
       mime: "image/vnd.microsoft.icon",
       type: "other",
     },
-    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2F&d=webrecorder.net":
+    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2F&d=webrecorder.net&r=null":
       { status: 202, mime: "text/plain", type: "xhr" },
   });
 }
@@ -172,7 +172,7 @@ function validateResourcesAbout(json) {
       { status: 200, mime: "font/woff2", type: "font" },
     "https://fonts.gstatic.com/s/sourcesanspro/v22/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
-    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2Fabout&d=webrecorder.net":
+    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2Fabout&d=webrecorder.net&r=null":
       {
         status: 0,
         type: "xhr",
