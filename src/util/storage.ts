@@ -223,7 +223,7 @@ export async function getFileSize(filename: string) {
   return stats.size;
 }
 
-export async function getDirSize(dir: string) {
+export async function getDirSize(dir: string): Promise<number> {
   const { size, errors } = await getFolderSize(dir);
   if (errors && errors.length) {
     logger.warn("Size check errors", { errors }, "storage");

@@ -206,13 +206,6 @@ class ArgParser {
         default: false,
       },
 
-      generateWACZStream: {
-        describe:
-          "If set, generate WACZ as stream for uploading. For use with external S3 uploads only",
-        type: "boolean",
-        default: false,
-      },
-
       logging: {
         describe:
           "Logging options for crawler, can include: stats (enabled by default), jserrors, debug",

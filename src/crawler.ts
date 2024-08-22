@@ -16,9 +16,7 @@ import { parseArgs } from "./util/argParser.js";
 
 import yaml from "js-yaml";
 
-import * as warcio from "warcio";
-
-import { WACZ, WACZInitOpts } from "./util/wacz.js";
+import { WACZ, WACZInitOpts, mergeCDXJ } from "./util/wacz.js";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
@@ -155,6 +153,7 @@ export class Crawler {
   archivesDir: string;
   tempdir: string;
   tempCdxDir: string;
+  indexesDir: string;
 
   screenshotWriter: WARCWriter | null;
   textWriter: WARCWriter | null;
@@ -292,7 +291,10 @@ export class Crawler {
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
     this.tempdir = path.join(os.tmpdir(), "tmp-dl");
+
+    // indexes dirs
     this.tempCdxDir = path.join(this.collDir, "tmp-cdx");
+    this.indexesDir = path.join(this.collDir, "indexes");
 
     this.screenshotWriter = null;
     this.textWriter = null;
@@ -1323,7 +1325,7 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    if (this.params.generateWACZ || this.params.generateWACZStream) {
+    if (this.params.generateWACZ) {
       this.storage = initStorage();
     }
 
@@ -1478,38 +1480,22 @@ self.__bx_behaviors.selectMainBehavior();
       await this.combineWARC();
     }
 
-    if (this.params.generateCDX && !this.params.dryRun) {
-      // just move cdx files from tmp-cdx -> indexes at this point
-      logger.info("Generating CDX");
-
-      const indexer = new warcio.CDXIndexer({ format: "cdxj" });
-
-      await this.crawlState.setStatus("generate-cdx");
-
-      const indexesDir = path.join(this.collDir, "indexes");
-      await fsp.mkdir(indexesDir, { recursive: true });
-
-      const indexFile = path.join(indexesDir, "index.cdxj");
-      const destFh = fs.createWriteStream(indexFile);
-
-      const archiveDir = path.join(this.collDir, "archive");
-      const archiveFiles = await fsp.readdir(archiveDir);
-      const warcFiles = archiveFiles.filter((f) => f.endsWith(".warc.gz"));
-
-      const files = warcFiles.map((warcFile) => {
-        return {
-          reader: fs.createReadStream(path.join(archiveDir, warcFile)),
-          filename: warcFile,
-        };
-      });
-
-      await indexer.writeAll(files, destFh);
-    }
-
     logger.info("Crawling done");
 
     if (
-      (this.params.generateWACZ || this.params.generateWACZStream) &&
+      (this.params.generateCDX || this.params.generateWACZ) &&
+      !this.params.dryRun
+    ) {
+      logger.info("Merging CDX");
+      await this.crawlState.setStatus(
+        this.params.generateWACZ ? "generate-wacz" : "generate-cdx",
+      );
+
+      await mergeCDXJ(this.tempCdxDir, this.indexesDir);
+    }
+
+    if (
+      this.params.generateWACZ &&
       !this.params.dryRun &&
       (!this.interrupted || this.finalExit || this.uploadAndDeleteLocal)
     ) {
@@ -1584,13 +1570,19 @@ self.__bx_behaviors.selectMainBehavior();
       logger.fatal("No WARC Files, assuming crawl failed");
     }
 
-    logger.debug("End of log file, storing logs in WACZ");
+    const waczPath = path.join(this.collDir, this.params.collection + ".wacz");
+
+    const streaming = !!this.storage;
+
+    if (!streaming) {
+      logger.debug("WACZ will be written to disk", { path: waczPath }, "wacz");
+    } else {
+      logger.debug("WACZ will be stream uploaded to remote storage");
+    }
+
+    logger.debug("End of log file in WACZ, storing logs to WACZ file");
 
     await this.closeLog();
-
-    // Build the argument list to pass to the wacz create command
-    const waczFilename = this.params.collection.concat(".wacz");
-    const waczPath = path.join(this.collDir, waczFilename);
 
     const waczOpts: WACZInitOpts = {
       input: warcFileList.map((x) => path.join(this.archivesDir, x)),
@@ -1598,6 +1590,7 @@ self.__bx_behaviors.selectMainBehavior();
       pages: this.pagesDir,
       logDirectory: this.logDir,
       tempCdxDir: this.tempCdxDir,
+      indexesDir: this.indexesDir,
       softwareString: this.infoString,
     };
 
@@ -1620,21 +1613,14 @@ self.__bx_behaviors.selectMainBehavior();
 
     try {
       wacz = new WACZ(waczOpts, this.collDir);
-      await wacz.mergeCDXJ();
-      if (this.params.generateWACZ) {
+      if (!streaming) {
         await wacz.generateToFile(waczPath);
       }
     } catch (e) {
       logger.error("Error creating WACZ", e);
-      if (this.params.generateWACZ) {
+      if (!streaming) {
         logger.fatal("Unable to write WACZ successfully");
       }
-    }
-
-    if (this.params.generateWACZ) {
-      logger.debug(`WACZ successfully generated and saved to: ${waczPath}`);
-    } else {
-      logger.debug("WACZ stream generated");
     }
 
     if (this.storage) {
@@ -1642,11 +1628,7 @@ self.__bx_behaviors.selectMainBehavior();
       const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
       const targetFilename = interpolateFilename(filename, this.crawlId);
 
-      await this.storage.uploadCollWACZ(
-        this.params.generateWACZ ? waczPath : wacz!,
-        targetFilename,
-        isFinished,
-      );
+      await this.storage.uploadCollWACZ(wacz!, targetFilename, isFinished);
       return true;
     }
 
