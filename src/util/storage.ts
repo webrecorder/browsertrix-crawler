@@ -92,7 +92,7 @@ export class S3StorageSync {
     };
     logger.info("S3 file upload information", fileUploadInfo, "storage");
 
-    const waczStream = wacz.getReadable();
+    const waczStream = wacz.generate();
 
     await this.client.putObject(
       this.bucketName,

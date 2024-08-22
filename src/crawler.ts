@@ -1596,11 +1596,9 @@ self.__bx_behaviors.selectMainBehavior();
       input: warcFileList.map((x) => path.join(this.archivesDir, x)),
       output: waczPath,
       pages: this.pagesDir,
-      detectPages: false,
-      indexFromWARCs: false,
       logDirectory: this.logDir,
       tempCdxDir: this.tempCdxDir,
-      //log: waczLogger,
+      softwareString: this.infoString,
     };
 
     if (process.env.WACZ_SIGN_URL) {
@@ -1622,9 +1620,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     try {
       wacz = new WACZ(waczOpts, this.collDir);
-      await wacz.generate();
+      await wacz.mergeCDXJ();
       if (this.params.generateWACZ) {
-        await wacz.writeToFile(waczPath);
+        await wacz.generateToFile(waczPath);
       }
     } catch (e) {
       logger.error("Error creating WACZ", e);

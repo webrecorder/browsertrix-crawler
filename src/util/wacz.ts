@@ -1,4 +1,4 @@
-import path from "node:path";
+import path, { basename } from "node:path";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import { Readable } from "node:stream";
@@ -11,9 +11,10 @@ import { createHash, Hash } from "node:crypto";
 import { ReadableStream } from "node:stream/web";
 
 import { makeZip, InputWithoutMeta } from "client-zip";
+import { logger, formatErr } from "./logger.js";
 
-import { getInfoString } from "./file_reader.js";
-import { logger } from "./logger.js";
+const DATAPACKAGE_JSON = "datapackage.json";
+const DATAPACKAGE_DIGEST_JSON = "datapackage-digest.json";
 
 // ============================================================================
 export type WACZInitOpts = {
@@ -21,9 +22,9 @@ export type WACZInitOpts = {
   output: string;
   pages: string;
   tempCdxDir: string;
-  detectPages: boolean;
-  indexFromWARCs: boolean;
   logDirectory: string;
+
+  softwareString: string;
 
   signingUrl?: string;
   signingToken?: string;
@@ -43,6 +44,12 @@ export type WACZDataPackage = {
   created: string;
   wacz_version: string;
   software: string;
+};
+
+type WACZDigest = {
+  path: string;
+  hash: string;
+  signedData?: string;
 };
 
 class StartMarker extends Uint8Array {
@@ -76,14 +83,12 @@ export class WACZ {
   tempCdxDir: string;
   indexesDir: string;
 
-  resources: WACZResourceEntry[] = [];
-  datapackage: WACZDataPackage | null = null;
+  datapackage: WACZDataPackage;
 
-  private chunkOrFile: (Uint8Array | string)[] = [];
+  signingUrl: string | null;
+  signingToken: string | null;
 
   private size = 0;
-  private hasher: Hash = createHash("sha256");
-
   private hash: string = "";
 
   constructor(config: WACZInitOpts, collDir: string) {
@@ -93,6 +98,16 @@ export class WACZ {
     this.tempCdxDir = config.tempCdxDir;
     this.collDir = collDir;
     this.indexesDir = path.join(collDir, "indexes");
+
+    this.datapackage = {
+      resources: [],
+      created: new Date().toISOString(),
+      wacz_version: "1.1.1",
+      software: config.softwareString,
+    };
+
+    this.signingUrl = config.signingUrl || null;
+    this.signingToken = config.signingToken || null;
   }
 
   addDirFiles(fullDir: string): string[] {
@@ -123,19 +138,7 @@ export class WACZ {
     await pipeline(Readable.from(readAll()), output);
   }
 
-  async generate() {
-    await this.mergeCDXJ();
-
-    this.hasher = createHash("sha256");
-    this.size = 0;
-
-    this.datapackage = {
-      resources: this.resources,
-      created: new Date().toISOString(),
-      wacz_version: "1.1.1",
-      software: await getInfoString(),
-    };
-
+  generate(): Readable {
     const files = [
       ...this.warcs,
       ...this.addDirFiles(this.indexesDir),
@@ -143,78 +146,55 @@ export class WACZ {
       ...this.addDirFiles(this.logsDir),
     ];
 
-    let isInFile = false;
-
-    let added = false;
-
-    let currMarker: StartMarker | null = null;
-
     const zip = makeZip(
       this.iterDirForZip(files),
     ) as ReadableStream<Uint8Array>;
 
-    for await (const chunk of zip) {
-      if (chunk instanceof StartMarker) {
-        isInFile = true;
-        currMarker = chunk;
-        added = false;
-      } else if (chunk instanceof EndMarker) {
-        isInFile = false;
-        if (added && currMarker) {
-          this.resources.push({
-            name: path.basename(currMarker.filename),
-            path: currMarker.zipPath,
-            bytes: currMarker.size,
-            hash: `sha256:${currMarker.hasher.digest("hex")}`,
-          });
-        }
-        currMarker = null;
-      } else if (isInFile) {
-        if (currMarker) {
-          if (!added) {
-            this.chunkOrFile.push(currMarker.filename);
-            added = true;
+    const hasher = createHash("sha256");
+    const resources = this.datapackage.resources;
+
+    let size = 0;
+
+    async function* iterWACZ(wacz: WACZ): AsyncIterable<Uint8Array> {
+      let isInFile = false;
+
+      let currMarker: StartMarker | null = null;
+
+      for await (const chunk of zip) {
+        if (chunk instanceof StartMarker) {
+          isInFile = true;
+          currMarker = chunk;
+        } else if (chunk instanceof EndMarker) {
+          isInFile = false;
+          if (currMarker) {
+            // Frictionless data validation requires this to be lowercase
+            const name = basename(currMarker.filename).toLowerCase();
+            const path = currMarker.zipPath;
+            const bytes = currMarker.size;
+            const hash = "sha256:" + currMarker.hasher.digest("hex");
+            resources.push({ name, path, bytes, hash });
+            logger.debug("Added file to WACZ", { path, bytes, hash }, "wacz");
           }
-          currMarker.hasher.update(chunk);
-          this.hasher.update(chunk);
-          this.size += chunk.length;
-        }
-      } else {
-        this.chunkOrFile.push(chunk);
-        this.hasher.update(chunk);
-        this.size += chunk.length;
-      }
-    }
-
-    this.hash = this.hasher.digest("hex");
-    return this.hash;
-  }
-
-  getReadable(): Readable {
-    async function* iterWACZ(
-      chunkOrFile: (Uint8Array | string)[],
-      origHash: string,
-    ): AsyncIterable<Uint8Array> {
-      const rehasher = createHash("sha256");
-      for (const entry of chunkOrFile) {
-        if (typeof entry === "string") {
-          for await (const chunk of fs.createReadStream(entry)) {
-            rehasher.update(chunk);
+          currMarker = null;
+        } else if (isInFile) {
+          if (currMarker) {
             yield chunk;
+            currMarker.hasher.update(chunk);
+            hasher.update(chunk);
+            size += chunk.length;
           }
         } else {
-          rehasher.update(entry);
-          yield entry;
+          yield chunk;
+          hasher.update(chunk);
+          size += chunk.length;
         }
       }
 
-      const hash = rehasher.digest("hex");
-      if (hash !== origHash) {
-        logger.error("Hash mismatch, WACZ may not be valid");
-      }
+      wacz.hash = hasher.digest("hex");
+      wacz.size = size;
     }
 
-    return Readable.from(iterWACZ(this.chunkOrFile, this.hash));
+    return Readable.from(iterWACZ(this));
   }
 
   getHash() {
@@ -225,12 +205,13 @@ export class WACZ {
     return this.size;
   }
 
-  async writeToFile(filename: string) {
-    await pipeline(this.getReadable(), fs.createWriteStream(filename));
+  async generateToFile(filename: string) {
+    await pipeline(await this.generate(), fs.createWriteStream(filename));
   }
 
   async *iterDirForZip(files: string[]): AsyncGenerator<InputWithoutMeta> {
     const encoder = new TextEncoder();
+    const end = new EndMarker();
     // correctly handles DST
     const hoursOffset = (24 - new Date(0).getHours()) % 24;
     const timezoneOffset = hoursOffset * 60 * 60 * 1000;
@@ -239,11 +220,14 @@ export class WACZ {
     async function* wrapMarkers(
       start: StartMarker,
       iter: AsyncIterable<Uint8Array>,
-      end: EndMarker,
     ) {
       yield start;
       yield* iter;
       yield end;
+    }
+
+    async function* getData(data: Uint8Array) {
+      yield data;
     }
 
     for (const filename of files) {
@@ -258,22 +242,71 @@ export class WACZ {
       const lastModified = new Date(mtime.getTime() + timezoneOffset);
 
       const start = new StartMarker(filename, nameStr, size);
-      const end = new EndMarker();
 
-      yield { input: wrapMarkers(start, input, end), lastModified, name, size };
+      yield { input: wrapMarkers(start, input), lastModified, name, size };
     }
 
-    const data = encoder.encode(JSON.stringify(this.datapackage, null, 2));
+    // datapackage.json
 
-    async function* getData(data: Uint8Array) {
-      yield data;
-    }
+    const datapackageData = encoder.encode(
+      JSON.stringify(this.datapackage, null, 2),
+    );
 
     yield {
-      input: getData(data),
+      input: getData(datapackageData),
       lastModified: new Date(),
-      name: "datapackage.json",
-      size: data.length,
+      name: DATAPACKAGE_JSON,
+      size: datapackageData.length,
+    };
+
+    const hash =
+      "sha256:" + createHash("sha256").update(datapackageData).digest("hex");
+
+    // datapackage-digest.json
+
+    const digest: WACZDigest = {
+      path: DATAPACKAGE_JSON,
+      hash,
+    };
+
+    // Get Signature
+    if (this.signingUrl) {
+      const body = JSON.stringify({
+        hash,
+        created: this.datapackage.created,
+      });
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (this.signingToken) {
+        headers["Authorization"] = this.signingToken;
+      }
+
+      try {
+        const response = await fetch(this.signingUrl, {
+          method: "POST",
+          headers,
+          body,
+        });
+        digest.signedData = await response.json();
+      } catch (e) {
+        logger.warn(
+          "Failed to sign WACZ, continuing w/o signature",
+          { ...formatErr(e) },
+          "wacz",
+        );
+      }
+    }
+
+    const digestData = encoder.encode(JSON.stringify(digest, null, 2));
+
+    yield {
+      input: getData(digestData),
+      lastModified: new Date(),
+      name: DATAPACKAGE_DIGEST_JSON,
+      size: digestData.length,
     };
   }
 }
