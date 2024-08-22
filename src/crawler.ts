@@ -3,7 +3,6 @@ import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp from "fs/promises";
-import readline from "readline";
 
 import {
   RedisCrawlState,
@@ -19,8 +18,7 @@ import yaml from "js-yaml";
 
 import * as warcio from "warcio";
 
-// @ts-expect-error TODO fill in why error is expected
-import { WACZ } from "@harvard-lil/js-wacz";
+import { WACZ, WACZInitOpts } from "./util/wacz.js";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
@@ -35,7 +33,7 @@ import {
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
-import { logger, formatErr, LogDetails, WACZLogger } from "./util/logger.js";
+import { logger, formatErr, LogDetails } from "./util/logger.js";
 import {
   WorkerOpts,
   WorkerState,
@@ -1531,10 +1529,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     // remove tmp-cdx, now that it's already been added to the WACZ and/or
     // copied to indexes
-    await fsp.rm(this.tempCdxDir, {
-      recursive: true,
-      force: true,
-    });
+    // await fsp.rm(this.tempCdxDir, {
+    //   recursive: true,
+    //   force: true,
+    // });
 
     if (this.params.waitOnDone && (!this.interrupted || this.finalExit)) {
       this.done = true;
@@ -1592,17 +1590,15 @@ self.__bx_behaviors.selectMainBehavior();
     const waczFilename = this.params.collection.concat(".wacz");
     const waczPath = path.join(this.collDir, waczFilename);
 
-    const waczLogger = new WACZLogger(logger);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const waczOpts: Record<string, any> = {
+    const waczOpts: WACZInitOpts = {
       input: warcFileList.map((x) => path.join(this.archivesDir, x)),
       output: waczPath,
       pages: this.pagesDir,
       detectPages: false,
       indexFromWARCs: false,
       logDirectory: this.logDir,
-      log: waczLogger,
+      tempCdxDir: this.tempCdxDir,
+      //log: waczLogger,
     };
 
     if (process.env.WACZ_SIGN_URL) {
@@ -1621,9 +1617,9 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     try {
-      const wacz = new WACZ(waczOpts);
-      await this._addCDXJ(wacz);
-      await wacz.process();
+      const wacz = new WACZ(waczOpts, this.collDir);
+      await wacz.generate();
+      await wacz.writeToFile(waczPath);
     } catch (e) {
       logger.error("Error creating WACZ", e);
       logger.fatal("Unable to write WACZ successfully");
@@ -1641,30 +1637,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     return false;
-  }
-
-  // todo: replace with js-wacz impl eventually
-  async _addCDXJ(wacz: WACZ) {
-    const dirPath = this.tempCdxDir;
-
-    try {
-      const cdxjFiles = await fsp.readdir(dirPath);
-
-      for (let i = 0; i < cdxjFiles.length; i++) {
-        const cdxjFile = path.join(dirPath, cdxjFiles[i]);
-
-        logger.debug(`CDXJ: Reading entries from ${cdxjFile}`);
-        const rl = readline.createInterface({
-          input: fs.createReadStream(cdxjFile),
-        });
-
-        for await (const line of rl) {
-          wacz.addCDXJ(line + "\n");
-        }
-      }
-    } catch (err) {
-      logger.error("CDXJ Indexing Error", err);
-    }
   }
 
   logMemory() {
