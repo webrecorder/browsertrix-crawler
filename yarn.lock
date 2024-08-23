@@ -5292,7 +5292,7 @@ warcio@^2.2.0, warcio@^2.2.1:
 
 "warcio@git+https://github.com/webrecorder/warcio.js.git#cdxj-compat":
   version "2.3.0"
-  resolved "git+https://github.com/webrecorder/warcio.js.git#4c67a81e2243aad01a36bb380605ec2483de5435"
+  resolved "git+https://github.com/webrecorder/warcio.js.git#57cfbd288fa90423c7f434f90d770683db800f72"
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"
