@@ -308,20 +308,16 @@ export function addDirFiles(fullDir: string): string[] {
 }
 
 export async function mergeCDXJ(tempCdxDir: string, indexesDir: string) {
-  const cdxFiles = addDirFiles(tempCdxDir);
-  const proc = child_process.spawn("sort", cdxFiles, {
-    env: { LC_ALL: "C" },
-  });
-
-  const rl = readline.createInterface({ input: proc.stdout });
-
-  async function* readAll() {
+  async function* readAll(rl: readline.Interface): AsyncGenerator<string> {
     for await (const line of rl) {
       yield line + "\n";
     }
   }
 
-  async function* generateCompressed(idxFile: Writable) {
+  async function* generateCompressed(
+    reader: AsyncGenerator<string>,
+    idxFile: Writable,
+  ) {
     let offset = 0;
 
     const encoder = new TextEncoder();
@@ -360,7 +356,7 @@ export async function mergeCDXJ(tempCdxDir: string, indexesDir: string) {
       return compressed;
     };
 
-    for await (const cdx of readAll()) {
+    for await (const cdx of reader) {
       if (!key) {
         key = cdx.split(" {", 1)[0];
       }
@@ -388,11 +384,21 @@ export async function mergeCDXJ(tempCdxDir: string, indexesDir: string) {
 
   const idxSize = await getDirSize(tempCdxDir);
 
+  const cdxFiles = addDirFiles(tempCdxDir);
+
+  const proc = child_process.spawn("sort", cdxFiles, {
+    env: { LC_ALL: "C" },
+  });
+
+  const rl = readline.createInterface({ input: proc.stdout });
+
+  const reader = readAll(rl);
+
   // if indexes are less than this size, use uncompressed version
   if (idxSize < ZIP_CDX_SIZE) {
     const output = fs.createWriteStream(path.join(indexesDir, "index.cdxj"));
 
-    await pipeline(Readable.from(readAll()), output);
+    await pipeline(Readable.from(reader), output);
 
     await removeIndexFile("index.idx");
     await removeIndexFile("index.cdx.gz");
@@ -401,7 +407,10 @@ export async function mergeCDXJ(tempCdxDir: string, indexesDir: string) {
 
     const outputIdx = fs.createWriteStream(path.join(indexesDir, "index.idx"));
 
-    await pipeline(Readable.from(generateCompressed(outputIdx)), output);
+    await pipeline(
+      Readable.from(generateCompressed(reader, outputIdx)),
+      output,
+    );
 
     await streamFinish(outputIdx);
 
