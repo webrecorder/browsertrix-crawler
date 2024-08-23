@@ -22,7 +22,7 @@ const DATAPACKAGE_DIGEST_JSON = "datapackage-digest.json";
 
 const LINES_PER_BLOCK = 256;
 
-const ZIP_CDX_SIZE = 50_000;
+const ZIP_CDX_MIN_SIZE = 50_000;
 
 // ============================================================================
 export type WACZInitOpts = {
@@ -307,7 +307,11 @@ export function addDirFiles(fullDir: string): string[] {
   return files.map((name) => path.join(fullDir, name));
 }
 
-export async function mergeCDXJ(tempCdxDir: string, indexesDir: string) {
+export async function mergeCDXJ(
+  tempCdxDir: string,
+  indexesDir: string,
+  zipped: boolean | null = null,
+) {
   async function* readAll(rl: readline.Interface): AsyncGenerator<string> {
     for await (const line of rl) {
       yield line + "\n";
@@ -382,7 +386,12 @@ export async function mergeCDXJ(tempCdxDir: string, indexesDir: string) {
     }
   };
 
-  const idxSize = await getDirSize(tempCdxDir);
+  if (zipped === null) {
+    const tempCdxSize = await getDirSize(tempCdxDir);
+
+    // if CDX size is at least this size, use compressed version
+    zipped = tempCdxSize >= ZIP_CDX_MIN_SIZE;
+  }
 
   const cdxFiles = addDirFiles(tempCdxDir);
 
@@ -394,8 +403,7 @@ export async function mergeCDXJ(tempCdxDir: string, indexesDir: string) {
 
   const reader = readAll(rl);
 
-  // if indexes are less than this size, use uncompressed version
-  if (idxSize < ZIP_CDX_SIZE) {
+  if (!zipped) {
     const output = fs.createWriteStream(path.join(indexesDir, "index.cdxj"));
 
     await pipeline(Readable.from(reader), output);
