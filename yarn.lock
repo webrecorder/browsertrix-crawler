@@ -5277,9 +5277,10 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.2.0, warcio@^2.2.1:
-  version "2.3.0"
-  resolved "git+https://github.com/webrecorder/warcio.js.git#53997e63d3e28f04c4d61551b8abfe2ede274000"
+warcio@2.3.0-beta.0:
+  version "2.3.0-beta.0"
+  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.3.0-beta.0.tgz#3fea59b18a7f72d03c0f01a10536ffff17bbf87c"
+  integrity sha512-R//hyuDfa9Xygdvz7vb8rMIH+rMaEhg0QkRqzp91Zid4TdJza582S/NjqVqJwFW2Bb3DLhqvFsPc7j/t4oueAw==
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"
@@ -5290,9 +5291,9 @@ warcio@^2.2.0, warcio@^2.2.1:
     uuid-random "^1.3.2"
     yargs "^17.6.2"
 
-"warcio@git+https://github.com/webrecorder/warcio.js.git#cdxj-compat":
+warcio@^2.2.0, warcio@^2.2.1:
   version "2.3.0"
-  resolved "git+https://github.com/webrecorder/warcio.js.git#bf5b36483d887fb1e8dc94c1330ebbbbc1d0a689"
+  resolved "git+https://github.com/webrecorder/warcio.js.git#53997e63d3e28f04c4d61551b8abfe2ede274000"
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"
