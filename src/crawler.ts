@@ -64,7 +64,12 @@ import {
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
-import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
+import {
+  WARCWriter,
+  createWARCInfo,
+  setWARCInfo,
+  streamFinish,
+} from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 
@@ -119,7 +124,7 @@ export class Crawler {
 
   pagesFH?: WriteStream | null = null;
   extraPagesFH?: WriteStream | null = null;
-  logFH!: WriteStream;
+  logFH: WriteStream | null = null;
 
   crawlId: string;
 
@@ -1536,11 +1541,9 @@ self.__bx_behaviors.selectMainBehavior();
     if (!this.logFH) {
       return;
     }
-    try {
-      await new Promise<void>((resolve) => this.logFH.close(() => resolve()));
-    } catch (e) {
-      // ignore
-    }
+    const logFH = this.logFH;
+    this.logFH = null;
+    await streamFinish(logFH);
   }
 
   async generateWACZ() {
