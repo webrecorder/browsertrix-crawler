@@ -61,7 +61,7 @@ jobs:
         run: yarn add -D http-server
 
       - name: run all tests as root
-        run: sudo DOCKER_HOST_NAME=172.17.0.1 yarn test --maxConcurrency=1
+        run: sudo DOCKER_HOST_NAME=172.17.0.1 yarn test
 
       - name: run saved state + qa compare test as non-root - with volume owned by current user
         run: |
