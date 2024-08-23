@@ -196,7 +196,7 @@ export class WACZ {
   }
 
   async generateToFile(filename: string) {
-    await pipeline(await this.generate(), fs.createWriteStream(filename));
+    await pipeline(this.generate(), fs.createWriteStream(filename));
   }
 
   async *iterDirForZip(files: string[]): AsyncGenerator<InputWithoutMeta> {
