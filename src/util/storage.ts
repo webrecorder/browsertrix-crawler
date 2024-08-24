@@ -266,10 +266,15 @@ export async function checkDiskUtilization(
   const kbTotal = parseInt(diskUsage["1K-blocks"]);
 
   let kbArchiveDirSize = Math.round(archiveDirSize / 1024);
-  if (params.combineWARC && params.generateWACZ) {
-    kbArchiveDirSize *= 4;
-  } else if (params.combineWARC || params.generateWACZ) {
-    kbArchiveDirSize *= 2;
+
+  // assume if has STORE_ENDPOINT_URL, will be uploading to remote
+  // and not storing local copy of either WACZ or WARC
+  if (!process.env.STORE_ENDPOINT_URL) {
+    if (params.combineWARC && params.generateWACZ) {
+      kbArchiveDirSize *= 4;
+    } else if (params.combineWARC || params.generateWACZ) {
+      kbArchiveDirSize *= 2;
+    }
   }
 
   const projectedTotal = kbUsed + kbArchiveDirSize;
