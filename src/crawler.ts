@@ -1522,13 +1522,6 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    // remove tmp-cdx, now that it's already been added to the WACZ and/or
-    // copied to indexes
-    // await fsp.rm(this.tempCdxDir, {
-    //   recursive: true,
-    //   force: true,
-    // });
-
     if (this.params.waitOnDone && (!this.interrupted || this.finalExit)) {
       this.done = true;
       logger.info("All done, waiting for signal...");
@@ -1616,30 +1609,28 @@ self.__bx_behaviors.selectMainBehavior();
       waczOpts.description = this.params.description;
     }
 
-    let wacz: WACZ;
-
     try {
-      wacz = new WACZ(waczOpts, this.collDir);
+      const wacz = new WACZ(waczOpts, this.collDir);
       if (!streaming) {
         await wacz.generateToFile(waczPath);
       }
+
+      if (this.storage) {
+        await this.crawlState.setStatus("uploading-wacz");
+        const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
+        const targetFilename = interpolateFilename(filename, this.crawlId);
+
+        await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
+        return true;
+      }
+
+      return false;
     } catch (e) {
       logger.error("Error creating WACZ", e);
       if (!streaming) {
         logger.fatal("Unable to write WACZ successfully");
       }
     }
-
-    if (this.storage) {
-      await this.crawlState.setStatus("uploading-wacz");
-      const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
-      const targetFilename = interpolateFilename(filename, this.crawlId);
-
-      await this.storage.uploadCollWACZ(wacz!, targetFilename, isFinished);
-      return true;
-    }
-
-    return false;
   }
 
   logMemory() {

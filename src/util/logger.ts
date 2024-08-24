@@ -174,14 +174,6 @@ class Logger {
     }
   }
 
-  trace(content: string | object, context: LogContext = "general") {
-    if (typeof content === "string") {
-      this.logAsJSON(content, {}, context, "trace");
-    } else {
-      this.logAsJSON("Stacktrace", content, context, "trace");
-    }
-  }
-
   fatal(
     message: string,
     data = {},
@@ -200,27 +192,3 @@ class Logger {
 }
 
 export const logger = new Logger();
-
-export class WACZLogger {
-  logger: Logger;
-
-  constructor(loggerInstance: Logger) {
-    this.logger = loggerInstance;
-  }
-
-  info(message: string) {
-    logger.info(message, {}, "wacz");
-  }
-
-  error(message: string) {
-    logger.error(message, {}, "wacz");
-  }
-
-  warn(message: string) {
-    logger.warn(message, {}, "wacz");
-  }
-
-  trace(content: string | object) {
-    logger.trace(content, "wacz");
-  }
-}
