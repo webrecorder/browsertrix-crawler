@@ -112,7 +112,8 @@ export class WACZ {
 
     this.datapackage = {
       resources: [],
-      created: new Date().toISOString(),
+      // drop microseconds
+      created: new Date().toISOString().split(".", 1)[0] + "Z",
       wacz_version: "1.1.1",
       software: config.softwareString,
     };
