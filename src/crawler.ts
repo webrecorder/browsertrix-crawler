@@ -1496,7 +1496,11 @@ self.__bx_behaviors.selectMainBehavior();
         this.params.generateWACZ ? "generate-wacz" : "generate-cdx",
       );
 
-      await mergeCDXJ(this.tempCdxDir, this.indexesDir, false);
+      await mergeCDXJ(
+        this.tempCdxDir,
+        this.indexesDir,
+        this.params.generateWACZ ? null : false,
+      );
     }
 
     if (
