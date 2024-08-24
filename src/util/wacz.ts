@@ -313,8 +313,8 @@ export async function mergeCDXJ(
   indexesDir: string,
   zipped: boolean | null = null,
 ) {
-  async function* readAll(rl: readline.Interface): AsyncGenerator<string> {
-    for await (const line of rl) {
+  async function* readLinesFrom(stdout: Readable): AsyncGenerator<string> {
+    for await (const line of readline.createInterface({ input: stdout })) {
       yield line + "\n";
     }
   }
@@ -400,14 +400,10 @@ export async function mergeCDXJ(
     env: { LC_ALL: "C" },
   });
 
-  const rl = readline.createInterface({ input: proc.stdout });
-
-  const reader = readAll(rl);
-
   if (!zipped) {
     const output = fs.createWriteStream(path.join(indexesDir, "index.cdxj"));
 
-    await pipeline(Readable.from(reader), output);
+    await pipeline(Readable.from(readLinesFrom(proc.stdout)), output);
 
     await removeIndexFile("index.idx");
     await removeIndexFile("index.cdx.gz");
@@ -417,7 +413,7 @@ export async function mergeCDXJ(
     const outputIdx = fs.createWriteStream(path.join(indexesDir, "index.idx"));
 
     await pipeline(
-      Readable.from(generateCompressed(reader, outputIdx)),
+      Readable.from(generateCompressed(readLinesFrom(proc.stdout), outputIdx)),
       output,
     );
 
