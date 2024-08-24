@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
-    "@webrecorder/wabac": "^2.19.7",
+    "@webrecorder/wabac": "github:webrecorder/wabac.js#warcio-update",
     "browsertrix-behaviors": "^0.6.4",
     "client-zip": "^2.4.5",
     "fetch-socks": "^1.3.0",
@@ -36,7 +36,7 @@
     "tsc": "^2.0.4",
     "undici": "^6.18.2",
     "uuid": "8.3.2",
-    "warcio": "2.3.0-beta.0",
+    "warcio": "^2.3.0-beta.0",
     "ws": "^7.4.4",
     "yargs": "^17.7.2"
   },
@@ -65,7 +65,6 @@
     "testTimeout": 90000
   },
   "resolutions": {
-    "wrap-ansi": "7.0.0",
-    "warcio": "2.3.0-beta.0"
+    "wrap-ansi": "7.0.0"
   }
 }

@@ -1312,15 +1312,14 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@webrecorder/wabac@^2.19.7":
-  version "2.19.7"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.19.7.tgz#3afe48f79752bcd189cffd5d5e6a8dbe4f394053"
-  integrity sha512-X9UFxWCww1KWDnAaEjg7vpg6SznBov5a88FPxbOvo5yCT/UkJcQHaa0qo1L52l46sIAUnSbsYz1ur9yMd6ygVA==
+"@webrecorder/wabac@github:webrecorder/wabac.js#warcio-update":
+  version "2.19.8"
+  resolved "https://codeload.github.com/webrecorder/wabac.js/tar.gz/677f33f33f9e42612ecf8967b33a9388b2f91471"
   dependencies:
     "@peculiar/asn1-ecc" "^2.3.4"
     "@peculiar/asn1-schema" "^2.3.3"
     "@peculiar/x509" "^1.9.2"
-    "@webrecorder/wombat" "^3.7.14"
+    "@webrecorder/wombat" "github:webrecorder/wombat#3.8.0-work"
     acorn "^8.10.0"
     auto-js-ipfs "^2.1.1"
     base64-js "^1.5.1"
@@ -1339,14 +1338,13 @@
     path-parser "^6.1.0"
     process "^0.11.10"
     stream-browserify "^3.0.0"
-    warcio "^2.2.1"
+    warcio "^2.3.0-beta.0"
 
-"@webrecorder/wombat@^3.7.14":
-  version "3.7.14"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.7.14.tgz#3779e4cadb256755bbbfd2960805965ec4daacd8"
-  integrity sha512-sDNH+c8WstQrK91y8kIPJh1XAC2WXLU5rC8wztANzK1mVzA7v6XB5gk3Yp7OIAn4bn1XuGRVjubhKhmxVVZ9kg==
+"@webrecorder/wombat@github:webrecorder/wombat#3.8.0-work":
+  version "3.8.0"
+  resolved "https://codeload.github.com/webrecorder/wombat/tar.gz/72242f2f0e38f7f526065d8a9d6d025e99b8bc75"
   dependencies:
-    warcio "^2.2.0"
+    warcio "^2.3.0-beta.0"
 
 "@zxing/text-encoding@0.9.0":
   version "0.9.0"
@@ -5277,7 +5275,7 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.2.0, warcio@^2.2.1, warcio@2.3.0-beta.0:
+warcio@^2.3.0-beta.0:
   version "2.3.0-beta.0"
   resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.3.0-beta.0.tgz#3fea59b18a7f72d03c0f01a10536ffff17bbf87c"
   integrity sha512-R//hyuDfa9Xygdvz7vb8rMIH+rMaEhg0QkRqzp91Zid4TdJza582S/NjqVqJwFW2Bb3DLhqvFsPc7j/t4oueAw==
