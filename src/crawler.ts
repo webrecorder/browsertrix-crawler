@@ -484,7 +484,11 @@ export class Crawler {
 
     logger.info("Seeds", this.seeds);
 
-    logger.info("Behavior Options", this.params.behaviorOpts);
+    if (this.params.behaviorOpts) {
+      logger.info("Behavior Options", this.params.behaviorOpts);
+    } else {
+      logger.info("Behaviors disabled");
+    }
 
     if (this.params.profile) {
       logger.info("With Browser Profile", { url: this.params.profile });

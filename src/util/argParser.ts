@@ -630,10 +630,14 @@ class ArgParser {
 
     // background behaviors to apply
     const behaviorOpts: { [key: string]: string | boolean } = {};
-    argv.behaviors.forEach((x: string) => (behaviorOpts[x] = true));
-    behaviorOpts.log = BEHAVIOR_LOG_FUNC;
-    behaviorOpts.startEarly = true;
-    argv.behaviorOpts = JSON.stringify(behaviorOpts);
+    if (argv.behaviors.length > 0) {
+      argv.behaviors.forEach((x: string) => (behaviorOpts[x] = true));
+      behaviorOpts.log = BEHAVIOR_LOG_FUNC;
+      behaviorOpts.startEarly = true;
+      argv.behaviorOpts = JSON.stringify(behaviorOpts);
+    } else {
+      argv.behaviorOpts = "";
+    }
 
     argv.text = argv.text || [];
 
