@@ -63,7 +63,7 @@ type WACZDigest = {
   signedData?: string;
 };
 
-class StartMarker extends Uint8Array {
+class CurrZipFileMarker extends Uint8Array {
   // empty array to mark start of WACZ file, also track metadata per-file
   filename: string;
   zipPath: string;
@@ -79,7 +79,7 @@ class StartMarker extends Uint8Array {
   }
 }
 
-class EndMarker extends Uint8Array {
+class EndOfZipFileMarker extends Uint8Array {
   // empty array to mark end of WACZ file
 }
 
@@ -147,30 +147,26 @@ export class WACZ {
     let size = 0;
 
     async function* iterWACZ(wacz: WACZ): AsyncIterable<Uint8Array> {
-      let isInFile = false;
-
-      let currMarker: StartMarker | null = null;
+      let currFile: CurrZipFileMarker | null = null;
 
       for await (const chunk of zip) {
-        if (chunk instanceof StartMarker) {
-          isInFile = true;
-          currMarker = chunk;
-        } else if (chunk instanceof EndMarker) {
-          isInFile = false;
-          if (currMarker) {
+        if (chunk instanceof CurrZipFileMarker) {
+          currFile = chunk;
+        } else if (chunk instanceof EndOfZipFileMarker) {
+          if (currFile) {
             // Frictionless data validation requires this to be lowercase
-            const name = basename(currMarker.filename).toLowerCase();
-            const path = currMarker.zipPath;
-            const bytes = currMarker.size;
-            const hash = "sha256:" + currMarker.hasher.digest("hex");
+            const name = basename(currFile.filename).toLowerCase();
+            const path = currFile.zipPath;
+            const bytes = currFile.size;
+            const hash = "sha256:" + currFile.hasher.digest("hex");
             resources.push({ name, path, bytes, hash });
             logger.debug("Added file to WACZ", { path, bytes, hash }, "wacz");
           }
-          currMarker = null;
+          currFile = null;
         } else {
           yield chunk;
-          if (currMarker) {
-            currMarker.hasher.update(chunk);
+          if (currFile) {
+            currFile.hasher.update(chunk);
           }
           hasher.update(chunk);
           size += chunk.length;
@@ -198,14 +194,10 @@ export class WACZ {
 
   async *iterDirForZip(files: string[]): AsyncGenerator<InputWithoutMeta> {
     const encoder = new TextEncoder();
-    const end = new EndMarker();
-    // correctly handles DST
-    const hoursOffset = (24 - new Date(0).getHours()) % 24;
-    const timezoneOffset = hoursOffset * 60 * 60 * 1000;
-    //const timezoneOffset = new Date().getTimezoneOffset() * 60000;
+    const end = new EndOfZipFileMarker();
 
     async function* wrapMarkers(
-      start: StartMarker,
+      start: CurrZipFileMarker,
       iter: AsyncIterable<Uint8Array>,
     ) {
       yield start;
@@ -221,16 +213,15 @@ export class WACZ {
       const input = fs.createReadStream(filename);
 
       const stat = await fsp.stat(filename);
-      const mtime = stat.mtime;
+      const lastModified = stat.mtime;
       const size = stat.size;
 
       const nameStr = filename.slice(this.collDir.length + 1);
       const name = encoder.encode(nameStr);
-      const lastModified = new Date(mtime.getTime() + timezoneOffset);
 
-      const start = new StartMarker(filename, nameStr, size);
+      const currFile = new CurrZipFileMarker(filename, nameStr, size);
 
-      yield { input: wrapMarkers(start, input), lastModified, name, size };
+      yield { input: wrapMarkers(currFile, input), lastModified, name, size };
     }
 
     // datapackage.json
