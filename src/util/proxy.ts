@@ -10,7 +10,7 @@ import type { SocksProxyType } from "socks/typings/common/constants.js";
 
 const SSH_PROXY_LOCAL_PORT = 9722;
 
-const SSH_WAIT_TIMEOUT = 5000;
+const SSH_WAIT_TIMEOUT = 30000;
 
 export function getEnvProxyUrl() {
   if (process.env.PROXY_SERVER) {
@@ -89,11 +89,12 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
   // unwrap ipv6 addresses which must be wrapped in []
   const host = proxyServerUrl.hostname.replace("[", "").replace("]", "");
   const port = proxyServerUrl.port || 22;
+  const user = proxyServerUrl.username || "root";
   const localPort = params.sshProxyLocalPort || SSH_PROXY_LOCAL_PORT;
   const proxyString = `socks5://localhost:${localPort}`;
 
   const coreArgs: string[] = [
-    host,
+    user + "@" + host,
     "-p",
     port,
     "-D",
