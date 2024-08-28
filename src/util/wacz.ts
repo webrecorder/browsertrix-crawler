@@ -20,6 +20,10 @@ import { getDirSize } from "./storage.js";
 const DATAPACKAGE_JSON = "datapackage.json";
 const DATAPACKAGE_DIGEST_JSON = "datapackage-digest.json";
 
+const INDEX_CDXJ = "index.cdxj";
+const INDEX_IDX = "index.idx";
+const INDEX_CDX_GZ = "index.cdx.gz";
+
 const LINES_PER_BLOCK = 256;
 
 const ZIP_CDX_MIN_SIZE = 50_000;
@@ -314,12 +318,19 @@ export async function mergeCDXJ(
 
     const encoder = new TextEncoder();
 
-    const filename = "index.cdx.gz";
+    const filename = INDEX_CDX_GZ;
 
     let cdxLines: string[] = [];
 
     let key = "";
     let count = 0;
+
+    idxFile.write(
+      `!meta 0 ${JSON.stringify({
+        format: "cdxj-gzip-1.0",
+        filename: INDEX_IDX,
+      })}\n`,
+    );
 
     const finishChunk = async () => {
       const compressed = await new Promise<Uint8Array>((resolve) => {
@@ -388,16 +399,18 @@ export async function mergeCDXJ(
   });
 
   if (!zipped) {
-    const output = fs.createWriteStream(path.join(indexesDir, "index.cdxj"));
+    const output = fs.createWriteStream(path.join(indexesDir, INDEX_CDXJ));
 
     await pipeline(Readable.from(readLinesFrom(proc.stdout)), output);
 
-    await removeIndexFile("index.idx");
-    await removeIndexFile("index.cdx.gz");
+    await removeIndexFile(INDEX_IDX);
+    await removeIndexFile(INDEX_CDX_GZ);
   } else {
-    const output = fs.createWriteStream(path.join(indexesDir, "index.cdx.gz"));
+    const output = fs.createWriteStream(path.join(indexesDir, INDEX_CDX_GZ));
 
-    const outputIdx = fs.createWriteStream(path.join(indexesDir, "index.idx"));
+    const outputIdx = fs.createWriteStream(path.join(indexesDir, INDEX_IDX), {
+      encoding: "utf-8",
+    });
 
     await pipeline(
       Readable.from(generateCompressed(readLinesFrom(proc.stdout), outputIdx)),
@@ -406,6 +419,6 @@ export async function mergeCDXJ(
 
     await streamFinish(outputIdx);
 
-    await removeIndexFile("index.cdxj");
+    await removeIndexFile(INDEX_CDXJ);
   }
 }
