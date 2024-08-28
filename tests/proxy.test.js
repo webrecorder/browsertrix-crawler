@@ -25,7 +25,7 @@ beforeAll(() => {
 
   proxyNoAuthId = execSync(`docker run -d --rm --network=proxy-test-net --name proxy-no-auth ${PROXY_IMAGE}`, {encoding: "utf-8"});
 
-  proxySSHId = execSync(`docker run -d --rm -e DOCKER_MODS=linuxserver/mods:openssh-server-ssh-tunnel -e USER_NAME=user -e PUBLIC_KEY_FILE=/keys/proxy-key.pub -v $PWD/tests/fixtures:/keys --network=proxy-test-net --name ssh-proxy ${SSH_PROXY_IMAGE}`);
+  proxySSHId = execSync(`docker run -d --rm -e DOCKER_MODS=linuxserver/mods:openssh-server-ssh-tunnel -e USER_NAME=user -e PUBLIC_KEY_FILE=/keys/proxy-key.pub -v $PWD/tests/fixtures/proxy-key.pub:/keys/proxy-key.pub --network=proxy-test-net --name ssh-proxy ${SSH_PROXY_IMAGE}`);
 });
 
 afterAll(async () => {
@@ -132,7 +132,7 @@ test("http proxy set, but not running, cli arg", () => {
 
 
 test("ssh socks proxy with custom user", () => {
-  execSync(`docker run --network=proxy-test-net -v $PWD/tests/fixtures:/keys/ webrecorder/browsertrix-crawler crawl --proxyServer ssh://user@ssh-proxy:2222 --sshProxyPrivateKeyFile /keys/proxy-key --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
+  execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxy-key:/keys/proxy-key webrecorder/browsertrix-crawler crawl --proxyServer ssh://user@ssh-proxy:2222 --sshProxyPrivateKeyFile /keys/proxy-key --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
 });
 
 
