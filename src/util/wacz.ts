@@ -167,15 +167,11 @@ export class WACZ {
             logger.debug("Added file to WACZ", { path, bytes, hash }, "wacz");
           }
           currMarker = null;
-        } else if (isInFile) {
-          if (currMarker) {
-            yield chunk;
-            currMarker.hasher.update(chunk);
-            hasher.update(chunk);
-            size += chunk.length;
-          }
         } else {
           yield chunk;
+          if (currMarker) {
+            currMarker.hasher.update(chunk);
+          }
           hasher.update(chunk);
           size += chunk.length;
         }
