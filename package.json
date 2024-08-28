@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
-    "@webrecorder/wabac": "github:webrecorder/wabac.js#warcio-update",
+    "@webrecorder/wabac": "^2.19.8",
     "browsertrix-behaviors": "^0.6.4",
     "client-zip": "^2.4.5",
     "fetch-socks": "^1.3.0",
@@ -36,7 +36,7 @@
     "tsc": "^2.0.4",
     "undici": "^6.18.2",
     "uuid": "8.3.2",
-    "warcio": "^2.3.0-beta.0",
+    "warcio": "^2.3.0",
     "ws": "^7.4.4",
     "yargs": "^17.7.2"
   },

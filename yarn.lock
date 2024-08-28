@@ -1312,14 +1312,15 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@webrecorder/wabac@github:webrecorder/wabac.js#warcio-update":
+"@webrecorder/wabac@^2.19.8":
   version "2.19.8"
-  resolved "https://codeload.github.com/webrecorder/wabac.js/tar.gz/677f33f33f9e42612ecf8967b33a9388b2f91471"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.19.8.tgz#302ade200953a1c76f0b355983ae4081428fb933"
+  integrity sha512-WjyfsGK8JWKeeDsGrOIT8ZLjMcOOAN93OMnRLO214jSV18SHEOY4JRvXzFOLF+OWYC5kJIMjl05gurTLq18jOA==
   dependencies:
     "@peculiar/asn1-ecc" "^2.3.4"
     "@peculiar/asn1-schema" "^2.3.3"
     "@peculiar/x509" "^1.9.2"
-    "@webrecorder/wombat" "github:webrecorder/wombat#3.8.0-work"
+    "@webrecorder/wombat" "^3.8.0"
     acorn "^8.10.0"
     auto-js-ipfs "^2.1.1"
     base64-js "^1.5.1"
@@ -1338,13 +1339,14 @@
     path-parser "^6.1.0"
     process "^0.11.10"
     stream-browserify "^3.0.0"
-    warcio "^2.3.0-beta.0"
+    warcio "^2.3.0"
 
-"@webrecorder/wombat@github:webrecorder/wombat#3.8.0-work":
+"@webrecorder/wombat@^3.8.0":
   version "3.8.0"
-  resolved "https://codeload.github.com/webrecorder/wombat/tar.gz/72242f2f0e38f7f526065d8a9d6d025e99b8bc75"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.8.0.tgz#63ed3df199f11223b23c9ce66202590b8511ae2a"
+  integrity sha512-MpzNu9+ClCHjOER9XCrsEIsJk15L6qGO+PxeBPiOtaFJmNUiz0auMT5AQwiPqJgKEAniZTlPx1O4kNCVJu9f2Q==
   dependencies:
-    warcio "^2.3.0-beta.0"
+    warcio "^2.3.0"
 
 "@zxing/text-encoding@0.9.0":
   version "0.9.0"
@@ -5275,10 +5277,10 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.3.0-beta.0:
-  version "2.3.0-beta.0"
-  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.3.0-beta.0.tgz#3fea59b18a7f72d03c0f01a10536ffff17bbf87c"
-  integrity sha512-R//hyuDfa9Xygdvz7vb8rMIH+rMaEhg0QkRqzp91Zid4TdJza582S/NjqVqJwFW2Bb3DLhqvFsPc7j/t4oueAw==
+warcio@^2.3.0:
+  version "2.3.0"
+  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.3.0.tgz#a655df9b5986a53e5d05aa68cda51bfefdfa8347"
+  integrity sha512-PCHcZ/fDE5+QECOFe/n/vzyDmAITJ1mvLx1jVONJ0uaV9OwcTbIWoh7Z0+OQwQdq8Wr1Nnb2hwhtHJ7J+9rHIQ==
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"
