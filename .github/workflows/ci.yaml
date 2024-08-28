@@ -52,13 +52,16 @@ jobs:
         run: docker compose build
 
       - name: install python deps for docs
-        run: pip install mkdocs-material wacz
+        run: pip install mkdocs-material
 
       - name: build docs for crawl test
         run: cd docs/ && mkdocs build
 
       - name: add http-server for tests
         run: yarn add -D http-server
+
+      - name: install py-wacz as root for tests
+        run: sudo pip install wacz
 
       - name: run all tests as root
         run: sudo DOCKER_HOST_NAME=172.17.0.1 yarn test -validate
