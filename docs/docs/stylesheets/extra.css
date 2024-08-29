@@ -91,6 +91,8 @@ code {
   border-width: 1px;
   border-color: #d1d5db;
   border-style: solid;
+
+  white-space : pre-wrap !important;
 }
 
 .md-typeset h1,

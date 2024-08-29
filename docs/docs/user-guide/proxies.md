@@ -1,12 +1,11 @@
-## Crawling through Proxies
+# Crawling with Proxies
+Browser Crawler supports crawling through HTTP and SOCKS5 proxies, including through a SOCKS5 proxy over an SSH tunnel.
 
-Browser Crawler supports crawling through SOCKS5 and HTTPS proxies, including through SOCKS5 proxies over an SSH tunnel.
+To specify a proxy, the `PROXY_SERVER` environment variable or `--proxyServer` cli flag can be passed in.
+If both are provided, the `--proxyServer` CLI flag will take precedence.
 
-To configure a proxy, the `PROXY_SERVER` environment variable or `--proxyServer` cli flag can be passed in.
-If both are provided, the `--proxyServer` cli flag will take precedence.
-
-For backwards compatibility with 0.x, `PROXY_HOST` and `PROXY_PORT` environment variables can be used instead of `PROXY_SERVER`,
-which takes precedence.
+(For backwards compatibility with 0.x, `PROXY_HOST` and `PROXY_PORT` environment variables can be used instead of `PROXY_SERVER`,
+which takes precedence).
 
 The proxy server can be specified as a `http://`, `socks5://`, or `ssh://` URL.
 
@@ -37,7 +36,7 @@ docker run -v $PWD/crawls/:/crawls/ -e PROXY_SERVER=socks5://path-to-proxy-host.
 The crawler does support password authentication for SOCKS5 proxies, which can be provided in the proxy URL:
 
 ```sh
-docker run-v $PWD/crawls/:/crawls/  -e PROXY_SERVER=socks5://user@pass:path-to-proxy-host.example.com:9001 webrecorder/browsertrix-crawler crawl --url https://example.com/
+docker run-v $PWD/crawls/:/crawls/ -e PROXY_SERVER=socks5://user@pass:path-to-proxy-host.example.com:9001 webrecorder/browsertrix-crawler crawl --url https://example.com/
 ```
 
 ### SSH Proxies
@@ -49,16 +48,16 @@ To use this proxy, the private SSH key file must be provided via `--sshProxyPriv
 
 The private key and public host key should be mounted as volumes into some path in the container.
 
-For example, to connect via SSH to host `path-to-ssh-host.example.com` as user `user`, run:
+For example, to connect via SSH to host `path-to-ssh-host.example.com` as user `user` with private key stored in `./my-proxy-private-key`, run:
 
 ```sh
 docker run -v $PWD/crawls/:/crawls/ -v $PWD/my-proxy-private-key:/tmp/private-key webrecorder/browsertrix-crawler crawl --url https://httpbin.org/ip --proxyServer ssh://user@path-to-ssh-host.example.com --sshProxyPrivateKeyFile /tmp/private-key
 ```
 
-To also provide the host public key (eg. `/known_hosts` file) for additional verification, run:
+To also provide the host public key (eg. `./known_hosts` file) for additional verification, run:
 
 ```sh
-docker run -v $PWD/crawls/:/crawls/ -v $PWD/my-proxy-private-key:/tmp/private-key -v $PWD/known_hosts:/tmp/public-host-key webrecorder/browsertrix-crawler crawl --url https://httpbin.org/ip --proxyServer ssh://user@path-to-ssh-host.example.com --sshProxyPrivateKeyFile /tmp/private-key --sshProxyKnownHostsFile /tmp/public-host-key
+docker run -v $PWD/crawls/:/crawls/ -v $PWD/my-proxy-private-key:/tmp/private-key -v $PWD/known_hosts:/tmp/known_hosts webrecorder/browsertrix-crawler crawl --url https://httpbin.org/ip --proxyServer ssh://user@path-to-ssh-host.example.com --sshProxyPrivateKeyFile /tmp/private-key --sshProxyKnownHostsFile /tmp/known_hosts
 ```
 
 The host key will only be checked if provided in a file via: `--sshProxyKnownHostsFile`.
@@ -69,7 +68,17 @@ connection will be attempted via the standard 22 port.
 The SSH connection establishes a local port (9722 by default) which will forward inbound/outbound traffic through the remote proxy.
 The `autossh` utility is used to guard for ssh issues.
 
-SSH proxies support key-based authentication only, due to browser limitations.
+For SSH proxies, only key-based authentication is supposed.
+
+## Browser Profiles
+
+The above proxy settings also apply to [Browser Profile Creation](./browser-profiles), and browser profiles can also be created using proxies, eg:
+
+```sh
+docker run -p 6080:6080 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles -v $PWD/my-proxy-private-key:/tmp/private-key -v $PWD/known_hosts:/tmp/known_hosts webrecorder/browsertrix-crawler create-login-profile --url https://example.com/ --proxyServer ssh://user@path-to-ssh-host.example.com --sshProxyPrivateKeyFile /tmp/private-key --sshProxyKnownHostsFile /tmp/known_hosts
+```
+
+
 
 
 
