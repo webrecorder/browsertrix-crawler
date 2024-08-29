@@ -4,6 +4,7 @@ import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
 import { HTML_TYPES } from "./constants.js";
 import { Response } from "undici";
+import { logger } from "./logger.js";
 
 const CONTENT_LENGTH = "content-length";
 const CONTENT_RANGE = "content-range";
@@ -160,10 +161,11 @@ export class RequestResponseInfo {
     const { securityDetails } = response;
 
     if (securityDetails) {
-      this.protocols.push(
-        securityDetails.protocol.replaceAll(" ", "/").toLowerCase(),
-      );
-      this.cipher = getCipher(securityDetails);
+      const securityProtocol = securityDetails.protocol
+        .replaceAll(" ", "/")
+        .toLowerCase();
+      this.protocols.push(securityProtocol);
+      this.cipher = getCipher(securityDetails, securityProtocol, this.url);
       const issuer: string = securityDetails.issuer || "";
       const ctc: string =
         securityDetails.certificateTransparencyCompliance === "compliant"
@@ -419,19 +421,35 @@ export function isRedirectStatus(status: number) {
   return status >= 300 && status < 400 && status !== 304;
 }
 
-function getCipher({
-  keyExchange,
-  keyExchangeGroup,
-  cipher,
-}: Protocol.Network.SecurityDetails): string {
+function getCipher(
+  { keyExchange, keyExchangeGroup, cipher }: Protocol.Network.SecurityDetails,
+  protocol: string,
+  url: string,
+): string {
   const key = `${keyExchange} ${keyExchangeGroup} ${cipher}`;
   const mapping: Record<string, string> = {
+    "ECDHE_RSA X25519 AES_128_GCM": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+    "ECDHE_RSA X25519 AES_256_GCM": "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
     " X25519Kyber768Draft00 AES_128_GCM": "TLS_AES_128_GCM_SHA256",
     " X25519 AES_128_GCM": "TLS_AES_128_GCM_SHA256",
-    "ECDHE_RSA X25519 AES_128_GCM": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
     " X25519Kyber768Draft00 AES_256_GCM": "TLS_AES_256_GCM_SHA384",
     " X25519 AES_256_GCM": "TLS_AES_256_GCM_SHA384",
-    "ECDHE_RSA X25519 AES_256_GCM": "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+    " P-256 AES_256_GCM": "TLS_AES_256_GCM_SHA384",
   };
-  return mapping[key] || "";
+  let cipherString = mapping[key] || "";
+  if (!cipherString && protocol === "tls/1.3") {
+    switch (keyExchangeGroup) {
+      case "AES_256_GCM":
+        cipherString = "TLS_AES_256_GCM_SHA384";
+        break;
+
+      case "AES_128_GCM":
+        cipherString = "TLS_AES_128_GCM_SHA256";
+        break;
+    }
+  }
+  if (!cipherString) {
+    logger.debug("No cipher for", { key, url });
+  }
+  return cipherString;
 }
