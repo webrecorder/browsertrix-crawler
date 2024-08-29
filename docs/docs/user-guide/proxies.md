@@ -42,7 +42,7 @@ docker run-v $PWD/crawls/:/crawls/ -e PROXY_SERVER=socks5://user:password@path-t
 
 ### SSH Proxies
 
-The crawler also supports crawling through an SOCKS5 that is established over an SSH tunnel, via `ssh -D`.
+Starting with 1.3.0, the crawler also supports crawling through an SOCKS5 that is established over an SSH tunnel, via `ssh -D`.
 With this option, the crawler can SSH into a remote machine that has SSH and port forwarding enabled and crawl through that machine's network.
 
 To use this proxy, the private SSH key file must be provided via `--sshProxyPrivateKeyFile` CLI flag.
