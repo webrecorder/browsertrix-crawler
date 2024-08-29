@@ -94,15 +94,15 @@ Options:
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "jsError", "fetch", "pageStatus", "memoryStatus", "crawlStatus", "l
-                                       inks", "sitemap", "replay"] [default: []]
+                              inks", "sitemap", "replay", "proxy"] [default: []]
       --logExcludeContext                   Comma-separated list of contexts to
                                             NOT include in logs
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "jsError", "fetch", "pageStatus", "memoryStatus", "crawlStatus", "l
-  inks", "sitemap", "replay"] [default: ["recorderNetwork","jsError","screencast
-                                                                             "]]
+  inks", "sitemap", "replay", "proxy"] [default: ["recorderNetwork","jsError","s
+                                                                    creencast"]]
       --text                                Extract initial (default) or final t
                                             ext to pages.jsonl or WARC resource
                                             record(s)
@@ -271,6 +271,11 @@ Options:
       --qaDebugImageDiff                    if specified, will write crawl.png,
                                             replay.png and diff.png for each pag
                                             e where they're different  [boolean]
+      --sshProxyPrivateKeyFile              path to SSH private key for SOCKS5 o
+                                            ver SSH proxy connection    [string]
+      --sshProxyKnownHostsFile              path to SSH known hosts file for SOC
+                                            KS5 over SSH proxy connection
+                                                                        [string]
       --config                              Path to YAML config file
 ```
 
@@ -278,33 +283,37 @@ Options:
 
 ```
 Options:
-  --help             Show help                                         [boolean]
-  --version          Show version number                               [boolean]
-  --url              The URL of the login page               [string] [required]
-  --user             The username for the login. If not specified, will be promp
-                     ted
-  --password         The password for the login. If not specified, will be promp
-                     ted (recommended)
-  --filename         The filename for the profile tarball, stored within /crawls
-                     /profiles if absolute path not provided
+  --help                    Show help                                  [boolean]
+  --version                 Show version number                        [boolean]
+  --url                     The URL of the login page        [string] [required]
+  --user                    The username for the login. If not specified, will b
+                            e prompted
+  --password                The password for the login. If not specified, will b
+                            e prompted (recommended)
+  --filename                The filename for the profile tarball, stored within
+                            /crawls/profiles if absolute path not provided
                                     [default: "/crawls/profiles/profile.tar.gz"]
-  --debugScreenshot  If specified, take a screenshot after login and save as thi
-                     s filename
-  --headless         Run in headless mode, otherwise start xvfb
+  --debugScreenshot         If specified, take a screenshot after login and save
+                             as this filename
+  --headless                Run in headless mode, otherwise start xvfb
                                                       [boolean] [default: false]
-  --automated        Start in automated mode, no interactive browser
+  --automated               Start in automated mode, no interactive browser
                                                       [boolean] [default: false]
-  --interactive      Deprecated. Now the default option!
+  --interactive             Deprecated. Now the default option!
                                                       [boolean] [default: false]
-  --shutdownWait     Shutdown browser in interactive after this many seconds, if
-                      no pings received                    [number] [default: 0]
-  --profile          Path or HTTP(S) URL to tar.gz file which contains the brows
-                     er profile directory                               [string]
-  --windowSize       Browser window dimensions, specified as: width,height
-                                                 [string] [default: "1360,1020"]
-  --proxyServer      if set, will use specified proxy server. Takes precedence o
-                     ver any env var proxy settings                     [string]
-  --cookieDays       If >0, set all cookies, including session cookies, to have
-                     this duration in days before saving profile
+  --shutdownWait            Shutdown browser in interactive after this many seco
+                            nds, if no pings received      [number] [default: 0]
+  --profile                 Path or HTTP(S) URL to tar.gz file which contains th
+                            e browser profile directory                 [string]
+  --windowSize              Browser window dimensions, specified as: width,heigh
+                            t                    [string] [default: "1360,1020"]
+  --cookieDays              If >0, set all cookies, including session cookies, t
+                            o have this duration in days before saving profile
                                                            [number] [default: 7]
+  --proxyServer             if set, will use specified proxy server. Takes prece
+                            dence over any env var proxy settings       [string]
+  --sshProxyPrivateKeyFile  path to SSH private key for SOCKS5 over SSH proxy co
+                            nnection                                    [string]
+  --sshProxyKnownHostsFile  path to SSH known hosts file for SOCKS5 over SSH pro
+                            xy connection                               [string]
 ```
