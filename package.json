@@ -17,9 +17,9 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
-    "@types/sax": "^1.2.7",
-    "@webrecorder/wabac": "^2.19.7",
+    "@webrecorder/wabac": "^2.19.8",
     "browsertrix-behaviors": "^0.6.4",
+    "client-zip": "^2.4.5",
     "fetch-socks": "^1.3.0",
     "get-folder-size": "^4.0.0",
     "husky": "^8.0.3",
@@ -36,7 +36,7 @@
     "tsc": "^2.0.4",
     "undici": "^6.18.2",
     "uuid": "8.3.2",
-    "warcio": "^2.2.1",
+    "warcio": "^2.3.0",
     "ws": "^7.4.4",
     "yargs": "^17.7.2"
   },
@@ -46,6 +46,7 @@
     "@types/node": "^20.8.7",
     "@types/pixelmatch": "^5.2.6",
     "@types/pngjs": "^6.0.4",
+    "@types/sax": "^1.2.7",
     "@types/uuid": "^9.0.6",
     "@types/ws": "^8.5.8",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
@@ -62,5 +63,8 @@
   "jest": {
     "transform": {},
     "testTimeout": 90000
+  },
+  "resolutions": {
+    "wrap-ansi": "7.0.0"
   }
 }

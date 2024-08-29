@@ -14,6 +14,8 @@ import { logger } from "./logger.js";
 // @ts-expect-error (incorrect types on get-folder-size)
 import getFolderSize from "get-folder-size";
 
+import { WACZ } from "./wacz.js";
+
 const DEFAULT_REGION = "us-east-1";
 
 // ===========================================================================
@@ -81,6 +83,32 @@ export class S3StorageSync {
     this.webhookUrl = webhookUrl;
   }
 
+  async uploadStreamingWACZ(wacz: WACZ, targetFilename: string) {
+    const fileUploadInfo = {
+      bucket: this.bucketName,
+      crawlId: this.crawlId,
+      prefix: this.objectPrefix,
+      targetFilename,
+    };
+    logger.info("S3 file upload information", fileUploadInfo, "storage");
+
+    const waczStream = wacz.generate();
+
+    await this.client.putObject(
+      this.bucketName,
+      this.objectPrefix + targetFilename,
+      waczStream,
+    );
+
+    const hash = wacz.getHash();
+    const path = targetFilename;
+
+    const size = wacz.getSize();
+
+    // for backwards compatibility, keep 'bytes'
+    return { path, size, hash, bytes: size };
+  }
+
   async uploadFile(srcFilename: string, targetFilename: string) {
     const fileUploadInfo = {
       bucket: this.bucketName,
@@ -114,11 +142,15 @@ export class S3StorageSync {
   }
 
   async uploadCollWACZ(
-    srcFilename: string,
+    srcOrWACZ: string | WACZ,
     targetFilename: string,
     completed = true,
   ) {
-    const resource = await this.uploadFile(srcFilename, targetFilename);
+    const resource =
+      typeof srcOrWACZ === "string"
+        ? await this.uploadFile(srcOrWACZ, targetFilename)
+        : await this.uploadStreamingWACZ(srcOrWACZ, targetFilename);
+
     logger.info(
       "WACZ S3 file upload resource",
       { targetFilename, resource },
@@ -191,7 +223,7 @@ export async function getFileSize(filename: string) {
   return stats.size;
 }
 
-export async function getDirSize(dir: string) {
+export async function getDirSize(dir: string): Promise<number> {
   const { size, errors } = await getFolderSize(dir);
   if (errors && errors.length) {
     logger.warn("Size check errors", { errors }, "storage");
@@ -234,10 +266,15 @@ export async function checkDiskUtilization(
   const kbTotal = parseInt(diskUsage["1K-blocks"]);
 
   let kbArchiveDirSize = Math.round(archiveDirSize / 1024);
-  if (params.combineWARC && params.generateWACZ) {
-    kbArchiveDirSize *= 4;
-  } else if (params.combineWARC || params.generateWACZ) {
-    kbArchiveDirSize *= 2;
+
+  // assume if has STORE_ENDPOINT_URL, will be uploading to remote
+  // and not storing local copy of either WACZ or WARC
+  if (!process.env.STORE_ENDPOINT_URL) {
+    if (params.combineWARC && params.generateWACZ) {
+      kbArchiveDirSize *= 4;
+    } else if (params.combineWARC || params.generateWACZ) {
+      kbArchiveDirSize *= 2;
+    }
   }
 
   const projectedTotal = kbUsed + kbArchiveDirSize;

@@ -51,6 +51,7 @@ export const LOG_CONTEXT_TYPES = [
   "crawlStatus",
   "links",
   "sitemap",
+  "wacz",
   "replay",
   "proxy",
 ] as const;

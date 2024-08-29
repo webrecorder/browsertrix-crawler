@@ -60,8 +60,11 @@ jobs:
       - name: add http-server for tests
         run: yarn add -D http-server
 
+      - name: install py-wacz as root for tests
+        run: sudo pip install wacz
+
       - name: run all tests as root
-        run: sudo DOCKER_HOST_NAME=172.17.0.1 yarn test
+        run: sudo DOCKER_HOST_NAME=172.17.0.1 yarn test -validate
 
       - name: run saved state + qa compare test as non-root - with volume owned by current user
         run: |

@@ -201,7 +201,7 @@ class ArgParser {
 
       generateWACZ: {
         alias: ["generatewacz", "generateWacz"],
-        describe: "If set, generate wacz",
+        describe: "If set, generate WACZ on disk",
         type: "boolean",
         default: false,
       },

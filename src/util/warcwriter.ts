@@ -24,7 +24,7 @@ export type ResourceRecordData = {
 // =================================================================
 export class WARCWriter implements IndexerOffsetLength {
   archivesDir: string;
-  tempCdxDir?: string;
+  warcCdxDir?: string;
   filenameTemplate: string;
   filename?: string;
   gzip: boolean;
@@ -45,23 +45,21 @@ export class WARCWriter implements IndexerOffsetLength {
 
   constructor({
     archivesDir,
-    tempCdxDir,
+    warcCdxDir,
     filenameTemplate,
     rolloverSize = DEFAULT_ROLLOVER_SIZE,
     gzip,
     logDetails,
   }: {
     archivesDir: string;
-    tempCdxDir?: string;
+    warcCdxDir?: string;
     filenameTemplate: string;
     rolloverSize?: number;
     gzip: boolean;
     logDetails: Record<string, string>;
   }) {
     this.archivesDir = archivesDir;
-    this.tempCdxDir = tempCdxDir;
-    // for now, disabling CDX
-    this.tempCdxDir = undefined;
+    this.warcCdxDir = warcCdxDir;
     this.logDetails = logDetails;
     this.gzip = gzip;
     this.rolloverSize = rolloverSize;
@@ -77,7 +75,7 @@ export class WARCWriter implements IndexerOffsetLength {
     this.offset = 0;
     this.recordLength = 0;
 
-    if (this.tempCdxDir) {
+    if (this.warcCdxDir) {
       this.indexer = new CDXIndexer({ format: "cdxj" });
     }
 
@@ -112,14 +110,19 @@ export class WARCWriter implements IndexerOffsetLength {
         flags: "a",
       });
     }
-    if (!this.cdxFH && this.tempCdxDir) {
+    if (!this.cdxFH && this.warcCdxDir) {
       this.cdxFH = fs.createWriteStream(
-        path.join(this.tempCdxDir, this.filename + ".cdx"),
+        path.join(this.warcCdxDir, this.filename + ".cdx"),
         { flags: "a" },
       );
     }
 
-    fh.write(await createWARCInfo(this.filename));
+    const buffer = await createWARCInfo(this.filename);
+    fh.write(buffer);
+
+    // account for size of warcinfo record, (don't index as warcinfo never added to cdx)
+    this.recordLength = buffer.length;
+    this.offset += buffer.length;
 
     return fh;
   }
