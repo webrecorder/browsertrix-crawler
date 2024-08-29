@@ -10,6 +10,8 @@ See [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors
 
 Browsertrix Crawler includes a `--pageExtraDelay`/`--delay` option, which can be used to have the crawler sleep for a configurable number of seconds after behaviors before moving on to the next page.
 
+To disable behaviors for a crawl, use `--behaviors ""`.
+
 ## Additional Custom Behaviors
 
 Custom behaviors can be mounted into the crawler and loaded from there. For example:

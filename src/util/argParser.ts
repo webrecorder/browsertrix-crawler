@@ -572,6 +572,18 @@ class ArgParser {
           "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
         type: "boolean",
       },
+
+      sshProxyPrivateKeyFile: {
+        describe:
+          "path to SSH private key for SOCKS5 over SSH proxy connection",
+        type: "string",
+      },
+
+      sshProxyKnownHostsFile: {
+        describe:
+          "path to SSH known hosts file for SOCKS5 over SSH proxy connection",
+        type: "string",
+      },
     };
   }
 
@@ -630,10 +642,14 @@ class ArgParser {
 
     // background behaviors to apply
     const behaviorOpts: { [key: string]: string | boolean } = {};
-    argv.behaviors.forEach((x: string) => (behaviorOpts[x] = true));
-    behaviorOpts.log = BEHAVIOR_LOG_FUNC;
-    behaviorOpts.startEarly = true;
-    argv.behaviorOpts = JSON.stringify(behaviorOpts);
+    if (argv.behaviors.length > 0) {
+      argv.behaviors.forEach((x: string) => (behaviorOpts[x] = true));
+      behaviorOpts.log = BEHAVIOR_LOG_FUNC;
+      behaviorOpts.startEarly = true;
+      argv.behaviorOpts = JSON.stringify(behaviorOpts);
+    } else {
+      argv.behaviorOpts = "";
+    }
 
     argv.text = argv.text || [];
 

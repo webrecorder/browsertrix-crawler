@@ -53,6 +53,7 @@ export const LOG_CONTEXT_TYPES = [
   "sitemap",
   "wacz",
   "replay",
+  "proxy",
 ] as const;
 
 export type LogContext = (typeof LOG_CONTEXT_TYPES)[number];

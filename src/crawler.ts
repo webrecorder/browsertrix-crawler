@@ -467,8 +467,6 @@ export class Crawler {
   async bootstrap() {
     const subprocesses: ChildProcess[] = [];
 
-    this.proxyServer = initProxy(this.params.proxyServer);
-
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
 
     if (
@@ -493,9 +491,15 @@ export class Crawler {
     setWARCInfo(this.infoString, this.params.warcInfo);
     logger.info(this.infoString);
 
+    this.proxyServer = await initProxy(this.params, RUN_DETACHED);
+
     logger.info("Seeds", this.seeds);
 
-    logger.info("Behavior Options", this.params.behaviorOpts);
+    if (this.params.behaviorOpts) {
+      logger.info("Behavior Options", this.params.behaviorOpts);
+    } else {
+      logger.info("Behaviors disabled");
+    }
 
     if (this.params.profile) {
       logger.info("With Browser Profile", { url: this.params.profile });

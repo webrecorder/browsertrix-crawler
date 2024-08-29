@@ -54,6 +54,7 @@ nav:
     - user-guide/crawl-scope.md
     - user-guide/yaml-config.md
     - user-guide/browser-profiles.md
+    - user-guide/proxies.md
     - user-guide/behaviors.md
     - user-guide/qa.md
     - user-guide/cli-options.md
