@@ -385,14 +385,19 @@ export async function mergeCDXJ(
     }
   };
 
+  const cdxFiles = addDirFiles(warcCdxDir);
+
+  if (!cdxFiles.length) {
+    logger.info("No CDXJ files to merge");
+    return;
+  }
+
   if (zipped === null) {
     const tempCdxSize = await getDirSize(warcCdxDir);
 
     // if CDX size is at least this size, use compressed version
     zipped = tempCdxSize >= ZIP_CDX_MIN_SIZE;
   }
-
-  const cdxFiles = addDirFiles(warcCdxDir);
 
   const proc = child_process.spawn("sort", cdxFiles, {
     env: { LC_ALL: "C" },
