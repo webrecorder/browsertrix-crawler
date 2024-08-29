@@ -456,8 +456,6 @@ export class Crawler {
   async bootstrap() {
     const subprocesses: ChildProcess[] = [];
 
-    this.proxyServer = initProxy(this.params.proxyServer);
-
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
 
     if (
@@ -481,6 +479,8 @@ export class Crawler {
     this.infoString = await getInfoString();
     setWARCInfo(this.infoString, this.params.warcInfo);
     logger.info(this.infoString);
+
+    this.proxyServer = await initProxy(this.params, RUN_DETACHED);
 
     logger.info("Seeds", this.seeds);
 

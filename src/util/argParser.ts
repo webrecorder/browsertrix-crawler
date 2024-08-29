@@ -572,6 +572,18 @@ class ArgParser {
           "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
         type: "boolean",
       },
+
+      sshProxyPrivateKeyFile: {
+        describe:
+          "path to SSH private key for SOCKS5 over SSH proxy connection",
+        type: "string",
+      },
+
+      sshProxyKnownHostsFile: {
+        describe:
+          "path to SSH known hosts file for SOCKS5 over SSH proxy connection",
+        type: "string",
+      },
     };
   }
 
