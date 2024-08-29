@@ -93,7 +93,7 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
   const localPort = params.sshProxyLocalPort || SSH_PROXY_LOCAL_PORT;
   const proxyString = `socks5://localhost:${localPort}`;
 
-  const coreArgs: string[] = [
+  const args: string[] = [
     user + "@" + host,
     "-p",
     port,
@@ -111,30 +111,27 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
   ];
 
   if (params.sshProxyKnownHostsFile) {
-    coreArgs.push(`UserKnownHostsFile=${params.sshProxyKnownHostsFile}`);
+    args.push(`UserKnownHostsFile=${params.sshProxyKnownHostsFile}`);
   } else {
-    coreArgs.push("StrictHostKeyChecking=no");
+    args.push("StrictHostKeyChecking=no");
   }
 
-  logger.info("Checking SSH connection for proxy...");
+  args.push("-M", "0", "-N", "-T");
 
-  const proc = child_process.spawn(
-    "autossh",
-    [...coreArgs, "-M", "0", "-N", "-T"],
-    {
-      detached,
-    },
-  );
+  logger.info("Checking SSH connection for proxy...", {}, "proxy");
+  logger.debug("SSH Command: autossh " + args.join(" "), {}, "proxy");
+
+  const proc = child_process.spawn("autossh", args, { detached });
 
   let procStdout = "";
   let procStderr = "";
   proc.stdout.on("data", (data) => {
     procStdout += data.toString();
-    logger.info(data.toString());
+    logger.debug("Proxy Stdout: " + data.toString(), {}, "proxy");
   });
   proc.stderr.on("data", (data) => {
     procStderr += data.toString();
-    logger.info(data.toString());
+    logger.debug("Proxy Stderr: " + data.toString(), {}, "proxy");
   });
 
   const timeout = SSH_WAIT_TIMEOUT;
@@ -144,8 +141,8 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
       if (Date.now() - startTime >= timeout) {
         reject("Timeout reached");
       } else {
-        logger.warn("Retrying connection to socks proxy port");
-        setTimeout(testPort, 250);
+        logger.debug("Retrying connection to SSH proxy port", {}, "proxy");
+        setTimeout(testPort, 500);
       }
     }
     function testPort() {
@@ -185,7 +182,7 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
         stderr: procStderr,
         code: proc.exitCode,
       },
-      "general",
+      "proxy",
       21,
     );
     return;
@@ -193,15 +190,21 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
 
   logger.info(
     `Established SSH tunnel for proxy ${proxyString} -> ${proxyServer}`,
+    {},
+    "proxy",
   );
 
   proc.on("exit", (code, signal) => {
-    logger.warn(`SSH crashed, restarting`, {
-      code,
-      signal,
-      stdout: procStdout,
-      stderr: procStderr,
-    });
+    logger.warn(
+      `SSH crashed, restarting`,
+      {
+        code,
+        signal,
+        stdout: procStdout,
+        stderr: procStderr,
+      },
+      "proxy",
+    );
     runSSHD(params, detached);
   });
 
