@@ -328,7 +328,7 @@ export async function mergeCDXJ(
     idxFile.write(
       `!meta 0 ${JSON.stringify({
         format: "cdxj-gzip-1.0",
-        filename: INDEX_IDX,
+        filename: INDEX_CDX_GZ,
       })}\n`,
     );
 
