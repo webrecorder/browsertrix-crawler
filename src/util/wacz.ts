@@ -33,7 +33,7 @@ export type WACZInitOpts = {
   input: string[];
   output: string;
   pages: string;
-  tempCdxDir: string;
+  warcCdxDir: string;
   indexesDir: string;
   logDirectory: string;
 
@@ -95,7 +95,7 @@ export class WACZ {
 
   pagesDir: string;
   logsDir: string;
-  tempCdxDir: string;
+  warcCdxDir: string;
   indexesDir: string;
 
   datapackage: WACZDataPackage;
@@ -110,7 +110,7 @@ export class WACZ {
     this.warcs = config.input;
     this.pagesDir = config.pages;
     this.logsDir = config.logDirectory;
-    this.tempCdxDir = config.tempCdxDir;
+    this.warcCdxDir = config.warcCdxDir;
     this.collDir = collDir;
     this.indexesDir = config.indexesDir;
 
@@ -300,7 +300,7 @@ export function addDirFiles(fullDir: string): string[] {
 }
 
 export async function mergeCDXJ(
-  tempCdxDir: string,
+  warcCdxDir: string,
   indexesDir: string,
   zipped: boolean | null = null,
 ) {
@@ -386,13 +386,13 @@ export async function mergeCDXJ(
   };
 
   if (zipped === null) {
-    const tempCdxSize = await getDirSize(tempCdxDir);
+    const tempCdxSize = await getDirSize(warcCdxDir);
 
     // if CDX size is at least this size, use compressed version
     zipped = tempCdxSize >= ZIP_CDX_MIN_SIZE;
   }
 
-  const cdxFiles = addDirFiles(tempCdxDir);
+  const cdxFiles = addDirFiles(warcCdxDir);
 
   const proc = child_process.spawn("sort", cdxFiles, {
     env: { LC_ALL: "C" },

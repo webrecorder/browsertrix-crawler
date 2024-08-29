@@ -157,7 +157,7 @@ export class Crawler {
 
   archivesDir: string;
   tempdir: string;
-  tempCdxDir: string;
+  warcCdxDir: string;
   indexesDir: string;
 
   screenshotWriter: WARCWriter | null;
@@ -298,7 +298,7 @@ export class Crawler {
     this.tempdir = path.join(os.tmpdir(), "tmp-dl");
 
     // indexes dirs
-    this.tempCdxDir = path.join(this.collDir, "tmp-cdx");
+    this.warcCdxDir = path.join(this.collDir, "warc-cdx");
     this.indexesDir = path.join(this.collDir, "indexes");
 
     this.screenshotWriter = null;
@@ -481,7 +481,7 @@ export class Crawler {
     if (!this.params.dryRun) {
       await fsp.mkdir(this.archivesDir, { recursive: true });
       await fsp.mkdir(this.tempdir, { recursive: true });
-      await fsp.mkdir(this.tempCdxDir, { recursive: true });
+      await fsp.mkdir(this.warcCdxDir, { recursive: true });
     }
 
     this.logFH = fs.createWriteStream(this.logFilename, { flags: "a" });
@@ -1501,7 +1501,7 @@ self.__bx_behaviors.selectMainBehavior();
       );
 
       await mergeCDXJ(
-        this.tempCdxDir,
+        this.warcCdxDir,
         this.indexesDir,
         this.params.generateWACZ ? null : false,
       );
@@ -1593,7 +1593,7 @@ self.__bx_behaviors.selectMainBehavior();
       output: waczPath,
       pages: this.pagesDir,
       logDirectory: this.logDir,
-      tempCdxDir: this.tempCdxDir,
+      warcCdxDir: this.warcCdxDir,
       indexesDir: this.indexesDir,
       softwareString: this.infoString,
     };
@@ -2558,7 +2558,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     return new WARCWriter({
       archivesDir: this.archivesDir,
-      tempCdxDir: this.tempCdxDir,
+      warcCdxDir: this.warcCdxDir,
       filenameTemplate,
       rolloverSize: this.params.rolloverSize,
       gzip,
