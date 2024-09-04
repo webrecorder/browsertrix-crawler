@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
-    "@webrecorder/wabac": "^2.19.8",
+    "@webrecorder/wabac": "^2.20.0-beta.4",
     "browsertrix-behaviors": "^0.6.4",
     "client-zip": "^2.4.5",
     "fetch-socks": "^1.3.0",
@@ -58,7 +58,7 @@
     "jest": "^29.7.0",
     "md5": "^2.3.0",
     "prettier": "3.0.3",
-    "typescript": "^5.2.2"
+    "typescript": "^5.5.4"
   },
   "jest": {
     "transform": {},

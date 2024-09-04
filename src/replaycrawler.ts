@@ -10,10 +10,7 @@ import { PageInfoRecord, PageInfoValue, Recorder } from "./util/recorder.js";
 import fsp from "fs/promises";
 import path from "path";
 
-// @ts-expect-error wabac.js
-import { ZipRangeReader } from "@webrecorder/wabac/src/wacz/ziprangereader.js";
-// @ts-expect-error wabac.js
-import { createLoader } from "@webrecorder/wabac/src/blockloaders.js";
+import { ZipRangeReader, createLoader } from "@webrecorder/wabac";
 
 import { AsyncIterReader } from "warcio";
 import { parseArgs } from "./util/argParser.js";
@@ -783,7 +780,7 @@ export class ReplayCrawler extends Crawler {
 
 class WACZLoader {
   url: string;
-  zipreader: ZipRangeReader;
+  zipreader: ZipRangeReader | null;
 
   constructor(url: string) {
     this.url = url;
@@ -802,7 +799,7 @@ class WACZLoader {
   }
 
   async loadFile(fileInZip: string) {
-    const { reader } = await this.zipreader.loadFile(fileInZip);
+    const { reader } = await this.zipreader!.loadFile(fileInZip);
 
     if (!reader) {
       return null;

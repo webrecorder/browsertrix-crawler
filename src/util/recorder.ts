@@ -10,13 +10,7 @@ import {
 
 import { fetch, getGlobalDispatcher, Response } from "undici";
 
-// @ts-expect-error TODO fill in why error is expected
-import { getCustomRewriter } from "@webrecorder/wabac/src/rewrite/index.js";
-import {
-  rewriteDASH,
-  rewriteHLS,
-  // @ts-expect-error TODO fill in why error is expected
-} from "@webrecorder/wabac/src/rewrite/rewriteVideo.js";
+import { getCustomRewriter, rewriteDASH, rewriteHLS } from "@webrecorder/wabac";
 
 import { WARCRecord } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";

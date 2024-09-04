@@ -1312,15 +1312,16 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@webrecorder/wabac@^2.19.8":
-  version "2.19.8"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.19.8.tgz#302ade200953a1c76f0b355983ae4081428fb933"
-  integrity sha512-WjyfsGK8JWKeeDsGrOIT8ZLjMcOOAN93OMnRLO214jSV18SHEOY4JRvXzFOLF+OWYC5kJIMjl05gurTLq18jOA==
+"@webrecorder/wabac@^2.20.0-beta.4":
+  version "2.20.0-beta.4"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.20.0-beta.4.tgz#c60fcd00f449cca52ce1a0bef305a06922c9e3e8"
+  integrity sha512-enHYcZoqs7cOu2tdTqVeB/zB27uL4wmCMzvF55bJqdB8d5zgPpY+/fpRA3eLxGrPc0nFYAjsI/aNaa62FH7WKQ==
   dependencies:
     "@peculiar/asn1-ecc" "^2.3.4"
     "@peculiar/asn1-schema" "^2.3.3"
     "@peculiar/x509" "^1.9.2"
-    "@webrecorder/wombat" "^3.8.0"
+    "@types/js-levenshtein" "^1.1.3"
+    "@webrecorder/wombat" "^3.8.2"
     acorn "^8.10.0"
     auto-js-ipfs "^2.1.1"
     base64-js "^1.5.1"
@@ -1339,14 +1340,14 @@
     path-parser "^6.1.0"
     process "^0.11.10"
     stream-browserify "^3.0.0"
-    warcio "^2.3.0"
+    warcio "^2.3.1"
 
-"@webrecorder/wombat@^3.8.0":
-  version "3.8.0"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.8.0.tgz#63ed3df199f11223b23c9ce66202590b8511ae2a"
-  integrity sha512-MpzNu9+ClCHjOER9XCrsEIsJk15L6qGO+PxeBPiOtaFJmNUiz0auMT5AQwiPqJgKEAniZTlPx1O4kNCVJu9f2Q==
+"@webrecorder/wombat@^3.8.2":
+  version "3.8.2"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.8.2.tgz#e46e18719834d633175eec52ce753a4dc4e48e27"
+  integrity sha512-uUZr9V4UYpVOpM64Tm27ND/hMjDbT37+/qyNaNV6loqDuVzBVQh5w7SfTEy0Bbjj1MYyNZP244mOtWtotTpUEA==
   dependencies:
-    warcio "^2.3.0"
+    warcio "^2.3.1"
 
 "@zxing/text-encoding@0.9.0":
   version "0.9.0"
@@ -5154,10 +5155,10 @@ typed-query-selector@^2.12.0:
   resolved "https://registry.yarnpkg.com/typed-query-selector/-/typed-query-selector-2.12.0.tgz#92b65dbc0a42655fccf4aeb1a08b1dddce8af5f2"
   integrity sha512-SbklCd1F0EiZOyPiW192rrHZzZ5sBijB6xM+cpmrwDqObvdtunOHHIk9fCGsoK5JVIYXoyEp4iEdE3upFH3PAg==
 
-typescript@^5.2.2:
-  version "5.2.2"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.2.2.tgz#5ebb5e5a5b75f085f22bc3f8460fba308310fa78"
-  integrity sha512-mI4WrpHsbCIcwT9cF4FZvr80QUeKvsUsUvKDoR+X/7XHQH98xYD8YHZg7ANtz2GtZt/CBq2QJ0thkGJMHfqc1w==
+typescript@^5.5.4:
+  version "5.5.4"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.5.4.tgz#d9852d6c82bad2d2eda4fd74a5762a8f5909e9ba"
+  integrity sha512-Mtq29sKDAEYP7aljRgtPOpTvOfbwRWlS6dPRzwjdE+C0R4brX/GUyhHSecbHMFLNBLcJIPt9nl9yG5TZ1weH+Q==
 
 unbox-primitive@^1.0.0, unbox-primitive@^1.0.1:
   version "1.0.1"
@@ -5282,7 +5283,7 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.3.0, warcio@^2.3.1:
+warcio@^2.3.1:
   version "2.3.1"
   resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.3.1.tgz#8ac9de897de1a556161168f2a3938b60929908ca"
   integrity sha512-PjcWqzXfs6HdWfHi1V/i8MoMmV5M0Csg3rOa2mqCJ1dmCJXswVfQ0VXbEVumwavNIW2oFFj6LJoCHHeL4Ls/zw==
