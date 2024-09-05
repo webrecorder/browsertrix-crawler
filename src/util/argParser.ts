@@ -4,7 +4,7 @@ import os from "os";
 
 import yaml from "js-yaml";
 import { KnownDevices as devices } from "puppeteer-core";
-import yargs, { Options } from "yargs";
+import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
 import {
@@ -19,17 +19,19 @@ import { screenshotTypes } from "./screenshots.js";
 import {
   DEFAULT_EXCLUDE_LOG_CONTEXTS,
   LOG_CONTEXT_TYPES,
+  LogContext,
   logger,
 } from "./logger.js";
+import { SaveState } from "./state.js";
 
-// ============================================================================
-class ArgParser {
-  get cliOpts(): { [key: string]: Options } {
-    const coerce = (array: string[]) => {
-      return array.flatMap((v) => v.split(",")).filter((x) => !!x);
-    };
+export function initArgs(argv: string[]) {
+  const coerce = (array: string[]): string[] => {
+    return array.flatMap((v) => v.split(",")).filter((x) => !!x);
+  };
 
-    return {
+  return yargs(hideBin(argv))
+    .usage("crawler [options]")
+    .options({
       seeds: {
         alias: "url",
         describe: "The URL to start crawling from",
@@ -119,11 +121,13 @@ class ArgParser {
         alias: "include",
         describe:
           "Regex of page URLs that should be included in the crawl (defaults to the immediate directory of URL)",
+        type: "string",
       },
 
       scopeExcludeRx: {
         alias: "exclude",
         describe: "Regex of page URLs that should be excluded from the crawl.",
+        type: "string",
       },
 
       allowHashUrls: {
@@ -142,6 +146,7 @@ class ArgParser {
         describe:
           "If specified, when a URL is blocked, a record with this error message is added instead",
         type: "string",
+        default: "",
       },
 
       blockAds: {
@@ -156,6 +161,7 @@ class ArgParser {
         describe:
           "If specified, when an ad is blocked, a record with this error message is added instead",
         type: "string",
+        default: "",
       },
 
       collection: {
@@ -289,15 +295,18 @@ class ArgParser {
         alias: "sitemapFrom",
         describe:
           "If set, filter URLs from sitemaps to those greater than or equal to (>=) provided ISO Date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS or partial date)",
+        type: "string",
       },
 
       sitemapToDate: {
         alias: "sitemapTo",
         describe:
           "If set, filter URLs from sitemaps to those less than or equal to (<=) provided ISO Date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS or partial date)",
+        type: "string",
       },
 
       statsFilename: {
+        type: "string",
         describe:
           "If set, output stats as JSON to this file. (Relative filename resolves to crawl working directory)",
       },
@@ -584,9 +593,27 @@ class ArgParser {
           "path to SSH known hosts file for SOCKS5 over SSH proxy connection",
         type: "string",
       },
-    };
-  }
+    });
+}
 
+export type CrawlerArgs = ReturnType<typeof parseArgs> & {
+  logContext: LogContext[];
+  logExcludeContext: LogContext[];
+  text: string[];
+
+  scopedSeeds: ScopedSeed[];
+
+  crawlId: string;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  origConfig: Record<string, any>;
+  state?: SaveState;
+
+  warcInfo?: Record<string, string>;
+};
+
+// ============================================================================
+class ArgParser {
   parseArgs(argvParams?: string[], isQA = false) {
     let argv = argvParams || process.argv;
 
@@ -601,9 +628,7 @@ class ArgParser {
 
     let origConfig = {};
 
-    const parsed = yargs(hideBin(argv))
-      .usage("crawler [options]")
-      .option(this.cliOpts)
+    const parsed = initArgs(argv)
       .config(
         "config",
         "Path to YAML config file",
@@ -616,9 +641,12 @@ class ArgParser {
           return origConfig;
         },
       )
-      .check((argv) => this.validateArgs(argv, isQA)).argv;
+      .check((argv) => this.validateArgs(argv, isQA))
+      .parseSync();
 
-    return { parsed, origConfig };
+    parsed.origConfig = origConfig;
+
+    return parsed;
   }
 
   splitCrawlArgsQuoteSafe(crawlArgs: string): string[] {
@@ -629,8 +657,8 @@ class ArgParser {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  validateArgs(argv: Record<string, any>, isQA: boolean) {
-    argv.crawlId = argv.crawlId || process.env.CRAWL_ID || os.hostname;
+  validateArgs(argv: any, isQA: boolean) {
+    argv.crawlId = argv.crawlId || process.env.CRAWL_ID || os.hostname();
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
 
     // Check that the collection name is valid.
@@ -675,7 +703,8 @@ class ArgParser {
 
       for (const seed of urlSeedFileList) {
         if (seed) {
-          argv.seeds.push(seed);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (argv.seeds as any).push(seed);
         }
       }
     }
@@ -689,7 +718,7 @@ class ArgParser {
       //logger.debug(`Set netIdleWait to ${argv.netIdleWait} seconds`);
     }
 
-    argv.scopedSeeds = [];
+    const scopedSeeds: ScopedSeed[] = [];
 
     if (!isQA) {
       const scopeOpts = {
@@ -701,24 +730,22 @@ class ArgParser {
         extraHops: argv.extraHops,
       };
 
-      for (let seed of argv.seeds) {
-        if (typeof seed === "string") {
-          seed = { url: seed };
-        }
+      for (const seed of argv.seeds) {
+        const newSeed = typeof seed === "string" ? { url: seed } : seed;
 
         try {
-          argv.scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...seed }));
+          scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...newSeed }));
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
           logger.error("Failed to create seed", {
             error: e.toString(),
             ...scopeOpts,
-            ...seed,
+            ...newSeed,
           });
           if (argv.failOnFailedSeed) {
             logger.fatal(
               "Invalid seed specified, aborting crawl",
-              { url: seed.url },
+              { url: newSeed.url },
               "general",
               1,
             );
@@ -726,12 +753,14 @@ class ArgParser {
         }
       }
 
-      if (!argv.scopedSeeds.length) {
+      if (!scopedSeeds.length) {
         logger.fatal("No valid seeds specified, aborting crawl");
       }
     } else if (!argv.qaSource) {
       logger.fatal("--qaSource required for QA mode");
     }
+
+    argv.scopedSeeds = scopedSeeds;
 
     // Resolve statsFilename
     if (argv.statsFilename) {

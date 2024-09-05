@@ -12,7 +12,7 @@ import {
   WorkerId,
 } from "./util/state.js";
 
-import { parseArgs } from "./util/argParser.js";
+import { CrawlerArgs, parseArgs } from "./util/argParser.js";
 
 import yaml from "js-yaml";
 
@@ -107,8 +107,7 @@ type PageEntry = {
 
 // ============================================================================
 export class Crawler {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  params: any;
+  params: CrawlerArgs;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   origConfig: any;
 
@@ -200,8 +199,8 @@ export class Crawler {
 
   constructor() {
     const args = this.parseArgs();
-    this.params = args.parsed;
-    this.origConfig = args.origConfig;
+    this.params = args as CrawlerArgs;
+    this.origConfig = this.params.origConfig;
 
     // root collections dir
     this.collDir = path.join(
@@ -2183,7 +2182,7 @@ self.__bx_behaviors.selectMainBehavior();
           id: "pages",
           title,
         };
-        header.hasText = this.params.text.includes("to-pages");
+        header.hasText = this.params.text.includes("to-pages") + "";
         if (this.params.text.length) {
           logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
@@ -2290,8 +2289,12 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    const fromDate = this.params.sitemapFromDate;
-    const toDate = this.params.sitemapToDate;
+    const fromDate = this.params.sitemapFromDate
+      ? new Date(this.params.sitemapFromDate)
+      : undefined;
+    const toDate = this.params.sitemapToDate
+      ? new Date(this.params.sitemapToDate)
+      : undefined;
     const headers = this.headers;
 
     logger.info(
