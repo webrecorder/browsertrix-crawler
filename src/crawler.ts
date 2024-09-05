@@ -52,7 +52,7 @@ import {
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
 } from "./util/constants.js";
 
-import { AdBlockRules, BlockRules } from "./util/blockrules.js";
+import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
 import { OriginOverride } from "./util/originoverride.js";
 
 import {
@@ -1395,7 +1395,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(
-        this.params.blockRules,
+        this.params.blockRules as BlockRuleDecl[],
         this.captureBasePrefix,
         this.params.blockMessage,
       );
@@ -1404,7 +1404,9 @@ self.__bx_behaviors.selectMainBehavior();
     this.screencaster = this.initScreenCaster();
 
     if (this.params.originOverride && this.params.originOverride.length) {
-      this.originOverride = new OriginOverride(this.params.originOverride);
+      this.originOverride = new OriginOverride(
+        this.params.originOverride as string[],
+      );
     }
 
     await this._addInitialSeeds();

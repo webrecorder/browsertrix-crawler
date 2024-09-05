@@ -18,7 +18,7 @@ const BlockState = {
   BLOCK_AD: "advertisement",
 };
 
-type BlockRuleDecl = {
+export type BlockRuleDecl = {
   url?: string;
   frameTextMatch?: string;
   inFrameUrl?: string;
