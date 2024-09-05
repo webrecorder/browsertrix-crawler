@@ -36,7 +36,7 @@
     "tsc": "^2.0.4",
     "undici": "^6.18.2",
     "uuid": "8.3.2",
-    "warcio": "^2.3.0",
+    "warcio": "^2.3.1",
     "ws": "^7.4.4",
     "yargs": "^17.7.2"
   },
@@ -65,6 +65,7 @@
     "testTimeout": 90000
   },
   "resolutions": {
-    "wrap-ansi": "7.0.0"
+    "wrap-ansi": "7.0.0",
+    "warcio": "^2.3.1"
   }
 }

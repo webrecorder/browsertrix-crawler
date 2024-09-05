@@ -156,7 +156,6 @@ export class Crawler {
   otherPagesFile: string;
 
   archivesDir: string;
-  tempdir: string;
   warcCdxDir: string;
   indexesDir: string;
 
@@ -295,7 +294,6 @@ export class Crawler {
 
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
-    this.tempdir = path.join(os.tmpdir(), "tmp-dl");
 
     // indexes dirs
     this.warcCdxDir = path.join(this.collDir, "warc-cdx");
@@ -480,7 +478,6 @@ export class Crawler {
 
     if (!this.params.dryRun) {
       await fsp.mkdir(this.archivesDir, { recursive: true });
-      await fsp.mkdir(this.tempdir, { recursive: true });
       await fsp.mkdir(this.warcCdxDir, { recursive: true });
     }
 
@@ -2581,7 +2578,6 @@ self.__bx_behaviors.selectMainBehavior();
       workerid: id,
       crawler: this,
       writer,
-      tempdir: this.tempdir,
     });
 
     this.browser.recorders.push(res);

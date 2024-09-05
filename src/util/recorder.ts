@@ -1,11 +1,7 @@
-import path from "path";
-
-import { v4 as uuidv4 } from "uuid";
-
 import PQueue from "p-queue";
 
 import { logger, formatErr } from "./logger.js";
-import { sleep, timedRun, timestampNow } from "./timing.js";
+import { sleep, timedRun } from "./timing.js";
 import {
   RequestResponseInfo,
   isHTMLMime,
@@ -142,8 +138,6 @@ export class Recorder {
   logDetails: Record<string, any> = {};
   skipping = false;
 
-  tempdir: string;
-
   gzip = true;
 
   writer: WARCWriter;
@@ -157,20 +151,16 @@ export class Recorder {
     workerid,
     writer,
     crawler,
-    tempdir,
   }: {
     workerid: WorkerId;
     writer: WARCWriter;
     crawler: Crawler;
-    tempdir: string;
   }) {
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
 
     this.writer = writer;
-
-    this.tempdir = tempdir;
 
     this.fetcherQ = new PQueue({ concurrency: 1 });
 
@@ -1274,9 +1264,6 @@ class AsyncFetcher {
 
   recorder: Recorder;
 
-  tempdir: string;
-  filename: string;
-
   manualRedirect = false;
 
   constructor({
@@ -1299,19 +1286,13 @@ class AsyncFetcher {
 
     this.recorder = recorder;
 
-    this.tempdir = recorder.tempdir;
-    this.filename = path.join(
-      this.tempdir,
-      `${timestampNow()}-${uuidv4()}.data`,
-    );
-
     this.maxFetchSize = maxFetchSize;
 
     this.manualRedirect = manualRedirect;
   }
 
   async load() {
-    const { reqresp, recorder, networkId, filename } = this;
+    const { reqresp, recorder, networkId } = this;
     const { url, status } = reqresp;
 
     const { pageid, crawlState, gzip, logDetails } = recorder;
@@ -1361,7 +1342,7 @@ class AsyncFetcher {
       } catch (e) {
         logger.error(
           "Error reading + digesting payload",
-          { url, filename, ...formatErr(e), ...logDetails },
+          { url, ...formatErr(e), ...logDetails },
           "recorder",
         );
       }
@@ -1436,7 +1417,7 @@ class AsyncFetcher {
       }
       logger.debug(
         "Streaming Fetch Error",
-        { url, networkId, filename, ...formatErr(e), ...logDetails },
+        { url, networkId, ...formatErr(e), ...logDetails },
         "recorder",
       );
       // indicate response is ultimately not valid
