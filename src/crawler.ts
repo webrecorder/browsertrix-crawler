@@ -878,7 +878,7 @@ self.__bx_behaviors.selectMainBehavior();
       try {
         const { fetched, mime, ts } = await timedRun(
           directFetchCapture({ url, headers: this.headers, cdp }),
-          FETCH_TIMEOUT_SECS,
+          this.params.pageLoadTimeout,
           "Direct fetch capture attempt timed out",
           logDetails,
           "fetch",

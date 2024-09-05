@@ -670,8 +670,10 @@ export class Recorder {
 
     // if contentLength is large or unknown, do streaming, unless its an essential resource
     // in which case, need to do a full fetch either way
+    // don't count non-200 responses which may not have content-length
     if (
       (contentLen < 0 || contentLen > MAX_BROWSER_DEFAULT_FETCH_SIZE) &&
+      responseStatusCode === 200 &&
       !this.isEssentialResource(reqresp.resourceType, mimeType)
     ) {
       const opts: ResponseStreamAsyncFetchOptions = {
@@ -1030,7 +1032,7 @@ export class Recorder {
   }
 
   isEssentialResource(resourceType: string | undefined, contentType: string) {
-    if (["document", "stylesheet", "script"].includes(resourceType || "")) {
+    if (resourceType === "script" || resourceType === "stylesheet") {
       return true;
     }
 
