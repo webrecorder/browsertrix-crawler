@@ -33,7 +33,7 @@ afterAll(async () => {
 });
 
 function runCrawl(name) {
-  const crawler = exec(`docker run --rm -v $PWD/test-crawls:/crawls --network=crawl --hostname=${name} webrecorder/browsertrix-crawler crawl --url https://www.webrecorder.net/ --limit 4 --collection shared-${name} --crawlId testcrawl --redisStoreUrl redis://redis:6379`);
+  const crawler = exec(`docker run --rm -v $PWD/test-crawls:/crawls --network=crawl --hostname=${name} webrecorder/browsertrix-crawler crawl --url https://www.webrecorder.net/ --limit 4 --exclude community --collection shared-${name} --crawlId testcrawl --redisStoreUrl redis://redis:6379`);
 
   return new Promise((resolve) => {
     crawler.on("exit", (code) => {
@@ -74,7 +74,7 @@ test("finish crawls successfully", async () => {
   const res = await Promise.allSettled([crawler1, crawler2]);
   expect(res[0].value).toBe(0);
   expect(res[1].value).toBe(0);
-}, 270000);
+}, 180000);
 
 test("ensure correct number of pages", () => {
 
