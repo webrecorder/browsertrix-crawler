@@ -397,6 +397,8 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
+    opts.markPageUsed();
+
     const date = new Date(ts);
 
     const timestamp = date.toISOString().slice(0, 19).replace(/[T:-]/g, "");

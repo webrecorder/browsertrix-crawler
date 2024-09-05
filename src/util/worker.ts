@@ -2,7 +2,11 @@ import os from "os";
 
 import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
-import { DirectFetchRequest, Recorder } from "./recorder.js";
+import {
+  DirectFetchRequest,
+  DirectFetchResponse,
+  Recorder,
+} from "./recorder.js";
 import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
 import { PageState, WorkerId } from "./state.js";
@@ -21,10 +25,9 @@ export type WorkerOpts = {
   // eslint-disable-next-line @typescript-eslint/ban-types
   callbacks: Record<string, Function>;
   directFetchCapture:
-    | ((
-        request: DirectFetchRequest,
-      ) => Promise<{ fetched: boolean; mime: string; ts: Date }>)
+    | ((request: DirectFetchRequest) => Promise<DirectFetchResponse>)
     | null;
+  markPageUsed: () => void;
   frameIdToExecId: Map<string, number>;
   isAuthSet?: boolean;
 };
@@ -134,7 +137,6 @@ export class PageWorker {
   async initPage(url: string): Promise<WorkerOpts> {
     let reuse = !this.crashed && !!this.opts && !!this.page;
     if (!this.alwaysReuse) {
-      ++this.reuseCount;
       reuse = this.reuseCount <= MAX_REUSE && this.isSameOrigin(url);
     }
     if (reuse) {
@@ -183,6 +185,11 @@ export class PageWorker {
           callbacks: this.callbacks,
           directFetchCapture,
           frameIdToExecId: new Map<string, number>(),
+          markPageUsed: () => {
+            if (!this.alwaysReuse) {
+              this.reuseCount++;
+            }
+          },
         };
 
         if (this.recorder) {
