@@ -1,5 +1,5 @@
 import net from "net";
-import { Dispatcher, ProxyAgent, setGlobalDispatcher } from "undici";
+import { Agent, Dispatcher, ProxyAgent, setGlobalDispatcher } from "undici";
 
 import child_process from "child_process";
 
@@ -7,6 +7,7 @@ import { logger } from "./logger.js";
 
 import { socksDispatcher } from "fetch-socks";
 import type { SocksProxyType } from "socks/typings/common/constants.js";
+import { FETCH_HEADERS_TIMEOUT_SECS } from "./constants.js";
 
 const SSH_PROXY_LOCAL_PORT = 9722;
 
@@ -29,7 +30,7 @@ export async function initProxy(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   params: Record<string, any>,
   detached: boolean,
-) {
+): Promise<string | undefined> {
   let proxy = params.proxyServer;
 
   if (!proxy) {
@@ -38,24 +39,28 @@ export async function initProxy(
   if (proxy && proxy.startsWith("ssh://")) {
     proxy = await runSSHD(params, detached);
   }
-  if (proxy) {
-    const dispatcher = createDispatcher(proxy);
-    if (dispatcher) {
-      setGlobalDispatcher(dispatcher);
-      return proxy;
-    }
-  }
-  return "";
+
+  const agentOpts: Agent.Options = {
+    headersTimeout: FETCH_HEADERS_TIMEOUT_SECS * 1000,
+  };
+
+  // set global fetch() dispatcher (with proxy, if any)
+  const dispatcher = createDispatcher(proxy, agentOpts);
+  setGlobalDispatcher(dispatcher);
+  return proxy;
 }
 
-export function createDispatcher(proxyUrl: string): Dispatcher | undefined {
+export function createDispatcher(
+  proxyUrl: string,
+  opts: Agent.Options,
+): Dispatcher {
   if (proxyUrl.startsWith("http://") || proxyUrl.startsWith("https://")) {
     // HTTP PROXY does not support auth, as it's not supported in the browser
     // so must drop username/password for consistency
     const url = new URL(proxyUrl);
     url.username = "";
     url.password = "";
-    return new ProxyAgent({ uri: url.href });
+    return new ProxyAgent({ uri: url.href, ...opts });
   } else if (
     proxyUrl.startsWith("socks://") ||
     proxyUrl.startsWith("socks5://") ||
@@ -71,9 +76,9 @@ export function createDispatcher(proxyUrl: string): Dispatcher | undefined {
       userId: url.username || undefined,
       password: url.password || undefined,
     };
-    return socksDispatcher(params);
+    return socksDispatcher(params, { ...opts, connect: undefined });
   } else {
-    return undefined;
+    return new Agent(opts);
   }
 }
 

@@ -48,6 +48,8 @@ import {
   BEHAVIOR_LOG_FUNC,
   DEFAULT_SELECTORS,
   DISPLAY,
+  PAGE_OP_TIMEOUT_SECS,
+  SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRules } from "./util/blockrules.js";
@@ -80,10 +82,6 @@ const behaviors = fs.readFileSync(
   ),
   { encoding: "utf8" },
 );
-
-const FETCH_TIMEOUT_SECS = 30;
-const PAGE_OP_TIMEOUT_SECS = 5;
-const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
 
 const RUN_DETACHED = process.env.DETACHED_CHILD_PROC == "1";
 
@@ -265,12 +263,11 @@ export class Crawler {
     this.seeds = this.params.scopedSeeds as ScopedSeed[];
     this.numOriginalSeeds = this.seeds.length;
 
-    // sum of page load + behavior timeouts + 2 x fetch + cloudflare + link extraction timeouts + extra page delay
+    // sum of page load + behavior timeouts + 2 x pageop timeouts (for cloudflare, link extraction) + extra page delay
     // if exceeded, will interrupt and move on to next page (likely behaviors or some other operation is stuck)
     this.maxPageTime =
       this.params.pageLoadTimeout +
       this.params.behaviorTimeout +
-      FETCH_TIMEOUT_SECS * 2 +
       PAGE_OP_TIMEOUT_SECS * 2 +
       this.params.pageExtraDelay;
 
@@ -861,10 +858,6 @@ self.__bx_behaviors.selectMainBehavior();
         seedId,
         seedUrl: this.seeds[seedId].url,
       });
-      await page.setExtraHTTPHeaders({ Authorization: auth });
-      opts.isAuthSet = true;
-    } else if (opts.isAuthSet) {
-      await page.setExtraHTTPHeaders({});
     }
 
     const logDetails = { page: url, workerid };
@@ -873,14 +866,25 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (directFetchCapture) {
       try {
-        const { fetched, mime, ts } = await timedRun(
-          directFetchCapture({ url, headers: this.headers, cdp }),
-          this.params.pageLoadTimeout,
-          "Direct fetch capture attempt timed out",
+        const headers = auth
+          ? { Authorization: auth, ...this.headers }
+          : this.headers;
+
+        const result = await timedRun(
+          directFetchCapture({ url, headers, cdp }),
+          this.params.timeout,
+          "Direct fetch of page URL timed out",
           logDetails,
           "fetch",
-          true,
         );
+
+        // fetched timed out, already logged, don't retry in browser
+        if (!result) {
+          return;
+        }
+
+        const { fetched, mime, ts } = result;
+
         if (mime) {
           data.mime = mime;
           data.isHTMLPage = isHTMLMime(mime);
@@ -897,13 +901,31 @@ self.__bx_behaviors.selectMainBehavior();
           return;
         }
       } catch (e) {
-        // filtered out direct fetch
-        logger.debug(
-          "Direct fetch response not accepted, continuing with browser fetch",
-          logDetails,
-          "fetch",
-        );
+        if (e instanceof Error && e.message === "response-filtered-out") {
+          // filtered out direct fetch
+          logger.debug(
+            "Direct fetch response not accepted, continuing with browser fetch",
+            logDetails,
+            "fetch",
+          );
+        } else {
+          logger.error(
+            "Direct fetch of page URL failed",
+            { e, ...logDetails },
+            "fetch",
+          );
+          return;
+        }
       }
+    }
+
+    opts.markPageUsed();
+
+    if (auth) {
+      await page.setExtraHTTPHeaders({ Authorization: auth });
+      opts.isAuthSet = true;
+    } else if (opts.isAuthSet) {
+      await page.setExtraHTTPHeaders({});
     }
 
     // run custom driver here
@@ -1020,27 +1042,35 @@ self.__bx_behaviors.selectMainBehavior();
 
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails } = data;
+    const { loadState, logDetails, depth, url } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       logger.info("Page Finished", { loadState, ...logDetails }, "pageStatus");
 
-      await this.crawlState.markFinished(data.url);
+      await this.crawlState.markFinished(url);
 
       if (this.healthChecker) {
         this.healthChecker.resetErrors();
       }
+
+      await this.serializeConfig();
+
+      await this.checkLimits();
     } else {
-      await this.crawlState.markFailed(data.url);
+      await this.crawlState.markFailed(url);
 
       if (this.healthChecker) {
         this.healthChecker.incError();
       }
+
+      await this.serializeConfig();
+
+      if (depth === 0 && this.params.failOnFailedSeed) {
+        logger.fatal("Seed Page Load Failed, failing crawl", {}, "general", 1);
+      }
+
+      await this.checkLimits();
     }
-
-    await this.serializeConfig();
-
-    await this.checkLimits();
   }
 
   async teardownPage({ workerid }: WorkerOpts) {
@@ -1694,8 +1724,6 @@ self.__bx_behaviors.selectMainBehavior();
 
     const logDetails = data.logDetails;
 
-    const failCrawlOnError = depth === 0 && this.params.failOnFailedSeed;
-
     // Attempt to load the page:
     // - Already tried direct fetch w/o browser before getting here, and that resulted in an HTML page or non-200 response
     //   so now loading using the browser
@@ -1760,19 +1788,8 @@ self.__bx_behaviors.selectMainBehavior();
         );
         data.skipBehaviors = true;
       } else if (!downloadResponse) {
-        if (failCrawlOnError) {
-          // if fail on error, immediately fail here
-          logger.fatal(
-            "Page Load Timeout, failing crawl",
-            {
-              msg,
-              ...logDetails,
-            },
-            "general",
-            1,
-          );
-          // log if not already log and rethrow, consider page failed
-        } else if (msg !== "logged") {
+        // log if not already log and rethrow, consider page failed
+        if (msg !== "logged") {
           logger.error("Page Load Failed, skipping page", {
             msg,
             loadState: data.loadState,
@@ -1818,26 +1835,14 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (failed) {
-      if (failCrawlOnError) {
-        logger.fatal(
-          "Seed Page Load Error, failing crawl",
-          {
-            status,
-            ...logDetails,
-          },
-          "general",
-          1,
-        );
-      } else {
-        logger.error(
-          isChromeError ? "Page Crashed on Load" : "Page Invalid Status",
-          {
-            status,
-            ...logDetails,
-          },
-        );
-        throw new Error("logged");
-      }
+      logger.error(
+        isChromeError ? "Page Crashed on Load" : "Page Invalid Status",
+        {
+          status,
+          ...logDetails,
+        },
+      );
+      throw new Error("logged");
     }
 
     const contentType = resp.headers()["content-type"];

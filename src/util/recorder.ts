@@ -8,7 +8,7 @@ import {
   isRedirectStatus,
 } from "./reqresp.js";
 
-import { fetch, Response } from "undici";
+import { fetch, getGlobalDispatcher, Response } from "undici";
 
 // @ts-expect-error TODO fill in why error is expected
 import { getCustomRewriter } from "@webrecorder/wabac/src/rewrite/index.js";
@@ -1188,12 +1188,6 @@ export class Recorder {
     reqresp.requestHeaders = headers;
     reqresp.ts = ts;
 
-    logger.debug(
-      "Directly fetching page URL without browser",
-      { url, ...this.logDetails },
-      "recorder",
-    );
-
     let mime: string = "";
 
     const filter = (resp: Response) => {
@@ -1207,7 +1201,17 @@ export class Recorder {
         mime = ct.split(";")[0];
       }
 
-      return !isHTMLMime(mime);
+      const result = !isHTMLMime(mime);
+
+      if (result) {
+        logger.info(
+          "Directly fetching page URL without browser",
+          { url, ...this.logDetails },
+          "fetch",
+        );
+      }
+
+      return result;
     };
 
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
@@ -1389,7 +1393,7 @@ class AsyncFetcher {
           externalBuffer.buffers = [reqresp.payload];
         } else if (fh) {
           logger.warn(
-            "Large streamed written to WARC, but not returned to browser, requires reading into memory",
+            "Large payload written to WARC, but not returned to browser (would require rereading into memory)",
             { url, actualSize: reqresp.readSize, maxSize: this.maxFetchSize },
             "recorder",
           );
@@ -1449,12 +1453,22 @@ class AsyncFetcher {
       signal = abort.signal;
     }
 
+    const dispatcher = getGlobalDispatcher().compose((dispatch) => {
+      return (opts, handler) => {
+        if (opts.headers) {
+          reqresp.requestHeaders = opts.headers as Record<string, string>;
+        }
+        return dispatch(opts, handler);
+      };
+    });
+
     const resp = await fetch(url!, {
       method,
       headers,
       body: reqresp.postData || undefined,
       signal,
       redirect: this.manualRedirect ? "manual" : "follow",
+      dispatcher,
     });
 
     if (this.filter && !this.filter(resp) && abort) {

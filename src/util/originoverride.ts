@@ -2,6 +2,8 @@ import { HTTPRequest, Page } from "puppeteer-core";
 import { formatErr, logger } from "./logger.js";
 import { Browser } from "./browser.js";
 
+import { fetch } from "undici";
+
 export class OriginOverride {
   originOverride: { origUrl: URL; destUrl: URL }[];
 
