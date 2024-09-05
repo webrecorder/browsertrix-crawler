@@ -48,22 +48,27 @@ function initArgs() {
       user: {
         describe:
           "The username for the login. If not specified, will be prompted",
+        type: "string",
       },
 
       password: {
         describe:
           "The password for the login. If not specified, will be prompted (recommended)",
+        type: "string",
       },
 
       filename: {
         describe:
           "The filename for the profile tarball, stored within /crawls/profiles if absolute path not provided",
+        type: "string",
         default: "/crawls/profiles/profile.tar.gz",
       },
 
       debugScreenshot: {
         describe:
           "If specified, take a screenshot after login and save as this filename",
+        type: "boolean",
+        default: false,
       },
 
       headless: {
@@ -99,15 +104,15 @@ function initArgs() {
       },
 
       windowSize: {
-        type: "string",
         describe: "Browser window dimensions, specified as: width,height",
+        type: "string",
         default: getDefaultWindowSize(),
       },
 
       cookieDays: {
-        type: "number",
         describe:
           "If >0, set all cookies, including session cookies, to have this duration in days before saving profile",
+        type: "number",
         default: 7,
       },
 
