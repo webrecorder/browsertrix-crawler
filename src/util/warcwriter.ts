@@ -155,6 +155,10 @@ export class WARCWriter implements IndexerOffsetLength {
 
     this._writeCDX(responseRecord);
 
+    if (requestRecord.httpHeaders?.method !== "GET") {
+      await requestRecord.readFully(false);
+    }
+
     const requestSerializer = new WARCSerializer(requestRecord, opts);
     this.recordLength = await this._writeRecord(
       requestRecord,
@@ -162,6 +166,10 @@ export class WARCWriter implements IndexerOffsetLength {
     );
 
     this._writeCDX(requestRecord);
+
+    if (this.offset >= this.rolloverSize) {
+      this.fh = await this.initFH();
+    }
   }
 
   private addToQueue(
@@ -197,6 +205,10 @@ export class WARCWriter implements IndexerOffsetLength {
     this.recordLength = await this._writeRecord(record, requestSerializer);
 
     this._writeCDX(record);
+
+    if (this.offset >= this.rolloverSize) {
+      this.fh = await this.initFH();
+    }
   }
 
   writeNewResourceRecord(
@@ -257,7 +269,7 @@ export class WARCWriter implements IndexerOffsetLength {
     let total = 0;
     const url = record.warcTargetURI;
 
-    if (!this.fh || this.offset >= this.rolloverSize) {
+    if (!this.fh) {
       this.fh = await this.initFH();
     }
 
