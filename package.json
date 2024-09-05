@@ -65,6 +65,7 @@
     "testTimeout": 90000
   },
   "resolutions": {
-    "wrap-ansi": "7.0.0"
+    "wrap-ansi": "7.0.0",
+    "warcio": "^2.3.1"
   }
 }
