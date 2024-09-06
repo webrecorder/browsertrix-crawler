@@ -229,7 +229,7 @@ export class SitemapReader extends EventEmitter {
 
     const { body } = resp;
     if (!body) {
-      this.closeSitemap(url);
+      void this.closeSitemap(url);
       throw new Error("missing response body");
     }
     // decompress .gz sitemaps
@@ -251,7 +251,7 @@ export class SitemapReader extends EventEmitter {
 
     readableNodeStream.on("error", (e: Error) => {
       logger.warn("Error parsing sitemap", formatErr(e), "sitemap");
-      this.closeSitemap(url);
+      void this.closeSitemap(url);
     });
 
     this.initSaxParser(url, readableNodeStream);
@@ -449,7 +449,7 @@ export class SitemapReader extends EventEmitter {
       return;
     }
 
-    this.queue.add(async () => {
+    void this.queue.add(async () => {
       try {
         await this.parseSitemap(url);
       } catch (e) {

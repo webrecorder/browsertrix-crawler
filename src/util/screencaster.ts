@@ -77,7 +77,9 @@ class WSTransport {
     );
 
     if (this.allWS.size === 1) {
-      this.caster.startCastAll();
+      this.caster
+        .startCastAll()
+        .catch((e) => logger.warn("error starting cast", e, "screencast"));
     }
 
     ws.on("close", () => {
@@ -85,7 +87,9 @@ class WSTransport {
       this.allWS.delete(ws);
 
       if (this.allWS.size === 0) {
-        this.caster.stopCastAll();
+        this.caster
+          .stopCastAll()
+          .catch((e) => logger.warn("error stopping cast", e, "screencast"));
       }
     });
   }
@@ -119,7 +123,7 @@ class RedisPubSubTransport {
     this.castChannel = `c:${crawlId}:cast`;
     this.ctrlChannel = `c:${crawlId}:ctrl`;
 
-    this.init(redisUrl);
+    void this.init(redisUrl);
   }
 
   async init(redisUrl: string) {
@@ -138,7 +142,7 @@ class RedisPubSubTransport {
         case "connect":
           this.numConnections++;
           if (this.numConnections === 1) {
-            this.caster.startCastAll();
+            await this.caster.startCastAll();
           } else {
             for (const packet of this.caster.iterCachedData()) {
               await this.sendAll(packet);
@@ -149,7 +153,7 @@ class RedisPubSubTransport {
         case "disconnect":
           this.numConnections--;
           if (this.numConnections === 0) {
-            this.caster.stopCastAll();
+            await this.caster.stopCastAll();
           }
           break;
       }
@@ -227,7 +231,7 @@ class ScreenCaster {
         this.caches.set(id, data);
         this.urls.set(id, url);
 
-        await this.transport.sendAll({ msg, id, data, url });
+        this.transport.sendAll({ msg, id, data, url });
       }
 
       try {
@@ -237,7 +241,7 @@ class ScreenCaster {
       }
     });
 
-    if (await this.transport.isActive()) {
+    if (this.transport.isActive()) {
       await this.startCast(cdp, id);
     }
   }
@@ -263,7 +267,7 @@ class ScreenCaster {
     }
 
     if (sendClose) {
-      await this.transport.sendAll({ msg: "close", id });
+      this.transport.sendAll({ msg: "close", id });
     }
 
     this.cdps.delete(id);

@@ -429,7 +429,9 @@ return inx;
             // can happen async w/o slowing down crawling
             // each page is still checked if in scope before crawling, even while
             // queue is being filtered
-            this.filterQueue(regex);
+            this.filterQueue(regex).catch((e) =>
+              logger.warn("filtering queue error", e, "exclusion"),
+            );
             break;
 
           case "removeExclusion":

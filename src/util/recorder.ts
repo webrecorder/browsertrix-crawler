@@ -177,8 +177,8 @@ export class Recorder {
     this.frameIdToExecId = frameIdToExecId;
 
     // Fetch
-    cdp.on("Fetch.requestPaused", async (params) => {
-      this.handleRequestPaused(params, cdp);
+    cdp.on("Fetch.requestPaused", (params) => {
+      void this.handleRequestPaused(params, cdp);
     });
 
     await cdp.send("Fetch.enable", {
@@ -398,7 +398,9 @@ export class Recorder {
       return;
     }
 
-    this.serializeToWARC(reqresp);
+    this.serializeToWARC(reqresp).catch((e) =>
+      logger.warn("Error Serializing to WARC", e, "recorder"),
+    );
   }
 
   handleLoadingFailed(params: Protocol.Network.LoadingFailedEvent) {
@@ -449,7 +451,7 @@ export class Recorder {
             recorder: this,
             networkId: requestId,
           });
-          this.fetcherQ.add(() => fetcher.load());
+          void this.fetcherQ.add(() => fetcher.load());
           return;
         }
         break;
@@ -491,7 +493,9 @@ export class Recorder {
       return;
     }
 
-    this.serializeToWARC(reqresp);
+    this.serializeToWARC(reqresp).catch((e) =>
+      logger.warn("Error Serializing to WARC", e, "recorder"),
+    );
   }
 
   async handleRequestPaused(
@@ -780,7 +784,7 @@ export class Recorder {
     } else {
       fetcher = new NetworkLoadStreamAsyncFetcher(opts);
     }
-    this.fetcherQ.add(() => fetcher.load());
+    void this.fetcherQ.add(() => fetcher.load());
   }
 
   startPage({ pageid, url }: { pageid: string; url: string }) {

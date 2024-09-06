@@ -177,7 +177,7 @@ export class WARCWriter implements IndexerOffsetLength {
     details: LogDetails | null = null,
     logContext: LogContext = "writer",
   ) {
-    this.warcQ.add(async () => {
+    void this.warcQ.add(async () => {
       try {
         await func();
         if (details) {
@@ -346,7 +346,7 @@ export async function createWARCInfo(filename: string) {
   const warcVersion = "WARC/1.1";
   const type = "warcinfo";
 
-  const record = await WARCRecord.createWARCInfo(
+  const record = WARCRecord.createWARCInfo(
     { filename, type, warcVersion },
     warcInfo,
   );

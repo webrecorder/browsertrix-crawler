@@ -104,7 +104,7 @@ export class BlockRules {
         );
       }
     };
-    await browser.interceptRequest(page, onRequest);
+    browser.interceptRequest(page, onRequest);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
