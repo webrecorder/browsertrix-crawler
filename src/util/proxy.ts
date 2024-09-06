@@ -210,7 +210,9 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
       },
       "proxy",
     );
-    runSSHD(params, detached);
+    runSSHD(params, detached).catch((e) =>
+      logger.error("proxy retry error", e, "proxy"),
+    );
   });
 
   return proxyString;

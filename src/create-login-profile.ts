@@ -437,7 +437,7 @@ class InteractiveBrowser {
 
     // attempt to keep everything to initial tab if headless
     if (this.params.headless) {
-      cdp.send("Page.enable");
+      cdp.send("Page.enable").catch((e) => logger.warn("Page.enable error", e));
 
       cdp.on("Page.windowOpen", async (resp) => {
         if (!resp.url) {
@@ -493,7 +493,9 @@ class InteractiveBrowser {
 
   handlePageLoad() {
     this.addOrigin();
-    this.saveCookiesFor(this.page.url());
+    this.saveCookiesFor(this.page.url()).catch((e) =>
+      logger.warn("Error saving cookies", e),
+    );
   }
 
   async saveAllCookies() {
@@ -722,4 +724,4 @@ class InteractiveBrowser {
   }
 }
 
-main();
+await main();

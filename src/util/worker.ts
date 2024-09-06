@@ -377,7 +377,7 @@ export class PageWorker {
       } else {
         // indicate that the worker has no more work (mostly for screencasting, status, etc...)
         // depending on other works, will either get more work or crawl will end
-        this.crawler.workerIdle(this.id);
+        await this.crawler.workerIdle(this.id);
 
         // check if any pending urls
         const pending = await crawlState.numPending();

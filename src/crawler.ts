@@ -193,7 +193,7 @@ export class Crawler {
     data: PageState;
     // eslint-disable-next-line no-use-before-define
     crawler: Crawler;
-  }) => NonNullable<unknown>;
+  }) => Promise<void>;
 
   recording: boolean;
 
@@ -770,7 +770,7 @@ self.__bx_behaviors.selectMainBehavior();
   ) {
     await cdp.send("Runtime.enable");
 
-    await cdp.on(
+    cdp.on(
       "Runtime.executionContextCreated",
       (params: Protocol.Runtime.ExecutionContextCreatedEvent) => {
         const { id, auxData } = params.context;
@@ -780,7 +780,7 @@ self.__bx_behaviors.selectMainBehavior();
       },
     );
 
-    await cdp.on(
+    cdp.on(
       "Runtime.executionContextDestroyed",
       (params: Protocol.Runtime.ExecutionContextDestroyedEvent) => {
         const { executionContextId } = params;
@@ -793,7 +793,7 @@ self.__bx_behaviors.selectMainBehavior();
       },
     );
 
-    await cdp.on("Runtime.executionContextsCleared", () => {
+    cdp.on("Runtime.executionContextsCleared", () => {
       frameIdToExecId.clear();
     });
   }
@@ -1877,7 +1877,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     // HTML Pages Only here
-    const frames = await page.frames();
+    const frames = page.frames();
 
     const filteredFrames = await Promise.allSettled(
       frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)),
@@ -2190,7 +2190,7 @@ self.__bx_behaviors.selectMainBehavior();
         } else {
           logger.debug("Text Extraction: None");
         }
-        await fh.write(JSON.stringify(header) + "\n");
+        fh.write(JSON.stringify(header) + "\n");
       }
     } catch (err) {
       logger.error(`"${filename}" creation failed`, err);
@@ -2271,7 +2271,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     try {
-      await pagesFH.write(processedRow);
+      pagesFH.write(processedRow);
     } catch (err) {
       logger.warn(
         "Page append failed",
@@ -2336,7 +2336,9 @@ self.__bx_behaviors.selectMainBehavior();
             { urlsFound: sitemapper.count, limitHit: sitemapper.atLimit() },
             "sitemap",
           );
-          this.crawlState.markSitemapDone();
+          this.crawlState
+            .markSitemapDone()
+            .catch((e) => logger.warn("Error marking sitemap done", e));
           finished = true;
         }
       });
@@ -2354,7 +2356,9 @@ self.__bx_behaviors.selectMainBehavior();
             "sitemap",
           );
         }
-        this.queueInScopeUrls(seedId, [url], 0, 0, true);
+        this.queueInScopeUrls(seedId, [url], 0, 0, true).catch((e) =>
+          logger.warn("Error queuing urls", e, "links"),
+        );
         if (count >= 100 && !resolved) {
           logger.info(
             "Sitemap partially parsed, continue parsing large sitemap in the background",
@@ -2458,7 +2462,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (fh) {
-      await fh.end();
+      fh.end();
     }
 
     logger.debug(`Combined WARCs saved as: ${generatedCombinedWarcs}`);

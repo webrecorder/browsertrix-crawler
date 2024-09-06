@@ -15,6 +15,8 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 12,
     sourceType: "module",
+    project: ["./tsconfig.eslint.json"],
+    tsconfigRootDir: __dirname,
   },
   rules: {
     "no-constant-condition": ["error", { checkLoops: false }],
@@ -27,6 +29,8 @@ module.exports = {
         allowNamedExports: true,
       },
     ],
+    "@typescript-eslint/no-floating-promises": "error",
+    "@typescript-eslint/await-thenable": "error"
   },
   reportUnusedDisableDirectives: true,
 };

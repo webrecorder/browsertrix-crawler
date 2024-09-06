@@ -153,7 +153,7 @@ class Logger {
       this.crawlState &&
       toLogToRedis.includes(logLevel)
     ) {
-      this.crawlState.logError(string);
+      this.crawlState.logError(string).catch(() => {});
     }
   }
 
@@ -185,7 +185,10 @@ class Logger {
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
 
     if (this.crawlState) {
-      this.crawlState.setStatus("failed").finally(process.exit(exitCode));
+      this.crawlState
+        .setStatus("failed")
+        .catch(() => {})
+        .finally(process.exit(exitCode));
     } else {
       process.exit(exitCode);
     }

@@ -330,10 +330,10 @@ export class ReplayCrawler extends Crawler {
           page.frames().length > 1
         ) {
           const frame = page.frames()[1];
-          const timeoutid = setTimeout(() => {
+          const timeoutid = setTimeout(async () => {
             logger.warn("Reloading RWP Frame, not inited", { url }, "replay");
             try {
-              frame.evaluate("window.location.reload();");
+              await frame.evaluate("window.location.reload();");
             } catch (e) {
               logger.error("RWP Reload failed", e, "replay");
             }
