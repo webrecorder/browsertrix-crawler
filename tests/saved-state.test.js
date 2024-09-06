@@ -53,7 +53,7 @@ test("check crawl interrupted + saved state written", async () => {
 
   try {
     containerId = execSync(
-      "docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://www.webrecorder.net/ --limit 10 --behaviors \"\"",
+      "docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://www.webrecorder.net/ --limit 10 --behaviors \"\" --exclude community",
       { encoding: "utf-8" },
       //wait.callback,
     );
@@ -129,7 +129,7 @@ test("check crawl restarted with saved state", async () => {
 
   try {
     containerId = execSync(
-      `docker run -d -p ${port}:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 10 --behaviors ""`,
+      `docker run -d -p ${port}:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 10 --behaviors "" --exclude community`,
       { encoding: "utf-8" },
     );
   } catch (error) {

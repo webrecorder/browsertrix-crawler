@@ -6,7 +6,7 @@ const exec = util.promisify(execCallback);
 
 test("ensure page limit reached", async () => {
   execSync(
-    'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --scopeType prefix --behaviors "" --url https://webrecorder.net/ --limit 12 --workers 2 --collection limit-test --statsFilename stats.json',
+    'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --scopeType prefix --behaviors "" --url https://webrecorder.net/ --limit 12 --workers 2 --collection limit-test --statsFilename stats.json --exclude community',
   );
 });
 
