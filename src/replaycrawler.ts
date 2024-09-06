@@ -110,8 +110,8 @@ export class ReplayCrawler extends Crawler {
 
     this.infoWriter = null;
 
-    this.includeRx = parseRx(this.params.include);
-    this.excludeRx = parseRx(this.params.include);
+    this.includeRx = parseRx(this.params.scopeIncludeRx);
+    this.excludeRx = parseRx(this.params.scopeExcludeRx);
   }
 
   async bootstrap(): Promise<void> {

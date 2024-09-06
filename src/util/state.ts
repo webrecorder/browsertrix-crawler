@@ -149,7 +149,7 @@ declare module "ioredis" {
 }
 
 // ============================================================================
-type SaveState = {
+export type SaveState = {
   done?: number | string[];
   finished: string[];
   queued: string[];

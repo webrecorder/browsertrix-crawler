@@ -12,7 +12,7 @@ import {
   WorkerId,
 } from "./util/state.js";
 
-import { parseArgs } from "./util/argParser.js";
+import { CrawlerArgs, parseArgs } from "./util/argParser.js";
 
 import yaml from "js-yaml";
 
@@ -52,7 +52,7 @@ import {
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
 } from "./util/constants.js";
 
-import { AdBlockRules, BlockRules } from "./util/blockrules.js";
+import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
 import { OriginOverride } from "./util/originoverride.js";
 
 import {
@@ -107,8 +107,7 @@ type PageEntry = {
 
 // ============================================================================
 export class Crawler {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  params: any;
+  params: CrawlerArgs;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   origConfig: any;
 
@@ -200,8 +199,8 @@ export class Crawler {
 
   constructor() {
     const args = this.parseArgs();
-    this.params = args.parsed;
-    this.origConfig = args.origConfig;
+    this.params = args as CrawlerArgs;
+    this.origConfig = this.params.origConfig;
 
     // root collections dir
     this.collDir = path.join(
@@ -872,7 +871,7 @@ self.__bx_behaviors.selectMainBehavior();
 
         const result = await timedRun(
           directFetchCapture({ url, headers, cdp }),
-          this.params.timeout,
+          this.params.pageLoadTimeout,
           "Direct fetch of page URL timed out",
           logDetails,
           "fetch",
@@ -1396,7 +1395,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.blockRules && this.params.blockRules.length) {
       this.blockRules = new BlockRules(
-        this.params.blockRules,
+        this.params.blockRules as BlockRuleDecl[],
         this.captureBasePrefix,
         this.params.blockMessage,
       );
@@ -1405,7 +1404,9 @@ self.__bx_behaviors.selectMainBehavior();
     this.screencaster = this.initScreenCaster();
 
     if (this.params.originOverride && this.params.originOverride.length) {
-      this.originOverride = new OriginOverride(this.params.originOverride);
+      this.originOverride = new OriginOverride(
+        this.params.originOverride as string[],
+      );
     }
 
     await this._addInitialSeeds();
@@ -2183,7 +2184,7 @@ self.__bx_behaviors.selectMainBehavior();
           id: "pages",
           title,
         };
-        header.hasText = this.params.text.includes("to-pages");
+        header.hasText = this.params.text.includes("to-pages") + "";
         if (this.params.text.length) {
           logger.debug("Text Extraction: " + this.params.text.join(","));
         } else {
@@ -2290,8 +2291,12 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    const fromDate = this.params.sitemapFromDate;
-    const toDate = this.params.sitemapToDate;
+    const fromDate = this.params.sitemapFromDate
+      ? new Date(this.params.sitemapFromDate)
+      : undefined;
+    const toDate = this.params.sitemapToDate
+      ? new Date(this.params.sitemapToDate)
+      : undefined;
     const headers = this.headers;
 
     logger.info(

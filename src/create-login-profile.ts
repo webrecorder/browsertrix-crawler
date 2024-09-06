@@ -7,7 +7,7 @@ import http, { IncomingMessage, ServerResponse } from "http";
 import readline from "readline";
 import child_process from "child_process";
 
-import yargs, { Options } from "yargs";
+import yargs from "yargs";
 
 import { logger } from "./util/logger.js";
 
@@ -35,96 +35,106 @@ const behaviors = fs.readFileSync(
   { encoding: "utf8" },
 );
 
-function cliOpts(): { [key: string]: Options } {
-  return {
-    url: {
-      describe: "The URL of the login page",
-      type: "string",
-      demandOption: true,
-    },
+function initArgs() {
+  return yargs(process.argv)
+    .usage("browsertrix-crawler profile [options]")
+    .options({
+      url: {
+        describe: "The URL of the login page",
+        type: "string",
+        demandOption: true,
+      },
 
-    user: {
-      describe:
-        "The username for the login. If not specified, will be prompted",
-    },
+      user: {
+        describe:
+          "The username for the login. If not specified, will be prompted",
+        type: "string",
+      },
 
-    password: {
-      describe:
-        "The password for the login. If not specified, will be prompted (recommended)",
-    },
+      password: {
+        describe:
+          "The password for the login. If not specified, will be prompted (recommended)",
+        type: "string",
+      },
 
-    filename: {
-      describe:
-        "The filename for the profile tarball, stored within /crawls/profiles if absolute path not provided",
-      default: "/crawls/profiles/profile.tar.gz",
-    },
+      filename: {
+        describe:
+          "The filename for the profile tarball, stored within /crawls/profiles if absolute path not provided",
+        type: "string",
+        default: "/crawls/profiles/profile.tar.gz",
+      },
 
-    debugScreenshot: {
-      describe:
-        "If specified, take a screenshot after login and save as this filename",
-    },
+      debugScreenshot: {
+        describe:
+          "If specified, take a screenshot after login and save as this filename",
+        type: "boolean",
+        default: false,
+      },
 
-    headless: {
-      describe: "Run in headless mode, otherwise start xvfb",
-      type: "boolean",
-      default: false,
-    },
+      headless: {
+        describe: "Run in headless mode, otherwise start xvfb",
+        type: "boolean",
+        default: false,
+      },
 
-    automated: {
-      describe: "Start in automated mode, no interactive browser",
-      type: "boolean",
-      default: false,
-    },
+      automated: {
+        describe: "Start in automated mode, no interactive browser",
+        type: "boolean",
+        default: false,
+      },
 
-    interactive: {
-      describe: "Deprecated. Now the default option!",
-      type: "boolean",
-      default: false,
-    },
+      interactive: {
+        describe: "Deprecated. Now the default option!",
+        type: "boolean",
+        default: false,
+      },
 
-    shutdownWait: {
-      describe:
-        "Shutdown browser in interactive after this many seconds, if no pings received",
-      type: "number",
-      default: 0,
-    },
+      shutdownWait: {
+        describe:
+          "Shutdown browser in interactive after this many seconds, if no pings received",
+        type: "number",
+        default: 0,
+      },
 
-    profile: {
-      describe:
-        "Path or HTTP(S) URL to tar.gz file which contains the browser profile directory",
-      type: "string",
-    },
+      profile: {
+        describe:
+          "Path or HTTP(S) URL to tar.gz file which contains the browser profile directory",
+        type: "string",
+        default: "",
+      },
 
-    windowSize: {
-      type: "string",
-      describe: "Browser window dimensions, specified as: width,height",
-      default: getDefaultWindowSize(),
-    },
+      windowSize: {
+        describe: "Browser window dimensions, specified as: width,height",
+        type: "string",
+        default: getDefaultWindowSize(),
+      },
 
-    cookieDays: {
-      type: "number",
-      describe:
-        "If >0, set all cookies, including session cookies, to have this duration in days before saving profile",
-      default: 7,
-    },
+      cookieDays: {
+        describe:
+          "If >0, set all cookies, including session cookies, to have this duration in days before saving profile",
+        type: "number",
+        default: 7,
+      },
 
-    proxyServer: {
-      describe:
-        "if set, will use specified proxy server. Takes precedence over any env var proxy settings",
-      type: "string",
-    },
+      proxyServer: {
+        describe:
+          "if set, will use specified proxy server. Takes precedence over any env var proxy settings",
+        type: "string",
+      },
 
-    sshProxyPrivateKeyFile: {
-      describe: "path to SSH private key for SOCKS5 over SSH proxy connection",
-      type: "string",
-    },
+      sshProxyPrivateKeyFile: {
+        describe:
+          "path to SSH private key for SOCKS5 over SSH proxy connection",
+        type: "string",
+      },
 
-    sshProxyKnownHostsFile: {
-      describe:
-        "path to SSH known hosts file for SOCKS5 over SSH proxy connection",
-      type: "string",
-    },
-  };
+      sshProxyKnownHostsFile: {
+        describe:
+          "path to SSH known hosts file for SOCKS5 over SSH proxy connection",
+        type: "string",
+      },
+    })
+    .parseSync();
 }
 
 function getDefaultWindowSize() {
@@ -140,10 +150,7 @@ function handleTerminate(signame: string) {
 }
 
 async function main() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const params: any = yargs(process.argv)
-    .usage("browsertrix-crawler profile [options]")
-    .option(cliOpts()).argv;
+  const params = initArgs();
 
   logger.setDebugLogging(true);
 

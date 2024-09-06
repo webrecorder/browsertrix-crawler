@@ -43,9 +43,9 @@ Options:
                                                                            tom"]
       --scopeIncludeRx, --include           Regex of page URLs that should be in
                                             cluded in the crawl (defaults to the
-                                             immediate directory of URL)
+                                             immediate directory of URL)[string]
       --scopeExcludeRx, --exclude           Regex of page URLs that should be ex
-                                            cluded from the crawl.
+                                            cluded from the crawl.      [string]
       --allowHashUrls                       Allow Hashtag URLs, useful for singl
                                             e-page-application crawling or when
                                             different hashtags load dynamic cont
@@ -56,14 +56,14 @@ Options:
                                             an iframe      [array] [default: []]
       --blockMessage                        If specified, when a URL is blocked,
                                              a record with this error message is
-                                             added instead              [string]
+                                             added instead[string] [default: ""]
       --blockAds, --blockads                If set, block advertisements from be
                                             ing loaded (based on Stephen Black's
                                              blocklist)
                                                       [boolean] [default: false]
       --adBlockMessage                      If specified, when an ad is blocked,
                                              a record with this error message is
-                                             added instead              [string]
+                                             added instead[string] [default: ""]
   -c, --collection                          Collection name to crawl to (replay
                                             will be accessible under this name i
                                             n pywb preview)
@@ -79,7 +79,7 @@ Options:
       ineWarc                                         [boolean] [default: false]
       --rolloverSize                        If set, declare the rollover size
                                                   [number] [default: 1000000000]
-      --generateWACZ, --generatewacz, --ge  If set, generate wacz
+      --generateWACZ, --generatewacz, --ge  If set, generate WACZ on disk
       nerateWacz                                      [boolean] [default: false]
       --logging                             Logging options for crawler, can inc
                                             lude: stats (enabled by default), js
@@ -94,15 +94,15 @@ Options:
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "jsError", "fetch", "pageStatus", "memoryStatus", "crawlStatus", "l
-                              inks", "sitemap", "replay", "proxy"] [default: []]
+                      inks", "sitemap", "wacz", "replay", "proxy"] [default: []]
       --logExcludeContext                   Comma-separated list of contexts to
                                             NOT include in logs
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "jsError", "fetch", "pageStatus", "memoryStatus", "crawlStatus", "l
-  inks", "sitemap", "replay", "proxy"] [default: ["recorderNetwork","jsError","s
-                                                                    creencast"]]
+  inks", "sitemap", "wacz", "replay", "proxy"] [default: ["recorderNetwork","jsE
+                                                            rror","screencast"]]
       --text                                Extract initial (default) or final t
                                             ext to pages.jsonl or WARC resource
                                             record(s)
@@ -127,15 +127,15 @@ Options:
                                              those greater than or equal to (>=)
                                              provided ISO Date string (YYYY-MM-D
                                             D or YYYY-MM-DDTHH:MM:SS or partial
-                                            date)
+                                            date)                       [string]
       --sitemapToDate, --sitemapTo          If set, filter URLs from sitemaps to
                                              those less than or equal to (<=) pr
                                             ovided ISO Date string (YYYY-MM-DD o
                                             r YYYY-MM-DDTHH:MM:SS or partial dat
-                                            e)
+                                            e)                          [string]
       --statsFilename                       If set, output stats as JSON to this
                                              file. (Relative filename resolves t
-                                            o crawl working directory)
+                                            o crawl working directory)  [string]
       --behaviors                           Which background behaviors to enable
                                              on each page
   [array] [choices: "autoplay", "autofetch", "autoscroll", "siteSpecific"] [defa
@@ -304,7 +304,7 @@ Options:
   --shutdownWait            Shutdown browser in interactive after this many seco
                             nds, if no pings received      [number] [default: 0]
   --profile                 Path or HTTP(S) URL to tar.gz file which contains th
-                            e browser profile directory                 [string]
+                            e browser profile directory   [string] [default: ""]
   --windowSize              Browser window dimensions, specified as: width,heigh
                             t                    [string] [default: "1360,1020"]
   --cookieDays              If >0, set all cookies, including session cookies, t
