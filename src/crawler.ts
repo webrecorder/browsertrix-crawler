@@ -871,7 +871,7 @@ self.__bx_behaviors.selectMainBehavior();
 
         const result = await timedRun(
           directFetchCapture({ url, headers, cdp }),
-          this.params.timeout,
+          this.params.pageLoadTimeout,
           "Direct fetch of page URL timed out",
           logDetails,
           "fetch",
