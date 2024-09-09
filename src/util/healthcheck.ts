@@ -8,9 +8,15 @@ export class HealthChecker {
   errorThreshold: number;
   healthServer: http.Server;
 
+  updater: (() => Promise<void>) | null;
+
   errorCount = 0;
 
-  constructor(port: number, errorThreshold: number) {
+  constructor(
+    port: number,
+    errorThreshold: number,
+    updater: (() => Promise<void>) | null = null,
+  ) {
     this.port = port;
     this.errorThreshold = errorThreshold;
 
@@ -19,6 +25,8 @@ export class HealthChecker {
     );
     logger.info(`Healthcheck server started on ${port}`, {}, "healthcheck");
     this.healthServer.listen(port);
+
+    this.updater = updater;
   }
 
   async healthCheck(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -33,6 +41,11 @@ export class HealthChecker {
           );
           res.writeHead(200);
           res.end();
+        }
+        if (this.updater) {
+          this.updater().catch((e) =>
+            logger.warn("Healthcheck Updater failed", e, "healthcheck"),
+          );
         }
         return;
     }

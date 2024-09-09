@@ -1206,12 +1206,22 @@ self.__bx_behaviors.selectMainBehavior();
     return res ? frame : null;
   }
 
+  async updateCurrSize(): Promise<number> {
+    if (this.params.dryRun) {
+      return 0;
+    }
+
+    const size = await getDirSize(this.archivesDir);
+
+    await this.crawlState.setArchiveSize(size);
+
+    return size;
+  }
+
   async checkLimits() {
     let interrupt = false;
 
-    const size = this.params.dryRun ? 0 : await getDirSize(this.archivesDir);
-
-    await this.crawlState.setArchiveSize(size);
+    const size = await this.updateCurrSize();
 
     if (this.params.sizeLimit) {
       if (size >= this.params.sizeLimit) {
@@ -1323,6 +1333,9 @@ self.__bx_behaviors.selectMainBehavior();
       this.healthChecker = new HealthChecker(
         this.params.healthCheckPort,
         this.params.workers,
+        async () => {
+          await this.updateCurrSize();
+        },
       );
     }
 
