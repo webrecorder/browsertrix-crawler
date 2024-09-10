@@ -1393,6 +1393,8 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
+    await this.checkLimits();
+
     await this.crawlState.setStatus("running");
 
     this.pagesFH = await this.initPages(this.seedPagesFile, "Seed Pages");
