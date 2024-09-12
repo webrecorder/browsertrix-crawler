@@ -170,6 +170,7 @@ export class Crawler {
   skipTextDocs = 0;
 
   interrupted = false;
+  browserCrashed = false;
   finalExit = false;
   uploadAndDeleteLocal = false;
   done = false;
@@ -582,7 +583,7 @@ export class Crawler {
           logger.info("Crawl gracefully stopped on request");
         } else if (this.interrupted) {
           status = "interrupted";
-          exitCode = 11;
+          exitCode = this.browserCrashed ? 10 : 11;
         }
       }
     } catch (e) {
@@ -1444,6 +1445,7 @@ self.__bx_behaviors.selectMainBehavior();
           err,
           "browser",
         );
+        this.browserCrashed = true;
       },
 
       recording: this.recording,
