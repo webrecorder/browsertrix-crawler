@@ -1449,14 +1449,6 @@ class AsyncFetcher {
 
     const headers = reqresp.getRequestHeadersDict();
 
-    let signal = null;
-    let abort = null;
-
-    if (this.filter) {
-      abort = new AbortController();
-      signal = abort.signal;
-    }
-
     const dispatcher = getGlobalDispatcher().compose((dispatch) => {
       return (opts, handler) => {
         if (opts.headers) {
@@ -1470,13 +1462,18 @@ class AsyncFetcher {
       method,
       headers,
       body: reqresp.postData || undefined,
-      signal,
       redirect: this.manualRedirect ? "manual" : "follow",
       dispatcher,
     });
 
-    if (this.filter && !this.filter(resp) && abort) {
-      abort.abort();
+    if (this.filter && !this.filter(resp)) {
+      // if redirect and cancelled, read whole buffer to avoid possible node error event
+      if (resp.status >= 300 && resp.status < 400) {
+        await resp.arrayBuffer();
+      } else {
+        // otherwise, just cancel
+        resp.body?.cancel().catch(() => {});
+      }
       throw new Error("response-filtered-out");
     }
 
