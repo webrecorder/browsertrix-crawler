@@ -50,6 +50,11 @@ Options:
                                             e-page-application crawling or when
                                             different hashtags load dynamic cont
                                             ent
+      --selectLinks                         one or more selectors for extracting
+                                             links, in the format [css selector]
+                                            ->[property to use],[css selector]->
+                                            @[attribute to use]
+                                            [array] [default: ["a[href]->href"]]
       --blockRules                          Additional rules for blocking certai
                                             n URLs from being loaded, by URL reg
                                             ex and optionally via text match in
@@ -287,14 +292,14 @@ Options:
   --version                 Show version number                        [boolean]
   --url                     The URL of the login page        [string] [required]
   --user                    The username for the login. If not specified, will b
-                            e prompted
+                            e prompted                                  [string]
   --password                The password for the login. If not specified, will b
-                            e prompted (recommended)
+                            e prompted (recommended)                    [string]
   --filename                The filename for the profile tarball, stored within
                             /crawls/profiles if absolute path not provided
-                                    [default: "/crawls/profiles/profile.tar.gz"]
+                           [string] [default: "/crawls/profiles/profile.tar.gz"]
   --debugScreenshot         If specified, take a screenshot after login and save
-                             as this filename
+                             as this filename         [boolean] [default: false]
   --headless                Run in headless mode, otherwise start xvfb
                                                       [boolean] [default: false]
   --automated               Start in automated mode, no interactive browser
