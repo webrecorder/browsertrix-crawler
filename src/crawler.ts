@@ -46,8 +46,8 @@ import { Browser } from "./util/browser.js";
 import {
   ADD_LINK_FUNC,
   BEHAVIOR_LOG_FUNC,
-  DEFAULT_SELECTORS,
   DISPLAY,
+  ExtractSelector,
   PAGE_OP_TIMEOUT_SECS,
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
 } from "./util/constants.js";
@@ -1733,11 +1733,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async loadPage(
-    page: Page,
-    data: PageState,
-    selectorOptsList = DEFAULT_SELECTORS,
-  ) {
+  async loadPage(page: Page, data: PageState) {
     const { url, depth } = data;
 
     const logDetails = data.logDetails;
@@ -1938,14 +1934,18 @@ self.__bx_behaviors.selectMainBehavior();
     await this.awaitPageLoad(page.mainFrame(), logDetails);
 
     // skip extraction if at max depth
-    if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
-      logger.debug("Skipping Link Extraction, At Max Depth");
+    if (seed.isAtMaxDepth(depth)) {
+      logger.debug("Skipping Link Extraction, At Max Depth", {}, "links");
       return;
     }
 
-    logger.debug("Extracting links", logDetails);
+    logger.debug(
+      "Extracting links",
+      { selectors: this.params.selectLinks, ...logDetails },
+      "links",
+    );
 
-    await this.extractLinks(page, data, selectorOptsList, logDetails);
+    await this.extractLinks(page, data, this.params.selectLinks, logDetails);
   }
 
   async netIdle(page: Page, details: LogDetails) {
@@ -1991,7 +1991,7 @@ self.__bx_behaviors.selectMainBehavior();
   async extractLinks(
     page: Page,
     data: PageState,
-    selectors = DEFAULT_SELECTORS,
+    selectors: ExtractSelector[],
     logDetails: LogDetails,
   ) {
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
@@ -2037,11 +2037,7 @@ self.__bx_behaviors.selectMainBehavior();
     const frames = filteredFrames || page.frames();
 
     try {
-      for (const {
-        selector = "a[href]",
-        extract = "href",
-        isAttribute = false,
-      } of selectors) {
+      for (const { selector, extract, isAttribute } of selectors) {
         const promiseResults = await Promise.allSettled(
           frames.map((frame) =>
             timedRun(
