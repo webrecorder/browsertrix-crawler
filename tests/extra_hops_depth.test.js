@@ -46,19 +46,25 @@ test(
     expect(crawledExtraPagesArray.length - 1).toEqual(expectedExtraPages.length);
 
     for (const page of crawledPagesArray) {
-      const url = JSON.parse(page).url;
+      const parsedPage = JSON.parse(page);
+      const url = parsedPage.url;
       if (!url) {
         continue;
       }
       expect(expectedPages.indexOf(url) >= 0).toBe(true);
+
+      expect(parsedPage.seed).toEqual(true);
+      expect(parsedPage.depth).toEqual(0);
     }
 
     for (const page of crawledExtraPagesArray) {
-      const url = JSON.parse(page).url;
+      const parsedPage = JSON.parse(page);
+      const url = parsedPage.url;
       if (!url) {
         continue;
       }
       expect(expectedExtraPages.indexOf(url) >= 0).toBe(true);
+      expect(parsedPage.depth >= 1).toBe(true);
     }
   },
   extraHopsTimeout,

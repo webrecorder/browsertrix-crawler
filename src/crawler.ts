@@ -103,6 +103,7 @@ type PageEntry = {
   favIconUrl?: string;
   ts?: string;
   status?: number;
+  depth?: number;
 };
 
 // ============================================================================
@@ -2268,6 +2269,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (depth === 0) {
       row.seed = true;
+    }
+
+    if (Number.isInteger(depth)) {
+      row.depth = depth;
     }
 
     if (text && this.textInPages) {
