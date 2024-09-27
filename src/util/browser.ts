@@ -371,8 +371,8 @@ export class Browser {
     }
   }
 
-  addInitScript(page: Page, script: string) {
-    return page.evaluateOnNewDocument(script);
+  async addInitScript(page: Page, script: string) {
+    await page.evaluateOnNewDocument(script);
   }
 
   async checkScript(cdp: CDPSession, filename: string, script: string) {

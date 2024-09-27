@@ -1249,14 +1249,19 @@ export class Recorder {
     return { fetched, mime, ts };
   }
 
-  async getCookieString(cdp: CDPSession, url: string) {
-    const cookieList: string[] = [];
-    const { cookies } = await cdp.send("Network.getCookies", { urls: [url] });
-    for (const { name, value } of cookies) {
-      cookieList.push(`${name}=${value}`);
-    }
+  async getCookieString(cdp: CDPSession, url: string): Promise<string> {
+    try {
+      const cookieList: string[] = [];
+      const { cookies } = await cdp.send("Network.getCookies", { urls: [url] });
+      for (const { name, value } of cookies) {
+        cookieList.push(`${name}=${value}`);
+      }
 
-    return cookieList.join(";");
+      return cookieList.join(";");
+    } catch (e) {
+      logger.warn("Error getting cookies", { page: url, e }, "recorder");
+      return "";
+    }
   }
 }
 

@@ -26,7 +26,7 @@ export function timedRun(
 
   return Promise.race([promise, rejectPromiseOnTimeout(timeout)]).catch(
     (err) => {
-      if (err == "timeout reached") {
+      if (err === "timeout reached") {
         const logFunc = isWarn ? logger.warn : logger.error;
         logFunc.call(
           logger,

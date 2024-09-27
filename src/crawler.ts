@@ -932,7 +932,12 @@ self.__bx_behaviors.selectMainBehavior();
     // run custom driver here
     await this.driver({ page, data, crawler: this });
 
-    data.title = await page.title();
+    data.title = await timedRun(
+      page.title(),
+      PAGE_OP_TIMEOUT_SECS,
+      "Timed out getting page title, something is likely wrong",
+      logDetails,
+    );
     data.favicon = await this.getFavicon(page, logDetails);
 
     await this.doPostLoadActions(opts);
