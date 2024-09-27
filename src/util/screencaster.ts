@@ -123,7 +123,9 @@ class RedisPubSubTransport {
     this.castChannel = `c:${crawlId}:cast`;
     this.ctrlChannel = `c:${crawlId}:ctrl`;
 
-    void this.init(redisUrl);
+    this.init(redisUrl).catch((e) =>
+      logger.warn("error starting cast", e, "screencast"),
+    );
   }
 
   async init(redisUrl: string) {
