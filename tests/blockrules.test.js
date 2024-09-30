@@ -23,7 +23,7 @@ function runCrawl(name, config, commandExtra = "") {
 
 function doesCDXContain(coll, value) {
   const data = fs.readFileSync(
-    `test-crawls/collections/${coll}/indexes/index.cdxj`,
+    `test-crawls/collections/${coll}/indexes/index.cdxj`, {encoding: "utf-8"}
   );
   console.log(data);
   return data.indexOf(value) >= 0;
