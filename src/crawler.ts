@@ -1921,7 +1921,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
 
-    const { seedId } = data;
+    const { seedId, extraHops } = data;
 
     const seed = await this.crawlState.getSeedAt(
       this.seeds,
@@ -1944,7 +1944,7 @@ self.__bx_behaviors.selectMainBehavior();
     await this.awaitPageLoad(page.mainFrame(), logDetails);
 
     // skip extraction if at max depth
-    if (seed.isAtMaxDepth(depth) || !selectorOptsList) {
+    if (seed.isAtMaxDepth(depth, extraHops) || !selectorOptsList) {
       logger.debug("Skipping Link Extraction, At Max Depth");
       return;
     }

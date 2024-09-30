@@ -225,8 +225,8 @@ export class ScopedSeed {
     return [include, allowHash];
   }
 
-  isAtMaxDepth(depth: number) {
-    return depth >= this.maxDepth;
+  isAtMaxDepth(depth: number, extraHops: number) {
+    return depth >= this.maxDepth && extraHops >= this.maxExtraHops;
   }
 
   isIncluded(
@@ -236,10 +236,6 @@ export class ScopedSeed {
     logDetails = {},
     noOOS = false,
   ): { url: string; isOOS: boolean } | false {
-    if (depth > this.maxDepth) {
-      return false;
-    }
-
     const urlParsed = this.parseUrl(url, logDetails);
     if (!urlParsed) {
       return false;
@@ -262,11 +258,14 @@ export class ScopedSeed {
     //}
     let inScope = false;
 
-    // check scopes
-    for (const s of this.include) {
-      if (s.test(url)) {
-        inScope = true;
-        break;
+    // check scopes if depth <= maxDepth
+    // if depth exceeds, than always out of scope
+    if (depth <= this.maxDepth) {
+      for (const s of this.include) {
+        if (s.test(url)) {
+          inScope = true;
+          break;
+        }
       }
     }
 
