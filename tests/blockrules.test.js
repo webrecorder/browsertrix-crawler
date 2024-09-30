@@ -25,6 +25,7 @@ function doesCDXContain(coll, value) {
   const data = fs.readFileSync(
     `test-crawls/collections/${coll}/indexes/index.cdxj`,
   );
+  console.log(data);
   return data.indexOf(value) >= 0;
 }
 
