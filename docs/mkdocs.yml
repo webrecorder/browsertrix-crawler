@@ -50,6 +50,7 @@ nav:
     - develop/docs.md
   - User Guide:
     - user-guide/index.md
+    - user-guide/outputs.md
     - user-guide/common-options.md
     - user-guide/crawl-scope.md
     - user-guide/yaml-config.md
