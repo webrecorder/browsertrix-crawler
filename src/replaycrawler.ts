@@ -256,7 +256,7 @@ export class ReplayCrawler extends Crawler {
     }
 
     for (const s of this.excludeRx) {
-      if (!s.test(url)) {
+      if (s.test(url)) {
         logger.info("Skipping excluded page", { url }, "replay");
         return;
       }
