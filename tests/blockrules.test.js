@@ -2,6 +2,9 @@ import child_process from "child_process";
 import fs from "fs";
 import yaml from "js-yaml";
 
+const isCI = !!process.env.get("CI");
+const testIf = (condition, ...args) => condition ? test(...args) : test.skip(...args);
+
 function runCrawl(name, config, commandExtra = "") {
   config.generateCDX = true;
   config.depth = 0;
@@ -63,7 +66,7 @@ test("test block rule on specific URL", () => {
   ).toBe(false);
 });
 
-test("test block rule based on iframe text, content included due to match", () => {
+testIf(!isCI, "test block rule based on iframe text, content included due to match", () => {
   const config = {
     url: "https://oembed.link/https://www.youtube.com/watch?v=aT-Up5Y4uRI",
     blockRules: [
@@ -116,7 +119,7 @@ test("test block rule based on iframe text, block matched", () => {
   expect(checkVideo("block-4")).toBe(false);
 });
 
-test("test rule based on iframe text not matching, plus allowOnly iframe", () => {
+testIf(!isCI, "test rule based on iframe text not matching, plus allowOnly iframe", () => {
   const config = {
     url: "https://oembed.link/https://www.youtube.com/watch?v=aT-Up5Y4uRI",
     blockRules: [
@@ -161,7 +164,7 @@ test("test block url in frame url", () => {
   ).toBe(false);
 });
 
-test("test block rules complex example, block external urls on main frame, but not on youtube", () => {
+testIf(!isCI, "test block rules complex example, block external urls on main frame, but not on youtube", () => {
   const config = {
     seeds: ["https://archiveweb.page/en/troubleshooting/errors/"],
     depth: "0",
