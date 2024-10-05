@@ -64,10 +64,10 @@ jobs:
         run: sudo pip install wacz
 
       - name: run all tests as root
-        run: sudo DOCKER_HOST_NAME=172.17.0.1 yarn test -validate
+        run: sudo DOCKER_HOST_NAME=172.17.0.1 CI=true yarn test -validate
 
       - name: run saved state + qa compare test as non-root - with volume owned by current user
         run: |
           sudo rm -rf ./test-crawls
           mkdir test-crawls
-          sudo yarn test ./tests/saved-state.test.js ./tests/qa_compare.test.js
+          sudo CI=true yarn test ./tests/saved-state.test.js ./tests/qa_compare.test.js
