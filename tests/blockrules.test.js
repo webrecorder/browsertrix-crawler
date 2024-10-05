@@ -2,7 +2,7 @@ import child_process from "child_process";
 import fs from "fs";
 import yaml from "js-yaml";
 
-const isCI = !!process.env.get("CI");
+const isCI = !!process.env.CI;
 const testIf = (condition, ...args) => condition ? test(...args) : test.skip(...args);
 
 function runCrawl(name, config, commandExtra = "") {
