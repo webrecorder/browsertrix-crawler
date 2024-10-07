@@ -377,7 +377,7 @@ class ArgParser {
 
         screenshot: {
           describe:
-            "Screenshot options for crawler, can include: view, thumbnail, fullPage",
+          "Screenshot options for crawler, can include: view, thumbnail, fullPage, fullPageAfterBehaviors",
           type: "array",
           default: [],
           choices: Array.from(Object.keys(screenshotTypes)),
