@@ -54,6 +54,8 @@ test("run QA comparison, with write pages to redis", async () => {
     expect(json).toHaveProperty("loadState");
     expect(json).toHaveProperty("comparison");
 
+    expect(json.title.indexOf("contact") < 0).toBe(true);
+
     expect(json.comparison).toHaveProperty("screenshotMatch");
     expect(json.comparison).toHaveProperty("textMatch");
     expect(json.comparison).toHaveProperty("resourceCounts");
