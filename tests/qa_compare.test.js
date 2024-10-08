@@ -8,7 +8,7 @@ test("run initial crawl with text and screenshots to prepare for QA", async () =
   fs.rmSync("./test-crawls/qa-wr-net", { recursive: true, force: true });
 
   child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --url https://webrecorder.net/about --url https://browsertrix.com/ --scopeType page --collection qa-wr-net --text to-warc --screenshot view --generateWACZ",
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --url https://webrecorder.net/about --url https://browsertrix.com/ --url https://webrecorder.net/contact --scopeType page --collection qa-wr-net --text to-warc --screenshot view --generateWACZ",
   );
 
   expect(
@@ -20,7 +20,7 @@ test("run QA comparison, with write pages to redis", async () => {
   fs.rmSync("./test-crawls/qa-wr-net-replay", { recursive: true, force: true });
 
   const child = child_process.exec(
-    "docker run -p 36380:6379 -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler qa --qaSource /crawls/collections/qa-wr-net/qa-wr-net.wacz --collection qa-wr-net-replay --crawlId test --qaDebugImageDiff --writePagesToRedis --debugAccessRedis",
+    "docker run -p 36380:6379 -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler qa --qaSource /crawls/collections/qa-wr-net/qa-wr-net.wacz --collection qa-wr-net-replay --crawlId test --qaDebugImageDiff --writePagesToRedis --debugAccessRedis --exclude contact",
   );
 
   // detect crawler exit
@@ -53,6 +53,8 @@ test("run QA comparison, with write pages to redis", async () => {
     expect(json).toHaveProperty("title");
     expect(json).toHaveProperty("loadState");
     expect(json).toHaveProperty("comparison");
+
+    expect(json.title.indexOf("contact") < 0).toBe(true);
 
     expect(json.comparison).toHaveProperty("screenshotMatch");
     expect(json.comparison).toHaveProperty("textMatch");
