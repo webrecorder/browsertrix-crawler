@@ -2048,33 +2048,31 @@ self.__bx_behaviors.selectMainBehavior();
         extract = "href",
         isAttribute = false,
       } of selectors) {
-        const promiseResults = await Promise.allSettled(
-          frames.map((frame) =>
-            timedRun(
-              frame.evaluate(loadLinks, {
+        await Promise.allSettled(
+          frames.map((frame) => {
+            const getLinks = frame
+              .evaluate(loadLinks, {
                 selector,
                 extract,
                 isAttribute,
                 addLinkFunc: ADD_LINK_FUNC,
-              }),
+              })
+              .catch((e) =>
+                logger.warn("Link Extraction failed in frame", {
+                  frameUrl: frame.url,
+                  ...logDetails,
+                  ...formatErr(e),
+                }),
+              );
+
+            return timedRun(
+              getLinks,
               PAGE_OP_TIMEOUT_SECS,
               "Link extraction timed out",
               logDetails,
-            ),
-          ),
+            );
+          }),
         );
-
-        for (let i = 0; i < promiseResults.length; i++) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { status, reason } = promiseResults[i] as any;
-          if (status === "rejected") {
-            logger.warn("Link Extraction failed in frame", {
-              reason,
-              frameUrl: frames[i].url,
-              ...logDetails,
-            });
-          }
-        }
       }
     } catch (e) {
       logger.warn("Link Extraction failed", e, "links");
