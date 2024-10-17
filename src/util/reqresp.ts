@@ -1,7 +1,4 @@
-// @ts-expect-error TODO fill in why error is expected
-import { getStatusText } from "@webrecorder/wabac/src/utils.js";
-// @ts-expect-error TODO fill in why error is expected
-import { getCustomRewriter } from "@webrecorder/wabac/src/rewrite/index.js";
+import { getCustomRewriter, getStatusText } from "@webrecorder/wabac";
 
 import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
