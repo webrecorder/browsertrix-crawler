@@ -39,7 +39,7 @@ import {
   runWorkers,
 } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
-import { collectAllFileSources, getInfoString } from "./util/file_reader.js";
+import { collectCustomBehaviors, getInfoString } from "./util/file_reader.js";
 
 import { Browser } from "./util/browser.js";
 
@@ -510,7 +510,7 @@ export class Crawler {
     }
 
     if (this.params.customBehaviors) {
-      this.customBehaviors = this.loadCustomBehaviors(
+      this.customBehaviors = await this.loadCustomBehaviors(
         this.params.customBehaviors,
       );
     }
@@ -800,10 +800,10 @@ self.__bx_behaviors.selectMainBehavior();
     });
   }
 
-  loadCustomBehaviors(filename: string) {
+  async loadCustomBehaviors(sources: string[]) {
     let str = "";
 
-    for (const { contents } of collectAllFileSources(filename, ".js")) {
+    for (const { contents } of await collectCustomBehaviors(sources)) {
       str += `self.__bx_behaviors.load(${contents});\n`;
     }
 
@@ -811,13 +811,13 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async checkBehaviorScripts(cdp: CDPSession) {
-    const filename = this.params.customBehaviors;
+    const sources = this.params.customBehaviors;
 
-    if (!filename) {
+    if (!sources) {
       return;
     }
 
-    for (const { path, contents } of collectAllFileSources(filename, ".js")) {
+    for (const { path, contents } of await collectCustomBehaviors(sources)) {
       await this.browser.checkScript(cdp, path, contents);
     }
   }
