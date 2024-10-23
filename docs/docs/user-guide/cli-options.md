@@ -248,7 +248,7 @@ Options:
                                                       [boolean] [default: false]
       --customBehaviors                     Custom behavior files to inject. Val
                                             ues can be URLs, paths to individual
-                                             behavior files, or pathsto a direct
+                                            behavior files, or paths to a direct
                                             ory of behavior files.
                                                            [array] [default: []]
       --debugAccessRedis                    if set, runs internal redis without

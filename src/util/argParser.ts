@@ -552,7 +552,7 @@ class ArgParser {
         customBehaviors: {
           describe:
             "Custom behavior files to inject. Values can be URLs, paths to individual behavior files, or paths" +
-            "to a directory of behavior files.",
+            " to a directory of behavior files",
           type: "array",
           default: [],
         },
