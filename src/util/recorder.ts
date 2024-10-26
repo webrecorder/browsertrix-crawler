@@ -122,6 +122,7 @@ export class Recorder {
   pendingRequests!: Map<string, RequestResponseInfo>;
   skipIds!: Set<string>;
   pageInfo!: PageInfoRecord;
+  skipRangeUrls!: Map<string, number>;
 
   swTargetId?: string | null;
   swFrameIds = new Set<string>();
@@ -407,6 +408,8 @@ export class Recorder {
     logNetwork("Network.loadingFailed", {
       requestId,
       url,
+      errorText,
+      type,
       ...this.logDetails,
     });
 
@@ -426,15 +429,13 @@ export class Recorder {
       case "net::ERR_ABORTED":
         // check if this is a false positive -- a valid download that's already been fetched
         // the abort is just for page, but download will succeed
-        if (type === "Document" && reqresp.isValidBinary()) {
+        if (
+          type === "Document" ||
+          (type === "Media" && reqresp.isValidBinary())
+        ) {
           this.removeReqResp(requestId);
           return this.serializeToWARC(reqresp);
-        } else if (
-          url &&
-          reqresp.requestHeaders &&
-          reqresp.requestHeaders["x-browsertrix-fetch"]
-        ) {
-          delete reqresp.requestHeaders["x-browsertrix-fetch"];
+        } else if (url && reqresp.requestHeaders && type === "Media") {
           logger.warn(
             "Attempt direct fetch of failed request",
             { url, ...this.logDetails },
@@ -453,7 +454,7 @@ export class Recorder {
       default:
         logger.warn(
           "Request failed",
-          { url, errorText, ...this.logDetails },
+          { url, errorText, type, status: reqresp.status, ...this.logDetails },
           "recorder",
         );
     }
@@ -520,8 +521,7 @@ export class Recorder {
       if (
         responseStatusCode &&
         !responseErrorReason &&
-        !this.shouldSkip(headers, url, method, resourceType) &&
-        !(isSWorker && networkId)
+        !this.shouldSkip(headers, url, method, resourceType)
       ) {
         continued = await this.handleFetchResponse(params, cdp, isSWorker);
       }
@@ -616,6 +616,16 @@ export class Recorder {
           "recorder",
         );
         this.removeReqResp(networkId);
+        const count = this.skipRangeUrls.get(url) || 0;
+        if (count > 2) {
+          // just fail additional range requests to save bandwidth, as these are not being recorded
+          await cdp.send("Fetch.failRequest", {
+            requestId,
+            errorReason: "BlockedByResponse",
+          });
+          return true;
+        }
+        this.skipRangeUrls.set(url, count + 1);
         return false;
       }
     }
@@ -794,6 +804,7 @@ export class Recorder {
     }
     this.pendingRequests = new Map();
     this.skipIds = new Set();
+    this.skipRangeUrls = new Map<string, number>();
     this.skipping = false;
     this.pageInfo = {
       pageid,
@@ -861,8 +872,13 @@ export class Recorder {
 
     let numPending = this.pendingRequests.size;
 
-    while (numPending && !this.crawler.interrupted) {
-      const pending = [];
+    let pending = [];
+    while (
+      numPending &&
+      !this.crawler.interrupted &&
+      !this.crawler.postCrawling
+    ) {
+      pending = [];
       for (const [requestId, reqresp] of this.pendingRequests.entries()) {
         const url = reqresp.url || "";
         const entry: {
@@ -891,6 +907,17 @@ export class Recorder {
       );
       await sleep(5.0);
       numPending = this.pendingRequests.size;
+    }
+
+    if (this.pendingRequests.size) {
+      logger.warn(
+        "Dropping timed out requests",
+        { numPending, pending, ...this.logDetails },
+        "recorder",
+      );
+      for (const requestId of this.pendingRequests.keys()) {
+        this.removeReqResp(requestId);
+      }
     }
   }
 
