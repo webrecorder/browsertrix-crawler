@@ -392,7 +392,6 @@ export class Browser {
     launchOpts: PuppeteerLaunchOptions,
     // eslint-disable-next-line @typescript-eslint/ban-types
     ondisconnect: Function | null = null,
-    //_recording: boolean,
   ) {
     this.browser = await puppeteer.launch(launchOpts);
 

@@ -430,8 +430,8 @@ export class Recorder {
         // check if this is a false positive -- a valid download that's already been fetched
         // the abort is just for page, but download will succeed
         if (
-          type === "Document" ||
-          (type === "Media" && reqresp.isValidBinary())
+          (type === "Document" || type === "Media") &&
+          reqresp.isValidBinary()
         ) {
           this.removeReqResp(requestId);
           return this.serializeToWARC(reqresp);
@@ -1422,7 +1422,7 @@ class AsyncFetcher {
           reqresp.payload = Buffer.concat(buffers, currSize);
           externalBuffer.buffers = [reqresp.payload];
         } else if (fh) {
-          logger.warn(
+          logger.debug(
             "Large payload written to WARC, but not returned to browser (would require rereading into memory)",
             { url, actualSize: reqresp.readSize, maxSize: this.maxFetchSize },
             "recorder",
