@@ -666,13 +666,13 @@ export class Recorder {
 
     let streamingConsume = false;
 
-    // if contentLength is large or unknown, do streaming, unless its an essential resource
-    // in which case, need to do a full fetch either way
-    // don't count non-200 responses which may not have content-length
     if (
-      (contentLen < 0 || contentLen > MAX_BROWSER_DEFAULT_FETCH_SIZE) &&
-      responseStatusCode === 200 &&
-      !this.isEssentialResource(reqresp.resourceType, mimeType)
+      this.shouldStream(
+        contentLen,
+        responseStatusCode || 0,
+        reqresp.resourceType || "",
+        mimeType,
+      )
     ) {
       const opts: ResponseStreamAsyncFetchOptions = {
         reqresp,
@@ -1046,12 +1046,46 @@ export class Recorder {
     }
   }
 
-  isEssentialResource(resourceType: string | undefined, contentType: string) {
+  isEssentialResource(resourceType: string, contentType: string) {
     if (resourceType === "script" || resourceType === "stylesheet") {
       return true;
     }
 
     if (RW_MIME_TYPES.includes(contentType)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  shouldStream(
+    contentLength: number,
+    responseStatusCode: number,
+    resourceType: string,
+    mimeType: string,
+  ) {
+    // if contentLength is too large even for rewriting, always stream, will not do rewriting
+    // even if text
+    if (contentLength > MAX_TEXT_REWRITE_SIZE) {
+      return true;
+    }
+
+    // if contentLength larger but is essential resource, do stream
+    // otherwise full fetch for rewriting
+    if (
+      contentLength > MAX_BROWSER_DEFAULT_FETCH_SIZE &&
+      !this.isEssentialResource(resourceType, mimeType)
+    ) {
+      return true;
+    }
+
+    // if contentLength is unknown, also stream if its an essential resource and not 3xx / 4xx / 5xx
+    // status code, as these codes may have no content-length, and are likely small
+    if (
+      contentLength < 0 &&
+      !this.isEssentialResource(resourceType, mimeType) &&
+      responseStatusCode < 300
+    ) {
       return true;
     }
 
