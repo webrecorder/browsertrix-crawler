@@ -1101,7 +1101,7 @@ export class Recorder {
     if (
       contentLength < 0 &&
       !this.isEssentialResource(resourceType, mimeType) &&
-      responseStatusCode < 300
+      reponseStatusCode >= 200 && responseStatusCode < 300
     ) {
       return true;
     }
