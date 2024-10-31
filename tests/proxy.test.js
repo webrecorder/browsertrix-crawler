@@ -10,7 +10,7 @@ const WRONG_PORT = "33130";
 const SSH_PROXY_IMAGE = "linuxserver/openssh-server"
 
 const PDF = "https://specs.webrecorder.net/wacz/1.1.1/wacz-2021.pdf";
-const HTML = "https://webrecorder.net/";
+const HTML = "https://old.webrecorder.net/";
 
 const extraArgs = "--limit 1 --failOnFailedSeed --timeout 10 --logging debug";
 

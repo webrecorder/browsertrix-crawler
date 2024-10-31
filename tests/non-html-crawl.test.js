@@ -6,7 +6,7 @@ import { WARCParser } from "warcio";
 const PDF = "https://specs.webrecorder.net/wacz/1.1.1/wacz-2021.pdf";
 const PDF_HTTP = PDF.replace("https", "http");
 
-const XML = "https://webrecorder.net/feed.xml";
+const XML = "https://old.webrecorder.net/feed.xml";
 const XML_REDIR = "https://www.webrecorder.net/feed.xml";
 
 test("PDF: ensure pdf is crawled", () => {
@@ -151,7 +151,7 @@ test("XML: check that CDX contains one xml 200, one 301 and one 200, two pageinf
 
   expect(cdxj.length).toBe(6);
 
-  expect(cdxj[0].url).toBe("https://webrecorder.net/favicon.ico");
+  expect(cdxj[0].url).toBe("https://old.webrecorder.net/favicon.ico");
 
   expect(cdxj[1].url).toBe(XML);
   expect(cdxj[1].status).toBe("200");

@@ -118,7 +118,7 @@ test("check parsing saved state + page done + queue present", () => {
 
   // ensure extra seeds also set
   expect(state.extraSeeds).toEqual([
-    `{"origSeedId":0,"newUrl":"https://webrecorder.net/"}`,
+    `{"origSeedId":0,"newUrl":"https://old.webrecorder.net/"}`,
   ]);
 });
 
@@ -129,7 +129,7 @@ test("check crawl restarted with saved state", async () => {
 
   try {
     containerId = execSync(
-      `docker run -d -p ${port}:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 10 --behaviors "" --exclude community`,
+      `docker run -d -p ${port}:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://old.webrecorder.net/ --config /crawls/collections/int-state-test/crawls/${savedStateFile} --debugAccessRedis --limit 10 --behaviors "" --exclude community`,
       { encoding: "utf-8" },
     );
   } catch (error) {

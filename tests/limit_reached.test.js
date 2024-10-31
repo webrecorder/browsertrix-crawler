@@ -6,7 +6,7 @@ const exec = util.promisify(execCallback);
 
 test("ensure page limit reached", async () => {
   execSync(
-    'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --scopeType prefix --behaviors "" --url https://webrecorder.net/ --limit 12 --workers 2 --collection limit-test --statsFilename stats.json --exclude community',
+    'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --scopeType prefix --behaviors "" --url https://old.webrecorder.net/ --limit 12 --workers 2 --collection limit-test --statsFilename stats.json --exclude community',
   );
 });
 
@@ -22,7 +22,7 @@ test("ensure crawl fails if failOnFailedLimit is reached", async () => {
   let passed = true;
   try {
     await exec(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/will404 --url https://specs.webrecorder.net --failOnInvalidStatus --failOnFailedLimit 1 --limit 10 --collection faillimitreached",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/will404 --url https://specs.webrecorder.net --failOnInvalidStatus --failOnFailedLimit 1 --limit 10 --collection faillimitreached",
     );
   } catch (error) {
     expect(error.code).toEqual(17);
