@@ -435,20 +435,23 @@ export class Recorder {
         ) {
           this.removeReqResp(requestId);
           return this.serializeToWARC(reqresp);
-        } else if (url && reqresp.requestHeaders && type === "Media") {
-          logger.warn(
-            "Attempt direct fetch of failed request",
-            { url, ...this.logDetails },
-            "recorder",
-          );
-          const fetcher = new AsyncFetcher({
-            reqresp,
-            recorder: this,
-            networkId: requestId,
-          });
-          void this.fetcherQ.add(() => fetcher.load());
-          return;
         }
+        // disable for now, driven by fetch from behaviors likely
+        // else if (url && reqresp.requestHeaders && type === "Media") {
+        //   this.removeReqResp(requestId);
+        //   logger.warn(
+        //     "Attempt direct fetch of failed request",
+        //     { url, ...this.logDetails },
+        //     "recorder",
+        //   );
+        //   const fetcher = new AsyncFetcher({
+        //     reqresp,
+        //     recorder: this,
+        //     networkId: requestId,
+        //   });
+        //   void this.fetcherQ.add(() => fetcher.load());
+        //   return;
+        // }
         break;
 
       default:
@@ -496,7 +499,7 @@ export class Recorder {
   async handleRequestPaused(
     params: Protocol.Fetch.RequestPausedEvent,
     cdp: CDPSession,
-    isSWorker = false,
+    isBrowserContext = false,
   ) {
     const {
       requestId,
@@ -523,7 +526,11 @@ export class Recorder {
         !responseErrorReason &&
         !this.shouldSkip(headers, url, method, resourceType)
       ) {
-        continued = await this.handleFetchResponse(params, cdp, isSWorker);
+        continued = await this.handleFetchResponse(
+          params,
+          cdp,
+          isBrowserContext,
+        );
       }
     } catch (e) {
       logger.error(
@@ -549,7 +556,7 @@ export class Recorder {
   async handleFetchResponse(
     params: Protocol.Fetch.RequestPausedEvent,
     cdp: CDPSession,
-    isSWorker: boolean,
+    isBrowserContext: boolean,
   ) {
     const { request } = params;
     const { url } = request;
@@ -610,11 +617,11 @@ export class Recorder {
 
         return false;
       } else {
-        logger.debug(
-          "Skip 206 Response",
-          { range, contentLen, url, ...this.logDetails },
-          "recorder",
-        );
+        // logger.debug(
+        //   "Skip 206 Response",
+        //   { range, contentLen, url, ...this.logDetails },
+        //   "recorder",
+        // );
         this.removeReqResp(networkId);
         const count = this.skipRangeUrls.get(url) || 0;
         if (count > 2) {
@@ -631,9 +638,22 @@ export class Recorder {
     }
 
     const reqresp = this.pendingReqResp(networkId);
+
     if (!reqresp) {
       return false;
     }
+
+    // indicate that this is intercepted in the page context
+    if (!isBrowserContext) {
+      reqresp.inPageContext = true;
+    }
+
+    // Already being handled by a different handler
+    if (reqresp.fetchContinued) {
+      return false;
+    }
+
+    reqresp.fetchContinued = true;
 
     if (
       url === this.pageUrl &&
@@ -653,12 +673,6 @@ export class Recorder {
 
     if (this.noResponseForStatus(responseStatusCode)) {
       reqresp.payload = new Uint8Array();
-
-      if (isSWorker) {
-        this.removeReqResp(networkId);
-        await this.serializeToWARC(reqresp);
-      }
-
       return false;
     }
 
@@ -734,9 +748,9 @@ export class Recorder {
 
     const rewritten = await this.rewriteResponse(reqresp, mimeType);
 
-    // if in service worker, serialize here
-    // as won't be getting a loadingFinished message
-    if (isSWorker && reqresp.payload) {
+    // if in browser context, and not also intercepted in page context
+    // serialize here, as won't be getting a loadingFinished message for it
+    if (isBrowserContext && !reqresp.inPageContext && reqresp.payload) {
       this.removeReqResp(networkId);
       await this.serializeToWARC(reqresp);
     }

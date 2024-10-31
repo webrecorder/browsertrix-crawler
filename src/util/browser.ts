@@ -484,6 +484,8 @@ export class Browser {
     this.firstCDP.on("Fetch.requestPaused", async (params) => {
       const { frameId, requestId, request } = params;
 
+      const { url } = request;
+
       if (!this.firstCDP) {
         throw new Error("CDP missing");
       }
@@ -491,7 +493,7 @@ export class Browser {
       let foundRecorder = null;
 
       for (const recorder of this.recorders) {
-        if (recorder.swUrls.has(request.url)) {
+        if (recorder.swUrls.has(url)) {
           recorder.swFrameIds.add(frameId);
         }
 
@@ -504,7 +506,7 @@ export class Browser {
       if (!foundRecorder) {
         logger.warn(
           "Skipping URL from unknown frame",
-          { url: request.url, frameId },
+          { url, frameId },
           "recorder",
         );
 
@@ -513,7 +515,7 @@ export class Browser {
         } catch (e) {
           logger.debug(
             "continueResponse failed",
-            { url: request.url, ...formatErr(e), from: "serviceWorker" },
+            { url, ...formatErr(e), from: "serviceWorker" },
             "recorder",
           );
         }
