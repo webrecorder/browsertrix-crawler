@@ -131,7 +131,8 @@ export class Recorder {
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logDetails: Record<string, any> = {};
-  skipping = false;
+
+  pageFinished = false;
 
   gzip = true;
 
@@ -170,6 +171,7 @@ export class Recorder {
     frameIdToExecId: Map<string, number>;
   }) {
     this.frameIdToExecId = frameIdToExecId;
+    this.pageFinished = false;
 
     // Fetch
     cdp.on("Fetch.requestPaused", (params) => {
@@ -435,23 +437,21 @@ export class Recorder {
         ) {
           this.removeReqResp(requestId);
           return this.serializeToWARC(reqresp);
+        } else if (url && reqresp.requestHeaders && type === "Media") {
+          this.removeReqResp(requestId);
+          logger.warn(
+            "Attempt direct fetch of failed request",
+            { url, ...this.logDetails },
+            "recorder",
+          );
+          const fetcher = new AsyncFetcher({
+            reqresp,
+            recorder: this,
+            networkId: requestId,
+          });
+          void this.fetcherQ.add(() => fetcher.load());
+          return;
         }
-        // disable for now, driven by fetch from behaviors likely
-        // else if (url && reqresp.requestHeaders && type === "Media") {
-        //   this.removeReqResp(requestId);
-        //   logger.warn(
-        //     "Attempt direct fetch of failed request",
-        //     { url, ...this.logDetails },
-        //     "recorder",
-        //   );
-        //   const fetcher = new AsyncFetcher({
-        //     reqresp,
-        //     recorder: this,
-        //     networkId: requestId,
-        //   });
-        //   void this.fetcherQ.add(() => fetcher.load());
-        //   return;
-        // }
         break;
 
       default:
@@ -819,7 +819,7 @@ export class Recorder {
     this.pendingRequests = new Map();
     this.skipIds = new Set();
     this.skipRangeUrls = new Map<string, number>();
-    this.skipping = false;
+    this.pageFinished = false;
     this.pageInfo = {
       pageid,
       urls: {},
@@ -889,6 +889,7 @@ export class Recorder {
     let pending = [];
     while (
       numPending &&
+      !this.pageFinished &&
       !this.crawler.interrupted &&
       !this.crawler.postCrawling
     ) {
@@ -938,6 +939,8 @@ export class Recorder {
   async onClosePage() {
     // Any page-specific handling before page is closed.
     this.frameIdToExecId = null;
+
+    this.pageFinished = true;
   }
 
   async onDone(timeout: number) {
@@ -1162,10 +1165,6 @@ export class Recorder {
       }
       if (this.skipIds.has(requestId)) {
         logNetwork("Skipping ignored id", { requestId });
-        return null;
-      }
-      if (this.skipping) {
-        //logger.debug("Skipping request, page already finished", this.logDetails, "recorder");
         return null;
       }
       const reqresp = new RequestResponseInfo(requestId);
