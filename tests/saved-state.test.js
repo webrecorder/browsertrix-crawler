@@ -53,7 +53,7 @@ test("check crawl interrupted + saved state written", async () => {
 
   try {
     containerId = execSync(
-      "docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://www.webrecorder.net/ --limit 10 --behaviors \"\" --exclude community",
+      "docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection int-state-test --url https://old.webrecorder.net/ --limit 10 --behaviors \"\" --exclude community",
       { encoding: "utf-8" },
       //wait.callback,
     );

@@ -27,7 +27,7 @@ test("test custom behaviors", async () => {
     ) > 0,
   ).toBe(true);
 
-  // another custom behavior ran for webrecorder.net
+  // another custom behavior ran for old.webrecorder.net
   expect(
     log.indexOf(
       '{"state":{},"msg":"test-stat-2","page":"https://old.webrecorder.net/","workerid":0}}',

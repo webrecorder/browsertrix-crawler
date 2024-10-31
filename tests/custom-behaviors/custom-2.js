@@ -11,7 +11,7 @@ class TestBehavior2 {
   }
 
   static isMatch() {
-    return window.location.origin === "https://webrecorder.net";
+    return window.location.origin === "https://old.webrecorder.net";
   }
 
   async *run(ctx) {

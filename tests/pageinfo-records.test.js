@@ -127,7 +127,7 @@ function validateResourcesIndex(json) {
       mime: "image/vnd.microsoft.icon",
       type: "other",
     },
-    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2F&d=webrecorder.net&r=null":
+    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fold.webrecorder.net%2F&d=webrecorder.net&r=null":
       { status: 202, mime: "text/plain", type: "xhr" },
   });
 }
