@@ -158,11 +158,6 @@ function validateResourcesAbout(json) {
       { status: 200, mime: "text/css", type: "stylesheet" },
     "https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@700;900&display=swap":
       { status: 200, mime: "text/css", type: "stylesheet" },
-    "https://stats.browsertrix.com/js/script.tagged-events.js": {
-      status: 200,
-      mime: "application/javascript",
-      type: "script",
-    },
     "https://old.webrecorder.net/assets/wr-logo.svg": {
       status: 200,
       mime: "image/svg+xml",
@@ -172,12 +167,6 @@ function validateResourcesAbout(json) {
       { status: 200, mime: "font/woff2", type: "font" },
     "https://fonts.gstatic.com/s/sourcesanspro/v22/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
-    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2Fabout&d=webrecorder.net&r=null":
-      {
-        status: 0,
-        type: "xhr",
-        error: "net::ERR_BLOCKED_BY_CLIENT",
-      },
   });
 }
 

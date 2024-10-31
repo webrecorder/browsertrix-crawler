@@ -6,9 +6,8 @@ import { WARCParser } from "warcio";
 const PDF = "https://specs.webrecorder.net/wacz/1.1.1/wacz-2021.pdf";
 const PDF_HTTP = PDF.replace("https", "http");
 
-const XML = "https://old.webrecorder.net/feed.xml";
-//const XML_REDIR = "https://www.webrecorder.net/feed.xml";
-const PDF_REDIR = "http://specs.webrecorder.net/wacz/1.1.1/wacz-2021.pdf"
+const XML = "https://webrecorder.net/feed.xml";
+const XML_REDIR = "https://www.webrecorder.net/feed.xml";
 
 test("PDF: ensure pdf is crawled", () => {
   child_process.execSync(
@@ -108,7 +107,7 @@ test("PDF: check that CDX contains one pdf 200, one 301 and one 200, two pageinf
 
 test("XML: ensure with and without redirect is crawled", () => {
   child_process.execSync(
-    `docker run -v $PWD/test-crawls:/crawls  webrecorder/browsertrix-crawler crawl --url "${XML}" --url "${PDF_REDIR}" --collection crawl-xml --generateCDX`
+    `docker run -v $PWD/test-crawls:/crawls  webrecorder/browsertrix-crawler crawl --url "${XML}" --url "${XML_REDIR}" --collection crawl-xml --generateCDX`
   );
 });
 
@@ -135,9 +134,9 @@ test("XML: check pages.jsonl file entry contains status code and mime type", () 
   expect(page.loadState).toBe(2);
 
   const pageH = JSON.parse(pages[2]);
-  expect(pageH.url).toBe(PDF_REDIR);
+  expect(pageH.url).toBe(XML_REDIR);
   expect(pageH.status).toBe(200);
-  expect(pageH.mime).toBe("application/pdf");
+  expect(pageH.mime).toBe("application/xml");
   expect(pageH.loadState).toBe(2);
 });
 
@@ -152,7 +151,7 @@ test("XML: check that CDX contains one xml 200, one 301 and one 200, two pageinf
 
   expect(cdxj.length).toBe(6);
 
-  expect(cdxj[0].url).toBe("https://old.webrecorder.net/favicon.ico");
+  expect(cdxj[0].url).toBe("https://webrecorder.net/favicon.ico");
 
   expect(cdxj[1].url).toBe(XML);
   expect(cdxj[1].status).toBe("200");
@@ -162,13 +161,13 @@ test("XML: check that CDX contains one xml 200, one 301 and one 200, two pageinf
   expect(cdxj[2].status).toBe("200");
   expect(cdxj[2].mime).toBe("application/xml");
 
-  expect(cdxj[3].url).toBe(PDF_REDIR);
+  expect(cdxj[3].url).toBe(XML_REDIR);
   expect(cdxj[3].status).toBe("301");
 
   expect(cdxj[4].url).toBe("urn:pageinfo:" + XML);
   expect(cdxj[4].mime).toBe("application/json");
 
-  expect(cdxj[5].url).toBe("urn:pageinfo:" + PDF_REDIR);
+  expect(cdxj[5].url).toBe("urn:pageinfo:" + XML_REDIR);
   expect(cdxj[5].mime).toBe("application/json");
 });
 
