@@ -113,11 +113,6 @@ function validateResourcesIndex(json) {
       { status: 200, mime: "text/css", type: "stylesheet" },
     "https://fonts.googleapis.com/css?family=Source+Code+Pro|Source+Sans+Pro&display=swap":
       { status: 200, mime: "text/css", type: "stylesheet" },
-    "https://stats.browsertrix.com/js/script.tagged-events.js": {
-      status: 200,
-      mime: "application/javascript",
-      type: "script",
-    },
     "https://fonts.gstatic.com/s/sourcesanspro/v22/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
     "https://fonts.gstatic.com/s/sourcesanspro/v22/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2":
@@ -127,8 +122,6 @@ function validateResourcesIndex(json) {
       mime: "image/vnd.microsoft.icon",
       type: "other",
     },
-    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fold.webrecorder.net%2F&d=webrecorder.net&r=null":
-      { status: 202, mime: "text/plain", type: "xhr" },
   });
 }
 
