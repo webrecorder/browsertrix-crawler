@@ -3,7 +3,7 @@ import fs from "fs";
 
 test("ensure that stats file is modified", async () => {
   const child = child_process.exec(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --generateWACZ --text --limit 3 --exclude community --collection file-stats --statsFilename progress.json",
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --generateWACZ --text --limit 3 --exclude community --collection file-stats --statsFilename progress.json",
   );
 
   // detect crawler exit

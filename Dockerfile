@@ -50,6 +50,8 @@ RUN ln -s /app/dist/main.js /usr/bin/crawl; \
     ln -s /app/dist/main.js /usr/bin/qa; \
     ln -s /app/dist/create-login-profile.js /usr/bin/create-login-profile
 
+RUN mkdir -p /app/behaviors
+
 WORKDIR /crawls
 
 # enable to test custom behaviors build (from browsertrix-behaviors)

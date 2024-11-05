@@ -5,7 +5,7 @@ import { WARCParser } from "warcio";
 
 test("run warc and ensure pageinfo records contain the correct resources", async () => {
   child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --url https://webrecorder.net/about --url https://invalid.invalid/ --scopeType page --collection page-info-test --combineWARC",
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --url https://invalid.invalid/ --scopeType page --collection page-info-test --combineWARC",
   );
 
   const filename = path.join(
@@ -26,7 +26,7 @@ test("run warc and ensure pageinfo records contain the correct resources", async
   for await (const record of parser) {
     if (
       !foundIndex &&
-      record.warcTargetURI === "urn:pageinfo:https://webrecorder.net/"
+      record.warcTargetURI === "urn:pageinfo:https://old.webrecorder.net/"
     ) {
       foundIndex = true;
       const text = await record.contentText();
@@ -35,7 +35,7 @@ test("run warc and ensure pageinfo records contain the correct resources", async
 
     if (
       !foundAbout &&
-      record.warcTargetURI === "urn:pageinfo:https://webrecorder.net/about"
+      record.warcTargetURI === "urn:pageinfo:https://old.webrecorder.net/about"
     ) {
       foundAbout = true;
       const text = await record.contentText();
@@ -64,47 +64,47 @@ function validateResourcesIndex(json) {
   expect(json).toHaveProperty("urls");
   expect(json.counts).toEqual({ jsErrors: 0 });
   expect(json.urls).toEqual({
-    "https://webrecorder.net/": {
+    "https://old.webrecorder.net/": {
       status: 200,
       mime: "text/html",
       type: "document",
     },
-    "https://webrecorder.net/assets/tools/logo-pywb.png": {
+    "https://old.webrecorder.net/assets/tools/logo-pywb.png": {
       mime: "image/png",
       status: 200,
       type: "image",
     },
-    "https://webrecorder.net/assets/brand/archivewebpage-icon-color.svg": {
+    "https://old.webrecorder.net/assets/brand/archivewebpage-icon-color.svg": {
       mime: "image/svg+xml",
       status: 200,
       type: "image",
     },
-    "https://webrecorder.net/assets/brand/browsertrix-icon-color.svg": {
+    "https://old.webrecorder.net/assets/brand/browsertrix-icon-color.svg": {
       mime: "image/svg+xml",
       status: 200,
       type: "image",
     },
-    "https://webrecorder.net/assets/brand/browsertrixcrawler-icon-color.svg": {
+    "https://old.webrecorder.net/assets/brand/browsertrixcrawler-icon-color.svg": {
       mime: "image/svg+xml",
       status: 200,
       type: "image",
     },
-    "https://webrecorder.net/assets/brand/replaywebpage-icon-color.svg": {
+    "https://old.webrecorder.net/assets/brand/replaywebpage-icon-color.svg": {
       mime: "image/svg+xml",
       status: 200,
       type: "image",
     },
-    "https://webrecorder.net/assets/fontawesome/all.css": {
+    "https://old.webrecorder.net/assets/fontawesome/all.css": {
       status: 200,
       mime: "text/css",
       type: "stylesheet",
     },
-    "https://webrecorder.net/assets/wr-logo.svg": {
+    "https://old.webrecorder.net/assets/wr-logo.svg": {
       status: 200,
       mime: "image/svg+xml",
       type: "image",
     },
-    "https://webrecorder.net/assets/main.css": {
+    "https://old.webrecorder.net/assets/main.css": {
       status: 200,
       mime: "text/css",
       type: "stylesheet",
@@ -113,22 +113,15 @@ function validateResourcesIndex(json) {
       { status: 200, mime: "text/css", type: "stylesheet" },
     "https://fonts.googleapis.com/css?family=Source+Code+Pro|Source+Sans+Pro&display=swap":
       { status: 200, mime: "text/css", type: "stylesheet" },
-    "https://stats.browsertrix.com/js/script.tagged-events.js": {
-      status: 200,
-      mime: "application/javascript",
-      type: "script",
-    },
     "https://fonts.gstatic.com/s/sourcesanspro/v22/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
     "https://fonts.gstatic.com/s/sourcesanspro/v22/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
-    "https://webrecorder.net/assets/favicon.ico": {
+    "https://old.webrecorder.net/assets/favicon.ico": {
       status: 200,
       mime: "image/vnd.microsoft.icon",
       type: "other",
     },
-    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2F&d=webrecorder.net&r=null":
-      { status: 202, mime: "text/plain", type: "xhr" },
   });
 }
 
@@ -139,17 +132,17 @@ function validateResourcesAbout(json) {
   expect(json).toHaveProperty("urls");
   expect(json.counts).toEqual({ jsErrors: 0 });
   expect(json.urls).toEqual({
-    "https://webrecorder.net/about": {
+    "https://old.webrecorder.net/about": {
       status: 200,
       mime: "text/html",
       type: "document",
     },
-    "https://webrecorder.net/assets/main.css": {
+    "https://old.webrecorder.net/assets/main.css": {
       status: 200,
       mime: "text/css",
       type: "stylesheet",
     },
-    "https://webrecorder.net/assets/fontawesome/all.css": {
+    "https://old.webrecorder.net/assets/fontawesome/all.css": {
       status: 200,
       mime: "text/css",
       type: "stylesheet",
@@ -158,12 +151,7 @@ function validateResourcesAbout(json) {
       { status: 200, mime: "text/css", type: "stylesheet" },
     "https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@700;900&display=swap":
       { status: 200, mime: "text/css", type: "stylesheet" },
-    "https://stats.browsertrix.com/js/script.tagged-events.js": {
-      status: 200,
-      mime: "application/javascript",
-      type: "script",
-    },
-    "https://webrecorder.net/assets/wr-logo.svg": {
+    "https://old.webrecorder.net/assets/wr-logo.svg": {
       status: 200,
       mime: "image/svg+xml",
       type: "image",
@@ -172,12 +160,6 @@ function validateResourcesAbout(json) {
       { status: 200, mime: "font/woff2", type: "font" },
     "https://fonts.gstatic.com/s/sourcesanspro/v22/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
-    "https://stats.browsertrix.com/api/event?__wb_method=POST&n=pageview&u=https%3A%2F%2Fwebrecorder.net%2Fabout&d=webrecorder.net&r=null":
-      {
-        status: 0,
-        type: "xhr",
-        error: "net::ERR_BLOCKED_BY_CLIENT",
-      },
   });
 }
 
