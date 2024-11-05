@@ -16,7 +16,7 @@ test("dynamically add exclusion while crawl is running", async () => {
 
   try {
     exec(
-      "docker run -p 36382:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection add-exclusion --url https://webrecorder.net/ --scopeType prefix --limit 20 --logging debug --debugAccessRedis",
+      "docker run -p 36382:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection add-exclusion --url https://old.webrecorder.net/ --scopeType prefix --limit 20 --logging debug --debugAccessRedis",
       { shell: "/bin/bash" },
       callback,
     );

@@ -4,7 +4,7 @@ import { execSync } from "child_process";
 test("check that gclid query URL is automatically redirected to remove it", async () => {
   try {
     execSync(
-      "docker run --rm  -v $PWD/test-crawls:/crawls -i webrecorder/browsertrix-crawler crawl --url 'https://webrecorder.net/about?gclid=abc' --collection test-brave-redir --behaviors \"\" --limit 1 --generateCDX");
+      "docker run --rm  -v $PWD/test-crawls:/crawls -i webrecorder/browsertrix-crawler crawl --url 'https://old.webrecorder.net/about?gclid=abc' --collection test-brave-redir --behaviors \"\" --limit 1 --generateCDX");
 
   } catch (error) {
     console.log(error.stderr);
@@ -23,9 +23,9 @@ test("check that gclid query URL is automatically redirected to remove it", asyn
   for (const line of lines) {
     const json = line.split(" ").slice(2).join(" ");
     const data = JSON.parse(json);
-    if (data.url === "https://webrecorder.net/about?gclid=abc" && data.status === "307") {
+    if (data.url === "https://old.webrecorder.net/about?gclid=abc" && data.status === "307") {
       redirectFound = true;
-    } else if (data.url === "https://webrecorder.net/about" && data.status === "200") {
+    } else if (data.url === "https://old.webrecorder.net/about" && data.status === "200") {
       responseFound = true;
     }
     if (responseFound && redirectFound) {

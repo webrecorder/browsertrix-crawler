@@ -175,6 +175,7 @@ export class Crawler {
   finalExit = false;
   uploadAndDeleteLocal = false;
   done = false;
+  postCrawling = false;
 
   textInPages = false;
 
@@ -1536,11 +1537,12 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async postCrawl() {
+    this.postCrawling = true;
+    logger.info("Crawling done");
+
     if (this.params.combineWARC && !this.params.dryRun) {
       await this.combineWARC();
     }
-
-    logger.info("Crawling done");
 
     if (
       (this.params.generateCDX || this.params.generateWACZ) &&

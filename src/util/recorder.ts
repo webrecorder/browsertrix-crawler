@@ -122,6 +122,7 @@ export class Recorder {
   pendingRequests!: Map<string, RequestResponseInfo>;
   skipIds!: Set<string>;
   pageInfo!: PageInfoRecord;
+  skipRangeUrls!: Map<string, number>;
 
   swTargetId?: string | null;
   swFrameIds = new Set<string>();
@@ -130,7 +131,8 @@ export class Recorder {
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logDetails: Record<string, any> = {};
-  skipping = false;
+
+  pageFinished = false;
 
   gzip = true;
 
@@ -169,6 +171,7 @@ export class Recorder {
     frameIdToExecId: Map<string, number>;
   }) {
     this.frameIdToExecId = frameIdToExecId;
+    this.pageFinished = false;
 
     // Fetch
     cdp.on("Fetch.requestPaused", (params) => {
@@ -407,6 +410,8 @@ export class Recorder {
     logNetwork("Network.loadingFailed", {
       requestId,
       url,
+      errorText,
+      type,
       ...this.logDetails,
     });
 
@@ -426,15 +431,14 @@ export class Recorder {
       case "net::ERR_ABORTED":
         // check if this is a false positive -- a valid download that's already been fetched
         // the abort is just for page, but download will succeed
-        if (type === "Document" && reqresp.isValidBinary()) {
+        if (
+          (type === "Document" || type === "Media") &&
+          reqresp.isValidBinary()
+        ) {
           this.removeReqResp(requestId);
           return this.serializeToWARC(reqresp);
-        } else if (
-          url &&
-          reqresp.requestHeaders &&
-          reqresp.requestHeaders["x-browsertrix-fetch"]
-        ) {
-          delete reqresp.requestHeaders["x-browsertrix-fetch"];
+        } else if (url && reqresp.requestHeaders && type === "Media") {
+          this.removeReqResp(requestId);
           logger.warn(
             "Attempt direct fetch of failed request",
             { url, ...this.logDetails },
@@ -453,7 +457,7 @@ export class Recorder {
       default:
         logger.warn(
           "Request failed",
-          { url, errorText, ...this.logDetails },
+          { url, errorText, type, status: reqresp.status, ...this.logDetails },
           "recorder",
         );
     }
@@ -495,7 +499,7 @@ export class Recorder {
   async handleRequestPaused(
     params: Protocol.Fetch.RequestPausedEvent,
     cdp: CDPSession,
-    isSWorker = false,
+    isBrowserContext = false,
   ) {
     const {
       requestId,
@@ -520,10 +524,13 @@ export class Recorder {
       if (
         responseStatusCode &&
         !responseErrorReason &&
-        !this.shouldSkip(headers, url, method, resourceType) &&
-        !(isSWorker && networkId)
+        !this.shouldSkip(headers, url, method, resourceType)
       ) {
-        continued = await this.handleFetchResponse(params, cdp, isSWorker);
+        continued = await this.handleFetchResponse(
+          params,
+          cdp,
+          isBrowserContext,
+        );
       }
     } catch (e) {
       logger.error(
@@ -549,7 +556,7 @@ export class Recorder {
   async handleFetchResponse(
     params: Protocol.Fetch.RequestPausedEvent,
     cdp: CDPSession,
-    isSWorker: boolean,
+    isBrowserContext: boolean,
   ) {
     const { request } = params;
     const { url } = request;
@@ -610,20 +617,43 @@ export class Recorder {
 
         return false;
       } else {
-        logger.debug(
-          "Skip 206 Response",
-          { range, contentLen, url, ...this.logDetails },
-          "recorder",
-        );
+        // logger.debug(
+        //   "Skip 206 Response",
+        //   { range, contentLen, url, ...this.logDetails },
+        //   "recorder",
+        // );
         this.removeReqResp(networkId);
+        const count = this.skipRangeUrls.get(url) || 0;
+        if (count > 2) {
+          // just fail additional range requests to save bandwidth, as these are not being recorded
+          await cdp.send("Fetch.failRequest", {
+            requestId,
+            errorReason: "BlockedByResponse",
+          });
+          return true;
+        }
+        this.skipRangeUrls.set(url, count + 1);
         return false;
       }
     }
 
     const reqresp = this.pendingReqResp(networkId);
+
     if (!reqresp) {
       return false;
     }
+
+    // indicate that this is intercepted in the page context
+    if (!isBrowserContext) {
+      reqresp.inPageContext = true;
+    }
+
+    // Already being handled by a different handler
+    if (reqresp.fetchContinued) {
+      return false;
+    }
+
+    reqresp.fetchContinued = true;
 
     if (
       url === this.pageUrl &&
@@ -643,12 +673,6 @@ export class Recorder {
 
     if (this.noResponseForStatus(responseStatusCode)) {
       reqresp.payload = new Uint8Array();
-
-      if (isSWorker) {
-        this.removeReqResp(networkId);
-        await this.serializeToWARC(reqresp);
-      }
-
       return false;
     }
 
@@ -656,13 +680,13 @@ export class Recorder {
 
     let streamingConsume = false;
 
-    // if contentLength is large or unknown, do streaming, unless its an essential resource
-    // in which case, need to do a full fetch either way
-    // don't count non-200 responses which may not have content-length
     if (
-      (contentLen < 0 || contentLen > MAX_BROWSER_DEFAULT_FETCH_SIZE) &&
-      responseStatusCode === 200 &&
-      !this.isEssentialResource(reqresp.resourceType, mimeType)
+      this.shouldStream(
+        contentLen,
+        responseStatusCode || 0,
+        reqresp.resourceType || "",
+        mimeType,
+      )
     ) {
       const opts: ResponseStreamAsyncFetchOptions = {
         reqresp,
@@ -724,9 +748,9 @@ export class Recorder {
 
     const rewritten = await this.rewriteResponse(reqresp, mimeType);
 
-    // if in service worker, serialize here
-    // as won't be getting a loadingFinished message
-    if (isSWorker && reqresp.payload) {
+    // if in browser context, and not also intercepted in page context
+    // serialize here, as won't be getting a loadingFinished message for it
+    if (isBrowserContext && !reqresp.inPageContext && reqresp.payload) {
       this.removeReqResp(networkId);
       await this.serializeToWARC(reqresp);
     }
@@ -794,7 +818,8 @@ export class Recorder {
     }
     this.pendingRequests = new Map();
     this.skipIds = new Set();
-    this.skipping = false;
+    this.skipRangeUrls = new Map<string, number>();
+    this.pageFinished = false;
     this.pageInfo = {
       pageid,
       urls: {},
@@ -861,8 +886,14 @@ export class Recorder {
 
     let numPending = this.pendingRequests.size;
 
-    while (numPending && !this.crawler.interrupted) {
-      const pending = [];
+    let pending = [];
+    while (
+      numPending &&
+      !this.pageFinished &&
+      !this.crawler.interrupted &&
+      !this.crawler.postCrawling
+    ) {
+      pending = [];
       for (const [requestId, reqresp] of this.pendingRequests.entries()) {
         const url = reqresp.url || "";
         const entry: {
@@ -892,11 +923,24 @@ export class Recorder {
       await sleep(5.0);
       numPending = this.pendingRequests.size;
     }
+
+    if (this.pendingRequests.size) {
+      logger.warn(
+        "Dropping timed out requests",
+        { numPending, pending, ...this.logDetails },
+        "recorder",
+      );
+      for (const requestId of this.pendingRequests.keys()) {
+        this.removeReqResp(requestId);
+      }
+    }
   }
 
   async onClosePage() {
     // Any page-specific handling before page is closed.
     this.frameIdToExecId = null;
+
+    this.pageFinished = true;
   }
 
   async onDone(timeout: number) {
@@ -1019,12 +1063,47 @@ export class Recorder {
     }
   }
 
-  isEssentialResource(resourceType: string | undefined, contentType: string) {
+  isEssentialResource(resourceType: string, contentType: string) {
     if (resourceType === "script" || resourceType === "stylesheet") {
       return true;
     }
 
     if (RW_MIME_TYPES.includes(contentType)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  shouldStream(
+    contentLength: number,
+    responseStatusCode: number,
+    resourceType: string,
+    mimeType: string,
+  ) {
+    // if contentLength is too large even for rewriting, always stream, will not do rewriting
+    // even if text
+    if (contentLength > MAX_TEXT_REWRITE_SIZE) {
+      return true;
+    }
+
+    // if contentLength larger but is essential resource, do stream
+    // otherwise full fetch for rewriting
+    if (
+      contentLength > MAX_BROWSER_DEFAULT_FETCH_SIZE &&
+      !this.isEssentialResource(resourceType, mimeType)
+    ) {
+      return true;
+    }
+
+    // if contentLength is unknown, also stream if its an essential resource and not 3xx / 4xx / 5xx
+    // status code, as these codes may have no content-length, and are likely small
+    if (
+      contentLength < 0 &&
+      !this.isEssentialResource(resourceType, mimeType) &&
+      responseStatusCode >= 200 &&
+      responseStatusCode < 300
+    ) {
       return true;
     }
 
@@ -1087,10 +1166,6 @@ export class Recorder {
       }
       if (this.skipIds.has(requestId)) {
         logNetwork("Skipping ignored id", { requestId });
-        return null;
-      }
-      if (this.skipping) {
-        //logger.debug("Skipping request, page already finished", this.logDetails, "recorder");
         return null;
       }
       const reqresp = new RequestResponseInfo(requestId);
@@ -1395,7 +1470,7 @@ class AsyncFetcher {
           reqresp.payload = Buffer.concat(buffers, currSize);
           externalBuffer.buffers = [reqresp.payload];
         } else if (fh) {
-          logger.warn(
+          logger.debug(
             "Large payload written to WARC, but not returned to browser (would require rereading into memory)",
             { url, actualSize: reqresp.readSize, maxSize: this.maxFetchSize },
             "recorder",

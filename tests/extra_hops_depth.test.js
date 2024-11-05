@@ -12,7 +12,7 @@ test(
   async () => {
     try {
       await exec(
-        "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-beyond --extraHops 2 --url https://webrecorder.net/ --limit 5 --timeout 10 --exclude community --exclude tools",
+        "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-beyond --extraHops 2 --url https://old.webrecorder.net/ --limit 5 --timeout 10 --exclude community --exclude tools",
       );
     } catch (error) {
       console.log(error);
@@ -31,14 +31,14 @@ test(
     const crawledExtraPagesArray = crawledExtraPages.trim().split("\n");
 
     const expectedPages = [
-      "https://webrecorder.net/",
+      "https://old.webrecorder.net/",
     ];
 
     const expectedExtraPages = [
-      "https://webrecorder.net/blog",
-      "https://webrecorder.net/about",
-      "https://webrecorder.net/contact",
-      "https://webrecorder.net/faq",
+      "https://old.webrecorder.net/blog",
+      "https://old.webrecorder.net/about",
+      "https://old.webrecorder.net/contact",
+      "https://old.webrecorder.net/faq",
     ];
 
     // first line is the header, not page, so adding -1
@@ -74,7 +74,7 @@ test(
 test("extra hops applies beyond depth limit", () => {
     try {
       execSync(
-        "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-depth-0 --extraHops 1 --url https://webrecorder.net/ --limit 2 --depth 0 --timeout 10 --exclude community --exclude tools",
+        "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-depth-0 --extraHops 1 --url https://old.webrecorder.net/ --limit 2 --depth 0 --timeout 10 --exclude community --exclude tools",
       );
     } catch (error) {
       console.log(error);
