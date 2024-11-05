@@ -191,12 +191,14 @@ export class Crawler {
 
   proxyServer?: string;
 
-  driver!: (opts: {
-    page: Page;
-    data: PageState;
-    // eslint-disable-next-line no-use-before-define
-    crawler: Crawler;
-  }) => Promise<void>;
+  driver:
+    | ((opts: {
+        page: Page;
+        data: PageState;
+        // eslint-disable-next-line no-use-before-define
+        crawler: Crawler;
+      }) => Promise<void>)
+    | null = null;
 
   recording: boolean;
 
@@ -930,8 +932,12 @@ self.__bx_behaviors.selectMainBehavior();
       await page.setExtraHTTPHeaders({});
     }
 
-    // run custom driver here
-    await this.driver({ page, data, crawler: this });
+    // run custom driver here, if any
+    if (this.driver) {
+      await this.driver({ page, data, crawler: this });
+    } else {
+      await this.loadPage(page, data);
+    }
 
     data.title = await timedRun(
       page.title(),
@@ -1347,12 +1353,14 @@ self.__bx_behaviors.selectMainBehavior();
       );
     }
 
-    try {
-      const driverUrl = new URL(this.params.driver, import.meta.url);
-      this.driver = (await import(driverUrl.href)).default;
-    } catch (e) {
-      logger.warn(`Error importing driver ${this.params.driver}`, e);
-      return;
+    if (this.params.driver) {
+      try {
+        const driverUrl = new URL(this.params.driver, import.meta.url);
+        this.driver = (await import(driverUrl.href)).default;
+      } catch (e) {
+        logger.warn(`Error importing driver ${this.params.driver}`, e);
+        return;
+      }
     }
 
     await this.initCrawlState();
