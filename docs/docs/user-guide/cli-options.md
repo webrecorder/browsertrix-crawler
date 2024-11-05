@@ -246,9 +246,11 @@ Options:
                                             ailOnFailedSeed may result in crawl
                                             failing due to non-200 responses
                                                       [boolean] [default: false]
-      --customBehaviors                     injects a custom behavior file or se
-                                            t of behavior files in a directory
-                                                                        [string]
+      --customBehaviors                     Custom behavior files to inject. Val
+                                            ues can be URLs, paths to individual
+                                            behavior files, or paths to a direct
+                                            ory of behavior files.
+                                                           [array] [default: []]
       --debugAccessRedis                    if set, runs internal redis without
                                             protected mode to allow external acc
                                             ess (for debugging)        [boolean]

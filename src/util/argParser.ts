@@ -551,8 +551,10 @@ class ArgParser {
 
         customBehaviors: {
           describe:
-            "injects a custom behavior file or set of behavior files in a directory",
-          type: "string",
+            "Custom behavior files to inject. Values can be URLs, paths to individual behavior files, or paths" +
+            " to a directory of behavior files",
+          type: "array",
+          default: [],
         },
 
         debugAccessRedis: {
