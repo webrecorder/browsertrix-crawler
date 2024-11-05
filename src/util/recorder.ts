@@ -1751,6 +1751,13 @@ function createResponse(
 
   const httpHeaders = reqresp.getResponseHeadersDict(reqresp.payload.length);
 
+  const cookie =
+    reqresp.requestHeaders &&
+    (reqresp.requestHeaders["cookie"] || reqresp.requestHeaders["Cookie"]);
+  if (cookie) {
+    httpHeaders["x-wabac-preset-cookie"] = cookie;
+  }
+
   const warcHeaders: Record<string, string> = {
     "WARC-Page-ID": pageid,
   };
