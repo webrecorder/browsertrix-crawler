@@ -1032,7 +1032,11 @@ self.__bx_behaviors.selectMainBehavior();
           await textextract.extractAndStoreText("textFinal", true, true);
         }
 
-        if (this.params.screenshot && this.screenshotWriter) {
+        if (
+          this.params.screenshot &&
+          this.screenshotWriter &&
+          this.params.screenshot.includes("fullPageAfterBehaviors")
+        ) {
           await page.evaluate(() => {
             window.scrollTo(0, 0);
           });
@@ -1042,9 +1046,7 @@ self.__bx_behaviors.selectMainBehavior();
             url,
             writer: this.screenshotWriter,
           });
-          if (this.params.screenshot.includes("fullPageAfterBehaviors")) {
-            await screenshots.takeFullPageAfterBehaviours();
-          }
+          await screenshots.takeFullPageAfterBehaviours();
         }
       }
     }
