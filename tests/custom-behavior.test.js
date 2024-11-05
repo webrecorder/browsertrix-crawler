@@ -36,7 +36,7 @@ test("test custom behaviors from local filepath", async () => {
 });
 
 test("test custom behavior from URL", async () => {
-  const res = child_process.execSync("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://webrecorder.net/ --customBehaviors https://raw.githubusercontent.com/webrecorder/browsertrix-crawler/refs/heads/main/tests/custom-behaviors/custom-2.js --scopeType page");
+  const res = child_process.execSync("docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --customBehaviors https://raw.githubusercontent.com/webrecorder/browsertrix-crawler/refs/heads/main/tests/custom-behaviors/custom-2.js --scopeType page");
 
   const log = res.toString();
 
@@ -44,13 +44,13 @@ test("test custom behavior from URL", async () => {
 
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat-2","page":"https://webrecorder.net/","workerid":0}}',
+      '{"state":{},"msg":"test-stat-2","page":"https://old.webrecorder.net/","workerid":0}}',
     ) > 0,
   ).toBe(true);
 });
 
 test("test mixed custom behavior sources", async () => {
-  const res = child_process.execSync("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://webrecorder.net/ --customBehaviors https://raw.githubusercontent.com/webrecorder/browsertrix-crawler/refs/heads/main/tests/custom-behaviors/custom-2.js --customBehaviors /custom-behaviors/custom.js --scopeType page");
+  const res = child_process.execSync("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://old.webrecorder.net/ --customBehaviors https://raw.githubusercontent.com/webrecorder/browsertrix-crawler/refs/heads/main/tests/custom-behaviors/custom-2.js --customBehaviors /custom-behaviors/custom.js --scopeType page");
 
   const log = res.toString();
 
@@ -66,7 +66,7 @@ test("test mixed custom behavior sources", async () => {
   // test custom behavior from local file ran
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat-2","page":"https://webrecorder.net/","workerid":0}}',
+      '{"state":{},"msg":"test-stat-2","page":"https://old.webrecorder.net/","workerid":0}}',
     ) > 0,
   ).toBe(true);
 });
