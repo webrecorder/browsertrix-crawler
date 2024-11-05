@@ -75,8 +75,7 @@ Options:
                                                  [string] [default: "crawl-@ts"]
       --headless                            Run in headless mode, otherwise star
                                             t xvfb    [boolean] [default: false]
-      --driver                              JS driver for the crawler
-                                        [string] [default: "./defaultDriver.js"]
+      --driver                              JS driver for the crawler   [string]
       --generateCDX, --generatecdx, --gene  If set, generate index (CDXJ) for us
       rateCdx                               e with pywb after crawl is done
                                                       [boolean] [default: false]
@@ -253,8 +252,8 @@ Options:
                                                       [boolean] [default: false]
       --customBehaviors                     Custom behavior files to inject. Val
                                             ues can be URLs, paths to individual
-                                            behavior files, or paths to a direct
-                                            ory of behavior files.
+                                             behavior files, or paths to a direc
+                                            tory of behavior files
                                                            [array] [default: []]
       --debugAccessRedis                    if set, runs internal redis without
                                             protected mode to allow external acc
