@@ -32,23 +32,23 @@ The repeatable `--customBehaviors` flag can accept:
 #### Local filepath (directory)
 
 ```sh
-docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors /custom-behaviors/
+docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net --customBehaviors /custom-behaviors/
 ```
 
 #### Local filepath (file)
 
 ```sh
-docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors /custom-behaviors/custom-behavior-1.js
+docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net --customBehaviors /custom-behaviors/custom.js
 ```
 
 #### URL
 
 ```sh
-docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors https://example.com/custom-behavior-1 --customBehaviors https://example.org/custom-behavior-2 
+docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net --customBehaviors https://example.com/custom-behavior-1 --customBehaviors https://example.org/custom-behavior-2 
 ```
 
 #### Git repository
 
 ```sh
-docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors "git+https://git.example.com/custom-behaviors?branch=dev&path=path/to/behaviors"
+docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors "git+https://git.example.com/custom-behaviors?branch=dev&path=path/to/behaviors"
 ```
