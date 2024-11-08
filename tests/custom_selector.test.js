@@ -52,20 +52,17 @@ test("test custom selector crawls JS files as pages", async () => {
 });
 
 
-test("test invalid selector, no pages extracted", async () => {
+test("test invalid selector, crawl fails", async () => {
+  let failed = false;
   try {
     child_process.execSync(
       "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --collection custom-sel-invalid --selectLinks \"script[\"",
     );
   } catch (error) {
-    console.log(error);
+    failed = true;
   }
 
-  const crawledExtraPages = fs.readFileSync(
-    "test-crawls/collections/custom-sel-invalid/pages/extraPages.jsonl",
-    "utf8",
-  );
-  expect(crawledExtraPages.trim().split("\n").length).toBe(1);
+  expect(failed).toBe(true);
 });
 
  
