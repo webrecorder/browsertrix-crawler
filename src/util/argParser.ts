@@ -564,8 +564,10 @@ class ArgParser {
 
         customBehaviors: {
           describe:
-            "Custom behavior files to inject. Values can be URLs, paths to individual behavior files, or paths" +
-            " to a directory of behavior files",
+            "Custom behavior files to inject. Valid values: URL to file, path to file, path to directory" +
+            " of behaviors, URL to Git repo of behaviors (prefixed with git+, optionally specify branch and" +
+            " relative path to a directory within repo as branch and path query parameters, e.g." +
+            ' --customBehaviors "git+https://git.example.com/repo.git?branch=dev&path=some/dir"',
           type: "array",
           default: [],
         },

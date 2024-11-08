@@ -2,8 +2,12 @@ import fsp from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { fetch } from "undici";
+import util from "util";
+import { exec as execCallback } from "child_process";
 
 import { logger } from "./logger.js";
+
+const exec = util.promisify(execCallback);
 
 const MAX_DEPTH = 2;
 
@@ -23,7 +27,10 @@ export async function collectCustomBehaviors(
   const collectedSources: FileSources = [];
 
   for (const fileSource of sources) {
-    if (fileSource.startsWith("http")) {
+    if (fileSource.startsWith("git+")) {
+      const newSources = await collectGitBehaviors(fileSource);
+      collectedSources.push(...newSources);
+    } else if (fileSource.startsWith("http")) {
       const newSources = await collectOnlineBehavior(fileSource);
       collectedSources.push(...newSources);
     } else {
@@ -33,6 +40,45 @@ export async function collectCustomBehaviors(
   }
 
   return collectedSources;
+}
+
+async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
+  const url = gitUrl.split("git+").pop() || "";
+  const params = new URL(url).searchParams;
+  const branch = params.get("branch") || "";
+  const relPath = params.get("path") || "";
+  const urlStripped = url.split("?")[0];
+
+  const timestamp = Date.now();
+  const tmpDir = `/tmp/behaviors-repo-${timestamp}`;
+
+  let cloneCommand = "git clone ";
+  if (branch) {
+    cloneCommand += `-b ${branch} --single-branch `;
+  }
+  cloneCommand += `${urlStripped} ${tmpDir}`;
+
+  let pathToCollect = tmpDir;
+  if (relPath) {
+    pathToCollect = path.join(tmpDir, relPath);
+  }
+
+  try {
+    await exec(cloneCommand);
+    logger.info(
+      "Custom behavior files downloaded from git repo",
+      { url: urlStripped },
+      "behavior",
+    );
+    return await collectLocalPathBehaviors(pathToCollect);
+  } catch (e) {
+    logger.error(
+      "Error downloading custom behaviors from Git repo",
+      { url: urlStripped, error: e },
+      "behavior",
+    );
+  }
+  return [];
 }
 
 async function collectOnlineBehavior(url: string): Promise<FileSources> {
