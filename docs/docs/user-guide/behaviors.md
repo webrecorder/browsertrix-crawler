@@ -14,12 +14,41 @@ To disable behaviors for a crawl, use `--behaviors ""`.
 
 ## Additional Custom Behaviors
 
-Custom behaviors can be mounted into the crawler and loaded from there. For example:
+Custom behaviors can be mounted into the crawler and ran from there, or downloaded from a URL.
+
+Each behavior should contain a single class that implements the behavior interface. See [the behaviors tutorial](https://github.com/webrecorder/browsertrix-behaviors/blob/main/docs/TUTORIAL.md) for more info on how to write behaviors.
+
+The first behavior which returns true for `isMatch()` will be run on a given page.
+
+The repeatable `--customBehaviors` flag can accept:
+
+- A path to a directory of behavior files
+- A path to a single behavior file
+- A URL for a single behavior file to download
+- A URL for a git repository of the form `git+https://git.example.com/repo.git`, with optional query parameters `branch` (to specify a particular branch to use) and `path` (to specify a relative path to a directory within the git repository where the custom behaviors are located)
+
+### Examples
+
+#### Local filepath (directory)
 
 ```sh
 docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors /custom-behaviors/
 ```
 
-This will load all the custom behaviors stored in the `tests/custom-behaviors` directory. The first behavior which returns true for `isMatch()` will be run on a given page.
+#### Local filepath (file)
 
-Each behavior should contain a single class that implements the behavior interface. See [the behaviors tutorial](https://github.com/webrecorder/browsertrix-behaviors/blob/main/docs/TUTORIAL.md) for more info on how to write behaviors.
+```sh
+docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors /custom-behaviors/custom-behavior-1.js
+```
+
+#### URL
+
+```sh
+docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors https://example.com/custom-behavior-1 --customBehaviors https://example.org/custom-behavior-2 
+```
+
+#### Git repository
+
+```sh
+docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors "git+https://git.example.com/custom-behaviors?branch=dev&path=path/to/behaviors"
+```
