@@ -17,6 +17,16 @@ can be used to specify additional seconds to wait after the page appears to have
 
 (On the other hand, the `--pageExtraDelay`/`--delay` adds an extra after all post-load actions have taken place, and can be useful for rate-limiting.)
 
+## Link Extraction
+
+By default, the crawler will extract all `href` properties from all `<a>` tags that have an `href`.
+This can be customized with the `--selectLinks` option, which can provide alternative selectors of the form:
+`[css selector]->[property to use]` or `[css selector]->@[attribute to use]`. The default value is `a[href]->href`.
+
+For example, to specify the default, but also include all `divs` that have class `mylink` and use `custom-href` attribute as the link, use `--selectLinks 'a[href]->href' --selectLinks 'div.mylink->@custom-href'`.
+
+Any number of selectors can be specified in this way, and each will be applied in sequence on each page.
+
 ## Ad Blocking
 
 Brave Browser, the browser used by Browsertrix Crawler for crawling, has some ad and tracker blocking features enabled by default. These [Shields](https://brave.com/shields/) be disabled or customized using [Browser Profiles](browser-profiles.md).
