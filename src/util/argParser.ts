@@ -7,6 +7,8 @@ import { KnownDevices as devices } from "puppeteer-core";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
+import { createParser } from "css-selector-parser";
+
 import {
   BEHAVIOR_LOG_FUNC,
   WAIT_UNTIL_OPTS,
@@ -727,6 +729,8 @@ class ArgParser {
 
     let selectLinks: ExtractSelector[];
 
+    const parser = createParser();
+
     if (argv.selectLinks) {
       selectLinks = argv.selectLinks.map((x: string) => {
         const parts = x.split("->");
@@ -734,6 +738,11 @@ class ArgParser {
         const value = parts[1] || "";
         const extract = parts.length > 1 ? value.replace("@", "") : "href";
         const isAttribute = value.startsWith("@");
+        try {
+          parser(selector);
+        } catch (e) {
+          logger.fatal("Invalid Link Extraction CSS Selector", { selector });
+        }
         return { selector, extract, isAttribute };
       });
     } else {

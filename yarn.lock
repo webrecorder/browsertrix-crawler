@@ -1312,16 +1312,16 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@webrecorder/wabac@^2.20.0-beta.4":
-  version "2.20.0-beta.4"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.20.0-beta.4.tgz#c60fcd00f449cca52ce1a0bef305a06922c9e3e8"
-  integrity sha512-enHYcZoqs7cOu2tdTqVeB/zB27uL4wmCMzvF55bJqdB8d5zgPpY+/fpRA3eLxGrPc0nFYAjsI/aNaa62FH7WKQ==
+"@webrecorder/wabac@^2.20.0":
+  version "2.20.1"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.20.1.tgz#58e397e2ef1c33de1bb37aa4f51fc7f3eec8a1f7"
+  integrity sha512-RX+U6m7aVgvsAfLb9FuLY/PcHCNL5dc1FPaD0GnUiFgswSSe5v4MjIhqJNOnbrJYEcbib81AJfxNuvOyXAJDJQ==
   dependencies:
     "@peculiar/asn1-ecc" "^2.3.4"
     "@peculiar/asn1-schema" "^2.3.3"
     "@peculiar/x509" "^1.9.2"
     "@types/js-levenshtein" "^1.1.3"
-    "@webrecorder/wombat" "^3.8.2"
+    "@webrecorder/wombat" "^3.8.3"
     acorn "^8.10.0"
     auto-js-ipfs "^2.1.1"
     base64-js "^1.5.1"
@@ -1342,10 +1342,10 @@
     stream-browserify "^3.0.0"
     warcio "^2.3.1"
 
-"@webrecorder/wombat@^3.8.2":
-  version "3.8.2"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.8.2.tgz#e46e18719834d633175eec52ce753a4dc4e48e27"
-  integrity sha512-uUZr9V4UYpVOpM64Tm27ND/hMjDbT37+/qyNaNV6loqDuVzBVQh5w7SfTEy0Bbjj1MYyNZP244mOtWtotTpUEA==
+"@webrecorder/wombat@^3.8.3":
+  version "3.8.3"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.8.3.tgz#c5a077225d1a70def9fbbbfcd50fa4465d236546"
+  integrity sha512-dqgoxigB3OdX5JeB3yxJrUNwFwUBlYC+LmGrLEgGeP259MFzXQLD2pmfuqGt5ygWvIv56SrAMV4sUceux07X2A==
   dependencies:
     warcio "^2.3.1"
 
@@ -1962,6 +1962,11 @@ crypto-random-string@^4.0.0:
   integrity sha512-x8dy3RnvYdlUcPOjkEHqozhiwzKNSq7GcPuXFbnyMOCHxX8V3OgIg/pYuabl2sbUPfIJaeAQB7PMOK8DFIdoRA==
   dependencies:
     type-fest "^1.0.1"
+
+css-selector-parser@^3.0.5:
+  version "3.0.5"
+  resolved "https://registry.yarnpkg.com/css-selector-parser/-/css-selector-parser-3.0.5.tgz#9b636ebccf7c4bcce5c1ac21ae27de9f01180ae9"
+  integrity sha512-3itoDFbKUNx1eKmVpYMFyqKX04Ww9osZ+dLgrk6GEv6KMVeXUhUnp4I5X+evw+u3ZxVU6RFXSSRxlTeMh8bA+g==
 
 data-uri-to-buffer@^5.0.1:
   version "5.0.1"

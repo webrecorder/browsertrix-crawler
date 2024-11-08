@@ -493,6 +493,8 @@ export class Crawler {
 
     logger.info("Seeds", this.seeds);
 
+    logger.info("Link Selectors", this.params.selectLinks);
+
     if (this.params.behaviorOpts) {
       logger.info("Behavior Options", this.params.behaviorOpts);
     } else {
