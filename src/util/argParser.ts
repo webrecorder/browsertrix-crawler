@@ -164,7 +164,7 @@ class ArgParser {
 
         selectLinks: {
           describe:
-            "one or more selectors for extracting links, in the format [css selector]->[property to use],[css selector]->@[attribute to use]",
+            "One or more selectors for extracting links, in the format [css selector]->[property to use],[css selector]->@[attribute to use]",
           type: "array",
           default: ["a[href]->href"],
           coerce,
