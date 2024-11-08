@@ -7,11 +7,15 @@ import { KnownDevices as devices } from "puppeteer-core";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
+import { createParser } from "css-selector-parser";
+
 import {
   BEHAVIOR_LOG_FUNC,
   WAIT_UNTIL_OPTS,
   EXTRACT_TEXT_TYPES,
   SERVICE_WORKER_OPTS,
+  DEFAULT_SELECTORS,
+  ExtractSelector,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
@@ -31,6 +35,8 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   text: string[];
 
   scopedSeeds: ScopedSeed[];
+
+  selectLinks: ExtractSelector[];
 
   crawlId: string;
 
@@ -156,6 +162,14 @@ class ArgParser {
             "Allow Hashtag URLs, useful for single-page-application crawling or when different hashtags load dynamic content",
         },
 
+        selectLinks: {
+          describe:
+            "One or more selectors for extracting links, in the format [css selector]->[property to use],[css selector]->@[attribute to use]",
+          type: "array",
+          default: ["a[href]->href"],
+          coerce,
+        },
+
         blockRules: {
           describe:
             "Additional rules for blocking certain URLs from being loaded, by URL regex and optionally via text match in an iframe",
@@ -200,9 +214,8 @@ class ArgParser {
         },
 
         driver: {
-          describe: "JS driver for the crawler",
+          describe: "Custom driver for the crawler, if any",
           type: "string",
-          default: "./defaultDriver.js",
         },
 
         generateCDX: {
@@ -713,6 +726,30 @@ class ArgParser {
         }
       }
     }
+
+    let selectLinks: ExtractSelector[];
+
+    const parser = createParser();
+
+    if (argv.selectLinks) {
+      selectLinks = argv.selectLinks.map((x: string) => {
+        const parts = x.split("->");
+        const selector = parts[0];
+        const value = parts[1] || "";
+        const extract = parts.length > 1 ? value.replace("@", "") : "href";
+        const isAttribute = value.startsWith("@");
+        try {
+          parser(selector);
+        } catch (e) {
+          logger.fatal("Invalid Link Extraction CSS Selector", { selector });
+        }
+        return { selector, extract, isAttribute };
+      });
+    } else {
+      selectLinks = DEFAULT_SELECTORS;
+    }
+
+    argv.selectLinks = selectLinks;
 
     if (argv.netIdleWait === -1) {
       if (argv.scopeType === "page" || argv.scopeType === "page-spa") {

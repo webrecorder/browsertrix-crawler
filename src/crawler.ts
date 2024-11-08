@@ -46,8 +46,8 @@ import { Browser } from "./util/browser.js";
 import {
   ADD_LINK_FUNC,
   BEHAVIOR_LOG_FUNC,
-  DEFAULT_SELECTORS,
   DISPLAY,
+  ExtractSelector,
   PAGE_OP_TIMEOUT_SECS,
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
 } from "./util/constants.js";
@@ -191,12 +191,14 @@ export class Crawler {
 
   proxyServer?: string;
 
-  driver!: (opts: {
-    page: Page;
-    data: PageState;
-    // eslint-disable-next-line no-use-before-define
-    crawler: Crawler;
-  }) => Promise<void>;
+  driver:
+    | ((opts: {
+        page: Page;
+        data: PageState;
+        // eslint-disable-next-line no-use-before-define
+        crawler: Crawler;
+      }) => Promise<void>)
+    | null = null;
 
   recording: boolean;
 
@@ -490,6 +492,8 @@ export class Crawler {
     this.proxyServer = await initProxy(this.params, RUN_DETACHED);
 
     logger.info("Seeds", this.seeds);
+
+    logger.info("Link Selectors", this.params.selectLinks);
 
     if (this.params.behaviorOpts) {
       logger.info("Behavior Options", this.params.behaviorOpts);
@@ -930,8 +934,12 @@ self.__bx_behaviors.selectMainBehavior();
       await page.setExtraHTTPHeaders({});
     }
 
-    // run custom driver here
-    await this.driver({ page, data, crawler: this });
+    // run custom driver here, if any
+    if (this.driver) {
+      await this.driver({ page, data, crawler: this });
+    } else {
+      await this.loadPage(page, data);
+    }
 
     data.title = await timedRun(
       page.title(),
@@ -1347,12 +1355,14 @@ self.__bx_behaviors.selectMainBehavior();
       );
     }
 
-    try {
-      const driverUrl = new URL(this.params.driver, import.meta.url);
-      this.driver = (await import(driverUrl.href)).default;
-    } catch (e) {
-      logger.warn(`Error importing driver ${this.params.driver}`, e);
-      return;
+    if (this.params.driver) {
+      try {
+        const driverUrl = new URL(this.params.driver, import.meta.url);
+        this.driver = (await import(driverUrl.href)).default;
+      } catch (e) {
+        logger.warn(`Error importing driver ${this.params.driver}`, e);
+        return;
+      }
     }
 
     await this.initCrawlState();
@@ -1741,11 +1751,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async loadPage(
-    page: Page,
-    data: PageState,
-    selectorOptsList = DEFAULT_SELECTORS,
-  ) {
+  async loadPage(page: Page, data: PageState) {
     const { url, depth } = data;
 
     const logDetails = data.logDetails;
@@ -1946,14 +1952,18 @@ self.__bx_behaviors.selectMainBehavior();
     await this.awaitPageLoad(page.mainFrame(), logDetails);
 
     // skip extraction if at max depth
-    if (seed.isAtMaxDepth(depth, extraHops) || !selectorOptsList) {
-      logger.debug("Skipping Link Extraction, At Max Depth");
+    if (seed.isAtMaxDepth(depth, extraHops)) {
+      logger.debug("Skipping Link Extraction, At Max Depth", {}, "links");
       return;
     }
 
-    logger.debug("Extracting links", logDetails);
+    logger.debug(
+      "Extracting links",
+      { selectors: this.params.selectLinks, ...logDetails },
+      "links",
+    );
 
-    await this.extractLinks(page, data, selectorOptsList, logDetails);
+    await this.extractLinks(page, data, this.params.selectLinks, logDetails);
   }
 
   async netIdle(page: Page, details: LogDetails) {
@@ -1999,7 +2009,7 @@ self.__bx_behaviors.selectMainBehavior();
   async extractLinks(
     page: Page,
     data: PageState,
-    selectors = DEFAULT_SELECTORS,
+    selectors: ExtractSelector[],
     logDetails: LogDetails,
   ) {
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
@@ -2045,11 +2055,7 @@ self.__bx_behaviors.selectMainBehavior();
     const frames = filteredFrames || page.frames();
 
     try {
-      for (const {
-        selector = "a[href]",
-        extract = "href",
-        isAttribute = false,
-      } of selectors) {
+      for (const { selector, extract, isAttribute } of selectors) {
         await Promise.allSettled(
           frames.map((frame) => {
             const getLinks = frame
