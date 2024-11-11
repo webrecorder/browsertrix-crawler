@@ -73,7 +73,7 @@ test("test mixed custom behavior sources", async () => {
 
 test("test custom behaviors from git repo", async () => {
   const res = child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://example.org/ --url https://old.webrecorder.net/ --customBehaviors \"git+https://github.com/webrecorder/browsertrix-crawler.git?branch=custom-behaviors-testing&path=tests/custom-behaviors\" --scopeType page",
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://example.org/ --url https://old.webrecorder.net/ --customBehaviors \"git+https://github.com/webrecorder/browsertrix-crawler.git?branch=main&path=tests/custom-behaviors\" --scopeType page",
   );
 
   const log = res.toString();
