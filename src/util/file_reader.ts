@@ -49,8 +49,7 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
   const relPath = params.get("path") || "";
   const urlStripped = url.split("?")[0];
 
-  const timestamp = Date.now();
-  const tmpDir = `/tmp/behaviors-repo-${timestamp}`;
+  const tmpDir = `/tmp/behaviors-repo-${crypto.randomBytes(4).toString("hex")}`;
 
   let cloneCommand = "git clone ";
   if (branch) {
