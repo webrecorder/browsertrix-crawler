@@ -582,6 +582,7 @@ export const defaultArgs = [
   "--disable-prompt-on-repost",
   "--disable-renderer-backgrounding",
   "--disable-sync",
+  "--disable-lazy-loading",
   "--force-color-profile=srgb",
   "--metrics-recording-only",
   "--no-first-run",
