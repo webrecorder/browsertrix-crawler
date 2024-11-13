@@ -1531,10 +1531,8 @@ class AsyncFetcher {
     const { method, url } = reqresp;
     logger.debug("Async started: fetch", { url }, "recorder");
 
-    const headers = new Headers(reqresp.getRequestHeadersDict());
-    if (headers.has("range")) {
-      headers.set("range", "bytes=0-");
-    }
+    const headers = reqresp.getRequestHeadersDict();
+
     const dispatcher = getGlobalDispatcher().compose((dispatch) => {
       return (opts, handler) => {
         if (opts.headers) {
