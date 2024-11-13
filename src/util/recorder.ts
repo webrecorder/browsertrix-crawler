@@ -697,19 +697,18 @@ export class Recorder {
         requestId,
       };
 
-      // fetching using response stream, await here and then either call fulFill, or if not started, return false
-      if (contentLen < 0) {
-        const fetcher = new ResponseStreamAsyncFetcher(opts);
-        const res = await fetcher.load();
-        switch (res) {
-          case "dupe":
-            this.removeReqResp(networkId);
-            return false;
+      // fetching using response stream as first attempt,
+      // await here and then either call fulFill, or if dupe, return false
+      const fetcher = new ResponseStreamAsyncFetcher(opts);
+      const res = await fetcher.load();
+      switch (res) {
+        case "dupe":
+          this.removeReqResp(networkId);
+          return false;
 
-          case "fetched":
-            streamingConsume = true;
-            break;
-        }
+        case "fetched":
+          streamingConsume = true;
+          break;
       }
 
       // if not consumed via takeStream, attempt async loading
@@ -750,7 +749,12 @@ export class Recorder {
 
     // if in browser context, and not also intercepted in page context
     // serialize here, as won't be getting a loadingFinished message for it
-    if (isBrowserContext && !reqresp.inPageContext && reqresp.payload) {
+    if (
+      isBrowserContext &&
+      !reqresp.inPageContext &&
+      reqresp.payload &&
+      reqresp.payload.length > 0
+    ) {
       this.removeReqResp(networkId);
       await this.serializeToWARC(reqresp);
     }
@@ -788,7 +792,7 @@ export class Recorder {
           ? "document not loaded in browser, possibly other URLs missing"
           : "URL not loaded in browser";
 
-      logger.debug(msg, { url, resourceType }, "recorder");
+      logger.debug(msg, { url, resourceType, e }, "recorder");
     }
 
     return true;
@@ -797,7 +801,11 @@ export class Recorder {
   addAsyncFetch(opts: NetworkLoadAsyncFetchOptions, contentLen: number) {
     let fetcher: AsyncFetcher;
 
-    if (opts.reqresp.method !== "GET" || contentLen > MAX_NETWORK_LOAD_SIZE) {
+    if (
+      opts.reqresp.method !== "GET" ||
+      contentLen > MAX_NETWORK_LOAD_SIZE ||
+      !opts.reqresp.inPageContext
+    ) {
       fetcher = new AsyncFetcher(opts);
     } else {
       fetcher = new NetworkLoadStreamAsyncFetcher(opts);
@@ -866,7 +874,7 @@ export class Recorder {
 
   async awaitPageResources() {
     for (const [requestId, reqresp] of this.pendingRequests.entries()) {
-      if (reqresp.payload) {
+      if (reqresp.payload && reqresp.payload.length > 0) {
         this.removeReqResp(requestId);
         await this.serializeToWARC(reqresp);
         // if no url, and not fetch intercept or async loading,
@@ -1455,8 +1463,10 @@ class AsyncFetcher {
           },
           "recorder",
         );
-        //await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
-        //return fetched;
+        if (status === 206) {
+          await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
+          return "notfetched";
+        }
       }
 
       const externalBuffer: TempFileBuffer =
@@ -1521,8 +1531,10 @@ class AsyncFetcher {
     const { method, url } = reqresp;
     logger.debug("Async started: fetch", { url }, "recorder");
 
-    const headers = reqresp.getRequestHeadersDict();
-
+    const headers = new Headers(reqresp.getRequestHeadersDict());
+    if (headers.has("range")) {
+      headers.set("range", "bytes=0-");
+    }
     const dispatcher = getGlobalDispatcher().compose((dispatch) => {
       return (opts, handler) => {
         if (opts.headers) {

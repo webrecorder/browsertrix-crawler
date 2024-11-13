@@ -438,9 +438,9 @@ export async function runWorkers(
 
   await Promise.allSettled(workers.map((worker) => worker.run()));
 
-  await crawler.browser.close();
-
   await closeWorkers();
+
+  await crawler.browser.close();
 }
 
 // ===========================================================================
