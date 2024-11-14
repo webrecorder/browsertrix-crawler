@@ -2,7 +2,7 @@ import fs from "fs";
 import { Writable } from "stream";
 import path from "path";
 
-import { CDXIndexer, WARCRecord } from "warcio";
+import { CDXIndexer, WARCRecord, DEFAULT_CDX_FIELDS } from "warcio";
 import { WARCSerializer } from "warcio/node";
 import { logger, formatErr, LogDetails, LogContext } from "./logger.js";
 import type { IndexerOffsetLength } from "warcio";
@@ -76,7 +76,10 @@ export class WARCWriter implements IndexerOffsetLength {
     this.recordLength = 0;
 
     if (this.warcCdxDir) {
-      this.indexer = new CDXIndexer({ format: "cdxj" });
+      this.indexer = new CDXIndexer({
+        format: "cdxj",
+        fields: [...DEFAULT_CDX_FIELDS, "req.http:cookie", "referrer"],
+      });
     }
 
     return filename;
