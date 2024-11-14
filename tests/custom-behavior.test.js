@@ -71,6 +71,41 @@ test("test mixed custom behavior sources", async () => {
   ).toBe(true);
 });
 
+test("test custom behaviors from git repo", async () => {
+  const res = child_process.execSync(
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://example.org/ --url https://old.webrecorder.net/ --customBehaviors \"git+https://github.com/webrecorder/browsertrix-crawler.git?branch=main&path=tests/custom-behaviors\" --scopeType page",
+  );
+
+  const log = res.toString();
+
+  // custom behavior ran for specs.webrecorder.net
+  expect(
+    log.indexOf(
+      '{"state":{},"msg":"test-stat","page":"https://specs.webrecorder.net/","workerid":0}}',
+    ) > 0,
+  ).toBe(true);
+
+  // but not for example.org
+  expect(
+    log.indexOf(
+      '{"state":{},"msg":"test-stat","page":"https://example.org/","workerid":0}}',
+    ) > 0,
+  ).toBe(false);
+
+  expect(
+    log.indexOf(
+      '{"state":{"segments":1},"msg":"Skipping autoscroll, page seems to not be responsive to scrolling events","page":"https://example.org/","workerid":0}}',
+    ) > 0,
+  ).toBe(true);
+
+  // another custom behavior ran for old.webrecorder.net
+  expect(
+    log.indexOf(
+      '{"state":{},"msg":"test-stat-2","page":"https://old.webrecorder.net/","workerid":0}}',
+    ) > 0,
+  ).toBe(true);
+});
+
 test("test invalid behavior exit", async () => {
   let status = 0;
 
