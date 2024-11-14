@@ -752,8 +752,8 @@ export class Recorder {
     if (
       isBrowserContext &&
       !reqresp.inPageContext &&
-      reqresp.payload &&
-      reqresp.payload.length > 0
+      !reqresp.asyncLoading &&
+      reqresp.payload
     ) {
       this.removeReqResp(networkId);
       await this.serializeToWARC(reqresp);
@@ -874,7 +874,7 @@ export class Recorder {
 
   async awaitPageResources() {
     for (const [requestId, reqresp] of this.pendingRequests.entries()) {
-      if (reqresp.payload && reqresp.payload.length > 0) {
+      if (reqresp.payload && !reqresp.asyncLoading) {
         this.removeReqResp(requestId);
         await this.serializeToWARC(reqresp);
         // if no url, and not fetch intercept or async loading,
