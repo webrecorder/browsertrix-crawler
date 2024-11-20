@@ -12,7 +12,7 @@ import { fetch, getGlobalDispatcher, Response } from "undici";
 
 import { getCustomRewriter, rewriteDASH, rewriteHLS } from "@webrecorder/wabac";
 
-import { WARCRecord } from "warcio";
+import { WARCRecord, multiValueHeader } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
 import { RedisCrawlState, WorkerId } from "./state.js";
@@ -1764,6 +1764,17 @@ function createResponse(
   const warcHeaders: Record<string, string> = {
     "WARC-Page-ID": pageid,
   };
+
+  if (reqresp.protocols.length) {
+    warcHeaders["WARC-Protocol"] = multiValueHeader(
+      "WARC-Protocol",
+      reqresp.protocols,
+    );
+  }
+
+  if (reqresp.cipher) {
+    warcHeaders["WARC-Cipher-Suite"] = reqresp.cipher;
+  }
 
   if (reqresp.resourceType) {
     warcHeaders["WARC-Resource-Type"] = reqresp.resourceType;
