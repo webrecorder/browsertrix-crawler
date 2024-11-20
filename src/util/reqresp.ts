@@ -2,8 +2,9 @@ import { getCustomRewriter, getStatusText } from "@webrecorder/wabac";
 
 import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
-import { HTML_TYPES } from "./constants.js";
 import { Response } from "undici";
+
+import { HTML_TYPES } from "./constants.js";
 import { logger } from "./logger.js";
 
 const CONTENT_LENGTH = "content-length";
