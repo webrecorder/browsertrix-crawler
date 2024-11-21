@@ -10,7 +10,12 @@ import {
 
 import { fetch, getGlobalDispatcher, Response } from "undici";
 
-import { getCustomRewriter, rewriteDASH, rewriteHLS } from "@webrecorder/wabac";
+import {
+  getCustomRewriter,
+  removeRangeAsQuery,
+  rewriteDASH,
+  rewriteHLS,
+} from "@webrecorder/wabac";
 
 import { WARCRecord } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";
@@ -635,6 +640,30 @@ export class Recorder {
         this.skipRangeUrls.set(url, count + 1);
         return false;
       }
+    } else {
+      const filteredUrl = removeRangeAsQuery(url);
+      if (filteredUrl) {
+        this.removeReqResp(networkId);
+
+        logger.debug(
+          "Removed range in query, async fetching full URL",
+          { url, ...this.logDetails },
+          "recorder",
+        );
+
+        const reqresp = new RequestResponseInfo("0");
+        reqresp.fillRequest(params.request, params.resourceType);
+        reqresp.url = filteredUrl;
+        reqresp.frameId = params.frameId;
+
+        this.addAsyncFetch({
+          reqresp,
+          recorder: this,
+          networkId: "0",
+          cdp,
+        });
+        return false;
+      }
     }
 
     const reqresp = this.pendingReqResp(networkId);
@@ -798,7 +827,7 @@ export class Recorder {
     return true;
   }
 
-  addAsyncFetch(opts: NetworkLoadAsyncFetchOptions, contentLen: number) {
+  addAsyncFetch(opts: NetworkLoadAsyncFetchOptions, contentLen: number = -1) {
     let fetcher: AsyncFetcher;
 
     if (

@@ -407,6 +407,21 @@ export class Browser {
     this.browser.on("disconnected", () => {
       this.browser = null;
     });
+
+    // common permissions
+    const permissions = [
+      "notifications",
+      "geolocation",
+      "camera",
+      "microphone",
+    ];
+
+    for (const name of permissions) {
+      await this.firstCDP.send("Browser.setPermission", {
+        permission: { name },
+        setting: "granted",
+      });
+    }
   }
 
   async newWindowPageWithCDP(): Promise<{ cdp: CDPSession; page: Page }> {
