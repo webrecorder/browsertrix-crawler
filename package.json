@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.4.0",
-    "@webrecorder/wabac": "^2.20.0",
+    "@webrecorder/wabac": "^2.20.6",
     "browsertrix-behaviors": "^0.6.5",
     "client-zip": "^2.4.5",
     "css-selector-parser": "^3.0.5",
@@ -37,7 +37,7 @@
     "tsc": "^2.0.4",
     "undici": "^6.18.2",
     "uuid": "8.3.2",
-    "warcio": "^2.4.0",
+    "warcio": "^2.4.2",
     "ws": "^7.4.4",
     "yargs": "^17.7.2"
   },
