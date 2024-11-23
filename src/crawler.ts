@@ -1035,7 +1035,7 @@ self.__bx_behaviors.selectMainBehavior();
         if (
           this.params.screenshot &&
           this.screenshotWriter &&
-          this.params.screenshot.includes("fullPageAfterBehaviors")
+          this.params.screenshot.includes("fullPageFinal")
         ) {
           await page.evaluate(() => {
             window.scrollTo(0, 0);
@@ -1046,7 +1046,7 @@ self.__bx_behaviors.selectMainBehavior();
             url,
             writer: this.screenshotWriter,
           });
-          await screenshots.takeFullPageAfterBehaviours();
+          await screenshots.takeFullPageFinal();
         }
       }
     }
