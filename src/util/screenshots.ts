@@ -15,7 +15,11 @@ type ScreenShotDesc = {
   encoding: "binary";
 };
 
-type ScreeshotType = "view" | "thumbnail" | "fullPage" | "fullPageAfterBehaviors";
+type ScreeshotType =
+  | "view"
+  | "thumbnail"
+  | "fullPage"
+  | "fullPageAfterBehaviors";
 
 export const screenshotTypes: Record<string, ScreenShotDesc> = {
   view: {
@@ -69,7 +73,10 @@ export class Screenshots {
     state: PageState | null = null,
   ) {
     try {
-      if (screenshotType !== "fullPage" && screenshotType !== "fullPageAfterBehaviors") {
+      if (
+        screenshotType !== "fullPage" &&
+        screenshotType !== "fullPageAfterBehaviors"
+      ) {
         await this.browser.setViewport(this.page, {
           width: 1920,
           height: 1080,
