@@ -1031,6 +1031,23 @@ self.__bx_behaviors.selectMainBehavior();
         if (textextract && this.params.text.includes("final-to-warc")) {
           await textextract.extractAndStoreText("textFinal", true, true);
         }
+
+        if (
+          this.params.screenshot &&
+          this.screenshotWriter &&
+          this.params.screenshot.includes("fullPageFinal")
+        ) {
+          await page.evaluate(() => {
+            window.scrollTo(0, 0);
+          });
+          const screenshots = new Screenshots({
+            browser: this.browser,
+            page,
+            url,
+            writer: this.screenshotWriter,
+          });
+          await screenshots.takeFullPageFinal();
+        }
       }
     }
   }
