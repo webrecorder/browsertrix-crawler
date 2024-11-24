@@ -36,6 +36,8 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
 
   scopedSeeds: ScopedSeed[];
 
+  customBehaviors: string[];
+
   selectLinks: ExtractSelector[];
 
   crawlId: string;
