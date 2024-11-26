@@ -590,10 +590,10 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
-"@novnc/novnc@^1.4.0":
-  version "1.5.0"
-  resolved "https://registry.yarnpkg.com/@novnc/novnc/-/novnc-1.5.0.tgz#7df3e4aca48eaa7c0d6f690e7dee89480232e2f1"
-  integrity sha512-4yGHOtUCnEJUCsgEt/L78eeJu00kthurLBWXFiaXfonNx0pzbs6R/3gJb1byZe6iAE8V9MF0syQb0xIL8MSOtQ==
+"@novnc/novnc@1.4.0":
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/@novnc/novnc/-/novnc-1.4.0.tgz#68adae81a741624142b518323441e852c1f34281"
+  integrity sha512-kW6ALMc5BuH08e/ond/I1naYcfjc19JYMN1EdtmgjjjzPGCjW8fMtVM3MwM6q7YLRjPlQ3orEvoKMgSS7RkEVQ==
 
 "@peculiar/asn1-cms@^2.3.13":
   version "2.3.13"
@@ -5006,7 +5006,7 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.3.1, warcio@^2.4.0, warcio@^2.4.2:
+warcio@^2.4.0, warcio@^2.4.2:
   version "2.4.2"
   resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.2.tgz#782d8dcb0769f271b0ae96521fb4969e2570e9b3"
   integrity sha512-QYbZ3EGYtnAIrzL7Bajo7ak87pipilpkIfaFIzFQWUX4wuXNuKqnfQy/EAoi2tEIl3VJgsWcL+wjjk4+15MKbQ==
