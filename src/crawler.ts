@@ -688,16 +688,14 @@ export class Crawler {
     return !!seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  async setupPage({
-    page,
-    cdp,
-    workerid,
-    callbacks,
-    frameIdToExecId,
-  }: WorkerOpts) {
+  async setupPage(opts: WorkerOpts) {
+    const { page, cdp, workerid, callbacks, frameIdToExecId } = opts;
+
     await this.browser.setupPage({ page, cdp });
 
     await this.setupExecContextEvents(cdp, frameIdToExecId);
+
+    opts.pageFinished = false;
 
     if (
       (this.adBlockRules && this.params.blockAds) ||
@@ -769,6 +767,44 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.browser.addInitScript(page, initScript);
     }
+
+    // cdp.on("Page.javascriptDialogOpening", async (params) => {
+    //   const { hasBrowserHandler, type, message } = params;
+    //   let accept = null;
+    //   if (!opts.pageFinished && (type === "beforeunload" || !hasBrowserHandler)) {
+    //     accept = false;
+    //   } else if (opts.pageFinished) {
+    //     accept = true;
+    //   }
+    //   if (accept !== null) {
+    //     try {
+    //       await cdp.send("Page.handleJavaScriptDialog", {accept});
+    //       logger.warn("JS Dialog", {accepted: accept, message, page: page.url(), workerid});
+    //     } catch (e) {
+    //       logger.warn("JS Dialog closing error", e, "general")
+    //     }
+    //   }
+    // });
+
+    page.on("dialog", async (dialog) => {
+      if (opts.pageFinished) {
+        await dialog.accept();
+      } else {
+        await dialog.dismiss();
+      }
+      logger.debug("JS Dialog", {
+        accepted: opts.pageFinished,
+        message: dialog.message,
+        page: page.url(),
+        workerid,
+      });
+    });
+
+    await page.exposeFunction("__bx_addSet", (data: string) =>
+      this.crawlState.addToUserSet(data),
+    );
+
+    // await page.exposeFunction("__bx_hasSet", (data: string) => this.crawlState.hasUserSet(data));
   }
 
   async setupExecContextEvents(
@@ -950,6 +986,8 @@ self.__bx_behaviors.selectMainBehavior();
     data.favicon = await this.getFavicon(page, logDetails);
 
     await this.doPostLoadActions(opts);
+
+    opts.pageFinished = true;
 
     await this.awaitPageExtraDelay(opts);
   }

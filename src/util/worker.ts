@@ -30,6 +30,7 @@ export type WorkerOpts = {
   markPageUsed: () => void;
   frameIdToExecId: Map<string, number>;
   isAuthSet?: boolean;
+  pageFinished?: boolean;
 };
 
 // ===========================================================================
@@ -190,6 +191,7 @@ export class PageWorker {
               this.reuseCount++;
             }
           },
+          pageFinished: false,
         };
 
         if (this.recorder) {

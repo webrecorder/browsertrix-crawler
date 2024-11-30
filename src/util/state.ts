@@ -837,6 +837,10 @@ return inx;
     return await this.redis.srem(key, status + "|" + url);
   }
 
+  async addToUserSet(value: string) {
+    return (await this.redis.sadd(this.key + ":user", value)) === 1;
+  }
+
   async logError(error: string) {
     return await this.redis.lpush(this.ekey, error);
   }

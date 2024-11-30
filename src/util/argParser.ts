@@ -350,8 +350,20 @@ class ArgParser {
         behaviors: {
           describe: "Which background behaviors to enable on each page",
           type: "array",
-          default: ["autoplay", "autofetch", "autoscroll", "siteSpecific"],
-          choices: ["autoplay", "autofetch", "autoscroll", "siteSpecific"],
+          default: [
+            "autoplay",
+            "autofetch",
+            "autoscroll",
+            "autoclick",
+            "siteSpecific",
+          ],
+          choices: [
+            "autoplay",
+            "autofetch",
+            "autoscroll",
+            "autoclick",
+            "siteSpecific",
+          ],
           coerce,
         },
 
