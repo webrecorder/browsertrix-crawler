@@ -695,8 +695,6 @@ export class Crawler {
 
     await this.setupExecContextEvents(cdp, frameIdToExecId);
 
-    opts.pageFinished = false;
-
     if (
       (this.adBlockRules && this.params.blockAds) ||
       this.blockRules ||
@@ -770,6 +768,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // cdp.on("Page.javascriptDialogOpening", async (params) => {
     //   const { hasBrowserHandler, type, message } = params;
+    //   console.log("JS DIALOG", params);
     //   let accept = null;
     //   if (!opts.pageFinished && (type === "beforeunload" || !hasBrowserHandler)) {
     //     accept = false;
@@ -787,13 +786,17 @@ self.__bx_behaviors.selectMainBehavior();
     // });
 
     page.on("dialog", async (dialog) => {
-      if (opts.pageFinished) {
-        await dialog.accept();
+      if (dialog.type() === "beforeunload") {
+        if (opts.pageBlockUnload) {
+          await dialog.dismiss();
+        } else {
+          await dialog.accept();
+        }
       } else {
-        await dialog.dismiss();
+        await dialog.accept();
       }
       logger.debug("JS Dialog", {
-        accepted: opts.pageFinished,
+        accepted: !opts.pageBlockUnload,
         message: dialog.message,
         page: page.url(),
         workerid,
@@ -962,6 +965,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     opts.markPageUsed();
+    opts.pageBlockUnload = false;
 
     if (auth) {
       await page.setExtraHTTPHeaders({ Authorization: auth });
@@ -987,7 +991,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.doPostLoadActions(opts);
 
-    opts.pageFinished = true;
+    opts.pageBlockUnload = false;
 
     await this.awaitPageExtraDelay(opts);
   }
