@@ -766,42 +766,28 @@ self.__bx_behaviors.selectMainBehavior();
       await this.browser.addInitScript(page, initScript);
     }
 
-    // cdp.on("Page.javascriptDialogOpening", async (params) => {
-    //   const { hasBrowserHandler, type, message } = params;
-    //   console.log("JS DIALOG", params);
-    //   let accept = null;
-    //   if (!opts.pageFinished && (type === "beforeunload" || !hasBrowserHandler)) {
-    //     accept = false;
-    //   } else if (opts.pageFinished) {
-    //     accept = true;
-    //   }
-    //   if (accept !== null) {
-    //     try {
-    //       await cdp.send("Page.handleJavaScriptDialog", {accept});
-    //       logger.warn("JS Dialog", {accepted: accept, message, page: page.url(), workerid});
-    //     } catch (e) {
-    //       logger.warn("JS Dialog closing error", e, "general")
-    //     }
-    //   }
-    // });
-
-    page.on("dialog", async (dialog) => {
-      if (dialog.type() === "beforeunload") {
-        if (opts.pageBlockUnload) {
-          await dialog.dismiss();
+    // only add if running with autoclick behavior
+    if (this.params.behaviors.includes("autoclick")) {
+      page.on("dialog", async (dialog) => {
+        let accepted = true;
+        if (dialog.type() === "beforeunload") {
+          if (opts.pageBlockUnload) {
+            accepted = false;
+            await dialog.dismiss();
+          } else {
+            await dialog.accept();
+          }
         } else {
           await dialog.accept();
         }
-      } else {
-        await dialog.accept();
-      }
-      logger.debug("JS Dialog", {
-        accepted: !opts.pageBlockUnload,
-        message: dialog.message,
-        page: page.url(),
-        workerid,
+        logger.debug("JS Dialog", {
+          accepted,
+          message: dialog.message,
+          page: page.url(),
+          workerid,
+        });
       });
-    });
+    }
 
     await page.exposeFunction("__bx_addSet", (data: string) =>
       this.crawlState.addToUserSet(data),
