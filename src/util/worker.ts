@@ -371,9 +371,11 @@ export class PageWorker {
 
         // init page (new or reuse)
         const opts = await this.initPage(data.url);
+        const state = opts as WorkerState;
+        state.data = data;
 
         // run timed crawl of page
-        await this.timedCrawlPage({ ...opts, data });
+        await this.timedCrawlPage(state);
 
         loggedWaiting = false;
       } else {

@@ -782,7 +782,9 @@ self.__bx_behaviors.selectMainBehavior();
         }
         logger.debug("JS Dialog", {
           accepted,
-          message: dialog.message,
+          blockingUnload: opts.pageBlockUnload,
+          message: dialog.message(),
+          type: dialog.type(),
           page: page.url(),
           workerid,
         });
@@ -974,6 +976,8 @@ self.__bx_behaviors.selectMainBehavior();
       logDetails,
     );
     data.favicon = await this.getFavicon(page, logDetails);
+
+    opts.pageBlockUnload = true;
 
     await this.doPostLoadActions(opts);
 
