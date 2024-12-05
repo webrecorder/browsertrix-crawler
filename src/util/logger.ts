@@ -35,6 +35,7 @@ export const LOG_CONTEXT_TYPES = [
   "redis",
   "storage",
   "text",
+  "dom",
   "exclusion",
   "screenshots",
   "screencast",

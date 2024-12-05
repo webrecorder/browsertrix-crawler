@@ -13,6 +13,7 @@ import {
   BEHAVIOR_LOG_FUNC,
   WAIT_UNTIL_OPTS,
   EXTRACT_TEXT_TYPES,
+  EXTRACT_DOM_TYPES,
   SERVICE_WORKER_OPTS,
   DEFAULT_SELECTORS,
   ExtractSelector,
@@ -33,6 +34,7 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   logContext: LogContext[];
   logExcludeContext: LogContext[];
   text: string[];
+  dom: string[];
 
   scopedSeeds: ScopedSeed[];
 
@@ -290,6 +292,19 @@ class ArgParser {
             if (!array.length || (array.length === 1 && array[0] === "true")) {
               return ["to-pages"];
             }
+            if (array.length === 1 && array[0] === "false") {
+              return [];
+            }
+            return coerce(array);
+          },
+        },
+
+        dom: {
+          describe:
+            "Extract initial (default) or final DOM to WARC resource record(s)",
+          type: "array",
+          choices: EXTRACT_DOM_TYPES,
+          coerce: (array) => {
             if (array.length === 1 && array[0] === "false") {
               return [];
             }
