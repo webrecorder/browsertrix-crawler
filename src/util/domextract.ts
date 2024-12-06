@@ -72,7 +72,7 @@ export abstract class BaseDomExtract {
 }
 
 // ============================================================================
-export class DomExtractViaSnapshot extends BaseDomExtract {
+export class DomExtractViaDocument extends BaseDomExtract {
   async doGetDom(): Promise<string> {
 
     // Get the root document node

@@ -20,7 +20,7 @@ import { WACZ, WACZInitOpts, mergeCDXJ } from "./util/wacz.js";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
-import { DomExtractViaSnapshot } from "./util/domextract.js";
+import { DomExtractViaDocument } from "./util/domextract.js";
 import {
   initStorage,
   getFileSize,
@@ -1010,7 +1010,7 @@ self.__bx_behaviors.selectMainBehavior();
     let domextract = null;
 
     if (this.domWriter) {
-      domextract = new DomExtractViaSnapshot(cdp, {
+      domextract = new DomExtractViaDocument(cdp, {
         writer: this.domWriter,
         url,
         skipDocs: this.skipTextDocs,
