@@ -32,12 +32,7 @@ import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
 import { logger, formatErr, LogDetails } from "./util/logger.js";
-import {
-  WorkerOpts,
-  WorkerState,
-  closeWorkers,
-  runWorkers,
-} from "./util/worker.js";
+import { WorkerState, closeWorkers, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectCustomBehaviors, getInfoString } from "./util/file_reader.js";
 
@@ -688,7 +683,7 @@ export class Crawler {
     return !!seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  async setupPage(opts: WorkerOpts) {
+  async setupPage(opts: WorkerState) {
     const { page, cdp, workerid, callbacks, frameIdToExecId } = opts;
 
     await this.browser.setupPage({ page, cdp });
@@ -789,6 +784,50 @@ self.__bx_behaviors.selectMainBehavior();
           workerid,
         });
       });
+
+      await cdp.send("Target.setDiscoverTargets", { discover: true });
+
+      cdp.on("Target.targetCreated", async (params) => {
+        const { targetInfo } = params;
+        const { type, openerFrameId, targetId } = targetInfo;
+
+        if (
+          type === "page" &&
+          openerFrameId &&
+          opts.frameIdToExecId.has(openerFrameId)
+        ) {
+          await cdp.send("Target.closeTarget", { targetId });
+        } else {
+          logger.debug("Extra not closed", { targetInfo });
+        }
+
+        await cdp.send("Runtime.runIfWaitingForDebugger");
+      });
+
+      void cdp.send("Target.setAutoAttach", {
+        autoAttach: true,
+        waitForDebuggerOnStart: true,
+        flatten: false,
+      });
+
+      if (this.recording) {
+        await cdp.send("Page.enable");
+
+        cdp.on("Page.windowOpen", async (params) => {
+          const { seedId, depth, extraHops = 0, url } = opts.data;
+
+          const logDetails = { page: url, workerid };
+
+          await this.queueInScopeUrls(
+            seedId,
+            [params.url],
+            depth,
+            extraHops,
+            false,
+            logDetails,
+          );
+        });
+      }
     }
 
     await page.exposeFunction("__bx_addSet", (data: string) =>
@@ -1137,7 +1176,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async teardownPage({ workerid }: WorkerOpts) {
+  async teardownPage({ workerid }: WorkerState) {
     if (this.screencaster) {
       await this.screencaster.stopById(workerid);
     }

@@ -3,7 +3,7 @@ import { Crawler } from "./crawler.js";
 import { ReplayServer } from "./util/replayserver.js";
 import { sleep } from "./util/timing.js";
 import { logger, formatErr } from "./util/logger.js";
-import { WorkerOpts, WorkerState } from "./util/worker.js";
+import { WorkerState } from "./util/worker.js";
 import { PageState } from "./util/state.js";
 import { PageInfoRecord, PageInfoValue, Recorder } from "./util/recorder.js";
 
@@ -718,7 +718,7 @@ export class ReplayCrawler extends Crawler {
     return text;
   }
 
-  async teardownPage(opts: WorkerOpts) {
+  async teardownPage(opts: WorkerState) {
     const { page } = opts;
     await this.processPageInfo(page);
     await super.teardownPage(opts);
