@@ -705,11 +705,13 @@ class ArgParser {
     // background behaviors to apply
     const behaviorOpts: { [key: string]: string | boolean } = {};
     if (argv.behaviors.length > 0) {
+      // for now, always enable autoclick
+      if (argv.behaviors.indexOf("autoclick") < 0) {
+        argv.behaviors.push("autoclick");
+      }
       argv.behaviors.forEach((x: string) => (behaviorOpts[x] = true));
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
       behaviorOpts.startEarly = true;
-      // for now, always enable autoclick
-      behaviorOpts.autoclick = true;
       argv.behaviorOpts = JSON.stringify(behaviorOpts);
     } else {
       argv.behaviorOpts = "";
