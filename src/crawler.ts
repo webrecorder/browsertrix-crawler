@@ -791,17 +791,21 @@ self.__bx_behaviors.selectMainBehavior();
         const { targetInfo } = params;
         const { type, openerFrameId, targetId } = targetInfo;
 
-        if (
-          type === "page" &&
-          openerFrameId &&
-          opts.frameIdToExecId.has(openerFrameId)
-        ) {
-          await cdp.send("Target.closeTarget", { targetId });
-        } else {
-          logger.debug("Extra not closed", { targetInfo });
-        }
+        try {
+          if (
+            type === "page" &&
+            openerFrameId &&
+            opts.frameIdToExecId.has(openerFrameId)
+          ) {
+            await cdp.send("Target.closeTarget", { targetId });
+          } else {
+            logger.warn("Extra target not closed", { targetInfo });
+          }
 
-        await cdp.send("Runtime.runIfWaitingForDebugger");
+          await cdp.send("Runtime.runIfWaitingForDebugger");
+        } catch (e) {
+          // target likely already closed
+        }
       });
 
       void cdp.send("Target.setAutoAttach", {
