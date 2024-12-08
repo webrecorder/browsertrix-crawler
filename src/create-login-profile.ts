@@ -17,6 +17,7 @@ import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
 import { getInfoString } from "./util/file_reader.js";
 import { DISPLAY } from "./util/constants.js";
 import { initProxy } from "./util/proxy.js";
+//import { sleep } from "./util/timing.js";
 
 const profileHTML = fs.readFileSync(
   new URL("../html/createProfile.html", import.meta.url),
@@ -437,6 +438,27 @@ class InteractiveBrowser {
 
     // attempt to keep everything to initial tab if headless
     if (this.params.headless) {
+      void cdp.send("Target.setDiscoverTargets", { discover: true });
+
+      cdp.on("Target.targetCreated", async (params) => {
+        const { targetInfo } = params;
+        const { type, openerFrameId } = targetInfo;
+
+        if (type === "page" && openerFrameId) {
+          await cdp.send("Target.closeTarget", {
+            targetId: params.targetInfo.targetId,
+          });
+        }
+
+        await cdp.send("Runtime.runIfWaitingForDebugger");
+      });
+
+      void cdp.send("Target.setAutoAttach", {
+        autoAttach: true,
+        waitForDebuggerOnStart: true,
+        flatten: false,
+      });
+
       cdp.send("Page.enable").catch((e) => logger.warn("Page.enable error", e));
 
       cdp.on("Page.windowOpen", async (resp) => {

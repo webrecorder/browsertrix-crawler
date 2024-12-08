@@ -350,8 +350,20 @@ class ArgParser {
         behaviors: {
           describe: "Which background behaviors to enable on each page",
           type: "array",
-          default: ["autoplay", "autofetch", "autoscroll", "siteSpecific"],
-          choices: ["autoplay", "autofetch", "autoscroll", "siteSpecific"],
+          default: [
+            "autoplay",
+            "autofetch",
+            "autoscroll",
+            "autoclick",
+            "siteSpecific",
+          ],
+          choices: [
+            "autoplay",
+            "autofetch",
+            "autoscroll",
+            "autoclick",
+            "siteSpecific",
+          ],
           coerce,
         },
 
@@ -693,6 +705,10 @@ class ArgParser {
     // background behaviors to apply
     const behaviorOpts: { [key: string]: string | boolean } = {};
     if (argv.behaviors.length > 0) {
+      // for now, always enable autoclick
+      if (argv.behaviors.indexOf("autoclick") < 0) {
+        argv.behaviors.push("autoclick");
+      }
       argv.behaviors.forEach((x: string) => (behaviorOpts[x] = true));
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
       behaviorOpts.startEarly = true;
