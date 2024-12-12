@@ -74,6 +74,7 @@ export class PageState {
   favicon?: string;
 
   skipBehaviors = false;
+  pageSkipped = false;
   filteredFrames: Frame[] = [];
   loadState: LoadState = LoadState.FAILED;
 

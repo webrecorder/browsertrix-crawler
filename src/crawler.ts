@@ -192,6 +192,7 @@ export class Crawler {
     | ((opts: {
         page: Page;
         data: PageState;
+        seed: ScopedSeed;
         // eslint-disable-next-line no-use-before-define
         crawler: Crawler;
       }) => Promise<void>)
@@ -930,7 +931,7 @@ self.__bx_behaviors.selectMainBehavior();
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
-    const { page, cdp, data, workerid, callbacks, directFetchCapture } = opts;
+    const { page, cdp, data, workerid, callbacks, recorder } = opts;
     data.callbacks = callbacks;
 
     const { url, seedId } = data;
@@ -948,14 +949,14 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    if (directFetchCapture) {
+    if (recorder) {
       try {
         const headers = auth
           ? { Authorization: auth, ...this.headers }
           : this.headers;
 
         const result = await timedRun(
-          directFetchCapture({ url, headers, cdp }),
+          recorder.directFetchCapture({ url, headers, cdp }),
           this.params.pageLoadTimeout,
           "Direct fetch of page URL timed out",
           logDetails,
@@ -1013,11 +1014,21 @@ self.__bx_behaviors.selectMainBehavior();
       await page.setExtraHTTPHeaders({});
     }
 
+    const seed = await this.crawlState.getSeedAt(
+      this.seeds,
+      this.numOriginalSeeds,
+      seedId,
+    );
+
+    if (recorder) {
+      recorder.pageSeed = seed;
+    }
+
     // run custom driver here, if any
     if (this.driver) {
-      await this.driver({ page, data, crawler: this });
+      await this.driver({ page, data, crawler: this, seed });
     } else {
-      await this.loadPage(page, data);
+      await this.loadPage(page, data, seed);
     }
 
     data.title = await timedRun(
@@ -1155,7 +1166,7 @@ self.__bx_behaviors.selectMainBehavior();
   async pageFinished(data: PageState) {
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url, retry } = data;
+    const { loadState, logDetails, depth, url, retry, pageSkipped } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       await this.writePage(data);
@@ -1172,11 +1183,14 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.checkLimits();
     } else {
-      if (retry >= MAX_RETRY_FAILED) {
+      if (retry >= MAX_RETRY_FAILED && !pageSkipped) {
         await this.writePage(data);
       }
-      await this.crawlState.markFailed(url);
-
+      if (pageSkipped) {
+        await this.crawlState.markExcluded(url);
+      } else {
+        await this.crawlState.markFailed(url);
+      }
       if (this.healthChecker) {
         this.healthChecker.incError();
       }
@@ -1861,7 +1875,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async loadPage(page: Page, data: PageState) {
+  async loadPage(page: Page, data: PageState, seed: ScopedSeed) {
     const { url, depth } = data;
 
     const logDetails = data.logDetails;
@@ -1889,8 +1903,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     // store the first successful non-redirect response, even if page doesn't load fully
     const waitFirstResponse = (resp: HTTPResponse) => {
-      firstResponse = resp;
-      if (!isRedirectStatus(firstResponse.status())) {
+      if (!isRedirectStatus(resp.status())) {
+        firstResponse = resp;
         // don't listen to any additional responses
         page.off("response", waitFirstResponse);
       }
@@ -1949,11 +1963,21 @@ self.__bx_behaviors.selectMainBehavior();
       } else if (!downloadResponse) {
         // log if not already log and rethrow, consider page failed
         if (msg !== "logged") {
-          logger.error("Page Load Failed, will retry", {
-            msg,
-            loadState: data.loadState,
-            ...logDetails,
-          });
+          const loadState = data.loadState;
+          if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
+            logger.error("Page Load Blocked, skipping", {
+              msg,
+              loadState,
+              ...logDetails,
+            });
+            data.pageSkipped = true;
+          } else {
+            logger.error("Page Load Failed, will retry", {
+              msg,
+              loadState,
+              ...logDetails,
+            });
+          }
           e.message = "logged";
         }
         throw e;
@@ -2063,12 +2087,6 @@ self.__bx_behaviors.selectMainBehavior();
     //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
 
     const { seedId, extraHops } = data;
-
-    const seed = await this.crawlState.getSeedAt(
-      this.seeds,
-      this.numOriginalSeeds,
-      seedId,
-    );
 
     if (!seed) {
       logger.error(
