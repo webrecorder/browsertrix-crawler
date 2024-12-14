@@ -3,7 +3,7 @@ import fs from "fs";
 
 test("set rollover to 500K and ensure individual WARCs rollover, including screenshots", async () => {
   child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit 5 --exclude community --collection rollover-500K --rolloverSize 500000 --screenshot view"
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit 5 --exclude community --collection rollover-500K --rolloverSize 500000 --screenshot view --logging debug"
   );
 
   const warcLists = fs.readdirSync("test-crawls/collections/rollover-500K/archive");

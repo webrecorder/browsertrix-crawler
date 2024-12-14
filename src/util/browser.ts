@@ -15,7 +15,7 @@ import puppeteer, {
   Frame,
   HTTPRequest,
   Page,
-  PuppeteerLaunchOptions,
+  LaunchOptions,
   Viewport,
 } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
@@ -108,7 +108,7 @@ export class Browser {
       };
     }
 
-    const launchOpts: PuppeteerLaunchOptions = {
+    const launchOpts: LaunchOptions = {
       args,
       headless,
       executablePath: this.getBrowserExe(),
@@ -126,7 +126,7 @@ export class Browser {
         ? undefined
         : (target) => this.targetFilter(target),
     };
-    await this._init(launchOpts, ondisconnect);
+    await this._init(launchOpts, recording, ondisconnect);
   }
 
   targetFilter(target: Target) {
@@ -388,8 +388,9 @@ export class Browser {
     }
   }
 
-  async _init(
-    launchOpts: PuppeteerLaunchOptions,
+  private async _init(
+    launchOpts: LaunchOptions,
+    recording: boolean,
     // eslint-disable-next-line @typescript-eslint/ban-types
     ondisconnect: Function | null = null,
   ) {
@@ -399,7 +400,9 @@ export class Browser {
 
     this.firstCDP = await target.createCDPSession();
 
-    await this.browserContextFetch();
+    if (recording) {
+      await this.browserContextFetch();
+    }
 
     if (ondisconnect) {
       this.browser.on("disconnected", (err) => ondisconnect(err));

@@ -719,10 +719,10 @@
     tslib "^2.7.0"
     tsyringe "^4.8.0"
 
-"@puppeteer/browsers@2.4.1":
-  version "2.4.1"
-  resolved "https://registry.yarnpkg.com/@puppeteer/browsers/-/browsers-2.4.1.tgz#7afd271199cc920ece2ff25109278be0a3e8a225"
-  integrity sha512-0kdAbmic3J09I6dT8e9vE2JOCSt13wHCW5x/ly8TSt2bDtuIWe2TgLZZDHdcziw9AVCzflMAXCrVyRIhIs44Ng==
+"@puppeteer/browsers@2.5.0":
+  version "2.5.0"
+  resolved "https://registry.yarnpkg.com/@puppeteer/browsers/-/browsers-2.5.0.tgz#7e4f7ba8f04e54f11501b78dc7bcc4033de935d4"
+  integrity sha512-6TQAc/5uRILE6deixJ1CR8rXyTbzXIXNgO1D0Woi9Bqicz2FV5iKP3BHYEg6o4UATCMcbQQ0jbmeaOkn/HQk2w==
   dependencies:
     debug "^4.3.7"
     extract-zip "^2.0.1"
@@ -4088,12 +4088,12 @@ punycode@^2.1.0:
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-2.3.1.tgz#027422e2faec0b25e1549c3e1bd8309b9133b6e5"
   integrity sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==
 
-puppeteer-core@^23.7.1:
-  version "23.9.0"
-  resolved "https://registry.yarnpkg.com/puppeteer-core/-/puppeteer-core-23.9.0.tgz#24add69fb58dde4ac49d165872b44a30d2bf5b32"
-  integrity sha512-hLVrav2HYMVdK0YILtfJwtnkBAwNOztUdR4aJ5YKDvgsbtagNr6urUJk9HyjRA9e+PaLI3jzJ0wM7A4jSZ7Qxw==
+puppeteer-core@^23.10.1:
+  version "23.10.1"
+  resolved "https://registry.yarnpkg.com/puppeteer-core/-/puppeteer-core-23.10.1.tgz#46feb3150454e799f1364c8e91d207dce3adbcb9"
+  integrity sha512-ey6NwixHYEUnhCA/uYi7uQQ4a0CZw4k+MatbHXGl5GEzaiRQziYUxc2HGpdQZ/gnh4KQWAKkocyIg1/dIm5d0g==
   dependencies:
-    "@puppeteer/browsers" "2.4.1"
+    "@puppeteer/browsers" "2.5.0"
     chromium-bidi "0.8.0"
     debug "^4.3.7"
     devtools-protocol "0.0.1367902"
