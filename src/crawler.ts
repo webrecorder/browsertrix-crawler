@@ -763,6 +763,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // only add if running with autoclick behavior
     if (this.params.behaviors.includes("autoclick")) {
+      // Ensure off-page navigation is canceled while behavior is running
       page.on("dialog", async (dialog) => {
         let accepted = true;
         if (dialog.type() === "beforeunload") {
@@ -785,6 +786,7 @@ self.__bx_behaviors.selectMainBehavior();
         });
       });
 
+      // Close any windows opened during navigation from autoclick
       await cdp.send("Target.setDiscoverTargets", { discover: true });
 
       cdp.on("Target.targetCreated", async (params) => {
