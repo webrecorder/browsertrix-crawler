@@ -6,7 +6,7 @@ FROM ${BROWSER_IMAGE_BASE}
 # needed to add args to main build stage
 ARG BROWSER_VERSION
 
-ENV GEOMETRY=1360x1020x16 \
+ENV GEOMETRY=1920x1080x16 \
     BROWSER_VERSION=${BROWSER_VERSION} \
     BROWSER_BIN=google-chrome \
     OPENSSL_CONF=/app/openssl.conf \
