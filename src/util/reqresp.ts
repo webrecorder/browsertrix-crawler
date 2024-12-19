@@ -335,6 +335,13 @@ export class RequestResponseInfo {
     return this.fromCache && !this.payload;
   }
 
+  deleteRange() {
+    if (this.requestHeaders) {
+      delete this.requestHeaders["range"];
+      delete this.requestHeaders["Range"];
+    }
+  }
+
   shouldSkipSave() {
     // skip cached, OPTIONS/HEAD responses, and 304 responses
     if (

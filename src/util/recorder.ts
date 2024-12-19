@@ -449,10 +449,14 @@ export class Recorder {
             { url, ...this.logDetails },
             "recorder",
           );
+          reqresp.deleteRange();
+          reqresp.requestId = "0";
+
           const fetcher = new AsyncFetcher({
             reqresp,
+            expectedSize: reqresp.expectedSize ? reqresp.expectedSize : -1,
             recorder: this,
-            networkId: requestId,
+            networkId: "0",
           });
           void this.fetcherQ.add(() => fetcher.load());
           return;
@@ -574,6 +578,12 @@ export class Recorder {
 
     const networkId = params.networkId || requestId;
 
+    const reqresp = this.pendingReqResp(networkId);
+
+    if (!reqresp) {
+      return false;
+    }
+
     if (responseErrorReason) {
       logger.warn(
         "Skipping failed response",
@@ -601,24 +611,23 @@ export class Recorder {
         );
         this.removeReqResp(networkId);
 
-        const reqresp = new RequestResponseInfo("0");
-        reqresp.fillRequest(params.request, params.resourceType);
-        if (reqresp.requestHeaders) {
-          delete reqresp.requestHeaders["range"];
-          delete reqresp.requestHeaders["Range"];
-        }
-        reqresp.frameId = params.frameId;
+        if (!reqresp.fetchContinued) {
+          const reqrespNew = new RequestResponseInfo("0");
+          reqrespNew.fillRequest(params.request, params.resourceType);
+          reqrespNew.deleteRange();
+          reqrespNew.frameId = params.frameId;
 
-        this.addAsyncFetch(
-          {
-            reqresp,
-            expectedSize: parseInt(range.split("/")[1]),
-            recorder: this,
-            networkId: "0",
-            cdp,
-          },
-          contentLen,
-        );
+          this.addAsyncFetch(
+            {
+              reqresp: reqrespNew,
+              expectedSize: parseInt(range.split("/")[1]),
+              recorder: this,
+              networkId: "0",
+              cdp,
+            },
+            contentLen,
+          );
+        }
 
         return false;
       } else {
@@ -651,25 +660,21 @@ export class Recorder {
           "recorder",
         );
 
-        const reqresp = new RequestResponseInfo("0");
-        reqresp.fillRequest(params.request, params.resourceType);
-        reqresp.url = filteredUrl;
-        reqresp.frameId = params.frameId;
+        if (!reqresp.fetchContinued) {
+          const reqrespNew = new RequestResponseInfo("0");
+          reqrespNew.fillRequest(params.request, params.resourceType);
+          reqrespNew.url = filteredUrl;
+          reqrespNew.frameId = params.frameId;
 
-        this.addAsyncFetch({
-          reqresp,
-          recorder: this,
-          networkId: "0",
-          cdp,
-        });
+          this.addAsyncFetch({
+            reqresp: reqrespNew,
+            recorder: this,
+            networkId: "0",
+            cdp,
+          });
+        }
         return false;
       }
-    }
-
-    const reqresp = this.pendingReqResp(networkId);
-
-    if (!reqresp) {
-      return false;
     }
 
     // indicate that this is intercepted in the page context
@@ -1485,6 +1490,7 @@ class AsyncFetcher {
         logger.warn(
           "Async fetch: possible response size mismatch",
           {
+            type: this.constructor.name,
             size: reqresp.readSize,
             expected: reqresp.expectedSize,
             url,
@@ -1492,7 +1498,8 @@ class AsyncFetcher {
           },
           "recorder",
         );
-        if (status === 206) {
+        if (status === 206 || status === 200) {
+          void serializer.externalBuffer?.purge();
           await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
           return "notfetched";
         }
