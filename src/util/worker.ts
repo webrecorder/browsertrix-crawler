@@ -27,6 +27,7 @@ export type WorkerOpts = {
   directFetchCapture:
     | ((request: DirectFetchRequest) => Promise<DirectFetchResponse>)
     | null;
+  recorder: Recorder | null;
   markPageUsed: () => void;
   frameIdToExecId: Map<string, number>;
   isAuthSet?: boolean;
@@ -183,6 +184,7 @@ export class PageWorker {
           cdp,
           workerid,
           callbacks: this.callbacks,
+          recorder: this.recorder,
           directFetchCapture,
           frameIdToExecId: new Map<string, number>(),
           markPageUsed: () => {
