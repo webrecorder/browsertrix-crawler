@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@novnc/novnc": "1.4.0",
-    "@webrecorder/wabac": "^2.20.7",
+    "@webrecorder/wabac": "^2.20.8",
     "browsertrix-behaviors": "^0.6.6",
     "client-zip": "^2.4.5",
     "css-selector-parser": "^3.0.5",
