@@ -24,6 +24,8 @@ export const EXTRACT_TEXT_TYPES = ["to-pages", "to-warc", "final-to-warc"];
 
 export const BEHAVIOR_LOG_FUNC = "__bx_log";
 export const ADD_LINK_FUNC = "__bx_addLink";
+export const FETCH_FUNC = "__bx_fetch";
+
 export const MAX_DEPTH = 1000000;
 
 export const FETCH_HEADERS_TIMEOUT_SECS = 30;

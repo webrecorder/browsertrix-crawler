@@ -41,6 +41,7 @@ import { Browser } from "./util/browser.js";
 import {
   ADD_LINK_FUNC,
   BEHAVIOR_LOG_FUNC,
+  FETCH_FUNC,
   DISPLAY,
   ExtractSelector,
   PAGE_OP_TIMEOUT_SECS,
@@ -684,7 +685,7 @@ export class Crawler {
   }
 
   async setupPage(opts: WorkerState) {
-    const { page, cdp, workerid, callbacks, frameIdToExecId } = opts;
+    const { page, cdp, workerid, callbacks, frameIdToExecId, recorder } = opts;
 
     await this.browser.setupPage({ page, cdp });
 
@@ -757,6 +758,10 @@ self.__bx_behaviors.selectMainBehavior();
         await this.checkBehaviorScripts(cdp);
         this.behaviorsChecked = true;
       }
+
+      await page.exposeFunction(FETCH_FUNC, (url: string) => {
+        return recorder ? recorder.addExternalFetch(url, cdp) : true;
+      });
 
       await this.browser.addInitScript(page, initScript);
     }

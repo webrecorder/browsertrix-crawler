@@ -61,7 +61,7 @@ jobs:
         run: yarn add -D http-server
 
       - name: install py-wacz as root for tests
-        run: sudo pip install wacz
+        run: sudo pip install wacz --ignore-installed
 
       - name: run all tests as root
         run: sudo DOCKER_HOST_NAME=172.17.0.1 CI=true yarn test -validate
