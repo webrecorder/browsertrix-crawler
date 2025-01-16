@@ -32,12 +32,7 @@ import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
 import { logger, formatErr, LogDetails } from "./util/logger.js";
-import {
-  WorkerOpts,
-  WorkerState,
-  closeWorkers,
-  runWorkers,
-} from "./util/worker.js";
+import { WorkerState, closeWorkers, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectCustomBehaviors, getInfoString } from "./util/file_reader.js";
 
@@ -689,14 +684,9 @@ export class Crawler {
     return !!seed.isIncluded(url, depth, extraHops, logDetails);
   }
 
-  async setupPage({
-    page,
-    cdp,
-    workerid,
-    callbacks,
-    recorder,
-    frameIdToExecId,
-  }: WorkerOpts) {
+  async setupPage(opts: WorkerState) {
+    const { page, cdp, workerid, callbacks, frameIdToExecId, recorder } = opts;
+
     await this.browser.setupPage({ page, cdp });
 
     await this.setupExecContextEvents(cdp, frameIdToExecId);
@@ -775,6 +765,87 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.browser.addInitScript(page, initScript);
     }
+
+    // only add if running with autoclick behavior
+    if (this.params.behaviors.includes("autoclick")) {
+      // Ensure off-page navigation is canceled while behavior is running
+      page.on("dialog", async (dialog) => {
+        let accepted = true;
+        if (dialog.type() === "beforeunload") {
+          if (opts.pageBlockUnload) {
+            accepted = false;
+            await dialog.dismiss();
+          } else {
+            await dialog.accept();
+          }
+        } else {
+          await dialog.accept();
+        }
+        logger.debug("JS Dialog", {
+          accepted,
+          blockingUnload: opts.pageBlockUnload,
+          message: dialog.message(),
+          type: dialog.type(),
+          page: page.url(),
+          workerid,
+        });
+      });
+
+      // Close any windows opened during navigation from autoclick
+      await cdp.send("Target.setDiscoverTargets", { discover: true });
+
+      cdp.on("Target.targetCreated", async (params) => {
+        const { targetInfo } = params;
+        const { type, openerFrameId, targetId } = targetInfo;
+
+        try {
+          if (
+            type === "page" &&
+            openerFrameId &&
+            opts.frameIdToExecId.has(openerFrameId)
+          ) {
+            await cdp.send("Target.closeTarget", { targetId });
+          } else {
+            logger.warn("Extra target not closed", { targetInfo });
+          }
+
+          await cdp.send("Runtime.runIfWaitingForDebugger");
+        } catch (e) {
+          // target likely already closed
+        }
+      });
+
+      void cdp.send("Target.setAutoAttach", {
+        autoAttach: true,
+        waitForDebuggerOnStart: true,
+        flatten: false,
+      });
+
+      if (this.recording) {
+        await cdp.send("Page.enable");
+
+        cdp.on("Page.windowOpen", async (params) => {
+          const { seedId, depth, extraHops = 0, url } = opts.data;
+
+          const logDetails = { page: url, workerid };
+
+          await this.queueInScopeUrls(
+            seedId,
+            [params.url],
+            depth,
+            extraHops,
+            false,
+            logDetails,
+          );
+        });
+      }
+    }
+
+    await page.exposeFunction("__bx_addSet", (data: string) =>
+      this.crawlState.addToUserSet(data),
+    );
+
+    // await page.exposeFunction("__bx_hasSet", (data: string) => this.crawlState.hasUserSet(data));
   }
 
   async setupExecContextEvents(
@@ -932,6 +1003,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     opts.markPageUsed();
+    opts.pageBlockUnload = false;
 
     if (auth) {
       await page.setExtraHTTPHeaders({ Authorization: auth });
@@ -955,7 +1027,11 @@ self.__bx_behaviors.selectMainBehavior();
     );
     data.favicon = await this.getFavicon(page, logDetails);
 
+    opts.pageBlockUnload = true;
+
     await this.doPostLoadActions(opts);
+
+    opts.pageBlockUnload = false;
 
     await this.awaitPageExtraDelay(opts);
   }
@@ -1111,7 +1187,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async teardownPage({ workerid }: WorkerOpts) {
+  async teardownPage({ workerid }: WorkerState) {
     if (this.screencaster) {
       await this.screencaster.stopById(workerid);
     }

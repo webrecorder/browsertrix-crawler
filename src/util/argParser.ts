@@ -15,6 +15,7 @@ import {
   EXTRACT_TEXT_TYPES,
   SERVICE_WORKER_OPTS,
   DEFAULT_SELECTORS,
+  BEHAVIOR_TYPES,
   ExtractSelector,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
@@ -165,11 +166,19 @@ class ArgParser {
         },
 
         selectLinks: {
+          alias: "linkSelector",
           describe:
             "One or more selectors for extracting links, in the format [css selector]->[property to use],[css selector]->@[attribute to use]",
           type: "array",
           default: ["a[href]->href"],
           coerce,
+        },
+
+        clickSelector: {
+          describe:
+            "Selector for elements to click when using the autoclick behavior",
+          type: "string",
+          default: "a",
         },
 
         blockRules: {
@@ -351,7 +360,6 @@ class ArgParser {
           describe: "Which background behaviors to enable on each page",
           type: "array",
           default: ["autoplay", "autofetch", "autoscroll", "siteSpecific"],
-          choices: ["autoplay", "autofetch", "autoscroll", "siteSpecific"],
           coerce,
         },
 
@@ -693,9 +701,20 @@ class ArgParser {
     // background behaviors to apply
     const behaviorOpts: { [key: string]: string | boolean } = {};
     if (argv.behaviors.length > 0) {
-      argv.behaviors.forEach((x: string) => (behaviorOpts[x] = true));
+      argv.behaviors.forEach((x: string) => {
+        if (BEHAVIOR_TYPES.includes(x)) {
+          behaviorOpts[x] = true;
+        } else {
+          logger.warn(
+            "Unknown behavior specified, ignoring",
+            { behavior: x },
+            "behavior",
+          );
+        }
+      });
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
       behaviorOpts.startEarly = true;
+      behaviorOpts.clickSelector = argv.clickSelector;
       argv.behaviorOpts = JSON.stringify(behaviorOpts);
     } else {
       argv.behaviorOpts = "";

@@ -18,7 +18,7 @@ const NEW_WINDOW_TIMEOUT = 20;
 const TEARDOWN_TIMEOUT = 10;
 const FINISHED_TIMEOUT = 60;
 
-export type WorkerOpts = {
+export type WorkerState = {
   page: Page;
   cdp: CDPSession;
   workerid: WorkerId;
@@ -31,10 +31,7 @@ export type WorkerOpts = {
   markPageUsed: () => void;
   frameIdToExecId: Map<string, number>;
   isAuthSet?: boolean;
-};
-
-// ===========================================================================
-export type WorkerState = WorkerOpts & {
+  pageBlockUnload?: boolean;
   data: PageState;
 };
 
@@ -53,7 +50,7 @@ export class PageWorker {
   // eslint-disable-next-line @typescript-eslint/ban-types
   callbacks?: Record<string, Function>;
 
-  opts?: WorkerOpts;
+  opts?: WorkerState;
 
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -135,7 +132,8 @@ export class PageWorker {
     }
   }
 
-  async initPage(url: string): Promise<WorkerOpts> {
+  async initPage(pagestate: PageState): Promise<WorkerState> {
+    const { url } = pagestate;
     let reuse = !this.crashed && !!this.opts && !!this.page;
     if (!this.alwaysReuse) {
       reuse = this.reuseCount <= MAX_REUSE && this.isSameOrigin(url);
@@ -146,6 +144,7 @@ export class PageWorker {
         { reuseCount: this.reuseCount, ...this.logDetails },
         "worker",
       );
+      this.opts!.data = pagestate;
       return this.opts!;
     } else if (this.page) {
       await this.closePage();
@@ -192,6 +191,8 @@ export class PageWorker {
               this.reuseCount++;
             }
           },
+          pageBlockUnload: false,
+          data: pagestate,
         };
 
         if (this.recorder) {
@@ -370,10 +371,10 @@ export class PageWorker {
         }
 
         // init page (new or reuse)
-        const opts = await this.initPage(data.url);
+        const opts = await this.initPage(data);
 
         // run timed crawl of page
-        await this.timedCrawlPage({ ...opts, data });
+        await this.timedCrawlPage(opts);
 
         loggedWaiting = false;
       } else {
