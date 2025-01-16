@@ -50,11 +50,14 @@ Options:
                                             e-page-application crawling or when
                                             different hashtags load dynamic cont
                                             ent
-      --selectLinks                         one or more selectors for extracting
+      --selectLinks, --linkSelector         One or more selectors for extracting
                                              links, in the format [css selector]
                                             ->[property to use],[css selector]->
                                             @[attribute to use]
                                             [array] [default: ["a[href]->href"]]
+      --clickSelector                       Selector for elements to click when
+                                            using autoclick behavior
+                                                         [string] [default: "a"]
       --blockRules                          Additional rules for blocking certai
                                             n URLs from being loaded, by URL reg
                                             ex and optionally via text match in
@@ -75,7 +78,8 @@ Options:
                                                  [string] [default: "crawl-@ts"]
       --headless                            Run in headless mode, otherwise star
                                             t xvfb    [boolean] [default: false]
-      --driver                              JS driver for the crawler   [string]
+      --driver                              Custom driver for the crawler, if an
+                                            y                           [string]
       --generateCDX, --generatecdx, --gene  If set, generate index (CDXJ) for us
       rateCdx                               e with pywb after crawl is done
                                                       [boolean] [default: false]
@@ -142,8 +146,8 @@ Options:
                                             o crawl working directory)  [string]
       --behaviors                           Which background behaviors to enable
                                              on each page
-  [array] [choices: "autoplay", "autofetch", "autoscroll", "siteSpecific"] [defa
-                      ult: ["autoplay","autofetch","autoscroll","siteSpecific"]]
+  [array] [default: ["autoplay","autofetch","autoscroll","autoclick","siteSpecif
+                                                                           ic"]]
       --behaviorTimeout                     If >0, timeout (in seconds) for in-p
                                             age behavior will run on each page.
                                             If 0, a behavior can run until finis
@@ -163,8 +167,10 @@ Options:
                                             hich contains the browser profile di
                                             rectory                     [string]
       --screenshot                          Screenshot options for crawler, can
-                                            include: view, thumbnail, fullPage
-                [array] [choices: "view", "thumbnail", "fullPage"] [default: []]
+                                            include: view, thumbnail, fullPage,
+                                            fullPageFinal
+   [array] [choices: "view", "thumbnail", "fullPage", "fullPageFinal"] [default:
+                                                                             []]
       --screencastPort                      If set to a non-zero value, starts a
                                             n HTTP server with screencast access
                                             ible on this port
@@ -251,9 +257,15 @@ Options:
                                             failing due to non-200 responses
                                                       [boolean] [default: false]
       --customBehaviors                     Custom behavior files to inject. Val
-                                            ues can be URLs, paths to individual
-                                             behavior files, or paths to a direc
-                                            tory of behavior files
+                                            id values: URL to file, path to file
+                                            , path to directory of behaviors, UR
+                                            L to Git repo of behaviors (prefixed
+                                             with git+, optionally specify branc
+                                            h and relative path to a directory w
+                                            ithin repo as branch and path query
+                                            parameters, e.g. --customBehaviors "
+                                            git+https://git.example.com/repo.git
+                                            ?branch=dev&path=some/dir"
                                                            [array] [default: []]
       --debugAccessRedis                    if set, runs internal redis without
                                             protected mode to allow external acc

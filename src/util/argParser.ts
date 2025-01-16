@@ -166,11 +166,19 @@ class ArgParser {
         },
 
         selectLinks: {
+          alias: "linkSelector",
           describe:
             "One or more selectors for extracting links, in the format [css selector]->[property to use],[css selector]->@[attribute to use]",
           type: "array",
           default: ["a[href]->href"],
           coerce,
+        },
+
+        clickSelector: {
+          describe:
+            "Selector for elements to click when using autoclick behavior",
+          type: "string",
+          default: "a",
         },
 
         blockRules: {
@@ -706,6 +714,7 @@ class ArgParser {
       });
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
       behaviorOpts.startEarly = true;
+      behaviorOpts.clickSelector = argv.clickSelector;
       argv.behaviorOpts = JSON.stringify(behaviorOpts);
     } else {
       argv.behaviorOpts = "";
