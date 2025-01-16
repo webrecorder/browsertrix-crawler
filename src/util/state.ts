@@ -306,7 +306,8 @@ if json then
     local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[2]);
     redis.call('zadd', KEYS[2], score, json);
     return 1;
-  end
+  else
+    return 2;
 end
 return 0;
 `,
@@ -573,20 +574,27 @@ return inx;
     let retryFailed = false;
 
     if (!json) {
-      if (
-        await this.redis.requeuefailed(
-          this.fkey,
-          this.qkey,
-          this.maxRetryPending,
-          MAX_DEPTH,
-        )
-      ) {
-        json = await this._getNext();
-        retryFailed = true;
-      } else {
-        logger.debug("Did not retry failed, already retried", {}, "state");
-        return null;
+      const res = await this.redis.requeuefailed(
+        this.fkey,
+        this.qkey,
+        this.maxRetryPending,
+        MAX_DEPTH,
+      );
+
+      switch (res) {
+        case 1:
+          json = await this._getNext();
+          retryFailed = true;
+          break;
+
+        case 2:
+          logger.debug("Did not retry failed, already retried", {}, "state");
+          return null;
       }
+    }
+
+    if (!json) {
+      return null;
     }
 
     let data;
@@ -598,12 +606,8 @@ return inx;
       return null;
     }
 
-    if (!data) {
-      return null;
-    }
-
     if (retryFailed) {
-      logger.debug("Retry failed URL", { url: data.url }, "state");
+      logger.debug("Retring failed URL", { url: data.url }, "state");
     }
 
     await this.markStarted(data.url);
