@@ -15,6 +15,7 @@ import {
   EXTRACT_TEXT_TYPES,
   SERVICE_WORKER_OPTS,
   DEFAULT_SELECTORS,
+  BEHAVIOR_TYPES,
   ExtractSelector,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
@@ -350,20 +351,7 @@ class ArgParser {
         behaviors: {
           describe: "Which background behaviors to enable on each page",
           type: "array",
-          default: [
-            "autoplay",
-            "autofetch",
-            "autoscroll",
-            "autoclick",
-            "siteSpecific",
-          ],
-          choices: [
-            "autoplay",
-            "autofetch",
-            "autoscroll",
-            "autoclick",
-            "siteSpecific",
-          ],
+          default: BEHAVIOR_TYPES,
           coerce,
         },
 
@@ -705,11 +693,17 @@ class ArgParser {
     // background behaviors to apply
     const behaviorOpts: { [key: string]: string | boolean } = {};
     if (argv.behaviors.length > 0) {
-      // for now, always enable autoclick
-      if (argv.behaviors.indexOf("autoclick") < 0) {
-        argv.behaviors.push("autoclick");
-      }
-      argv.behaviors.forEach((x: string) => (behaviorOpts[x] = true));
+      argv.behaviors.forEach((x: string) => {
+        if (BEHAVIOR_TYPES.includes(x)) {
+          behaviorOpts[x] = true;
+        } else {
+          logger.warn(
+            "Unknown behavior specified, ignoring",
+            { behavior: x },
+            "behavior",
+          );
+        }
+      });
       behaviorOpts.log = BEHAVIOR_LOG_FUNC;
       behaviorOpts.startEarly = true;
       argv.behaviorOpts = JSON.stringify(behaviorOpts);

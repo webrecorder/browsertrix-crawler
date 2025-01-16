@@ -46,4 +46,12 @@ export const DEFAULT_SELECTORS: ExtractSelector[] = [
   },
 ];
 
+export const BEHAVIOR_TYPES = [
+  "autoplay",
+  "autofetch",
+  "autoscroll",
+  "autoclick",
+  "siteSpecific",
+];
+
 export const DISPLAY = ":99";

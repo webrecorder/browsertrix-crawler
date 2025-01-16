@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=1.73.104
+ARG BROWSER_VERSION=1.74.48
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
 FROM ${BROWSER_IMAGE_BASE}
@@ -39,7 +39,7 @@ ADD config/ /app/
 
 ADD html/ /app/html/
 
-ARG RWP_VERSION=2.2.4
+ARG RWP_VERSION=2.2.5
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/ui.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/sw.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/adblock/adblock.gz /app/html/rwp/adblock.gz
@@ -55,7 +55,7 @@ RUN mkdir -p /app/behaviors
 WORKDIR /crawls
 
 # enable to test custom behaviors build (from browsertrix-behaviors)
-COPY behaviors.js /app/node_modules/browsertrix-behaviors/dist/behaviors.js
+# COPY behaviors.js /app/node_modules/browsertrix-behaviors/dist/behaviors.js
 
 # add brave/chromium group policies
 RUN mkdir -p /etc/brave/policies/managed/
