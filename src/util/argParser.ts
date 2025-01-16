@@ -176,7 +176,7 @@ class ArgParser {
 
         clickSelector: {
           describe:
-            "Selector for elements to click when using autoclick behavior",
+            "Selector for elements to click when using the autoclick behavior",
           type: "string",
           default: "a",
         },
@@ -359,7 +359,7 @@ class ArgParser {
         behaviors: {
           describe: "Which background behaviors to enable on each page",
           type: "array",
-          default: BEHAVIOR_TYPES,
+          default: ["autoplay", "autofetch", "autoscroll", "siteSpecific"],
           coerce,
         },
 

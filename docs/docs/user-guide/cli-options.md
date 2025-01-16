@@ -56,7 +56,7 @@ Options:
                                             @[attribute to use]
                                             [array] [default: ["a[href]->href"]]
       --clickSelector                       Selector for elements to click when
-                                            using autoclick behavior
+                                            using the autoclick behavior
                                                          [string] [default: "a"]
       --blockRules                          Additional rules for blocking certai
                                             n URLs from being loaded, by URL reg
@@ -146,8 +146,7 @@ Options:
                                             o crawl working directory)  [string]
       --behaviors                           Which background behaviors to enable
                                              on each page
-  [array] [default: ["autoplay","autofetch","autoscroll","autoclick","siteSpecif
-                                                                           ic"]]
+         [array] [default: ["autoplay","autofetch","autoscroll","siteSpecific"]]
       --behaviorTimeout                     If >0, timeout (in seconds) for in-p
                                             age behavior will run on each page.
                                             If 0, a behavior can run until finis
