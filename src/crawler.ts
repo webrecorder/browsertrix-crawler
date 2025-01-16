@@ -1038,13 +1038,9 @@ self.__bx_behaviors.selectMainBehavior();
 
   async doPostLoadActions(opts: WorkerState, saveOutput = false) {
     const { page, cdp, data, workerid } = opts;
-    const { url, status } = data;
+    const { url } = data;
 
     if (!data.isHTMLPage) {
-      return;
-    }
-
-    if (status >= 400) {
       return;
     }
 

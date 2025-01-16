@@ -570,6 +570,7 @@ return inx;
 
   async nextFromQueue() {
     let json = await this._getNext();
+    let retryFailed = false;
 
     if (!json) {
       if (
@@ -580,10 +581,10 @@ return inx;
           MAX_DEPTH,
         )
       ) {
-        logger.debug("Requeued failed");
         json = await this._getNext();
+        retryFailed = true;
       } else {
-        logger.debug("Did not requeue failed");
+        logger.debug("Did not retry failed, already retried", {}, "state");
         return null;
       }
     }
@@ -593,12 +594,16 @@ return inx;
     try {
       data = JSON.parse(json);
     } catch (e) {
-      logger.error("Invalid queued json", json, "redis");
+      logger.error("Invalid queued json", json, "state");
       return null;
     }
 
     if (!data) {
       return null;
+    }
+
+    if (retryFailed) {
+      logger.debug("Retry failed URL", { url: data.url }, "state");
     }
 
     await this.markStarted(data.url);
