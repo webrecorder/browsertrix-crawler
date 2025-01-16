@@ -4,6 +4,7 @@ import { logger } from "./util/logger.js";
 import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
 import { ReplayCrawler } from "./replaycrawler.js";
+import fs from "node:fs";
 
 let crawler: Crawler | null = null;
 
@@ -54,6 +55,13 @@ if (process.argv[1].endsWith("qa")) {
   crawler = new ReplayCrawler();
 } else {
   crawler = new Crawler();
+}
+
+// remove any core dumps which could be taking up space in the working dir
+try {
+  fs.unlinkSync("./core");
+} catch (e) {
+  //ignore
 }
 
 await crawler.run();

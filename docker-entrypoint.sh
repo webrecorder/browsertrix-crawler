@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# disable core dumps
+ulimit -c 0
+
 # Get UID/GID from volume dir
 
 VOLUME_UID=$(stat -c '%u' /crawls)
