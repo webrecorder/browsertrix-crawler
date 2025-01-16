@@ -123,6 +123,13 @@ declare module "ioredis" {
       state: string,
     ): Result<void, Context>;
 
+    requeuefailed(
+      fkey: string,
+      qkey: string,
+      maxRetryPending: number,
+      maxRegularDepth: number,
+    ): Result<number, Context>;
+
     unlockpending(
       pkeyUrl: string,
       uid: string,
@@ -283,6 +290,27 @@ if json then
   redis.call('hdel', KEYS[1], ARGV[1]);
 end
 
+`,
+    });
+
+    redis.defineCommand("requeuefailed", {
+      numberOfKeys: 2,
+      lua: `
+local json = redis.call('rpop', KEYS[1]);
+
+if json then
+  local data = cjson.decode(json);
+  data['retry'] = (data['retry'] or 0) + 1;
+  if tonumber(data['retry']) <= tonumber(ARGV[1]) then
+    json = cjson.encode(data);
+    local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[2]);
+    redis.call('zadd', KEYS[2], score, json);
+    return 1;
+  else
+    return 2;
+  end
+end
+return 0;
 `,
     });
 
@@ -543,18 +571,44 @@ return inx;
   }
 
   async nextFromQueue() {
-    const json = await this._getNext();
+    let json = await this._getNext();
+    let retryFailed = false;
+
+    if (!json) {
+      const res = await this.redis.requeuefailed(
+        this.fkey,
+        this.qkey,
+        this.maxRetryPending,
+        MAX_DEPTH,
+      );
+
+      switch (res) {
+        case 1:
+          json = await this._getNext();
+          retryFailed = true;
+          break;
+
+        case 2:
+          logger.debug("Did not retry failed, already retried", {}, "state");
+          return null;
+      }
+    }
+
+    if (!json) {
+      return null;
+    }
+
     let data;
 
     try {
       data = JSON.parse(json);
     } catch (e) {
-      logger.error("Invalid queued json", json, "redis");
+      logger.error("Invalid queued json", json, "state");
       return null;
     }
 
-    if (!data) {
-      return null;
+    if (retryFailed) {
+      logger.debug("Retring failed URL", { url: data.url }, "state");
     }
 
     await this.markStarted(data.url);

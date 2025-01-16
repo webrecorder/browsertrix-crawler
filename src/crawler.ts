@@ -1938,10 +1938,15 @@ self.__bx_behaviors.selectMainBehavior();
       throw new Error("no response for page load, assuming failed");
     }
 
-    const respUrl = resp.url();
+    const respUrl = resp.url().split("#")[0];
     const isChromeError = page.url().startsWith("chrome-error://");
 
-    if (depth === 0 && !isChromeError && respUrl !== url && !downloadResponse) {
+    if (
+      depth === 0 &&
+      !isChromeError &&
+      respUrl !== url.split("#")[0] &&
+      !downloadResponse
+    ) {
       data.seedId = await this.crawlState.addExtraSeed(
         this.seeds,
         this.numOriginalSeeds,
