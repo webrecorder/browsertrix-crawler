@@ -15,43 +15,50 @@ const TEST_QUEUE = "test:q";
 
 test("dynamically add exclusion while crawl is running", async () => {
   console.log("Starting Docker container...");
-  const redis = new Redis(REDIS_URL, { lazyConnect: true, retryStrategy: () => null });
+  let containerId = null;
 
   try {
-    await execAsync(
-      `docker run -p ${REDIS_PORT}:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection add-exclusion --url https://old.webrecorder.net/ --scopeType prefix --limit 20 --logging debug --debugAccessRedis`,
+    // Start Docker container and capture its ID
+    const { stdout: containerStartOutput } = await execAsync(
+      `docker run -d -p ${REDIS_PORT}:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection add-exclusion --url https://old.webrecorder.net/ --scopeType prefix --limit 20 --logging debug --debugAccessRedis`,
       { shell: "/bin/bash" }
     );
+    containerId = containerStartOutput.trim(); // Capture the container ID
+    console.log(`Docker container started with ID: ${containerId}`);
 
     console.log("Waiting for Redis to start...");
+    const redis = new Redis(REDIS_URL, { lazyConnect: true, retryStrategy: () => null });
+
     let retries = 0;
     const MAX_RETRIES = 20;
-    while (retries < MAX_RETRIES && redis.status !== 'ready') {
-      await sleep(1000);
-      retries++;
-      console.log(`Redis status: ${redis.status} (Retry ${retries}/${MAX_RETRIES})`);
+
+    while (retries < MAX_RETRIES) {
+      try {
+        await redis.connect();
+        if (redis.status === "ready") break;
+      } catch {
+        // Retry on connection failure
+        retries++;
+        console.log(`Retry ${retries}/${MAX_RETRIES}`);
+        await sleep(1000);
+      }
     }
 
-    if (redis.status !== 'ready') {
-      throw new Error("Redis connection failed to become ready");
+    if (redis.status !== "ready") {
+      throw new Error("Failed to connect to Redis.");
     }
-
-    await redis.connect();
-    console.log("Redis connected");
 
     console.log("Monitoring Redis queue...");
     retries = 0;
+
     while (retries < MAX_RETRIES) {
-      if (Number(await redis.zcard(TEST_QUEUE)) > 1) {
-        break;
-      }
+      if (Number(await redis.zcard(TEST_QUEUE)) > 1) break;
       await sleep(500);
       retries++;
-      console.log(`Retry ${retries}/${MAX_RETRIES}`);
     }
 
     if (retries === MAX_RETRIES) {
-      throw new Error("Timeout waiting for Redis queue to populate");
+      throw new Error("Timeout waiting for Redis queue to populate.");
     }
 
     const uids = await redis.hkeys("test:status");
@@ -61,18 +68,21 @@ test("dynamically add exclusion while crawl is running", async () => {
       JSON.stringify({ type: "addExclusion", regex: EXCLUSION_REGEX })
     );
 
-    console.log("Asserting debug logs...");
-    const { stdout } = await execAsync(`docker logs <container_id>`); // Replace with container id
-    expect(stdout.indexOf("Add Exclusion") > 0).toBe(true);
-    expect(stdout.indexOf("Removing excluded URL") > 0).toBe(true);
+    console.log("Fetching and asserting logs...");
+    const { stdout: logs } = await execAsync(`docker logs ${containerId}`);
+    expect(logs.indexOf("Add Exclusion") > 0).toBe(true);
+    expect(logs.indexOf("Removing excluded URL") > 0).toBe(true);
+
+    console.log("Test completed successfully.");
   } catch (error) {
     console.error(`Error during test: ${error.message}`);
-    console.error(`Redis status during error: ${redis.status}`);
     throw error;
   } finally {
     console.log("Cleaning up resources...");
-    if (redis.status !== 'end') {
-      await redis.quit();
+    if (containerId) {
+      await execAsync(`docker stop ${containerId}`);
+      await execAsync(`docker rm ${containerId}`);
+      console.log(`Docker container ${containerId} stopped and removed.`);
     }
   }
 });
