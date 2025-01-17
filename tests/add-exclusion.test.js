@@ -24,13 +24,23 @@ test("dynamically add exclusion while crawl is running", async () => {
     );
 
     console.log("Waiting for Redis to start...");
-    await redis.connect();
-    console.log(`Redis connection status: ${redis.status}`);
-
-    const MAX_RETRIES = 100;
     let retries = 0;
+    const MAX_RETRIES = 20;
+    while (retries < MAX_RETRIES && redis.status !== 'ready') {
+      await sleep(1000);
+      retries++;
+      console.log(`Redis status: ${redis.status} (Retry ${retries}/${MAX_RETRIES})`);
+    }
+
+    if (redis.status !== 'ready') {
+      throw new Error("Redis connection failed to become ready");
+    }
+
+    await redis.connect();
+    console.log("Redis connected");
 
     console.log("Monitoring Redis queue...");
+    retries = 0;
     while (retries < MAX_RETRIES) {
       if (Number(await redis.zcard(TEST_QUEUE)) > 1) {
         break;
@@ -57,6 +67,7 @@ test("dynamically add exclusion while crawl is running", async () => {
     expect(stdout.indexOf("Removing excluded URL") > 0).toBe(true);
   } catch (error) {
     console.error(`Error during test: ${error.message}`);
+    console.error(`Redis status during error: ${redis.status}`);
     throw error;
   } finally {
     console.log("Cleaning up resources...");
