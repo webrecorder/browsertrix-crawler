@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "./logger.js";
 
-import { MAX_DEPTH } from "./constants.js";
+import { MAX_DEPTH, MAX_RETRY_FAILED } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 
@@ -170,7 +170,7 @@ export type SaveState = {
 // ============================================================================
 export class RedisCrawlState {
   redis: Redis;
-  maxRetryPending = 1;
+  maxRetryPending = MAX_RETRY_FAILED;
 
   uid: string;
   key: string;
@@ -608,7 +608,7 @@ return inx;
     }
 
     if (retryFailed) {
-      logger.debug("Retring failed URL", { url: data.url }, "state");
+      logger.debug("Retrying failed URL", { url: data.url }, "state");
     }
 
     await this.markStarted(data.url);

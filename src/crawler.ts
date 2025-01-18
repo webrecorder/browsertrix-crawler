@@ -1921,7 +1921,7 @@ self.__bx_behaviors.selectMainBehavior();
       } else if (!downloadResponse) {
         // log if not already log and rethrow, consider page failed
         if (msg !== "logged") {
-          logger.error("Page Load Failed, skipping page", {
+          logger.error("Page Load Failed, will retry", {
             msg,
             loadState: data.loadState,
             ...logDetails,
