@@ -1582,8 +1582,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.writeStats();
 
-    // if crawl has been stopped, mark as final exit for post-crawl tasks
-    if (await this.crawlState.isCrawlStopped()) {
+    // if crawl has been stopped or finished, mark as final exit for post-crawl tasks
+    if (
+      (await this.crawlState.isCrawlStopped()) ||
+      (await this.crawlState.isFinished())
+    ) {
       this.finalExit = true;
     }
 
