@@ -6,6 +6,7 @@ import util from "util";
 import { exec as execCallback } from "child_process";
 
 import { logger } from "./logger.js";
+import { getProxyDispatcher } from "./proxy.js";
 
 const exec = util.promisify(execCallback);
 
@@ -85,7 +86,7 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
   const behaviorFilepath = `/app/behaviors/${filename}`;
 
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { dispatcher: getProxyDispatcher() });
     const fileContents = await res.text();
     await fsp.writeFile(behaviorFilepath, fileContents);
     logger.info(

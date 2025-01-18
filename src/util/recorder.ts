@@ -8,7 +8,7 @@ import {
   isRedirectStatus,
 } from "./reqresp.js";
 
-import { fetch, getGlobalDispatcher, Response } from "undici";
+import { fetch, Response } from "undici";
 
 import {
   getCustomRewriter,
@@ -23,6 +23,7 @@ import { WARCWriter } from "./warcwriter.js";
 import { RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
+import { getProxyDispatcher } from "./proxy.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -1588,14 +1589,18 @@ class AsyncFetcher {
 
     const headers = reqresp.getRequestHeadersDict();
 
-    const dispatcher = getGlobalDispatcher().compose((dispatch) => {
-      return (opts, handler) => {
-        if (opts.headers) {
-          reqresp.requestHeaders = opts.headers as Record<string, string>;
-        }
-        return dispatch(opts, handler);
-      };
-    });
+    let dispatcher = getProxyDispatcher();
+
+    if (dispatcher) {
+      dispatcher = dispatcher.compose((dispatch) => {
+        return (opts, handler) => {
+          if (opts.headers) {
+            reqresp.requestHeaders = opts.headers as Record<string, string>;
+          }
+          return dispatch(opts, handler);
+        };
+      });
+    }
 
     const resp = await fetch(url!, {
       method,

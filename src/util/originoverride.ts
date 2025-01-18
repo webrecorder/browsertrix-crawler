@@ -3,6 +3,7 @@ import { formatErr, logger } from "./logger.js";
 import { Browser } from "./browser.js";
 
 import { fetch } from "undici";
+import { getProxyDispatcher } from "./proxy.js";
 
 export class OriginOverride {
   originOverride: { origUrl: URL; destUrl: URL }[];
@@ -45,7 +46,10 @@ export class OriginOverride {
           headers.set("origin", orig.origin);
         }
 
-        const resp = await fetch(newUrl, { headers });
+        const resp = await fetch(newUrl, {
+          headers,
+          dispatcher: getProxyDispatcher(),
+        });
 
         const body = Buffer.from(await resp.arrayBuffer());
         const respHeaders = Object.fromEntries(resp.headers);

@@ -700,6 +700,9 @@ class ArgParser {
 
     // background behaviors to apply
     const behaviorOpts: { [key: string]: string | boolean } = {};
+    if (argv.blockAds) {
+      argv.behaviors.push("autoclick");
+    }
     if (argv.behaviors.length > 0) {
       argv.behaviors.forEach((x: string) => {
         if (BEHAVIOR_TYPES.includes(x)) {

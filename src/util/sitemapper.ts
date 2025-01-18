@@ -10,6 +10,7 @@ import { DETECT_SITEMAP } from "./constants.js";
 import { sleep } from "./timing.js";
 
 import { fetch, Response } from "undici";
+import { getProxyDispatcher } from "./proxy.js";
 
 const SITEMAP_CONCURRENCY = 5;
 
@@ -65,7 +66,10 @@ export class SitemapReader extends EventEmitter {
 
   async _fetchWithRetry(url: string, message: string) {
     while (true) {
-      const resp = await fetch(url, { headers: this.headers });
+      const resp = await fetch(url, {
+        headers: this.headers,
+        dispatcher: getProxyDispatcher(),
+      });
 
       if (resp.ok) {
         return resp;

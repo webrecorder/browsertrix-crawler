@@ -1498,6 +1498,7 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info("crawl already finished, running post-crawl tasks", {
         state: initState,
       });
+      this.finalExit = true;
       await this.postCrawl();
       return;
     } else if (await this.crawlState.isCrawlStopped()) {
@@ -1945,6 +1946,7 @@ self.__bx_behaviors.selectMainBehavior();
       depth === 0 &&
       !isChromeError &&
       respUrl !== url.split("#")[0] &&
+      respUrl + "/" !== url &&
       !downloadResponse
     ) {
       data.seedId = await this.crawlState.addExtraSeed(
