@@ -35,6 +35,7 @@ export type QueueEntry = {
   extraHops: number;
   ts?: number;
   pageid?: string;
+  retry?: number;
 };
 
 // ============================================================================
@@ -54,6 +55,7 @@ export class PageState {
   seedId: number;
   depth: number;
   extraHops: number;
+  retry: number;
 
   status: number;
 
@@ -87,6 +89,7 @@ export class PageState {
     }
     this.pageid = redisData.pageid || uuidv4();
     this.status = 0;
+    this.retry = redisData.retry || 0;
   }
 }
 
@@ -115,13 +118,7 @@ declare module "ioredis" {
       uid: string,
     ): Result<void, Context>;
 
-    movefailed(
-      pkey: string,
-      fkey: string,
-      url: string,
-      value: string,
-      state: string,
-    ): Result<void, Context>;
+    movefailed(pkey: string, fkey: string, url: string): Result<void, Context>;
 
     requeuefailed(
       fkey: string,
@@ -283,7 +280,6 @@ local json = redis.call('hget', KEYS[1], ARGV[1]);
 
 if json then
   local data = cjson.decode(json);
-  data[ARGV[3]] = ARGV[2];
   json = cjson.encode(data);
 
   redis.call('lpush', KEYS[2], json);
@@ -375,15 +371,21 @@ return inx;
     );
   }
 
-  async markFinished(url: string) {
+  async markFinished(url: string, retry: number) {
     await this.redis.hdel(this.pkey, url);
 
+    if (retry) {
+      return 1;
+    }
     return await this.redis.incr(this.dkey);
   }
 
-  async markFailed(url: string) {
-    await this.redis.movefailed(this.pkey, this.fkey, url, "1", "failed");
+  async markFailed(url: string, retry: number) {
+    await this.redis.movefailed(this.pkey, this.fkey, url);
 
+    if (retry) {
+      return 1;
+    }
     return await this.redis.incr(this.dkey);
   }
 

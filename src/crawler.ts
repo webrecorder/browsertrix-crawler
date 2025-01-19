@@ -1156,12 +1156,12 @@ self.__bx_behaviors.selectMainBehavior();
 
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url } = data;
+    const { loadState, logDetails, depth, url, retry } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       logger.info("Page Finished", { loadState, ...logDetails }, "pageStatus");
 
-      await this.crawlState.markFinished(url);
+      await this.crawlState.markFinished(url, retry);
 
       if (this.healthChecker) {
         this.healthChecker.resetErrors();
@@ -1171,7 +1171,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.checkLimits();
     } else {
-      await this.crawlState.markFailed(url);
+      await this.crawlState.markFailed(url, retry);
 
       if (this.healthChecker) {
         this.healthChecker.incError();
