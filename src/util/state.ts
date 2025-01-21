@@ -123,6 +123,7 @@ declare module "ioredis" {
     requeuefailed(
       fkey: string,
       qkey: string,
+      ffkey: string,
       maxRetryPending: number,
       maxRegularDepth: number,
     ): Result<number, Context>;
@@ -178,6 +179,7 @@ export class RedisCrawlState {
   skey: string;
   dkey: string;
   fkey: string;
+  ffkey: string;
   ekey: string;
   pageskey: string;
   esKey: string;
@@ -199,6 +201,8 @@ export class RedisCrawlState {
     this.dkey = this.key + ":d";
     // failed
     this.fkey = this.key + ":f";
+    // failed final, no more retry
+    this.ffkey = this.key + ":ff";
     // crawler errors
     this.ekey = this.key + ":e";
     // pages
@@ -290,19 +294,21 @@ end
     });
 
     redis.defineCommand("requeuefailed", {
-      numberOfKeys: 2,
+      numberOfKeys: 3,
       lua: `
 local json = redis.call('rpop', KEYS[1]);
 
 if json then
   local data = cjson.decode(json);
   data['retry'] = (data['retry'] or 0) + 1;
+
   if tonumber(data['retry']) <= tonumber(ARGV[1]) then
-    json = cjson.encode(data);
+    local json = cjson.encode(data);
     local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[2]);
     redis.call('zadd', KEYS[2], score, json);
     return 1;
   else
+    redis.call('lpush', KEYS[3], json);
     return 2;
   end
 end
@@ -580,6 +586,7 @@ return inx;
       const res = await this.redis.requeuefailed(
         this.fkey,
         this.qkey,
+        this.ffkey,
         this.maxRetryPending,
         MAX_DEPTH,
       );
