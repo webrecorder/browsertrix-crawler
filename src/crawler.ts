@@ -1889,12 +1889,14 @@ self.__bx_behaviors.selectMainBehavior();
       }
     };
 
-    page.on("response", waitFirstResponse);
+    const handleFirstLoadEvents = () => {
+      page.on("response", waitFirstResponse);
 
-    // store that domcontentloaded was finished
-    page.once("domcontentloaded", () => {
-      data.loadState = LoadState.CONTENT_LOADED;
-    });
+      // store that domcontentloaded was finished
+      page.once("domcontentloaded", () => {
+        data.loadState = LoadState.CONTENT_LOADED;
+      });
+    };
 
     const gotoOpts = data.isHTMLPage
       ? this.gotoOpts
@@ -1902,9 +1904,24 @@ self.__bx_behaviors.selectMainBehavior();
 
     logger.info("Awaiting page load", logDetails);
 
+    const urlNoHash = url.split("#")[0];
+
+    const fullRefresh = urlNoHash === page.url().split("#")[0];
+
     try {
+      if (!fullRefresh) {
+        handleFirstLoadEvents();
+      }
       // store the page load response when page fully loads
       fullLoadedResponse = await page.goto(url, gotoOpts);
+
+      if (fullRefresh) {
+        logger.debug("Hashtag-only change, doing full page reload");
+
+        handleFirstLoadEvents();
+
+        fullLoadedResponse = await page.reload(gotoOpts);
+      }
     } catch (e) {
       if (!(e instanceof Error)) {
         throw e;
@@ -1948,7 +1965,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (
       depth === 0 &&
       !isChromeError &&
-      respUrl !== url.split("#")[0] &&
+      respUrl !== urlNoHash &&
       respUrl + "/" !== url &&
       !downloadResponse
     ) {
