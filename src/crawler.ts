@@ -2657,8 +2657,9 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.origConfig) {
       this.origConfig.state = state;
     }
-    const res = yaml.dump(this.origConfig, { lineWidth: -1 });
+
     try {
+      const res = yaml.dump(this.origConfig, { lineWidth: -1 });
       logger.info(`Saving crawl state to: ${filename}`);
       await fsp.writeFile(filename, res);
     } catch (e) {
