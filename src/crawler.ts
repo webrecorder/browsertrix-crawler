@@ -1370,7 +1370,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.failOnFailedLimit) {
-      const numFailed = await this.crawlState.numFailed();
+      const numFailed = await this.crawlState.numFailedWillRetry();
       const failedLimit = this.params.failOnFailedLimit;
       if (numFailed >= failedLimit) {
         logger.fatal(
@@ -1826,16 +1826,19 @@ self.__bx_behaviors.selectMainBehavior();
 
     const realSize = await this.crawlState.queueSize();
     const pendingPages = await this.crawlState.getPendingList();
-    const done = await this.crawlState.numDone();
-    const failed = await this.crawlState.numFailed();
-    const total = realSize + pendingPages.length + done;
+    const pending = pendingPages.length;
+    const crawled = await this.crawlState.numDone();
+    const failedWillRetry = await this.crawlState.numFailedWillRetry();
+    const failedNoRetry = await this.crawlState.numFailedNoRetry();
+    const total = realSize + pendingPages.length + crawled;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
-      crawled: done,
-      total: total,
-      pending: pendingPages.length,
-      failed: failed,
-      limit: limit,
+      crawled,
+      total,
+      pending,
+      failedWillRetry,
+      failedNoRetry,
+      limit,
       pendingPages,
     };
 
@@ -1906,7 +1909,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     const urlNoHash = url.split("#")[0];
 
-    const fullRefresh = urlNoHash === page.url().split("#")[0];
+    const fullRefresh = false; //urlNoHash === page.url().split("#")[0];
 
     try {
       if (!fullRefresh) {

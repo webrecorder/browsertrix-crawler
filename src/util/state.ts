@@ -635,10 +635,13 @@ return inx;
     const seen = await this._iterSet(this.skey);
     const queued = await this._iterSortedKey(this.qkey, seen);
     const pending = await this.getPendingList();
-    const failed = await this._iterListKeys(this.fkey, seen);
+    const failedWillRetry = await this._iterListKeys(this.fkey, seen);
+    const failedNoRetry = await this._iterListKeys(this.ffkey, seen);
     const errors = await this.getErrorList();
     const extraSeeds = await this._iterListKeys(this.esKey, seen);
     const sitemapDone = await this.isSitemapDone();
+
+    const failed = failedWillRetry.concat(failedNoRetry);
 
     const finished = [...seen.values()];
 
@@ -730,6 +733,7 @@ return inx;
     await this.redis.del(this.pkey);
     await this.redis.del(this.dkey);
     await this.redis.del(this.fkey);
+    await this.redis.del(this.ffkey);
     await this.redis.del(this.skey);
     await this.redis.del(this.ekey);
 
@@ -812,7 +816,12 @@ return inx;
 
     for (const json of state.failed) {
       const data = JSON.parse(json);
-      await this.redis.zadd(this.qkey, this._getScore(data), json);
+      const retry = data.retry || 0;
+      if (retry <= this.maxRetryPending) {
+        await this.redis.zadd(this.qkey, this._getScore(data), json);
+      } else {
+        await this.redis.rpush(this.ffkey, json);
+      }
       seen.push(data.url);
     }
 
@@ -840,8 +849,12 @@ return inx;
     return res;
   }
 
-  async numFailed() {
+  async numFailedWillRetry() {
     return await this.redis.llen(this.fkey);
+  }
+
+  async numFailedNoRetry() {
+    return await this.redis.llen(this.ffkey);
   }
 
   async getPendingList() {
