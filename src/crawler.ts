@@ -1829,7 +1829,7 @@ self.__bx_behaviors.selectMainBehavior();
     const pending = pendingPages.length;
     const crawled = await this.crawlState.numDone();
     const failedWillRetry = await this.crawlState.numFailedWillRetry();
-    const failedNoRetry = await this.crawlState.numFailedNoRetry();
+    const failed = await this.crawlState.numFailedNoRetry();
     const total = realSize + pendingPages.length + crawled;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
@@ -1837,7 +1837,7 @@ self.__bx_behaviors.selectMainBehavior();
       total,
       pending,
       failedWillRetry,
-      failedNoRetry,
+      failed,
       limit,
       pendingPages,
     };
