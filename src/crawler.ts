@@ -1909,7 +1909,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     const urlNoHash = url.split("#")[0];
 
-    const fullRefresh = false; //urlNoHash === page.url().split("#")[0];
+    const fullRefresh = urlNoHash === page.url().split("#")[0];
 
     try {
       if (!fullRefresh) {
