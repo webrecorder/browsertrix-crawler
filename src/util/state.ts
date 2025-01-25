@@ -377,22 +377,14 @@ return inx;
     );
   }
 
-  async markFinished(url: string, retry: number) {
+  async markFinished(url: string) {
     await this.redis.hdel(this.pkey, url);
 
-    if (retry) {
-      return 1;
-    }
     return await this.redis.incr(this.dkey);
   }
 
-  async markFailed(url: string, retry: number) {
+  async markFailed(url: string) {
     await this.redis.movefailed(this.pkey, this.fkey, url);
-
-    if (retry) {
-      return 1;
-    }
-    return await this.redis.incr(this.dkey);
   }
 
   async markExcluded(url: string) {
@@ -408,7 +400,10 @@ return inx;
   }
 
   async isFinished() {
-    return (await this.queueSize()) == 0 && (await this.numDone()) > 0;
+    return (
+      (await this.queueSize()) == 0 &&
+      (await this.numDone()) + (await this.numFailedNoRetry()) > 0
+    );
   }
 
   async setStatus(status_: string) {
