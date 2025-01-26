@@ -1,4 +1,5 @@
 import { execSync, spawn } from "child_process";
+import fs from "fs";
 import Redis from "ioredis";
 
 const DOCKER_HOST_NAME = process.env.DOCKER_HOST_NAME || "host.docker.internal";
@@ -9,7 +10,7 @@ async function sleep(time) {
 
 test("run crawl", async () => {
   let status = 0;
-  execSync(`docker run -d -e CRAWL_ID=test -p 36387:6379 --rm webrecorder/browsertrix-crawler crawl --url http://${DOCKER_HOST_NAME}:31501 --url https://example.com/ --limit 2 --pageExtraDelay 10 --debugAccessRedis`);
+  execSync(`docker run -d -v $PWD/test-crawls:/crawls -e CRAWL_ID=test -p 36387:6379 --rm webrecorder/browsertrix-crawler crawl --url http://${DOCKER_HOST_NAME}:31501 --url https://example.com/ --limit 2 --pageExtraDelay 10 --debugAccessRedis --collection retry-fail`);
 
 /*
   async function runServer() {
@@ -51,4 +52,20 @@ test("run crawl", async () => {
     expect(numRetries).toBe(5);
   }
 });
+
+
+test("check only one failed page entry is made", () => {
+  expect(
+    fs.existsSync("test-crawls/collections/retry-fail/pages/pages.jsonl"),
+  ).toBe(true);
+
+  expect(
+    fs
+      .readFileSync(
+        "test-crawls/collections/retry-fail/pages/pages.jsonl",
+        "utf8",
+      ).trim().split("\n").length
+  ).toBe(3);
+});
+ 
 
