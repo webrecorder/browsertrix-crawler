@@ -5,6 +5,7 @@ import { HTTPRequest, Page } from "puppeteer-core";
 import { Browser } from "./browser.js";
 
 import { fetch } from "undici";
+import { getProxyDispatcher } from "./proxy.js";
 
 const RULE_TYPES = ["block", "allowOnly"];
 
@@ -271,7 +272,7 @@ export class BlockRules {
     logDetails: Record<string, any>,
   ) {
     try {
-      const res = await fetch(reqUrl);
+      const res = await fetch(reqUrl, { dispatcher: getProxyDispatcher() });
       const text = await res.text();
 
       return !!text.match(frameTextMatch);
@@ -302,6 +303,7 @@ export class BlockRules {
       method: "PUT",
       headers: { "Content-Type": "text/html" },
       body,
+      dispatcher: getProxyDispatcher(),
     });
   }
 }

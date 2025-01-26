@@ -1,5 +1,5 @@
 import net from "net";
-import { Agent, Dispatcher, ProxyAgent, setGlobalDispatcher } from "undici";
+import { Agent, Dispatcher, ProxyAgent } from "undici";
 
 import child_process from "child_process";
 
@@ -12,6 +12,8 @@ import { FETCH_HEADERS_TIMEOUT_SECS } from "./constants.js";
 const SSH_PROXY_LOCAL_PORT = 9722;
 
 const SSH_WAIT_TIMEOUT = 30000;
+
+let proxyDispatcher: Dispatcher | undefined = undefined;
 
 export function getEnvProxyUrl() {
   if (process.env.PROXY_SERVER) {
@@ -46,8 +48,12 @@ export async function initProxy(
 
   // set global fetch() dispatcher (with proxy, if any)
   const dispatcher = createDispatcher(proxy, agentOpts);
-  setGlobalDispatcher(dispatcher);
+  proxyDispatcher = dispatcher;
   return proxy;
+}
+
+export function getProxyDispatcher() {
+  return proxyDispatcher;
 }
 
 export function createDispatcher(

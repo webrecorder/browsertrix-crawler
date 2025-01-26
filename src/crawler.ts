@@ -46,6 +46,7 @@ import {
   ExtractSelector,
   PAGE_OP_TIMEOUT_SECS,
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
+  MAX_RETRY_FAILED,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -1152,13 +1153,13 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async pageFinished(data: PageState) {
-    await this.writePage(data);
-
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url } = data;
+    const { loadState, logDetails, depth, url, retry } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
+      await this.writePage(data);
+
       logger.info("Page Finished", { loadState, ...logDetails }, "pageStatus");
 
       await this.crawlState.markFinished(url);
@@ -1171,6 +1172,9 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.checkLimits();
     } else {
+      if (retry >= MAX_RETRY_FAILED) {
+        await this.writePage(data);
+      }
       await this.crawlState.markFailed(url);
 
       if (this.healthChecker) {
@@ -1370,7 +1374,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.failOnFailedLimit) {
-      const numFailed = await this.crawlState.numFailed();
+      const numFailed = await this.crawlState.numFailedWillRetry();
       const failedLimit = this.params.failOnFailedLimit;
       if (numFailed >= failedLimit) {
         logger.fatal(
@@ -1498,6 +1502,7 @@ self.__bx_behaviors.selectMainBehavior();
       logger.info("crawl already finished, running post-crawl tasks", {
         state: initState,
       });
+      this.finalExit = true;
       await this.postCrawl();
       return;
     } else if (await this.crawlState.isCrawlStopped()) {
@@ -1581,8 +1586,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.writeStats();
 
-    // if crawl has been stopped, mark as final exit for post-crawl tasks
-    if (await this.crawlState.isCrawlStopped()) {
+    // if crawl has been stopped or finished, mark as final exit for post-crawl tasks
+    if (
+      (await this.crawlState.isCrawlStopped()) ||
+      (await this.crawlState.isFinished())
+    ) {
       this.finalExit = true;
     }
 
@@ -1822,16 +1830,19 @@ self.__bx_behaviors.selectMainBehavior();
 
     const realSize = await this.crawlState.queueSize();
     const pendingPages = await this.crawlState.getPendingList();
-    const done = await this.crawlState.numDone();
-    const failed = await this.crawlState.numFailed();
-    const total = realSize + pendingPages.length + done;
+    const pending = pendingPages.length;
+    const crawled = await this.crawlState.numDone();
+    const failedWillRetry = await this.crawlState.numFailedWillRetry();
+    const failed = await this.crawlState.numFailedNoRetry();
+    const total = realSize + pendingPages.length + crawled;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
-      crawled: done,
-      total: total,
-      pending: pendingPages.length,
-      failed: failed,
-      limit: limit,
+      crawled,
+      total,
+      pending,
+      failedWillRetry,
+      failed,
+      limit,
       pendingPages,
     };
 
@@ -1885,12 +1896,14 @@ self.__bx_behaviors.selectMainBehavior();
       }
     };
 
-    page.on("response", waitFirstResponse);
+    const handleFirstLoadEvents = () => {
+      page.on("response", waitFirstResponse);
 
-    // store that domcontentloaded was finished
-    page.once("domcontentloaded", () => {
-      data.loadState = LoadState.CONTENT_LOADED;
-    });
+      // store that domcontentloaded was finished
+      page.once("domcontentloaded", () => {
+        data.loadState = LoadState.CONTENT_LOADED;
+      });
+    };
 
     const gotoOpts = data.isHTMLPage
       ? this.gotoOpts
@@ -1898,9 +1911,24 @@ self.__bx_behaviors.selectMainBehavior();
 
     logger.info("Awaiting page load", logDetails);
 
+    const urlNoHash = url.split("#")[0];
+
+    const fullRefresh = urlNoHash === page.url().split("#")[0];
+
     try {
+      if (!fullRefresh) {
+        handleFirstLoadEvents();
+      }
       // store the page load response when page fully loads
       fullLoadedResponse = await page.goto(url, gotoOpts);
+
+      if (fullRefresh) {
+        logger.debug("Hashtag-only change, doing full page reload");
+
+        handleFirstLoadEvents();
+
+        fullLoadedResponse = await page.reload(gotoOpts);
+      }
     } catch (e) {
       if (!(e instanceof Error)) {
         throw e;
@@ -1921,7 +1949,7 @@ self.__bx_behaviors.selectMainBehavior();
       } else if (!downloadResponse) {
         // log if not already log and rethrow, consider page failed
         if (msg !== "logged") {
-          logger.error("Page Load Failed, skipping page", {
+          logger.error("Page Load Failed, will retry", {
             msg,
             loadState: data.loadState,
             ...logDetails,
@@ -1944,7 +1972,8 @@ self.__bx_behaviors.selectMainBehavior();
     if (
       depth === 0 &&
       !isChromeError &&
-      respUrl !== url.split("#")[0] &&
+      respUrl !== urlNoHash &&
+      respUrl + "/" !== url &&
       !downloadResponse
     ) {
       data.seedId = await this.crawlState.addExtraSeed(
@@ -2652,8 +2681,9 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.origConfig) {
       this.origConfig.state = state;
     }
-    const res = yaml.dump(this.origConfig, { lineWidth: -1 });
+
     try {
+      const res = yaml.dump(this.origConfig, { lineWidth: -1 });
       logger.info(`Saving crawl state to: ${filename}`);
       await fsp.writeFile(filename, res);
     } catch (e) {
