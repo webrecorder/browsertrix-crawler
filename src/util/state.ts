@@ -302,17 +302,17 @@ if json then
   local data = cjson.decode(json);
   data['retry'] = (data['retry'] or 0) + 1;
 
-  if tonumber(data['retry']) <= tonumber(ARGV[1]) then
+  if data['retry'] <= tonumber(ARGV[1]) then
     local json = cjson.encode(data);
     local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[2]);
     redis.call('zadd', KEYS[2], score, json);
-    return 1;
+    return data['retry'];
   else
     redis.call('lpush', KEYS[3], json);
-    return 2;
+    return 0;
   end
 end
-return 0;
+return -1;
 `,
     });
 
@@ -401,7 +401,7 @@ return inx;
 
   async isFinished() {
     return (
-      (await this.queueSize()) == 0 &&
+      (await this.queueSize()) + (await this.numFailedWillRetry()) == 0 &&
       (await this.numDone()) + (await this.numFailedNoRetry()) > 0
     );
   }
@@ -575,10 +575,10 @@ return inx;
 
   async nextFromQueue() {
     let json = await this._getNext();
-    let retryFailed = false;
+    let retry = 0;
 
     if (!json) {
-      const res = await this.redis.requeuefailed(
+      retry = await this.redis.requeuefailed(
         this.fkey,
         this.qkey,
         this.ffkey,
@@ -586,15 +586,11 @@ return inx;
         MAX_DEPTH,
       );
 
-      switch (res) {
-        case 1:
-          json = await this._getNext();
-          retryFailed = true;
-          break;
-
-        case 2:
-          logger.debug("Did not retry failed, already retried", {}, "state");
-          return null;
+      if (retry > 0) {
+        json = await this._getNext();
+      } else if (retry === 0) {
+        logger.debug("Did not retry failed, already retried", {}, "state");
+        return null;
       }
     }
 
@@ -611,8 +607,8 @@ return inx;
       return null;
     }
 
-    if (retryFailed) {
-      logger.debug("Retrying failed URL", { url: data.url }, "state");
+    if (retry) {
+      logger.debug("Retrying failed URL", { url: data.url, retry }, "state");
     }
 
     await this.markStarted(data.url);
