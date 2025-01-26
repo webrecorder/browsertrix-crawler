@@ -46,6 +46,7 @@ import {
   ExtractSelector,
   PAGE_OP_TIMEOUT_SECS,
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
+  MAX_RETRY_FAILED,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -1152,13 +1153,13 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async pageFinished(data: PageState) {
-    await this.writePage(data);
-
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url } = data;
+    const { loadState, logDetails, depth, url, retry } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
+      await this.writePage(data);
+
       logger.info("Page Finished", { loadState, ...logDetails }, "pageStatus");
 
       await this.crawlState.markFinished(url);
@@ -1171,6 +1172,9 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.checkLimits();
     } else {
+      if (retry >= MAX_RETRY_FAILED) {
+        await this.writePage(data);
+      }
       await this.crawlState.markFailed(url);
 
       if (this.healthChecker) {
