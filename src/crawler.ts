@@ -1964,13 +1964,11 @@ self.__bx_behaviors.selectMainBehavior();
         // log if not already log and rethrow, consider page failed
         if (msg !== "logged") {
           const loadState = data.loadState;
+
+          // excluded in recorder
           if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
-            logger.error("Page Load Blocked, skipping", {
-              msg,
-              loadState,
-              ...logDetails,
-            });
             data.pageSkipped = true;
+            logger.warn("Page Load Blocked, skipping", { msg, loadState });
           } else {
             logger.error("Page Load Failed, will retry", {
               msg,
