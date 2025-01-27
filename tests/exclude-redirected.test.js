@@ -12,7 +12,7 @@ test("ensure exclusion is applied on redirected URL, which contains 'help', so i
   expect(
     fs
       .readFileSync(
-        "test-crawls/collections/retry-fail/pages/extraPages.jsonl",
+        "test-crawls/collections/redir-exclude-test/pages/extraPages.jsonl",
         "utf8",
       ).trim().split("\n").length
   ).toBe(1);
