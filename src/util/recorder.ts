@@ -894,8 +894,6 @@ export class Recorder {
         if (loc) {
           loc = new URL(loc, url).href;
 
-          this.pageUrl = loc;
-
           if (this.pageSeed && this.pageSeed.isExcluded(loc)) {
             logger.warn(
               "Skipping page that redirects to excluded URL",
