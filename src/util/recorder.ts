@@ -24,6 +24,7 @@ import { RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
+import { ScopedSeed } from "./seeds.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -147,6 +148,8 @@ export class Recorder {
 
   pageUrl!: string;
   pageid!: string;
+
+  pageSeed?: ScopedSeed;
 
   frameIdToExecId: Map<string, number> | null;
 
@@ -691,11 +694,27 @@ export class Recorder {
 
     reqresp.fetchContinued = true;
 
+    reqresp.fillFetchRequestPaused(params);
+
     if (
       url === this.pageUrl &&
       (!this.pageInfo.ts ||
-        (responseStatusCode && responseStatusCode < this.pageInfo.tsStatus))
+        (responseStatusCode && responseStatusCode <= this.pageInfo.tsStatus))
     ) {
+      const errorReason = await this.blockPageResponse(
+        url,
+        reqresp,
+        responseHeaders,
+      );
+
+      if (errorReason) {
+        await cdp.send("Fetch.failRequest", {
+          requestId,
+          errorReason,
+        });
+        return true;
+      }
+
       logger.debug("Setting page timestamp", {
         ts: reqresp.ts,
         url,
@@ -705,8 +724,6 @@ export class Recorder {
       this.pageInfo.tsStatus = responseStatusCode!;
       this.mainFrameId = params.frameId;
     }
-
-    reqresp.fillFetchRequestPaused(params);
 
     if (this.noResponseForStatus(responseStatusCode)) {
       reqresp.payload = new Uint8Array();
@@ -864,6 +881,34 @@ export class Recorder {
     void this.fetcherQ.add(() => fetcher.load());
     // return true if successful
     return true;
+  }
+
+  async blockPageResponse(
+    url: string,
+    reqresp: RequestResponseInfo,
+    responseHeaders?: Protocol.Fetch.HeaderEntry[],
+  ): Promise<Protocol.Network.ErrorReason | undefined> {
+    if (reqresp.isRedirectStatus()) {
+      try {
+        let loc = this.getLocation(responseHeaders);
+        if (loc) {
+          loc = new URL(loc, url).href;
+
+          if (this.pageSeed && this.pageSeed.isExcluded(loc)) {
+            logger.warn(
+              "Skipping page that redirects to excluded URL",
+              { newUrl: loc, origUrl: this.pageUrl },
+              "recorder",
+            );
+
+            return "BlockedByResponse";
+          }
+        }
+      } catch (e) {
+        // ignore
+        logger.debug("Redirect check error", e, "recorder");
+      }
+    }
   }
 
   startPage({ pageid, url }: { pageid: string; url: string }) {
@@ -1181,6 +1226,21 @@ export class Recorder {
     for (const header of headers) {
       if (header.name.toLowerCase() === "content-type") {
         return header.value.split(";")[0];
+      }
+    }
+
+    return null;
+  }
+
+  protected getLocation(
+    headers?: Protocol.Fetch.HeaderEntry[] | { name: string; value: string }[],
+  ) {
+    if (!headers) {
+      return null;
+    }
+    for (const header of headers) {
+      if (header.name.toLowerCase() === "location") {
+        return header.value;
       }
     }
 

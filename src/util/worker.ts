@@ -2,11 +2,7 @@ import os from "os";
 
 import { logger, formatErr } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
-import {
-  DirectFetchRequest,
-  DirectFetchResponse,
-  Recorder,
-} from "./recorder.js";
+import { Recorder } from "./recorder.js";
 import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
 import { PageState, WorkerId } from "./state.js";
@@ -24,9 +20,6 @@ export type WorkerState = {
   workerid: WorkerId;
   // eslint-disable-next-line @typescript-eslint/ban-types
   callbacks: Record<string, Function>;
-  directFetchCapture:
-    | ((request: DirectFetchRequest) => Promise<DirectFetchResponse>)
-    | null;
   recorder: Recorder | null;
   markPageUsed: () => void;
   frameIdToExecId: Map<string, number>;
@@ -175,16 +168,13 @@ export class PageWorker {
         this.page = page;
         this.cdp = cdp;
         this.callbacks = {};
-        const directFetchCapture = this.recorder
-          ? (req: DirectFetchRequest) => this.recorder!.directFetchCapture(req)
-          : null;
+
         this.opts = {
           page,
           cdp,
           workerid,
           callbacks: this.callbacks,
           recorder: this.recorder,
-          directFetchCapture,
           frameIdToExecId: new Map<string, number>(),
           markPageUsed: () => {
             if (!this.alwaysReuse) {

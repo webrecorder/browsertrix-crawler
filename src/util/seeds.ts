@@ -280,15 +280,23 @@ export class ScopedSeed {
       }
     }
 
+    if (this.isExcluded(url)) {
+      return false;
+    }
+
+    return { url, isOOS };
+  }
+
+  isExcluded(url: string) {
     // check exclusions
     for (const e of this.exclude) {
       if (e.test(url)) {
         //console.log(`Skipping ${url} excluded by ${e}`);
-        return false;
+        return true;
       }
     }
 
-    return { url, isOOS };
+    return false;
   }
 }
 
