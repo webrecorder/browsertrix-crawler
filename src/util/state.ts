@@ -943,7 +943,6 @@ return inx;
     data: Record<string, string | number | boolean | object>,
   ) {
     data["filename"] = await this.getWACZFilename();
-    console.log("FILENAME", data["filename"]);
     return await this.redis.lpush(this.pageskey, JSON.stringify(data));
   }
 
