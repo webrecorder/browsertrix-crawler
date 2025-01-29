@@ -244,7 +244,7 @@ export class Crawler {
     // pages file
     this.pagesFH = null;
 
-    this.crawlId = process.env.CRAWL_ID || os.hostname();
+    this.crawlId = this.params.crawlId;
 
     this.startTime = Date.now();
 
@@ -375,7 +375,7 @@ export class Crawler {
 
     this.crawlState = new RedisCrawlState(
       redis,
-      this.params.crawlId,
+      this.crawlId,
       this.maxPageTime,
       os.hostname(),
     );
@@ -1510,6 +1510,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.generateWACZ) {
       this.storage = initStorage();
+
+      if (this.storage) {
+        await this.crawlState.setWACZFilename();
+      }
     }
 
     if (POST_CRAWL_STATES.includes(initState)) {
@@ -1805,10 +1809,13 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (this.storage) {
         await this.crawlState.setStatus("uploading-wacz");
-        const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
-        const targetFilename = interpolateFilename(filename, this.crawlId);
+
+        const targetFilename = await this.crawlState.getWACZFilename();
 
         await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
+
+        await this.crawlState.clearWACZFilename();
+
         return true;
       }
 
@@ -2423,7 +2430,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.writePagesToRedis) {
       await this.crawlState.writeToPagesQueue(
-        JSON.stringify(this.pageEntryForRedis(row, state)),
+        this.pageEntryForRedis(row, state),
       );
     }
 
@@ -2688,7 +2695,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await fsp.mkdir(crawlDir, { recursive: true });
 
-    const filenameOnly = `crawl-${ts}-${this.params.crawlId}.yaml`;
+    const filenameOnly = `crawl-${ts}-${this.crawlId}.yaml`;
 
     const filename = path.join(crawlDir, filenameOnly);
 

@@ -6,6 +6,7 @@ import { logger } from "./logger.js";
 import { MAX_DEPTH, MAX_RETRY_FAILED } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
+import { interpolateFilename } from "./storage.js";
 
 // ============================================================================
 export enum LoadState {
@@ -187,6 +188,8 @@ export class RedisCrawlState {
   esMap: string;
 
   sitemapDoneKey: string;
+
+  waczFilename: string | null = null;
 
   constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
     this.redis = redis;
@@ -413,6 +416,29 @@ return inx;
 
   async getStatus(): Promise<string> {
     return (await this.redis.hget(`${this.key}:status`, this.uid)) || "";
+  }
+
+  async setWACZFilename(): Promise<string> {
+    const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
+    this.waczFilename = interpolateFilename(filename, this.key);
+    await this.redis.hsetnx(
+      `${this.key}:nextWacz`,
+      this.uid,
+      this.waczFilename,
+    );
+    return this.waczFilename;
+  }
+
+  async getWACZFilename(): Promise<string> {
+    if (!this.waczFilename) {
+      return await this.setWACZFilename();
+    }
+    return this.waczFilename;
+  }
+
+  async clearWACZFilename(): Promise<void> {
+    await this.redis.hdel(`${this.key}:nextWacz`, this.uid);
+    this.waczFilename = null;
   }
 
   async setArchiveSize(size: number) {
@@ -913,8 +939,12 @@ return inx;
     return await this.redis.lpush(this.ekey, error);
   }
 
-  async writeToPagesQueue(value: string) {
-    return await this.redis.lpush(this.pageskey, value);
+  async writeToPagesQueue(
+    data: Record<string, string | number | boolean | object>,
+  ) {
+    data["filename"] = await this.getWACZFilename();
+    console.log("FILENAME", data["filename"]);
+    return await this.redis.lpush(this.pageskey, JSON.stringify(data));
   }
 
   // add extra seeds from redirect
