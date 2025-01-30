@@ -2428,12 +2428,6 @@ self.__bx_behaviors.selectMainBehavior();
       row.status = status;
     }
 
-    if (this.params.writePagesToRedis) {
-      await this.crawlState.writeToPagesQueue(
-        this.pageEntryForRedis(row, state),
-      );
-    }
-
     if (depth === 0) {
       row.seed = true;
     }
@@ -2442,12 +2436,18 @@ self.__bx_behaviors.selectMainBehavior();
       row.depth = depth;
     }
 
-    if (text && this.textInPages) {
-      row.text = text;
-    }
-
     if (favicon) {
       row.favIconUrl = favicon;
+    }
+
+    if (this.params.writePagesToRedis) {
+      await this.crawlState.writeToPagesQueue(
+        this.pageEntryForRedis(row, state),
+      );
+    }
+
+    if (text && this.textInPages) {
+      row.text = text;
     }
 
     const processedRow = JSON.stringify(row) + "\n";

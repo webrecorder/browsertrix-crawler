@@ -64,6 +64,9 @@ test("run crawl with upload", async () => {
     expect(json).toHaveProperty("title");
     expect(json).toHaveProperty("loadState");
     expect(json).toHaveProperty("filename");
+    expect(json).toHaveProperty("depth");
+    expect(json).toHaveProperty("seed");
+    expect(json).toHaveProperty("favIconUrl");
     filename = json.filename;
     break;
   }
