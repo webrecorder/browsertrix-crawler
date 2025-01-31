@@ -1131,9 +1131,15 @@ self.__bx_behaviors.selectMainBehavior();
           this.screenshotWriter &&
           this.params.screenshot.includes("fullPageFinal")
         ) {
-          await page.evaluate(() => {
-            window.scrollTo(0, 0);
-          });
+          await timedRun(
+            page.evaluate(() => {
+              window.scrollTo(0, 0);
+            }),
+            PAGE_OP_TIMEOUT_SECS,
+            "Page scroll timed out",
+            logDetails,
+          );
+
           const screenshots = new Screenshots({
             browser: this.browser,
             page,
@@ -2147,8 +2153,13 @@ self.__bx_behaviors.selectMainBehavior();
       "behavior",
     );
     try {
-      await frame.evaluate(
-        "self.__bx_behaviors && self.__bx_behaviors.awaitPageLoad();",
+      await timedRun(
+        frame.evaluate(
+          "self.__bx_behaviors && self.__bx_behaviors.awaitPageLoad();",
+        ),
+        PAGE_OP_TIMEOUT_SECS,
+        "Custom page load check timed out",
+        logDetails,
       );
     } catch (e) {
       logger.warn("Waiting for custom page load failed", e, "behavior");
