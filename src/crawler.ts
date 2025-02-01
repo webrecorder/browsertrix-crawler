@@ -20,6 +20,7 @@ import { WACZ, WACZInitOpts, mergeCDXJ } from "./util/wacz.js";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
+import { DomExtractViaDocument } from "./util/domextract.js";
 import {
   initStorage,
   getFileSize,
@@ -156,6 +157,7 @@ export class Crawler {
 
   screenshotWriter: WARCWriter | null;
   textWriter: WARCWriter | null;
+  domWriter: WARCWriter | null;
 
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
@@ -300,6 +302,7 @@ export class Crawler {
 
     this.screenshotWriter = null;
     this.textWriter = null;
+    this.domWriter = null;
 
     this.blockRules = null;
     this.adBlockRules = null;
@@ -557,6 +560,9 @@ export class Crawler {
     }
     if (this.params.text && !this.params.dryRun) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
+    }
+    if (this.params.dom && !this.params.dryRun) {
+      this.domWriter = this.createExtraResourceWarcWriter("dom");
     }
   }
 
@@ -1095,6 +1101,21 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
+    let domextract = null;
+
+    if (this.domWriter) {
+      domextract = new DomExtractViaDocument(cdp, {
+        writer: this.domWriter,
+        url,
+        skipDocs: this.skipTextDocs,
+      });
+      const { dom } = await domextract.extractAndStoreDom(
+        "dom",
+        false,
+        this.params.dom.includes("to-warc"),
+      );
+    }
+
     data.loadState = LoadState.EXTRACTION_DONE;
 
     if (this.params.behaviorOpts && data.status < 400) {
@@ -1124,6 +1145,10 @@ self.__bx_behaviors.selectMainBehavior();
 
         if (textextract && this.params.text.includes("final-to-warc")) {
           await textextract.extractAndStoreText("textFinal", true, true);
+        }
+
+        if (domextract && this.params.dom.includes("final-to-warc")) {
+          await domextract.extractAndStoreDom("domFinal", true, true);
         }
 
         if (
@@ -1650,6 +1675,9 @@ self.__bx_behaviors.selectMainBehavior();
   async closeFiles() {
     if (this.textWriter) {
       await this.textWriter.flush();
+    }
+    if (this.domWriter) {
+      await this.domWriter.flush();
     }
     if (this.screenshotWriter) {
       await this.screenshotWriter.flush();
