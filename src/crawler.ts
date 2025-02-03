@@ -27,6 +27,7 @@ import {
   interpolateFilename,
   checkDiskUtilization,
   S3StorageSync,
+  isDiskFull,
 } from "./util/storage.js";
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
@@ -47,6 +48,7 @@ import {
   PAGE_OP_TIMEOUT_SECS,
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
   MAX_RETRY_FAILED,
+  ExitCodes,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -462,6 +464,15 @@ export class Crawler {
   }
 
   async bootstrap() {
+    if (await isDiskFull(this.params.cwd)) {
+      logger.fatal(
+        "Out of disk space, exiting",
+        {},
+        "general",
+        ExitCodes.OutOfSpace,
+      );
+    }
+
     const subprocesses: ChildProcess[] = [];
 
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
@@ -572,7 +583,7 @@ export class Crawler {
     await this.bootstrap();
 
     let status = "done";
-    let exitCode = 0;
+    let exitCode = ExitCodes.Success;
 
     try {
       await this.crawl();
@@ -587,12 +598,14 @@ export class Crawler {
           logger.info("Crawl gracefully stopped on request");
         } else if (this.interrupted) {
           status = "interrupted";
-          exitCode = this.browserCrashed ? 10 : 11;
+          exitCode = this.browserCrashed
+            ? ExitCodes.BrowserCrashed
+            : ExitCodes.InterruptedGraceful;
         }
       }
     } catch (e) {
       logger.error("Crawl failed", e);
-      exitCode = 9;
+      exitCode = ExitCodes.Failed;
       status = "failing";
       if (await this.crawlState.incFailCount()) {
         status = "failed";
@@ -1419,11 +1432,11 @@ self.__bx_behaviors.selectMainBehavior();
 
   async checkCanceled() {
     if (this.crawlState && (await this.crawlState.isCrawlCanceled())) {
-      await this.setStatusAndExit(0, "canceled");
+      await this.setStatusAndExit(ExitCodes.Success, "canceled");
     }
   }
 
-  async setStatusAndExit(exitCode: number, status: string) {
+  async setStatusAndExit(exitCode: ExitCodes, status: string) {
     logger.info(`Exiting, Crawl status: ${status}`);
 
     await this.closeLog();
@@ -1442,11 +1455,14 @@ self.__bx_behaviors.selectMainBehavior();
       await closeWorkers(0);
       await this.closeFiles();
       if (!this.done) {
-        await this.setStatusAndExit(13, "interrupted");
+        await this.setStatusAndExit(
+          ExitCodes.InterruptedImmediate,
+          "interrupted",
+        );
         return;
       }
     }
-    await this.setStatusAndExit(0, "done");
+    await this.setStatusAndExit(ExitCodes.Success, "done");
   }
 
   async isCrawlRunning() {
@@ -1455,7 +1471,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (await this.crawlState.isCrawlCanceled()) {
-      await this.setStatusAndExit(0, "canceled");
+      await this.setStatusAndExit(ExitCodes.Success, "canceled");
       return false;
     }
 

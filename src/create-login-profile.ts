@@ -15,7 +15,7 @@ import { Browser } from "./util/browser.js";
 import { initStorage } from "./util/storage.js";
 import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
 import { getInfoString } from "./util/file_reader.js";
-import { DISPLAY } from "./util/constants.js";
+import { DISPLAY, ExitCodes } from "./util/constants.js";
 import { initProxy } from "./util/proxy.js";
 //import { sleep } from "./util/timing.js";
 
@@ -147,7 +147,7 @@ function getDefaultWindowSize() {
 
 function handleTerminate(signame: string) {
   logger.info(`Got signal ${signame}, exiting`);
-  process.exit(1);
+  process.exit(ExitCodes.GenericError);
 }
 
 async function main() {
@@ -478,7 +478,10 @@ class InteractiveBrowser {
     this.shutdownWait = params.shutdownWait * 1000;
 
     if (this.shutdownWait) {
-      this.shutdownTimer = setTimeout(() => process.exit(0), this.shutdownWait);
+      this.shutdownTimer = setTimeout(
+        () => process.exit(ExitCodes.Success),
+        this.shutdownWait,
+      );
       logger.debug(
         `Shutting down in ${this.shutdownWait}ms if no ping received`,
       );
@@ -602,7 +605,7 @@ class InteractiveBrowser {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           clearTimeout(this.shutdownTimer as any);
           this.shutdownTimer = setTimeout(
-            () => process.exit(0),
+            () => process.exit(ExitCodes.Success),
             this.shutdownWait,
           );
           logger.debug(
@@ -682,7 +685,7 @@ class InteractiveBrowser {
           logger.warn("HTTP Error", e);
         }
 
-        setTimeout(() => process.exit(0), 200);
+        setTimeout(() => process.exit(ExitCodes.Success), 200);
         return;
 
       case "/createProfile":
@@ -708,7 +711,7 @@ class InteractiveBrowser {
           logger.warn("HTTP Error", e);
         }
 
-        setTimeout(() => process.exit(0), 200);
+        setTimeout(() => process.exit(ExitCodes.Success), 200);
         return;
     }
 
