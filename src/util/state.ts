@@ -306,7 +306,7 @@ if json then
     redis.call('lpush', KEYS[3], json);
   end
 end
-return -1
+return -1;
 
 `,
     });
