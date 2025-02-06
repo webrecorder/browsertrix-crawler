@@ -1197,9 +1197,17 @@ self.__bx_behaviors.selectMainBehavior();
       } else {
         const retry = await this.crawlState.markFailed(url);
         if (retry > 0) {
-          logger.debug("Page failed, will be retried", {loadState, retry, url, ...logDetails}, "pageStatus");
+          logger.debug(
+            "Page failed, will be retried",
+            { loadState, retry, url, ...logDetails },
+            "pageStatus",
+          );
         } else {
-          logger.debug("Page failed, retry limit reached, will not be retried", {loadState, retry, ...logDetails}, "pageStatus");
+          logger.debug(
+            "Page failed, retry limit reached, will not be retried",
+            { loadState, retry, ...logDetails },
+            "pageStatus",
+          );
         }
       }
       if (this.healthChecker) {
