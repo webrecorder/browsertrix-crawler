@@ -438,6 +438,11 @@ export class ReplayCrawler extends Crawler {
       );
     }
 
+    while (replayFrame.url().indexOf("about:blank") >= 0) {
+      logger.debug("Waiting for replay frame to update");
+      await sleep(2);
+    }
+
     // optionally reload (todo: reevaluate if this is needed)
     // await page.reload();
 
