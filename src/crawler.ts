@@ -1195,7 +1195,12 @@ self.__bx_behaviors.selectMainBehavior();
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
       } else {
-        await this.crawlState.markFailed(url);
+        const retry = await this.crawlState.markFailed(url);
+        if (retry > 0) {
+          logger.debug("Page failed, will be retried", {loadState, retry, url, ...logDetails}, "pageStatus");
+        } else {
+          logger.debug("Page failed, retry limit reached, will not be retried", {loadState, retry, ...logDetails}, "pageStatus");
+        }
       }
       if (this.healthChecker) {
         this.healthChecker.incError();
@@ -1394,7 +1399,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.failOnFailedLimit) {
-      const numFailed = await this.crawlState.numFailedWillRetry();
+      const numFailed = await this.crawlState.numFailed();
       const failedLimit = this.params.failOnFailedLimit;
       if (numFailed >= failedLimit) {
         logger.fatal(
@@ -1859,15 +1864,13 @@ self.__bx_behaviors.selectMainBehavior();
     const pendingPages = await this.crawlState.getPendingList();
     const pending = pendingPages.length;
     const crawled = await this.crawlState.numDone();
-    const failedWillRetry = await this.crawlState.numFailedWillRetry();
-    const failed = await this.crawlState.numFailedNoRetry();
+    const failed = await this.crawlState.numFailed();
     const total = realSize + pendingPages.length + crawled;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled,
       total,
       pending,
-      failedWillRetry,
       failed,
       limit,
       pendingPages,
@@ -1983,7 +1986,7 @@ self.__bx_behaviors.selectMainBehavior();
             data.pageSkipped = true;
             logger.warn("Page Load Blocked, skipping", { msg, loadState });
           } else {
-            logger.error("Page Load Failed, will retry", {
+            logger.warn("Page Load Failed, will retry", {
               msg,
               loadState,
               ...logDetails,

@@ -35,7 +35,7 @@ test("run crawl", async () => {
     //runServer();
 
     while (true) {
-      const res = await redis.lrange("test:ff", 0, -1);
+      const res = await redis.lrange("test:f", 0, -1);
       if (res.length) {
         const data = JSON.parse(res);
         if (data.retry) {
