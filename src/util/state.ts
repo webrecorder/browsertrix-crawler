@@ -649,7 +649,11 @@ return inx;
   }
 
   _getScore(data: QueueEntry) {
-    return (data.depth || 0) + (data.extraHops || 0) * MAX_DEPTH;
+    return (
+      (data.depth || 0) +
+      (data.extraHops || 0) * MAX_DEPTH +
+      (data.retry || 0) * MAX_DEPTH * 2
+    );
   }
 
   async _iterSet(key: string, count = 100) {
@@ -807,8 +811,13 @@ return inx;
 
     for (const json of state.failed) {
       const data = JSON.parse(json);
-      // keep permanantely failed URLs in the failed list
-      await this.redis.rpush(this.fkey, json);
+      const retry = data.retry || 0;
+      // allow retrying failed URLs if number of retries has increased
+      if (retry < this.maxRetries) {
+        await this.redis.zadd(this.qkey, this._getScore(data), json);
+      } else {
+        await this.redis.rpush(this.fkey, json);
+      }
       seen.push(data.url);
     }
 
