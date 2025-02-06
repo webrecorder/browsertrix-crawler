@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "./logger.js";
 
-import { MAX_DEPTH, DEFAULT_NUM_RETRIES } from "./constants.js";
+import { MAX_DEPTH, DEFAULT_MAX_RETRIES } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 import { interpolateFilename } from "./storage.js";
@@ -201,7 +201,7 @@ export class RedisCrawlState {
     this.uid = uid;
     this.key = key;
     this.maxPageTime = maxPageTime;
-    this.maxRetries = maxRetries || DEFAULT_NUM_RETRIES;
+    this.maxRetries = maxRetries || DEFAULT_MAX_RETRIES;
 
     this.qkey = this.key + ":q";
     this.pkey = this.key + ":p";

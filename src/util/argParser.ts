@@ -17,7 +17,7 @@ import {
   DEFAULT_SELECTORS,
   BEHAVIOR_TYPES,
   ExtractSelector,
-  DEFAULT_NUM_RETRIES,
+  DEFAULT_MAX_RETRIES,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
@@ -550,11 +550,12 @@ class ArgParser {
           default: false,
         },
 
-        numRetries: {
+        maxPageRetries: {
+          alias: "retries",
           describe:
-            "If set, number of times to retry a page that failed to load",
+            "If set, number of times to retry a page that failed to load before page is considered to have failed",
           type: "number",
-          default: DEFAULT_NUM_RETRIES,
+          default: DEFAULT_MAX_RETRIES,
         },
 
         failOnFailedSeed: {

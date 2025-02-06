@@ -27,7 +27,7 @@ export const ADD_LINK_FUNC = "__bx_addLink";
 export const FETCH_FUNC = "__bx_fetch";
 
 export const MAX_DEPTH = 1000000;
-export const DEFAULT_NUM_RETRIES = 1;
+export const DEFAULT_MAX_RETRIES = 1;
 
 export const FETCH_HEADERS_TIMEOUT_SECS = 30;
 export const PAGE_OP_TIMEOUT_SECS = 5;

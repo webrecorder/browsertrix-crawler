@@ -377,7 +377,7 @@ export class Crawler {
       this.crawlId,
       this.maxPageTime,
       os.hostname(),
-      this.params.numRetries,
+      this.params.maxPageRetries,
     );
 
     // load full state from config
@@ -1189,7 +1189,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.checkLimits();
     } else {
-      if (retry >= this.params.numRetries && !pageSkipped) {
+      if (retry >= this.params.maxPageRetries && !pageSkipped) {
         await this.writePage(data);
       }
       if (pageSkipped) {
@@ -1980,7 +1980,7 @@ self.__bx_behaviors.selectMainBehavior();
           if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
             data.pageSkipped = true;
             logger.warn("Page Load Blocked, skipping", { msg, loadState });
-          } else if (retry < this.params.numRetries) {
+          } else if (retry < this.params.maxPageRetries) {
             logger.warn(
               "Page Load Failed, will retry",
               {
