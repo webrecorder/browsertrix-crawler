@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "./logger.js";
 
-import { MAX_DEPTH, MAX_RETRY_FAILED } from "./constants.js";
+import { MAX_DEPTH, DEFAULT_NUM_RETRIES } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 import { interpolateFilename } from "./storage.js";
@@ -126,7 +126,7 @@ declare module "ioredis" {
       fkey: string,
       qkey: string,
       ffkey: string,
-      maxRetryPending: number,
+      maxRetries: number,
       maxRegularDepth: number,
     ): Result<number, Context>;
 
@@ -141,7 +141,7 @@ declare module "ioredis" {
       qkey: string,
       pkeyUrl: string,
       url: string,
-      maxRetryPending: number,
+      maxRetries: number,
       maxRegularDepth: number,
     ): Result<number, Context>;
 
@@ -170,7 +170,7 @@ export type SaveState = {
 // ============================================================================
 export class RedisCrawlState {
   redis: Redis;
-  maxRetryPending = MAX_RETRY_FAILED;
+  maxRetries: number;
 
   uid: string;
   key: string;
@@ -191,12 +191,19 @@ export class RedisCrawlState {
 
   waczFilename: string | null = null;
 
-  constructor(redis: Redis, key: string, maxPageTime: number, uid: string) {
+  constructor(
+    redis: Redis,
+    key: string,
+    maxPageTime: number,
+    uid: string,
+    maxRetries?: number,
+  ) {
     this.redis = redis;
 
     this.uid = uid;
     this.key = key;
     this.maxPageTime = maxPageTime;
+    this.maxRetries = maxRetries || DEFAULT_NUM_RETRIES;
 
     this.qkey = this.key + ":q";
     this.pkey = this.key + ":p";
@@ -609,7 +616,7 @@ return inx;
         this.fkey,
         this.qkey,
         this.ffkey,
-        this.maxRetryPending,
+        this.maxRetries,
         MAX_DEPTH,
       );
 
@@ -835,7 +842,7 @@ return inx;
     for (const json of state.failed) {
       const data = JSON.parse(json);
       const retry = data.retry || 0;
-      if (retry <= this.maxRetryPending) {
+      if (retry <= this.maxRetries) {
         await this.redis.zadd(this.qkey, this._getScore(data), json);
       } else {
         await this.redis.rpush(this.ffkey, json);
@@ -904,7 +911,7 @@ return inx;
         this.qkey,
         this.pkey + ":" + url,
         url,
-        this.maxRetryPending,
+        this.maxRetries,
         MAX_DEPTH,
       );
       switch (res) {

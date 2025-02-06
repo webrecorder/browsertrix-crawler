@@ -240,6 +240,9 @@ Options:
                                             s         [boolean] [default: false]
       --writePagesToRedis                   If set, write page objects to redis
                                                       [boolean] [default: false]
+      --numRetries                          If set, number of times to retry a p
+                                            age that failed to load
+                                                           [number] [default: 1]
       --failOnFailedSeed                    If set, crawler will fail with exit
                                             code 1 if any seed fails. When combi
                                             ned with --failOnInvalidStatus,will

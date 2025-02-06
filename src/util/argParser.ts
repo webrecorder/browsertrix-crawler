@@ -17,6 +17,7 @@ import {
   DEFAULT_SELECTORS,
   BEHAVIOR_TYPES,
   ExtractSelector,
+  DEFAULT_NUM_RETRIES,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
@@ -547,6 +548,13 @@ class ArgParser {
           describe: "If set, write page objects to redis",
           type: "boolean",
           default: false,
+        },
+
+        numRetries: {
+          describe:
+            "If set, number of times to retry a page that failed to load",
+          type: "number",
+          default: DEFAULT_NUM_RETRIES,
         },
 
         failOnFailedSeed: {

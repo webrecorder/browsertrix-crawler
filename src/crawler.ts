@@ -47,7 +47,6 @@ import {
   ExtractSelector,
   PAGE_OP_TIMEOUT_SECS,
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
-  MAX_RETRY_FAILED,
   ExitCodes,
 } from "./util/constants.js";
 
@@ -380,6 +379,7 @@ export class Crawler {
       this.crawlId,
       this.maxPageTime,
       os.hostname(),
+      this.params.numRetries,
     );
 
     // load full state from config
@@ -1202,7 +1202,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.checkLimits();
     } else {
-      if (retry >= MAX_RETRY_FAILED && !pageSkipped) {
+      if (retry >= this.params.numRetries && !pageSkipped) {
         await this.writePage(data);
       }
       if (pageSkipped) {
