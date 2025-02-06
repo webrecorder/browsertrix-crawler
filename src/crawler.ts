@@ -1886,6 +1886,24 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pageFailed(msg: string, retry: number, msgData: any) {
+    if (retry < this.params.maxPageRetries) {
+      logger.warn(
+        msg + ": will retry",
+        { retry, retries: this.params.maxPageRetries, ...msgData },
+        "pageStatus",
+      );
+    } else {
+      logger.error(
+        msg + ": retry limit reached",
+        { retry, retries: this.params.maxPageRetries, ...msgData },
+        "pageStatus",
+      );
+    }
+    throw new Error("logged");
+  }
+
   async loadPage(page: Page, data: PageState, seed: ScopedSeed) {
     const { url, depth, retry } = data;
 
@@ -1980,43 +1998,25 @@ self.__bx_behaviors.selectMainBehavior();
           if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
             data.pageSkipped = true;
             logger.warn("Page Load Blocked, skipping", { msg, loadState });
-          } else if (retry < this.params.maxPageRetries) {
-            logger.warn(
-              "Page Load Failed, will retry",
-              {
-                msg,
-                url,
-                retry,
-                maxRetries: this.params.maxPageRetries,
-                loadState,
-                ...logDetails,
-              },
-              "pageStatus",
-            );
           } else {
-            logger.error(
-              "Page Load Failed, no retries left",
-              {
-                msg,
-                url,
-                retry,
-                maxRetries: this.params.maxPageRetries,
-                loadState,
-                ...logDetails,
-              },
-              "pageStatus",
-            );
+            return this.pageFailed("Page Load Failed", retry, {
+              msg,
+              url,
+              loadState,
+              ...logDetails,
+            });
           }
-          e.message = "logged";
         }
-        throw e;
       }
     }
 
     const resp = fullLoadedResponse || downloadResponse || firstResponse;
 
     if (!resp) {
-      throw new Error("no response for page load, assuming failed");
+      return this.pageFailed("Page Load Failed, no response", retry, {
+        url,
+        ...logDetails,
+      });
     }
 
     const respUrl = resp.url().split("#")[0];
@@ -2053,14 +2053,11 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (failed) {
-      logger.error(
+      return this.pageFailed(
         isChromeError ? "Page Crashed on Load" : "Page Invalid Status",
-        {
-          status,
-          ...logDetails,
-        },
+        retry,
+        { url, status, ...logDetails },
       );
-      throw new Error("logged");
     }
 
     const contentType = resp.headers()["content-type"];
