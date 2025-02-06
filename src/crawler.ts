@@ -1195,20 +1195,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
       } else {
-        const retry = await this.crawlState.markFailed(url);
-        if (retry > 0) {
-          logger.debug(
-            "Page failed, will be retried",
-            { loadState, retry, url, ...logDetails },
-            "pageStatus",
-          );
-        } else {
-          logger.debug(
-            "Page failed, retry limit reached, will not be retried",
-            { loadState, retry, ...logDetails },
-            "pageStatus",
-          );
-        }
+        await this.crawlState.markFailed(url);
       }
       if (this.healthChecker) {
         this.healthChecker.incError();
@@ -1900,7 +1887,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async loadPage(page: Page, data: PageState, seed: ScopedSeed) {
-    const { url, depth } = data;
+    const { url, depth, retry } = data;
 
     const logDetails = data.logDetails;
 
@@ -1993,12 +1980,32 @@ self.__bx_behaviors.selectMainBehavior();
           if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
             data.pageSkipped = true;
             logger.warn("Page Load Blocked, skipping", { msg, loadState });
+          } else if (retry < this.params.numRetries) {
+            logger.warn(
+              "Page Load Failed, will retry",
+              {
+                msg,
+                url,
+                retry,
+                maxRetries: this.params.numRetries,
+                loadState,
+                ...logDetails,
+              },
+              "pageStatus",
+            );
           } else {
-            logger.warn("Page Load Failed, will retry", {
-              msg,
-              loadState,
-              ...logDetails,
-            });
+            logger.error(
+              "Page Load Failed, no retries left",
+              {
+                msg,
+                url,
+                retry,
+                maxRetries: this.params.numRetries,
+                loadState,
+                ...logDetails,
+              },
+              "pageStatus",
+            );
           }
           e.message = "logged";
         }

@@ -291,22 +291,22 @@ local json = redis.call('hget', KEYS[1], ARGV[1]);
 
 if json then
   local data = cjson.decode(json);
-
-  data['retry'] = (data['retry'] or 0) + 1;
-
-  json = cjson.encode(data);
-
-  if data['retry'] < tonumber(ARGV[2]) then
-    local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[3]) + (data['retry'] * ARGV[3] * 2);
-    redis.call('zadd', KEYS[2], score, json);
-    return data['retry'];
-  else
-    redis.call('lpush', KEYS[3], json);
-    return -1;
-  end
+  local retry = data['retry'] or 0;
 
   redis.call('hdel', KEYS[1], ARGV[1]);
+
+  if retry < tonumber(ARGV[2]) then
+    retry = retry + 1;
+    data['retry'] = retry;
+    json = cjson.encode(data);
+    local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[3]) + (retry * ARGV[3] * 2);
+    redis.call('zadd', KEYS[2], score, json);
+    return retry;
+  else
+    redis.call('lpush', KEYS[3], json);
+  end
 end
+return -1
 
 `,
     });
@@ -319,11 +319,15 @@ if not res then
   local json = redis.call('hget', KEYS[1], ARGV[1]);
   if json then
     local data = cjson.decode(json);
-    data['retry'] = (data['retry'] or 0) + 1;
+    local retry = data['retry'] or 0;
+
     redis.call('hdel', KEYS[1], ARGV[1]);
-    if tonumber(data['retry']) < tonumber(ARGV[2]) then
+
+    if retry < tonumber(ARGV[2]) then
+      retry = retry + 1;
+      data['retry'] = retry;
       json = cjson.encode(data);
-      local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[3]) + (data['retry'] * ARGV[3] * 2);
+      local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[3]) + (retry * ARGV[3] * 2);
       redis.call('zadd', KEYS[2], score, json);
       return 1;
     else
