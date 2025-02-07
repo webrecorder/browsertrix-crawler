@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "./logger.js";
 
-import { MAX_DEPTH, DEFAULT_NUM_RETRIES } from "./constants.js";
+import { MAX_DEPTH, DEFAULT_MAX_RETRIES } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 import { interpolateFilename } from "./storage.js";
@@ -120,16 +120,6 @@ declare module "ioredis" {
       uid: string,
     ): Result<void, Context>;
 
-    movefailed(pkey: string, fkey: string, url: string): Result<void, Context>;
-
-    requeuefailed(
-      fkey: string,
-      qkey: string,
-      ffkey: string,
-      maxRetries: number,
-      maxRegularDepth: number,
-    ): Result<number, Context>;
-
     unlockpending(
       pkeyUrl: string,
       uid: string,
@@ -140,6 +130,15 @@ declare module "ioredis" {
       pkey: string,
       qkey: string,
       pkeyUrl: string,
+      url: string,
+      maxRetries: number,
+      maxRegularDepth: number,
+    ): Result<number, Context>;
+
+    requeuefailed(
+      pkey: string,
+      qkey: string,
+      fkey: string,
       url: string,
       maxRetries: number,
       maxRegularDepth: number,
@@ -181,7 +180,6 @@ export class RedisCrawlState {
   skey: string;
   dkey: string;
   fkey: string;
-  ffkey: string;
   ekey: string;
   pageskey: string;
   esKey: string;
@@ -203,17 +201,15 @@ export class RedisCrawlState {
     this.uid = uid;
     this.key = key;
     this.maxPageTime = maxPageTime;
-    this.maxRetries = maxRetries || DEFAULT_NUM_RETRIES;
+    this.maxRetries = maxRetries ?? DEFAULT_MAX_RETRIES;
 
     this.qkey = this.key + ":q";
     this.pkey = this.key + ":p";
     this.skey = this.key + ":s";
     // done (integer)
     this.dkey = this.key + ":d";
-    // failed
-    this.fkey = this.key + ":f";
     // failed final, no more retry
-    this.ffkey = this.key + ":ff";
+    this.fkey = this.key + ":f";
     // crawler errors
     this.ekey = this.key + ":e";
     // pages
@@ -288,42 +284,30 @@ end
 `,
     });
 
-    redis.defineCommand("movefailed", {
-      numberOfKeys: 2,
+    redis.defineCommand("requeuefailed", {
+      numberOfKeys: 3,
       lua: `
 local json = redis.call('hget', KEYS[1], ARGV[1]);
 
 if json then
   local data = cjson.decode(json);
-  json = cjson.encode(data);
+  local retry = data['retry'] or 0;
 
-  redis.call('lpush', KEYS[2], json);
   redis.call('hdel', KEYS[1], ARGV[1]);
-end
 
-`,
-    });
-
-    redis.defineCommand("requeuefailed", {
-      numberOfKeys: 3,
-      lua: `
-local json = redis.call('rpop', KEYS[1]);
-
-if json then
-  local data = cjson.decode(json);
-  data['retry'] = (data['retry'] or 0) + 1;
-
-  if data['retry'] <= tonumber(ARGV[1]) then
-    local json = cjson.encode(data);
-    local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[2]);
+  if retry < tonumber(ARGV[2]) then
+    retry = retry + 1;
+    data['retry'] = retry;
+    json = cjson.encode(data);
+    local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[3]) + (retry * ARGV[3] * 2);
     redis.call('zadd', KEYS[2], score, json);
-    return data['retry'];
+    return retry;
   else
     redis.call('lpush', KEYS[3], json);
-    return 0;
   end
 end
 return -1;
+
 `,
     });
 
@@ -335,11 +319,15 @@ if not res then
   local json = redis.call('hget', KEYS[1], ARGV[1]);
   if json then
     local data = cjson.decode(json);
-    data['retry'] = (data['retry'] or 0) + 1;
+    local retry = data['retry'] or 0;
+
     redis.call('hdel', KEYS[1], ARGV[1]);
-    if tonumber(data['retry']) <= tonumber(ARGV[2]) then
+
+    if retry < tonumber(ARGV[2]) then
+      retry = retry + 1;
+      data['retry'] = retry;
       json = cjson.encode(data);
-      local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[3]);
+      local score = (data['depth'] or 0) + ((data['extraHops'] or 0) * ARGV[3]) + (retry * ARGV[3] * 2);
       redis.call('zadd', KEYS[2], score, json);
       return 1;
     else
@@ -395,7 +383,14 @@ return inx;
   }
 
   async markFailed(url: string) {
-    await this.redis.movefailed(this.pkey, this.fkey, url);
+    return await this.redis.requeuefailed(
+      this.pkey,
+      this.qkey,
+      this.fkey,
+      url,
+      this.maxRetries,
+      MAX_DEPTH,
+    );
   }
 
   async markExcluded(url: string) {
@@ -411,10 +406,7 @@ return inx;
   }
 
   async isFinished() {
-    return (
-      (await this.queueSize()) + (await this.numFailedWillRetry()) == 0 &&
-      (await this.numDone()) + (await this.numFailedNoRetry()) > 0
-    );
+    return (await this.queueSize()) == 0 && (await this.numDone()) > 0;
   }
 
   async setStatus(status_: string) {
@@ -608,25 +600,7 @@ return inx;
   }
 
   async nextFromQueue() {
-    let json = await this._getNext();
-    let retry = 0;
-
-    if (!json) {
-      retry = await this.redis.requeuefailed(
-        this.fkey,
-        this.qkey,
-        this.ffkey,
-        this.maxRetries,
-        MAX_DEPTH,
-      );
-
-      if (retry > 0) {
-        json = await this._getNext();
-      } else if (retry === 0) {
-        logger.debug("Did not retry failed, already retried", {}, "state");
-        return null;
-      }
-    }
+    const json = await this._getNext();
 
     if (!json) {
       return null;
@@ -639,10 +613,6 @@ return inx;
     } catch (e) {
       logger.error("Invalid queued json", json, "state");
       return null;
-    }
-
-    if (retry) {
-      logger.debug("Retrying failed URL", { url: data.url, retry }, "state");
     }
 
     await this.markStarted(data.url);
@@ -660,13 +630,10 @@ return inx;
     const seen = await this._iterSet(this.skey);
     const queued = await this._iterSortedKey(this.qkey, seen);
     const pending = await this.getPendingList();
-    const failedWillRetry = await this._iterListKeys(this.fkey, seen);
-    const failedNoRetry = await this._iterListKeys(this.ffkey, seen);
+    const failed = await this._iterListKeys(this.fkey, seen);
     const errors = await this.getErrorList();
     const extraSeeds = await this._iterListKeys(this.esKey, seen);
     const sitemapDone = await this.isSitemapDone();
-
-    const failed = failedWillRetry.concat(failedNoRetry);
 
     const finished = [...seen.values()];
 
@@ -682,7 +649,11 @@ return inx;
   }
 
   _getScore(data: QueueEntry) {
-    return (data.depth || 0) + (data.extraHops || 0) * MAX_DEPTH;
+    return (
+      (data.depth || 0) +
+      (data.extraHops || 0) * MAX_DEPTH +
+      (data.retry || 0) * MAX_DEPTH * 2
+    );
   }
 
   async _iterSet(key: string, count = 100) {
@@ -758,7 +729,6 @@ return inx;
     await this.redis.del(this.pkey);
     await this.redis.del(this.dkey);
     await this.redis.del(this.fkey);
-    await this.redis.del(this.ffkey);
     await this.redis.del(this.skey);
     await this.redis.del(this.ekey);
 
@@ -842,10 +812,11 @@ return inx;
     for (const json of state.failed) {
       const data = JSON.parse(json);
       const retry = data.retry || 0;
-      if (retry <= this.maxRetries) {
+      // allow retrying failed URLs if number of retries has increased
+      if (retry < this.maxRetries) {
         await this.redis.zadd(this.qkey, this._getScore(data), json);
       } else {
-        await this.redis.rpush(this.ffkey, json);
+        await this.redis.rpush(this.fkey, json);
       }
       seen.push(data.url);
     }
@@ -874,12 +845,8 @@ return inx;
     return res;
   }
 
-  async numFailedWillRetry() {
+  async numFailed() {
     return await this.redis.llen(this.fkey);
-  }
-
-  async numFailedNoRetry() {
-    return await this.redis.llen(this.ffkey);
   }
 
   async getPendingList() {

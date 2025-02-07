@@ -50,7 +50,6 @@ test("check that stats file format is correct", () => {
   expect(dataJSON.total).toEqual(3);
   expect(dataJSON.pending).toEqual(0);
   expect(dataJSON.failed).toEqual(0);
-  expect(dataJSON.failedWillRetry).toEqual(0);
   expect(dataJSON.limit.max).toEqual(3);
   expect(dataJSON.limit.hit).toBe(true);
   expect(dataJSON.pendingPages.length).toEqual(0);

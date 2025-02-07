@@ -379,7 +379,7 @@ export class Crawler {
       this.crawlId,
       this.maxPageTime,
       os.hostname(),
-      this.params.numRetries,
+      this.params.maxPageRetries,
     );
 
     // load full state from config
@@ -1202,22 +1202,30 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.checkLimits();
     } else {
-      if (retry >= this.params.numRetries && !pageSkipped) {
+      if (retry >= this.params.maxPageRetries && !pageSkipped) {
         await this.writePage(data);
       }
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
       } else {
-        await this.crawlState.markFailed(url);
-      }
-      if (this.healthChecker) {
-        this.healthChecker.incError();
-      }
+        const retry = await this.crawlState.markFailed(url);
 
-      await this.serializeConfig();
+        if (retry < 0) {
+          if (this.healthChecker) {
+            this.healthChecker.incError();
+          }
 
-      if (depth === 0 && this.params.failOnFailedSeed) {
-        logger.fatal("Seed Page Load Failed, failing crawl", {}, "general", 1);
+          await this.serializeConfig();
+
+          if (depth === 0 && this.params.failOnFailedSeed) {
+            logger.fatal(
+              "Seed Page Load Failed, failing crawl",
+              {},
+              "general",
+              1,
+            );
+          }
+        }
       }
 
       await this.checkLimits();
@@ -1407,7 +1415,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.failOnFailedLimit) {
-      const numFailed = await this.crawlState.numFailedWillRetry();
+      const numFailed = await this.crawlState.numFailed();
       const failedLimit = this.params.failOnFailedLimit;
       if (numFailed >= failedLimit) {
         logger.fatal(
@@ -1875,15 +1883,13 @@ self.__bx_behaviors.selectMainBehavior();
     const pendingPages = await this.crawlState.getPendingList();
     const pending = pendingPages.length;
     const crawled = await this.crawlState.numDone();
-    const failedWillRetry = await this.crawlState.numFailedWillRetry();
-    const failed = await this.crawlState.numFailedNoRetry();
+    const failed = await this.crawlState.numFailed();
     const total = realSize + pendingPages.length + crawled;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled,
       total,
       pending,
-      failedWillRetry,
       failed,
       limit,
       pendingPages,
@@ -1904,8 +1910,26 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pageFailed(msg: string, retry: number, msgData: any) {
+    if (retry < this.params.maxPageRetries) {
+      logger.warn(
+        msg + ": will retry",
+        { retry, retries: this.params.maxPageRetries, ...msgData },
+        "pageStatus",
+      );
+    } else {
+      logger.error(
+        msg + ": retry limit reached",
+        { retry, retries: this.params.maxPageRetries, ...msgData },
+        "pageStatus",
+      );
+    }
+    throw new Error("logged");
+  }
+
   async loadPage(page: Page, data: PageState, seed: ScopedSeed) {
-    const { url, depth } = data;
+    const { url, depth, retry } = data;
 
     const logDetails = data.logDetails;
 
@@ -1999,22 +2023,24 @@ self.__bx_behaviors.selectMainBehavior();
             data.pageSkipped = true;
             logger.warn("Page Load Blocked, skipping", { msg, loadState });
           } else {
-            logger.error("Page Load Failed, will retry", {
+            return this.pageFailed("Page Load Failed", retry, {
               msg,
+              url,
               loadState,
               ...logDetails,
             });
           }
-          e.message = "logged";
         }
-        throw e;
       }
     }
 
     const resp = fullLoadedResponse || downloadResponse || firstResponse;
 
     if (!resp) {
-      throw new Error("no response for page load, assuming failed");
+      return this.pageFailed("Page Load Failed, no response", retry, {
+        url,
+        ...logDetails,
+      });
     }
 
     const respUrl = resp.url().split("#")[0];
@@ -2051,14 +2077,11 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (failed) {
-      logger.error(
+      return this.pageFailed(
         isChromeError ? "Page Crashed on Load" : "Page Invalid Status",
-        {
-          status,
-          ...logDetails,
-        },
+        retry,
+        { url, status, ...logDetails },
       );
-      throw new Error("logged");
     }
 
     const contentType = resp.headers()["content-type"];
