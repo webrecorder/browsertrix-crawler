@@ -1195,16 +1195,24 @@ self.__bx_behaviors.selectMainBehavior();
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
       } else {
-        await this.crawlState.markFailed(url);
-      }
-      if (this.healthChecker) {
-        this.healthChecker.incError();
-      }
+        const retry = await this.crawlState.markFailed(url);
 
-      await this.serializeConfig();
+        if (retry < 0) {
+          if (this.healthChecker) {
+            this.healthChecker.incError();
+          }
 
-      if (depth === 0 && this.params.failOnFailedSeed) {
-        logger.fatal("Seed Page Load Failed, failing crawl", {}, "general", 1);
+          await this.serializeConfig();
+
+          if (depth === 0 && this.params.failOnFailedSeed) {
+            logger.fatal(
+              "Seed Page Load Failed, failing crawl",
+              {},
+              "general",
+              1,
+            );
+          }
+        }
       }
 
       await this.checkLimits();

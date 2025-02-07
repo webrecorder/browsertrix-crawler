@@ -201,7 +201,7 @@ export class RedisCrawlState {
     this.uid = uid;
     this.key = key;
     this.maxPageTime = maxPageTime;
-    this.maxRetries = maxRetries || DEFAULT_MAX_RETRIES;
+    this.maxRetries = maxRetries ?? DEFAULT_MAX_RETRIES;
 
     this.qkey = this.key + ":q";
     this.pkey = this.key + ":p";
