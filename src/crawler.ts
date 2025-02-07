@@ -1185,7 +1185,7 @@ self.__bx_behaviors.selectMainBehavior();
   async pageFinished(data: PageState) {
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url, retry, pageSkipped } = data;
+    const { loadState, logDetails, depth, url, pageSkipped } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       await this.writePage(data);
@@ -1202,18 +1202,17 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.checkLimits();
     } else {
-      if (retry >= this.params.maxPageRetries && !pageSkipped) {
-        await this.writePage(data);
-      }
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
       } else {
         const retry = await this.crawlState.markFailed(url);
 
+        if (this.healthChecker) {
+          this.healthChecker.incError();
+        }
+
         if (retry < 0) {
-          if (this.healthChecker) {
-            this.healthChecker.incError();
-          }
+          await this.writePage(data);
 
           await this.serializeConfig();
 
