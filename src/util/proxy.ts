@@ -7,7 +7,7 @@ import { logger } from "./logger.js";
 
 import { socksDispatcher } from "fetch-socks";
 import type { SocksProxyType } from "socks/typings/common/constants.js";
-import { FETCH_HEADERS_TIMEOUT_SECS } from "./constants.js";
+import { ExitCodes, FETCH_HEADERS_TIMEOUT_SECS } from "./constants.js";
 
 const SSH_PROXY_LOCAL_PORT = 9722;
 
@@ -194,7 +194,7 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
         code: proc.exitCode,
       },
       "proxy",
-      21,
+      ExitCodes.ProxyError,
     );
     return;
   }

@@ -231,6 +231,12 @@ export async function getDirSize(dir: string): Promise<number> {
   return size;
 }
 
+export async function isDiskFull(collDir: string) {
+  const diskUsage: Record<string, string> = await getDiskUsage(collDir);
+  const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
+  return usedPercentage >= 99;
+}
+
 export async function checkDiskUtilization(
   collDir: string,
   // TODO: Fix this the next time the file is edited.

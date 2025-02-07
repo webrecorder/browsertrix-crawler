@@ -56,3 +56,15 @@ export const BEHAVIOR_TYPES = [
 ];
 
 export const DISPLAY = ":99";
+
+export enum ExitCodes {
+  Success = 0,
+  GenericError = 1,
+  Failed = 9,
+  OutOfSpace = 3,
+  BrowserCrashed = 10,
+  InterruptedGraceful = 11,
+  InterruptedImmediate = 13,
+  Fatal = 17,
+  ProxyError = 21,
+}

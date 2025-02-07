@@ -5,6 +5,7 @@ import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
 import { ReplayCrawler } from "./replaycrawler.js";
 import fs from "node:fs";
+import { ExitCodes } from "./util/constants.js";
 
 let crawler: Crawler | null = null;
 
@@ -15,12 +16,12 @@ async function handleTerminate(signame: string) {
   logger.info(`${signame} received...`);
   if (!crawler || !crawler.crawlState) {
     logger.error("error: no crawler running, exiting");
-    process.exit(1);
+    process.exit(ExitCodes.GenericError);
   }
 
   if (crawler.done) {
     logger.info("success: crawler done, exiting");
-    process.exit(0);
+    process.exit(ExitCodes.Success);
   }
 
   setExitOnRedisError();
