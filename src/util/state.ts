@@ -382,13 +382,13 @@ return inx;
     return await this.redis.incr(this.dkey);
   }
 
-  async markFailed(url: string) {
+  async markFailed(url: string, noRetries = false) {
     return await this.redis.requeuefailed(
       this.pkey,
       this.qkey,
       this.fkey,
       url,
-      this.maxRetries,
+      noRetries ? 0 : this.maxRetries,
       MAX_DEPTH,
     );
   }
