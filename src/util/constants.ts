@@ -67,4 +67,7 @@ export enum ExitCodes {
   InterruptedImmediate = 13,
   Fatal = 17,
   ProxyError = 21,
+
+  // used to indicate crawl should be failed, not just restarted
+  FailCrawl = 1001,
 }

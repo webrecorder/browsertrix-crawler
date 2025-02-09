@@ -228,7 +228,7 @@ export class Crawler {
     // exit with 0 from fatal by default, to avoid unnecessary restart
     // otherwise, exit with default fatal exit code
     if (this.params.restartsOnError) {
-      logger.setDefaultFatalExitCode(0);
+      logger.setDefaultFatalExitCode(ExitCodes.Success);
     }
 
     logger.debug("Writing log to: " + this.logFilename, {}, "general");
@@ -350,6 +350,9 @@ export class Crawler {
     if (!redisUrl.startsWith("redis://")) {
       logger.fatal(
         "stateStoreUrl must start with redis:// -- Only redis-based store currently supported",
+        {},
+        "redis",
+        ExitCodes.FailCrawl,
       );
     }
 
@@ -1221,7 +1224,7 @@ self.__bx_behaviors.selectMainBehavior();
               "Seed Page Load Failed, failing crawl",
               {},
               "general",
-              1,
+              ExitCodes.FailCrawl,
             );
           }
         }
@@ -1419,6 +1422,9 @@ self.__bx_behaviors.selectMainBehavior();
       if (numFailed >= failedLimit) {
         logger.fatal(
           `Failed threshold reached ${numFailed} >= ${failedLimit}, failing crawl`,
+          {},
+          "general",
+          ExitCodes.FailCrawl,
         );
       }
     }
@@ -1788,7 +1794,12 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
       // fail crawl otherwise
-      logger.fatal("No WARC Files, assuming crawl failed");
+      logger.fatal(
+        "No WARC Files, assuming crawl failed",
+        {},
+        "general",
+        ExitCodes.FailCrawl,
+      );
     }
 
     const waczPath = path.join(this.collDir, this.params.collection + ".wacz");
@@ -1852,7 +1863,12 @@ self.__bx_behaviors.selectMainBehavior();
     } catch (e) {
       logger.error("Error creating WACZ", e);
       if (!streaming) {
-        logger.fatal("Unable to write WACZ successfully");
+        logger.fatal(
+          "Unable to write WACZ successfully",
+          {},
+          "wacz",
+          ExitCodes.Fatal,
+        );
       }
     }
   }
@@ -1883,11 +1899,13 @@ self.__bx_behaviors.selectMainBehavior();
     const pending = pendingPages.length;
     const crawled = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
-    const total = realSize + pendingPages.length + crawled;
+    const totalSeen = await this.crawlState.numSeen();
+    const total = realSize + pendingPages.length + crawled + failed;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled,
       total,
+      totalSeen,
       pending,
       failed,
       limit,

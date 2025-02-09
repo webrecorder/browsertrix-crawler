@@ -7,6 +7,7 @@ import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
 import { PageState, WorkerId } from "./state.js";
 import { Crawler } from "../crawler.js";
+import { ExitCodes } from "./constants.js";
 
 const MAX_REUSE = 5;
 
@@ -235,6 +236,7 @@ export class PageWorker {
             "Unable to get new page, browser likely crashed",
             this.logDetails,
             "worker",
+            ExitCodes.BrowserCrashed,
           );
         }
 

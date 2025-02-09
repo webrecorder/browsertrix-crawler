@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "./logger.js";
 
-import { MAX_DEPTH, DEFAULT_MAX_RETRIES } from "./constants.js";
+import { MAX_DEPTH, DEFAULT_MAX_RETRIES, ExitCodes } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 import { interpolateFilename } from "./storage.js";
@@ -849,6 +849,12 @@ return inx;
     return await this.redis.llen(this.fkey);
   }
 
+  async numSeen() {
+    const seen = await this.redis.scard(this.skey);
+    const numExtraSeeds = await this.redis.llen(this.esKey);
+    return seen - numExtraSeeds;
+  }
+
   async getPendingList() {
     return await this.redis.hvals(this.pkey);
   }
@@ -932,6 +938,7 @@ return inx;
         "State load, original seed missing",
         { origSeedId },
         "state",
+        ExitCodes.FailCrawl,
       );
     }
     const redirectSeed: ExtraRedirectSeed = { origSeedId, newUrl };

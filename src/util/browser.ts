@@ -9,7 +9,7 @@ import path from "path";
 import { formatErr, LogContext, logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
-import { DISPLAY, type ServiceWorkerOpt } from "./constants.js";
+import { DISPLAY, ExitCodes, type ServiceWorkerOpt } from "./constants.js";
 
 import puppeteer, {
   Frame,
@@ -192,6 +192,9 @@ export class Browser {
       if (!storage) {
         logger.fatal(
           "Profile specified relative to s3 storage, but no S3 storage defined",
+          {},
+          "general",
+          ExitCodes.FailCrawl,
         );
         return false;
       }
@@ -384,6 +387,7 @@ export class Browser {
         "Custom behavior load error, aborting",
         { filename, ...exceptionDetails },
         "behavior",
+        ExitCodes.FailCrawl,
       );
     }
   }
