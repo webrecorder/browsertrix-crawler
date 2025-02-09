@@ -59,13 +59,15 @@ export const DISPLAY = ":99";
 
 export enum ExitCodes {
   Success = 0,
-  GenericError = 1,
-  Failed = 9,
+  //GenericError = 1,
   OutOfSpace = 3,
+  CrawlFailed = 9,
   BrowserCrashed = 10,
   InterruptedGraceful = 11,
   InterruptedImmediate = 13,
-  Fatal = 17,
+  FatalError = 17,
+  RedisGone = 18,
+  UploadError = 19,
   ProxyError = 21,
 
   // used to indicate crawl should be failed, not just restarted

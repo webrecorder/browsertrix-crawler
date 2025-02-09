@@ -16,7 +16,7 @@ async function handleTerminate(signame: string) {
   logger.info(`${signame} received...`);
   if (!crawler || !crawler.crawlState) {
     logger.error("error: no crawler running, exiting");
-    process.exit(ExitCodes.GenericError);
+    process.exit(ExitCodes.CrawlFailed);
   }
 
   if (crawler.done) {

@@ -1,5 +1,5 @@
 import { logger } from "./logger.js";
-import { MAX_DEPTH } from "./constants.js";
+import { ExitCodes, MAX_DEPTH } from "./constants.js";
 
 type ScopeType =
   | "prefix"
@@ -219,6 +219,9 @@ export class ScopedSeed {
       default:
         logger.fatal(
           `Invalid scope type "${scopeType}" specified, valid types are: page, page-spa, prefix, host, domain, any`,
+          {},
+          "general",
+          ExitCodes.FailCrawl,
         );
     }
 

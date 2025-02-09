@@ -6,6 +6,7 @@ import { Browser } from "./browser.js";
 
 import { fetch } from "undici";
 import { getProxyDispatcher } from "./proxy.js";
+import { ExitCodes } from "./constants.js";
 
 const RULE_TYPES = ["block", "allowOnly"];
 
@@ -47,7 +48,12 @@ class BlockRule {
     }
 
     if (!RULE_TYPES.includes(this.type)) {
-      logger.fatal('Rule "type" must be: ' + RULE_TYPES.join(", "));
+      logger.fatal(
+        'Rule "type" must be: ' + RULE_TYPES.join(", "),
+        {},
+        "blocking",
+        ExitCodes.FailCrawl,
+      );
     }
   }
 

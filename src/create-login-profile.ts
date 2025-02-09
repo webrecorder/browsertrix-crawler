@@ -147,7 +147,7 @@ function getDefaultWindowSize() {
 
 function handleTerminate(signame: string) {
   logger.info(`Got signal ${signame}, exiting`);
-  process.exit(ExitCodes.GenericError);
+  process.exit(ExitCodes.InterruptedGraceful);
 }
 
 async function main() {

@@ -74,7 +74,7 @@ class Logger {
   contexts: LogContext[] = [];
   excludeContexts: LogContext[] = [];
   crawlState?: RedisCrawlState | null = null;
-  fatalExitCode: ExitCodes = ExitCodes.Fatal;
+  fatalExitCode: ExitCodes = ExitCodes.FatalError;
 
   setDefaultFatalExitCode(exitCode: ExitCodes) {
     this.fatalExitCode = exitCode;
@@ -184,9 +184,9 @@ class Logger {
     message: string,
     data = {},
     context: LogContext = "general",
-    exitCode?: ExitCodes | undefined,
+    exitCode: ExitCodes,
   ) {
-    if (!exitCode) {
+    if (exitCode === ExitCodes.FailCrawl) {
       exitCode = this.fatalExitCode;
     }
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");

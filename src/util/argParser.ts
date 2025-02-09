@@ -835,7 +835,7 @@ class ArgParser {
               "Invalid seed specified, aborting crawl",
               { url: newSeed.url },
               "general",
-              1,
+              ExitCodes.FailCrawl,
             );
           }
         }

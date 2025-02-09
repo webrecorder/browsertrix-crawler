@@ -608,7 +608,7 @@ export class Crawler {
       }
     } catch (e) {
       logger.error("Crawl failed", e);
-      exitCode = ExitCodes.Failed;
+      exitCode = ExitCodes.CrawlFailed;
       status = "failing";
       if (await this.crawlState.incFailCount()) {
         status = "failed";
@@ -1867,7 +1867,7 @@ self.__bx_behaviors.selectMainBehavior();
           "Unable to write WACZ successfully",
           {},
           "wacz",
-          ExitCodes.Fatal,
+          ExitCodes.UploadError,
         );
       }
     }
