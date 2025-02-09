@@ -7,7 +7,6 @@ import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
 import { PageState, WorkerId } from "./state.js";
 import { Crawler } from "../crawler.js";
-import { ExitCodes } from "./constants.js";
 
 const MAX_REUSE = 5;
 
@@ -232,12 +231,9 @@ export class PageWorker {
         }
 
         if (retry >= MAX_REUSE) {
-          logger.fatal(
-            "Unable to get new page, browser likely crashed",
-            this.logDetails,
-            "worker",
-            ExitCodes.BrowserCrashed,
-          );
+          this.crawler.browserCrashed = true;
+          this.crawler.interrupted = true;
+          throw new Error("Unable to load new page, browser needs restart");
         }
 
         await sleep(0.5);
