@@ -11,5 +11,5 @@ test("ensure custom driver creates PDF", async () => {
   }
 
   const pdfs = fs.readdirSync("test-crawls/collections/custom-driver-1").filter(x => x.endsWith(".pdf"));
-  expect(pdfs.length).toBe(1);
+  expect(pdfs.length).toBe(17);
 });

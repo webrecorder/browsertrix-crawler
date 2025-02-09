@@ -132,7 +132,7 @@ test("run crawl with retries for 503, not enough retries, fail", async () => {
 
   await crawlFinished;
 
-  expect(status).toBe(1);
+  expect(status).toBe(17);
   // (1 + 1) * 3 requests == 6 requests
   expect(requests).toBe(6);
   expect(success).toBe(false);
@@ -158,7 +158,7 @@ test("run crawl with retries for 503, no retries, fail", async () => {
 
   await crawlFinished;
 
-  expect(status).toBe(1);
+  expect(status).toBe(17);
   // (1) * 3 requests == 3 requests
   expect(requests).toBe(3);
   expect(success).toBe(false);

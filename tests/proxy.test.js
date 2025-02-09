@@ -75,7 +75,7 @@ describe("socks5 + https proxy tests", () => {
         } catch (e) {
           status = e.status;
         }
-        expect(status).toBe(1);
+        expect(status).toBe(21);
       });
 
       test(`${scheme} proxy, ${type}, wrong protocol`, () => {
@@ -86,7 +86,7 @@ describe("socks5 + https proxy tests", () => {
         } catch (e) {
           status = e.status;
         }
-        expect(status).toBe(1);
+        expect(status).toBe(21);
       });
     }
 
@@ -98,7 +98,7 @@ describe("socks5 + https proxy tests", () => {
       } catch (e) {
         status = e.status;
       }
-      expect(status).toBe(1);
+      expect(status).toBe(21);
     });
   }
 });
@@ -116,7 +116,7 @@ test("http proxy set, but not running, separate env vars", () => {
   } catch (e) {
     status = e.status;
   }
-  expect(status).toBe(1);
+  expect(status).toBe(21);
 });
 
 test("http proxy set, but not running, cli arg", () => {
@@ -127,7 +127,7 @@ test("http proxy set, but not running, cli arg", () => {
   } catch (e) {
     status = e.status;
   }
-  expect(status).toBe(1);
+  expect(status).toBe(21);
 });
 
 

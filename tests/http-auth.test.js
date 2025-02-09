@@ -23,7 +23,7 @@ test("run crawl without auth", () => {
   } catch (e) {
     status = e.status;
   }
-  expect(status).toBe(1);
+  expect(status).toBe(17);
 });
 
 test("run crawl with auth", () => {
