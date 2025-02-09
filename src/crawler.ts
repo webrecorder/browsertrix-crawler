@@ -1883,7 +1883,7 @@ self.__bx_behaviors.selectMainBehavior();
     const pending = pendingPages.length;
     const crawled = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
-    const total = realSize + pendingPages.length + crawled;
+    const total = realSize + pendingPages.length + crawled + failed;
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled,

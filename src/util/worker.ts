@@ -157,6 +157,7 @@ export class PageWorker {
           "New Window Timed Out",
           { workerid },
           "worker",
+          true,
         );
 
         if (!result) {
@@ -231,11 +232,9 @@ export class PageWorker {
         }
 
         if (retry >= MAX_REUSE) {
-          logger.fatal(
-            "Unable to get new page, browser likely crashed",
-            this.logDetails,
-            "worker",
-          );
+          this.crawler.browserCrashed = true;
+          this.crawler.interrupted = true;
+          throw new Error("Unable to load new page, browser needs restart");
         }
 
         await sleep(0.5);
