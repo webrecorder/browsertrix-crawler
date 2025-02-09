@@ -18,6 +18,7 @@ import {
   BEHAVIOR_TYPES,
   ExtractSelector,
   DEFAULT_MAX_RETRIES,
+  ExitCodes,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
@@ -704,6 +705,9 @@ class ArgParser {
     if (argv.collection.search(/^[\w][\w-]*$/) === -1) {
       logger.fatal(
         `\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`,
+        {},
+        "general",
+        ExitCodes.FailCrawl,
       );
     }
 
@@ -737,7 +741,12 @@ class ArgParser {
         argv.mobileDevice.replace("-", " ")
       ];
       if (!argv.emulateDevice) {
-        logger.fatal("Unknown device: " + argv.mobileDevice);
+        logger.fatal(
+          "Unknown device: " + argv.mobileDevice,
+          {},
+          "general",
+          ExitCodes.FailCrawl,
+        );
       }
     } else {
       argv.emulateDevice = { viewport: null };
@@ -773,7 +782,12 @@ class ArgParser {
         try {
           parser(selector);
         } catch (e) {
-          logger.fatal("Invalid Link Extraction CSS Selector", { selector });
+          logger.fatal(
+            "Invalid Link Extraction CSS Selector",
+            { selector },
+            "general",
+            ExitCodes.FailCrawl,
+          );
         }
         return { selector, extract, isAttribute };
       });
@@ -828,10 +842,20 @@ class ArgParser {
       }
 
       if (!scopedSeeds.length) {
-        logger.fatal("No valid seeds specified, aborting crawl");
+        logger.fatal(
+          "No valid seeds specified, aborting crawl",
+          {},
+          "general",
+          ExitCodes.FailCrawl,
+        );
       }
     } else if (!argv.qaSource) {
-      logger.fatal("--qaSource required for QA mode");
+      logger.fatal(
+        "--qaSource required for QA mode",
+        {},
+        "general",
+        ExitCodes.FailCrawl,
+      );
     }
 
     argv.scopedSeeds = scopedSeeds;

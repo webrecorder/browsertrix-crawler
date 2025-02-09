@@ -15,6 +15,7 @@ import { logger } from "./logger.js";
 import getFolderSize from "get-folder-size";
 
 import { WACZ } from "./wacz.js";
+import { ExitCodes } from "./constants.js";
 
 const DEFAULT_REGION = "us-east-1";
 
@@ -186,6 +187,7 @@ export class S3StorageSync {
             "redis webhook url must be in format: redis://<host>:<port>/<db>/<key>",
             {},
             "redis",
+            ExitCodes.FailCrawl,
           );
         }
         const redis = await initRedis(parts.slice(0, 4).join("/"));
