@@ -7,6 +7,7 @@ import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
 import { PageState, WorkerId } from "./state.js";
 import { Crawler } from "../crawler.js";
+import { PAGE_OP_TIMEOUT_SECS } from "./constants.js";
 
 const MAX_REUSE = 5;
 
@@ -432,7 +433,16 @@ export async function runWorkers(
 
   await closeWorkers();
 
-  await crawler.browser.close();
+  if (!crawler.browserCrashed) {
+    await timedRun(
+      crawler.browser.close(),
+      PAGE_OP_TIMEOUT_SECS,
+      "Closing Browser Timed Out",
+      {},
+      "worker",
+      true,
+    );
+  }
 }
 
 // ===========================================================================
