@@ -157,7 +157,7 @@ export class PageWorker {
           "New Window Timed Out",
           { workerid },
           "worker",
-          true
+          true,
         );
 
         if (!result) {
