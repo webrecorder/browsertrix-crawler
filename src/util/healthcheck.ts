@@ -1,13 +1,14 @@
 import http from "http";
 import url from "url";
 import { logger } from "./logger.js";
+import { Browser } from "./browser.js";
 
 // ===========================================================================
 export class HealthChecker {
   port: number;
   errorThreshold: number;
   healthServer: http.Server;
-  browserCrashed = false;
+  browser: Browser;
 
   updater: (() => Promise<void>) | null;
 
@@ -16,9 +17,11 @@ export class HealthChecker {
   constructor(
     port: number,
     errorThreshold: number,
+    browser: Browser,
     updater: (() => Promise<void>) | null = null,
   ) {
     this.port = port;
+    this.browser = browser;
     this.errorThreshold = errorThreshold;
 
     this.healthServer = http.createServer((...args) =>
@@ -34,7 +37,7 @@ export class HealthChecker {
     const pathname = req.url ? url.parse(req.url).pathname : "";
     switch (pathname) {
       case "/healthz":
-        if (this.errorCount < this.errorThreshold && !this.browserCrashed) {
+        if (this.errorCount < this.errorThreshold && !this.browser.crashed) {
           logger.debug(
             `health check ok, num errors ${this.errorCount} < ${this.errorThreshold}`,
             {},

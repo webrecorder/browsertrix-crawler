@@ -9,7 +9,11 @@ import path from "path";
 import { formatErr, LogContext, logger } from "./logger.js";
 import { initStorage } from "./storage.js";
 
-import { DISPLAY, type ServiceWorkerOpt } from "./constants.js";
+import {
+  DISPLAY,
+  PAGE_OP_TIMEOUT_SECS,
+  type ServiceWorkerOpt,
+} from "./constants.js";
 
 import puppeteer, {
   Frame,
@@ -20,6 +24,7 @@ import puppeteer, {
 } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 import { Recorder } from "./recorder.js";
+import { timedRun } from "./timing.js";
 
 type BtrixChromeOpts = {
   proxy?: string;
@@ -35,6 +40,7 @@ type LaunchOpts = {
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   emulateDevice?: Record<string, any>;
+
   ondisconnect?: ((err: unknown) => NonNullable<unknown>) | null;
 
   swOpt?: ServiceWorkerOpt;
@@ -60,6 +66,8 @@ export class Browser {
   recorders: Recorder[] = [];
 
   swOpt?: ServiceWorkerOpt = "disabled";
+
+  crashed = false;
 
   constructor() {
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
@@ -364,9 +372,24 @@ export class Browser {
   }
 
   async close() {
-    if (this.browser) {
+    if (!this.browser) {
+      return;
+    }
+
+    if (!this.crashed) {
       this.browser.removeAllListeners("disconnected");
-      await this.browser.close();
+      try {
+        await timedRun(
+          this.browser.close(),
+          PAGE_OP_TIMEOUT_SECS,
+          "Closing Browser Timed Out",
+          {},
+          "browser",
+          true,
+        );
+      } catch (e) {
+        // ignore
+      }
       this.browser = null;
     }
   }
