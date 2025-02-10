@@ -48,6 +48,7 @@ import {
   PAGE_OP_TIMEOUT_SECS,
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
   ExitCodes,
+  InterruptReason,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -168,8 +169,7 @@ export class Crawler {
 
   skipTextDocs = 0;
 
-  interrupted = false;
-  browserCrashed = false;
+  interrupt_reason: InterruptReason | null = null;
   finalExit = false;
   uploadAndDeleteLocal = false;
   done = false;
@@ -307,7 +307,7 @@ export class Crawler {
 
     this.healthChecker = null;
 
-    this.interrupted = false;
+    this.interrupt_reason = null;
     this.finalExit = false;
     this.uploadAndDeleteLocal = false;
 
@@ -593,14 +593,32 @@ export class Crawler {
       if (!finished) {
         if (canceled) {
           status = "canceled";
+          exitCode = ExitCodes.Cancelled;
         } else if (stopped) {
           status = "done";
           logger.info("Crawl gracefully stopped on request");
-        } else if (this.interrupted) {
+        } else if (this.interrupt_reason) {
           status = "interrupted";
-          exitCode = this.browserCrashed
-            ? ExitCodes.BrowserCrashed
-            : ExitCodes.InterruptedGraceful;
+          switch (this.interrupt_reason) {
+            case InterruptReason.SizeLimit:
+              exitCode = ExitCodes.SizeLimit;
+              break;
+            case InterruptReason.BrowserCrashed:
+              exitCode = ExitCodes.BrowserCrashed;
+              break;
+            case InterruptReason.Cancelled:
+              exitCode = ExitCodes.Cancelled;
+              break;
+            case InterruptReason.DiskUtilization:
+              exitCode = ExitCodes.DiskUtilization;
+              break;
+            case InterruptReason.FailedLimit:
+              exitCode = ExitCodes.FailedLimit;
+              break;
+            case InterruptReason.TimeLimit:
+              exitCode = ExitCodes.TimeLimit;
+              break;
+          }
         }
       }
     } catch (e) {
@@ -1378,7 +1396,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async checkLimits() {
-    let interrupt = false;
+    let interrupt: InterruptReason | null = null;
 
     const size = await this.updateCurrSize();
 
@@ -1387,7 +1405,7 @@ self.__bx_behaviors.selectMainBehavior();
         logger.info(
           `Size threshold reached ${size} >= ${this.params.sizeLimit}, stopping`,
         );
-        interrupt = true;
+        interrupt = InterruptReason.SizeLimit;
       }
     }
 
@@ -1397,7 +1415,7 @@ self.__bx_behaviors.selectMainBehavior();
         logger.info(
           `Time threshold reached ${elapsed} > ${this.params.timeLimit}, stopping`,
         );
-        interrupt = true;
+        interrupt = InterruptReason.TimeLimit;
       }
     }
 
@@ -1409,7 +1427,7 @@ self.__bx_behaviors.selectMainBehavior();
         size,
       );
       if (diskUtil.stop === true) {
-        interrupt = true;
+        interrupt = InterruptReason.DiskUtilization;
       }
     }
 
@@ -1419,18 +1437,21 @@ self.__bx_behaviors.selectMainBehavior();
       if (numFailed >= failedLimit) {
         logger.fatal(
           `Failed threshold reached ${numFailed} >= ${failedLimit}, failing crawl`,
+          undefined,
+          undefined,
+          ExitCodes.FailedLimit,
         );
       }
     }
 
     if (interrupt) {
       this.uploadAndDeleteLocal = true;
-      this.gracefulFinishOnInterrupt();
+      this.gracefulFinishOnInterrupt(interrupt);
     }
   }
 
-  gracefulFinishOnInterrupt() {
-    this.interrupted = true;
+  gracefulFinishOnInterrupt(interrupt_reason: InterruptReason) {
+    this.interrupt_reason = interrupt_reason;
     logger.info("Crawler interrupted, gracefully finishing current pages");
     if (!this.params.waitOnDone && !this.params.restartsOnError) {
       this.finalExit = true;
@@ -1457,23 +1478,19 @@ self.__bx_behaviors.selectMainBehavior();
   async serializeAndExit() {
     await this.serializeConfig();
 
-    if (this.interrupted) {
-      await this.browser.close();
-      await closeWorkers(0);
-      await this.closeFiles();
-      if (!this.done) {
-        await this.setStatusAndExit(
-          ExitCodes.InterruptedImmediate,
-          "interrupted",
-        );
-        return;
-      }
+    await this.browser.close();
+    await closeWorkers(0);
+    await this.closeFiles();
+    if (!this.done) {
+      await this.setStatusAndExit(ExitCodes.Interrupted, "interrupted");
+      return;
     }
+
     await this.setStatusAndExit(ExitCodes.Success, "done");
   }
 
   async isCrawlRunning() {
-    if (this.interrupted) {
+    if (this.interrupt_reason) {
       return false;
     }
 
@@ -1726,7 +1743,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (
       this.params.generateWACZ &&
       !this.params.dryRun &&
-      (!this.interrupted || this.finalExit || this.uploadAndDeleteLocal)
+      (!this.interrupt_reason || this.finalExit || this.uploadAndDeleteLocal)
     ) {
       const uploaded = await this.generateWACZ();
 
@@ -1742,7 +1759,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.waitOnDone && (!this.interrupted || this.finalExit)) {
+    if (this.params.waitOnDone && (!this.interrupt_reason || this.finalExit)) {
       this.done = true;
       logger.info("All done, waiting for signal...");
       await this.crawlState.setStatus("done");
@@ -1753,7 +1770,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   markBrowserCrashed() {
-    this.interrupted = true;
+    this.interrupt_reason = InterruptReason.BrowserCrashed;
     this.browserCrashed = true;
     if (this.healthChecker) {
       this.healthChecker.browserCrashed = true;
