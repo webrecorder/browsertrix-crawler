@@ -1478,12 +1478,15 @@ self.__bx_behaviors.selectMainBehavior();
   async serializeAndExit() {
     await this.serializeConfig();
 
-    await this.browser.close();
-    await closeWorkers(0);
-    await this.closeFiles();
-    if (!this.done) {
-      await this.setStatusAndExit(ExitCodes.Interrupted, "interrupted");
-      return;
+    if (this.interrupt_reason) {
+      await closeWorkers(0);
+      await this.browser.close();
+      await this.closeFiles();
+
+      if (!this.done) {
+        await this.setStatusAndExit(ExitCodes.Interrupted, "interrupted");
+        return;
+      }
     }
 
     await this.setStatusAndExit(ExitCodes.Success, "done");
@@ -1512,6 +1515,7 @@ self.__bx_behaviors.selectMainBehavior();
       this.healthChecker = new HealthChecker(
         this.params.healthCheckPort,
         this.params.workers,
+        this.browser,
         async () => {
           await this.updateCurrSize();
         },
@@ -1771,10 +1775,7 @@ self.__bx_behaviors.selectMainBehavior();
 
   markBrowserCrashed() {
     this.interrupt_reason = InterruptReason.BrowserCrashed;
-    this.browserCrashed = true;
-    if (this.healthChecker) {
-      this.healthChecker.browserCrashed = true;
-    }
+    this.browser.crashed = true;
   }
 
   async closeLog(): Promise<void> {

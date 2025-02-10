@@ -7,8 +7,6 @@ import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
 import { PageState, WorkerId } from "./state.js";
 import { Crawler } from "../crawler.js";
-import { PAGE_OP_TIMEOUT_SECS } from "./constants.js";
-import { InterruptReason } from "./constants.js";
 
 const MAX_REUSE = 5;
 
@@ -234,7 +232,7 @@ export class PageWorker {
         }
 
         if (retry >= MAX_REUSE) {
-          this.crawler.interrupt_reason = InterruptReason.BrowserCrashed;
+          this.crawler.markBrowserCrashed();
           throw new Error("Unable to load new page, browser needs restart");
         }
 
@@ -433,16 +431,7 @@ export async function runWorkers(
 
   await closeWorkers();
 
-  if (!crawler.browserCrashed) {
-    await timedRun(
-      crawler.browser.close(),
-      PAGE_OP_TIMEOUT_SECS,
-      "Closing Browser Timed Out",
-      {},
-      "worker",
-      true,
-    );
-  }
+  await crawler.browser.close();
 }
 
 // ===========================================================================
