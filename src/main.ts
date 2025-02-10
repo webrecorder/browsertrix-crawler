@@ -29,7 +29,7 @@ async function handleTerminate(signame: string) {
   try {
     await crawler.checkCanceled();
 
-    if (!crawler.interrupt_reason) {
+    if (!crawler.interruptReason) {
       logger.info("SIGNAL: canceled received...");
       crawler.gracefulFinishOnInterrupt(InterruptReason.Cancelled);
     } else if (forceTerm || Date.now() - lastSigInt > 200) {

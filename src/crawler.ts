@@ -169,7 +169,7 @@ export class Crawler {
 
   skipTextDocs = 0;
 
-  interrupt_reason: InterruptReason | null = null;
+  interruptReason: InterruptReason | null = null;
   finalExit = false;
   uploadAndDeleteLocal = false;
   done = false;
@@ -307,7 +307,7 @@ export class Crawler {
 
     this.healthChecker = null;
 
-    this.interrupt_reason = null;
+    this.interruptReason = null;
     this.finalExit = false;
     this.uploadAndDeleteLocal = false;
 
@@ -597,9 +597,9 @@ export class Crawler {
         } else if (stopped) {
           status = "done";
           logger.info("Crawl gracefully stopped on request");
-        } else if (this.interrupt_reason) {
+        } else if (this.interruptReason) {
           status = "interrupted";
-          switch (this.interrupt_reason) {
+          switch (this.interruptReason) {
             case InterruptReason.SizeLimit:
               exitCode = ExitCodes.SizeLimit;
               break;
@@ -1437,8 +1437,8 @@ self.__bx_behaviors.selectMainBehavior();
       if (numFailed >= failedLimit) {
         logger.fatal(
           `Failed threshold reached ${numFailed} >= ${failedLimit}, failing crawl`,
-          undefined,
-          undefined,
+          {},
+          "general",
           ExitCodes.FailedLimit,
         );
       }
@@ -1450,8 +1450,8 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  gracefulFinishOnInterrupt(interrupt_reason: InterruptReason) {
-    this.interrupt_reason = interrupt_reason;
+  gracefulFinishOnInterrupt(interruptReason: InterruptReason) {
+    this.interruptReason = interruptReason;
     logger.info("Crawler interrupted, gracefully finishing current pages");
     if (!this.params.waitOnDone && !this.params.restartsOnError) {
       this.finalExit = true;
@@ -1478,7 +1478,7 @@ self.__bx_behaviors.selectMainBehavior();
   async serializeAndExit() {
     await this.serializeConfig();
 
-    if (this.interrupt_reason) {
+    if (this.interruptReason) {
       await closeWorkers(0);
       await this.browser.close();
       await this.closeFiles();
@@ -1493,7 +1493,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async isCrawlRunning() {
-    if (this.interrupt_reason) {
+    if (this.interruptReason) {
       return false;
     }
 
@@ -1747,7 +1747,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (
       this.params.generateWACZ &&
       !this.params.dryRun &&
-      (!this.interrupt_reason || this.finalExit || this.uploadAndDeleteLocal)
+      (!this.interruptReason || this.finalExit || this.uploadAndDeleteLocal)
     ) {
       const uploaded = await this.generateWACZ();
 
@@ -1763,7 +1763,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.waitOnDone && (!this.interrupt_reason || this.finalExit)) {
+    if (this.params.waitOnDone && (!this.interruptReason || this.finalExit)) {
       this.done = true;
       logger.info("All done, waiting for signal...");
       await this.crawlState.setStatus("done");
@@ -1774,7 +1774,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   markBrowserCrashed() {
-    this.interrupt_reason = InterruptReason.BrowserCrashed;
+    this.interruptReason = InterruptReason.BrowserCrashed;
     this.browser.crashed = true;
   }
 
