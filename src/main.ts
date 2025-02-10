@@ -30,7 +30,7 @@ async function handleTerminate(signame: string) {
     await crawler.checkCanceled();
 
     if (!crawler.interruptReason) {
-      logger.info("SIGNAL: canceled received...");
+      logger.info("SIGNAL: interrupt request received, finishing current pages before exit...");
       crawler.gracefulFinishOnInterrupt(InterruptReason.Cancelled);
     } else if (forceTerm || Date.now() - lastSigInt > 200) {
       logger.info("SIGNAL: stopping crawl now...");
