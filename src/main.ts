@@ -5,7 +5,7 @@ import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
 import { ReplayCrawler } from "./replaycrawler.js";
 import fs from "node:fs";
-import { ExitCodes } from "./util/constants.js";
+import { ExitCodes, InterruptReason } from "./util/constants.js";
 
 let crawler: Crawler | null = null;
 
@@ -29,9 +29,9 @@ async function handleTerminate(signame: string) {
   try {
     await crawler.checkCanceled();
 
-    if (!crawler.interrupted) {
-      logger.info("SIGNAL: gracefully finishing current pages...");
-      crawler.gracefulFinishOnInterrupt();
+    if (!crawler.interrupt_reason) {
+      logger.info("SIGNAL: canceled received...");
+      crawler.gracefulFinishOnInterrupt(InterruptReason.Cancelled);
     } else if (forceTerm || Date.now() - lastSigInt > 200) {
       logger.info("SIGNAL: stopping crawl now...");
       await crawler.serializeAndExit();

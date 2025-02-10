@@ -63,8 +63,21 @@ export enum ExitCodes {
   Failed = 9,
   OutOfSpace = 3,
   BrowserCrashed = 10,
-  InterruptedGraceful = 11,
-  InterruptedImmediate = 13,
+  Cancelled = 11,
+  FailedLimit = 12,
+  Interrupted = 13,
+  SizeLimit = 14,
+  TimeLimit = 15,
+  DiskUtilization = 16,
   Fatal = 17,
   ProxyError = 21,
+}
+
+export enum InterruptReason {
+  SizeLimit = 1,
+  TimeLimit = 2,
+  FailedLimit = 3,
+  DiskUtilization = 4,
+  BrowserCrashed = 5,
+  Cancelled = 6,
 }

@@ -997,7 +997,7 @@ export class Recorder {
     while (
       numPending &&
       !this.pageFinished &&
-      !this.crawler.interrupted &&
+      !this.crawler.interrupt_reason &&
       !this.crawler.postCrawling
     ) {
       pending = [];
