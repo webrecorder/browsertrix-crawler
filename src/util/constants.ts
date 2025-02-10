@@ -63,9 +63,9 @@ export enum ExitCodes {
   Failed = 9,
   OutOfSpace = 3,
   BrowserCrashed = 10,
-  Cancelled = 11,
+  SignalInterrupted = 11,
   FailedLimit = 12,
-  Interrupted = 13,
+  SignalInterruptedForce = 13,
   SizeLimit = 14,
   TimeLimit = 15,
   DiskUtilization = 16,
@@ -79,5 +79,5 @@ export enum InterruptReason {
   FailedLimit = 3,
   DiskUtilization = 4,
   BrowserCrashed = 5,
-  Cancelled = 6,
+  SignalInterrupted = 6,
 }

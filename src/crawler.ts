@@ -593,7 +593,6 @@ export class Crawler {
       if (!finished) {
         if (canceled) {
           status = "canceled";
-          exitCode = ExitCodes.Cancelled;
         } else if (stopped) {
           status = "done";
           logger.info("Crawl gracefully stopped on request");
@@ -606,8 +605,8 @@ export class Crawler {
             case InterruptReason.BrowserCrashed:
               exitCode = ExitCodes.BrowserCrashed;
               break;
-            case InterruptReason.Cancelled:
-              exitCode = ExitCodes.Cancelled;
+            case InterruptReason.SignalInterrupted:
+              exitCode = ExitCodes.SignalInterrupted;
               break;
             case InterruptReason.DiskUtilization:
               exitCode = ExitCodes.DiskUtilization;
@@ -1484,7 +1483,10 @@ self.__bx_behaviors.selectMainBehavior();
       await this.closeFiles();
 
       if (!this.done) {
-        await this.setStatusAndExit(ExitCodes.Interrupted, "interrupted");
+        await this.setStatusAndExit(
+          ExitCodes.SignalInterruptedForce,
+          "interrupted",
+        );
         return;
       }
     }
