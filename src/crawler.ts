@@ -1607,13 +1607,12 @@ self.__bx_behaviors.selectMainBehavior();
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ondisconnect: (err: any) => {
-        this.interrupted = true;
+        this.markBrowserCrashed();
         logger.error(
           "Browser disconnected (crashed?), interrupting crawl",
           err,
           "browser",
         );
-        this.browserCrashed = true;
       },
 
       recording: this.recording,
@@ -1750,6 +1749,14 @@ self.__bx_behaviors.selectMainBehavior();
 
       // wait forever until signal
       await new Promise(() => {});
+    }
+  }
+
+  markBrowserCrashed() {
+    this.interrupted = true;
+    this.browserCrashed = true;
+    if (this.healthChecker) {
+      this.healthChecker.browserCrashed = true;
     }
   }
 

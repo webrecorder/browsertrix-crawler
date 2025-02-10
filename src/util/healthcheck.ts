@@ -7,6 +7,7 @@ export class HealthChecker {
   port: number;
   errorThreshold: number;
   healthServer: http.Server;
+  browserCrashed = false;
 
   updater: (() => Promise<void>) | null;
 
@@ -33,7 +34,7 @@ export class HealthChecker {
     const pathname = req.url ? url.parse(req.url).pathname : "";
     switch (pathname) {
       case "/healthz":
-        if (this.errorCount < this.errorThreshold) {
+        if (this.errorCount < this.errorThreshold && !this.browserCrashed) {
           logger.debug(
             `health check ok, num errors ${this.errorCount} < ${this.errorThreshold}`,
             {},
