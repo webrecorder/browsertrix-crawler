@@ -147,7 +147,7 @@ function getDefaultWindowSize() {
 
 function handleTerminate(signame: string) {
   logger.info(`Got signal ${signame}, exiting`);
-  process.exit(ExitCodes.GenericError);
+  process.exit(ExitCodes.SignalInterrupted);
 }
 
 async function main() {
@@ -299,7 +299,7 @@ async function automatedProfile(
     }
     logger.debug("Login form could not be found");
     await page.close();
-    process.exit(1);
+    process.exit(ExitCodes.GenericError);
     return;
   }
 
@@ -318,7 +318,7 @@ async function automatedProfile(
 
   await createProfile(params, browser, page, cdp);
 
-  process.exit(0);
+  process.exit(ExitCodes.Success);
 }
 
 async function createProfile(
