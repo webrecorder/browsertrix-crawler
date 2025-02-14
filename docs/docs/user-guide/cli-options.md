@@ -18,7 +18,7 @@ Options:
       --crawlId, --id                       A user provided ID for this crawl or
                                              crawl configuration (can also be se
                                             t via CRAWL_ID env var, defaults to
-                                            hostname)                   [string]
+                                            Docker container hostname)  [string]
       --waitUntil                           Puppeteer page.goto() condition to w
                                             ait for before continuing, can be mu
                                             ltiple separated by ','
