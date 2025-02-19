@@ -10,7 +10,7 @@ import { Crawler } from "../crawler.js";
 
 const MAX_REUSE = 5;
 
-const NEW_WINDOW_TIMEOUT = 20;
+const NEW_WINDOW_TIMEOUT = 20000;
 const TEARDOWN_TIMEOUT = 10;
 const FINISHED_TIMEOUT = 60;
 
@@ -231,7 +231,7 @@ export class PageWorker {
           break;
         }
 
-        if (retry >= MAX_REUSE) {
+        if (retry >= 1000000000) {
           this.crawler.markBrowserCrashed();
           throw new Error("Unable to load new page, browser needs restart");
         }
