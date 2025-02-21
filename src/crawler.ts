@@ -40,9 +40,7 @@ import { collectCustomBehaviors, getInfoString } from "./util/file_reader.js";
 import { Browser } from "./util/browser.js";
 
 import {
-  ADD_LINK_FUNC,
-  BEHAVIOR_LOG_FUNC,
-  FETCH_FUNC,
+  BxFunctionBindings,
   DISPLAY,
   ExtractSelector,
   PAGE_OP_TIMEOUT_SECS,
@@ -768,17 +766,43 @@ export class Crawler {
       await this.screencaster.screencastPage(page, cdp, workerid);
     }
 
-    await page.exposeFunction(
-      ADD_LINK_FUNC,
-      (url: string) => callbacks.addLink && callbacks.addLink(url),
-    );
+    cdp.on("Runtime.bindingCalled", (params) => {
+      const { name, payload } = params;
+
+      switch (name as BxFunctionBindings) {
+        case BxFunctionBindings.AddLinkFunc:
+          callbacks.addLink && callbacks.addLink(payload);
+          break;
+
+        case BxFunctionBindings.BehaviorLogFunc:
+          {
+            const logdata: { data: string; type: string } = JSON.parse(payload);
+            this._behaviorLog(logdata, page.url(), workerid);
+          }
+          break;
+
+        case BxFunctionBindings.FetchFunc:
+          if (recorder) {
+            recorder.addExternalFetch(payload, cdp);
+          }
+          break;
+
+        case BxFunctionBindings.AddToSeenSet:
+          this.crawlState
+            .addToUserSet(payload)
+            .catch((e) => logger.warn("Adding to URL set error", e));
+          break;
+      }
+    });
+
+    await cdp.send("Runtime.addBinding", {
+      name: BxFunctionBindings.AddLinkFunc,
+    });
 
     if (this.params.behaviorOpts) {
-      await page.exposeFunction(
-        BEHAVIOR_LOG_FUNC,
-        (logdata: { data: string; type: string }) =>
-          this._behaviorLog(logdata, page.url(), workerid),
-      );
+      await cdp.send("Runtime.addBinding", {
+        name: BxFunctionBindings.BehaviorLogFunc,
+      });
       await this.browser.addInitScript(page, behaviors);
 
       const initScript = `
@@ -791,9 +815,11 @@ self.__bx_behaviors.selectMainBehavior();
         this.behaviorsChecked = true;
       }
 
-      await page.exposeFunction(FETCH_FUNC, (url: string) => {
-        return recorder ? recorder.addExternalFetch(url, cdp) : true;
-      });
+      if (recorder) {
+        await cdp.send("Runtime.addBinding", {
+          name: BxFunctionBindings.FetchFunc,
+        });
+      }
 
       await this.browser.addInitScript(page, initScript);
     }
@@ -873,11 +899,9 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    await page.exposeFunction("__bx_addSet", (data: string) =>
-      this.crawlState.addToUserSet(data),
-    );
-
-    // await page.exposeFunction("__bx_hasSet", (data: string) => this.crawlState.hasUserSet(data));
+    await cdp.send("Runtime.addBinding", {
+      name: BxFunctionBindings.AddToSeenSet,
+    });
   }
 
   async setupExecContextEvents(
@@ -2295,7 +2319,7 @@ self.__bx_behaviors.selectMainBehavior();
                 selector,
                 extract,
                 isAttribute,
-                addLinkFunc: ADD_LINK_FUNC,
+                addLinkFunc: BxFunctionBindings.AddLinkFunc,
               })
               .catch((e) =>
                 logger.warn("Link Extraction failed in frame", {
