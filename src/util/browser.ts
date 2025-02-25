@@ -7,6 +7,7 @@ import os from "os";
 import path from "path";
 
 import { formatErr, LogContext, logger } from "./logger.js";
+import { getSafeProxyString } from "./proxy.js";
 import { initStorage } from "./storage.js";
 
 import {
@@ -250,7 +251,8 @@ export class Browser {
     ];
 
     if (proxy) {
-      logger.info("Using proxy", { proxy }, "browser");
+      const proxyString = getSafeProxyString(proxy);
+      logger.info("Using proxy", { proxy: proxyString }, "browser");
     }
 
     if (proxy) {

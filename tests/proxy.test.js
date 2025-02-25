@@ -1,5 +1,7 @@
 import { execSync, exec } from "child_process";
 
+import { getSafeProxyString } from "../dist/util/proxy.js";
+
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 const PROXY_IMAGE = "tarampampam/3proxy:1.9.1";
@@ -147,6 +149,18 @@ test("ssh socks proxy, wrong user", () => {
   expect(status).toBe(21);
 });
 
+
+test("ensure logged proxy string does not include any credentials", () => {
+  const testParams = [
+    // [input, expectedOutput]
+    ["socks5://username:password@proxy-host.example.com:9001", "socks5://proxy-host.example.com:9001"],
+    ["socks5://path-to-proxy-host.example.com:9001", "socks5://path-to-proxy-host.example.com:9001"],
+    ["ssh://localhost:9700", "ssh://localhost:9700"]
+  ];
+  for (const testParamSet of testParams) {
+    expect(getSafeProxyString(testParamSet[0])).toEqual(testParamSet[1]);
+  }
+});
 
 
 
