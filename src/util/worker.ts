@@ -231,7 +231,7 @@ export class PageWorker {
           break;
         }
 
-        if (retry >= 3) {
+        if (retry >= 2) {
           this.crawler.markBrowserCrashed();
           if (this.crawler.params.restartsOnError) {
             throw new Error("Unable to load new page, browser needs restart");
