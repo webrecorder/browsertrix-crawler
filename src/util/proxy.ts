@@ -28,6 +28,31 @@ export function getEnvProxyUrl() {
   return "";
 }
 
+export function getSafeProxyString(proxyString: string): string {
+  if (!proxyString) {
+    return "";
+  }
+
+  try {
+    const proxySplit = proxyString.split("://");
+    const prefix = proxySplit[0];
+    const remainder = proxySplit[1];
+
+    const credSplit = remainder.split("@");
+
+    let addressIndex = 1;
+    if (credSplit.length === 1) {
+      addressIndex = 0;
+    }
+
+    const addressNoCredentials = credSplit[addressIndex];
+
+    return `${prefix}://${addressNoCredentials}`;
+  } catch (e) {
+    return "";
+  }
+}
+
 export async function initProxy(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   params: Record<string, any>,
