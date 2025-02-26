@@ -394,6 +394,18 @@ export class Browser {
     }
   }
 
+  killBrowser() {
+    // used when main browser process appears to be stalled
+    // puppeteer should still be able to continue, from initial testing
+    // and avoids interrupting crawler when not auto-restarting
+    if (this.browser) {
+      const proc = this.browser.process();
+      if (proc) {
+        proc.kill();
+      }
+    }
+  }
+
   async addInitScript(page: Page, script: string) {
     await page.evaluateOnNewDocument(script);
   }
