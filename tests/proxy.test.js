@@ -154,6 +154,7 @@ test("ensure logged proxy string does not include any credentials", () => {
   const testParams = [
     // [input, expectedOutput]
     ["socks5://username:password@proxy-host.example.com:9001", "socks5://proxy-host.example.com:9001"],
+    ["socks5://username@proxy-host.example.com:9001", "socks5://proxy-host.example.com:9001"],
     ["socks5://path-to-proxy-host.example.com:9001", "socks5://path-to-proxy-host.example.com:9001"],
     ["ssh://localhost:9700", "ssh://localhost:9700"]
   ];
