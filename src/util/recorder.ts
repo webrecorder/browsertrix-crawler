@@ -192,6 +192,8 @@ export class Recorder {
       patterns: [{ urlPattern: "*", requestStage: "Response" }],
     });
 
+    logger.debug("Recorder fetch.enable finished", {}, "worker");
+
     // Response
     cdp.on("Network.responseReceived", (params) =>
       this.handleResponseReceived(params),
@@ -225,6 +227,7 @@ export class Recorder {
     );
 
     await cdp.send("Network.enable");
+    logger.debug("Recorder Network.enable finished", {}, "worker");
 
     // Target
     cdp.on("Target.attachedToTarget", async (params) => {
@@ -249,6 +252,7 @@ export class Recorder {
       waitForDebuggerOnStart: false,
       flatten: true,
     });
+    logger.debug("Recorder Target.setAutoAttach finished", {}, "worker");
 
     // Console
     cdp.on("Console.messageAdded", (params) => {
