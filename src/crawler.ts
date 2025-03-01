@@ -1730,9 +1730,13 @@ self.__bx_behaviors.selectMainBehavior();
       await this.combineWARC();
     }
 
+    const generateFiles =
+      !this.params.dryRun &&
+      (!this.interruptReason || this.finalExit || this.uploadAndDeleteLocal);
+
     if (
       (this.params.generateCDX || this.params.generateWACZ) &&
-      !this.params.dryRun
+      generateFiles
     ) {
       logger.info("Merging CDX");
       await this.crawlState.setStatus(
@@ -1746,11 +1750,7 @@ self.__bx_behaviors.selectMainBehavior();
       );
     }
 
-    if (
-      this.params.generateWACZ &&
-      !this.params.dryRun &&
-      (!this.interruptReason || this.finalExit || this.uploadAndDeleteLocal)
-    ) {
+    if (this.params.generateWACZ && generateFiles) {
       const uploaded = await this.generateWACZ();
 
       if (uploaded && this.uploadAndDeleteLocal) {

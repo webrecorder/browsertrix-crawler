@@ -420,12 +420,30 @@ return inx;
   async setWACZFilename(): Promise<string> {
     const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
     this.waczFilename = interpolateFilename(filename, this.key);
-    await this.redis.hsetnx(
-      `${this.key}:nextWacz`,
-      this.uid,
-      this.waczFilename,
-    );
-    return this.waczFilename;
+    if (
+      !(await this.redis.hsetnx(
+        `${this.key}:nextWacz`,
+        this.uid,
+        this.waczFilename,
+      ))
+    ) {
+      this.waczFilename = await this.redis.hget(
+        `${this.key}:nextWacz`,
+        this.uid,
+      );
+      logger.debug(
+        "Keeping WACZ Filename",
+        { filename: this.waczFilename },
+        "state",
+      );
+    } else {
+      logger.debug(
+        "Using New WACZ Filename",
+        { filename: this.waczFilename },
+        "state",
+      );
+    }
+    return this.waczFilename!;
   }
 
   async getWACZFilename(): Promise<string> {
