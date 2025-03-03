@@ -181,7 +181,7 @@ class ScreenCaster {
   urls = new Map<WorkerId, string>();
   cdps = new Map<WorkerId, CDPSession>();
   maxWidth = 640;
-  maxHeight = 480;
+  maxHeight = 360;
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initMsg: { [key: string]: any };
