@@ -26,11 +26,21 @@
   font-feature-settings: "ss03";
 }
 
+@font-face {
+  font-family: "Konsole";
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+  src: url("https://wr-static.sfo3.cdn.digitaloceanspaces.com/fonts/konsole/Konsolev1.1-VF.woff2")
+    format("woff2");
+}
+
 :root {
+  --md-display-font: "Konsole", "Helvetica", sans-serif;
   --md-code-font: "Recursive", monospace;
   --md-text-font: "Inter", "Helvetica", "Arial", sans-serif;
-  --wr-blue-primary: #0891B2;
-  --wr-orange-primary: #C96509;
+  --wr-blue-primary: #088eaf;
+  --wr-orange-primary: #bb4a00;
 }
 
 [data-md-color-scheme="webrecorder"] {
@@ -45,14 +55,26 @@
 
 /* Nav changes */
 
-.md-header__title {
-  font-family: var(--md-code-font);
-  font-variation-settings: "MONO" 0.51;
+.md-header__title,
+.md-nav__title {
+  font-family: var(--md-display-font);
+  text-transform: uppercase;
+  font-variation-settings:
+    "wght" 750,
+    "wdth" 87;
+  margin-left: 0 !important;
 }
 
 .md-header__title--active {
-  font-family: var(--md-text-font);
-  font-weight: 600;
+  font-family: var(--md-display-font);
+  text-transform: none;
+  font-variation-settings:
+    "wght" 550,
+    "wdth" 90;
+}
+
+.md-header__button {
+  margin-right: 0 !important;
 }
 
 /* Custom menu item hover */
