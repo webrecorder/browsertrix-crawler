@@ -1,14 +1,18 @@
-import ws, { WebSocket } from "ws";
-import http, { IncomingMessage, type Server, ServerResponse } from "http";
+import ws, { type WebSocket } from "ws";
+import http, {
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "http";
 import url from "url";
 import fs from "fs";
 
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
-import { Duplex } from "stream";
-import { CDPSession, Page } from "puppeteer-core";
-import { WorkerId } from "./state.js";
-import Redis from "ioredis";
+import { type Duplex } from "stream";
+import { type CDPSession, type Page } from "puppeteer-core";
+import { type WorkerId } from "./state.js";
+import type Redis from "ioredis";
 
 const indexHTML = fs.readFileSync(
   new URL("../../html/screencast.html", import.meta.url),
