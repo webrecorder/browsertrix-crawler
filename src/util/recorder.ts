@@ -1404,7 +1404,7 @@ export class Recorder extends EventEmitter {
         mime = ct.split(";")[0];
       }
 
-      const result = !isHTMLMime(mime);
+      const result = !!mime && !isHTMLMime(mime);
 
       if (result) {
         logger.info(
