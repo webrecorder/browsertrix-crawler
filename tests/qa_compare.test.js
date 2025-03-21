@@ -8,7 +8,7 @@ test("run initial crawl with text and screenshots to prepare for QA", async () =
   fs.rmSync("./test-crawls/qa-wr-net", { recursive: true, force: true });
 
   child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --url https://browsertrix.com/ --url https://old.webrecorder.net/contact --scopeType page --collection qa-wr-net --text to-warc --screenshot view --generateWACZ",
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --url https://archiveweb.page/ --url https://old.webrecorder.net/contact --scopeType page --collection qa-wr-net --text to-warc --screenshot view --generateWACZ",
   );
 
   expect(
