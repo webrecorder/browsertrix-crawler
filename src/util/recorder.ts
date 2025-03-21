@@ -505,7 +505,7 @@ export class Recorder {
       return;
     }
 
-    this.serializeToWARC(reqresp).catch((e) =>
+    this.serializeToWARC(reqresp, true).catch((e) =>
       logger.warn("Error Serializing to WARC", e, "recorder"),
     );
   }
@@ -1319,7 +1319,7 @@ export class Recorder {
     return reqresp;
   }
 
-  async serializeToWARC(reqresp: RequestResponseInfo) {
+  async serializeToWARC(reqresp: RequestResponseInfo, fromFinished = false) {
     // always include in pageinfo record if going to serialize to WARC
     // even if serialization does not happen
     this.addPageRecord(reqresp);
@@ -1363,6 +1363,15 @@ export class Recorder {
     const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
 
     this.writer.writeRecordPair(responseRecord, requestRecord);
+
+    // edge case: from finished response load, and page response and no mime type or status != 200, possibly a captcha/sso page
+    // allow it to be captured again
+    if (
+      (fromFinished && url === this.pageUrl && !reqresp.getMimeType()) ||
+      status !== 200
+    ) {
+      await this.crawlState.removeDupe(WRITE_DUPE_KEY, url, status);
+    }
   }
 
   async directFetchCapture({
