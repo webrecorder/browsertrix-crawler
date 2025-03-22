@@ -981,7 +981,7 @@ export class Recorder {
       "recorder",
     );
 
-    await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url);
+    await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, 200);
   }
 
   writePageInfoRecord() {

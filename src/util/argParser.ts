@@ -226,7 +226,8 @@ class ArgParser {
         },
 
         domSnapshot: {
-          describe: "If set, will generate DOM snapshots of HTML after page load",
+          describe:
+            "If set, will generate DOM snapshots of HTML after page load",
           type: "boolean",
           default: false,
         },

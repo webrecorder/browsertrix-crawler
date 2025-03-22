@@ -71,7 +71,6 @@ import {
 } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
-import { snapshotToDom } from "./util/domsnapshot.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -1080,7 +1079,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async doPostLoadActions(opts: WorkerState, saveOutput = false) {
-    const { page, cdp, data, workerid, addDOMSnapshot } = opts;
+    const { page, cdp, data, workerid, recorder } = opts;
     const { url } = data;
 
     if (!data.isHTMLPage) {
@@ -1181,6 +1180,10 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
     }
+
+    if (this.params.domSnapshot && recorder) {
+      await recorder.addDOMSnapshot(cdp);
+    }
   }
 
   async awaitPageExtraDelay(opts: WorkerState) {
@@ -1197,10 +1200,6 @@ self.__bx_behaviors.selectMainBehavior();
         logDetails,
       );
       await sleep(this.params.pageExtraDelay);
-    }
-
-    if (this.params.domSnapshot) {
-      await addDOMSnapshot(cdp);
     }
   }
 
