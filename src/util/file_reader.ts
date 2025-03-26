@@ -72,7 +72,7 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
     );
     return await collectLocalPathBehaviors(pathToCollect);
   } catch (e) {
-    logger.error(
+    logger.fatal(
       "Error downloading custom behaviors from Git repo",
       { url: urlStripped, error: e },
       "behavior",
@@ -96,7 +96,7 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
     );
     return await collectLocalPathBehaviors(behaviorFilepath);
   } catch (e) {
-    logger.error(
+    logger.fatal(
       "Error downloading custom behavior from URL",
       { url, error: e },
       "behavior",
