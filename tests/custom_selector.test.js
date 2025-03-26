@@ -53,7 +53,7 @@ test("test custom selector crawls JS files as pages", async () => {
 
 
 test("test invalid selector, crawl fails", async () => {
-  let failed = false;
+  let status = 0;
   try {
     child_process.execSync(
       "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --collection custom-sel-invalid --selectLinks \"script[\"",
@@ -66,8 +66,23 @@ test("test invalid selector, crawl fails", async () => {
   expect(status).toBe(17);
 });
 
+test("test valid autoclick selector passes validation", async () => {
+  let failed = false;
 
-test("test invalid autoclick selector, crawl fails", async () => {
+  try {
+    child_process.execSync(
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com/ --clickSelector button --scopeType page",
+    );
+  } catch (e) {
+    failed = true;
+  }
+
+  // logger fatal exit code
+  expect(failed).toBe(false);
+});
+
+
+test("test invalid autoclick selector fails validation, crawl fails", async () => {
   let status = 0;
 
   try {
