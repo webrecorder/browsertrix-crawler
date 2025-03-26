@@ -700,6 +700,9 @@ class ArgParser {
     argv.crawlId = argv.crawlId || process.env.CRAWL_ID || os.hostname();
     argv.collection = interpolateFilename(argv.collection, argv.crawlId);
 
+    // css selector parser
+    const parser = createParser();
+
     // Check that the collection name is valid.
     if (argv.collection.search(/^[\w][\w-]*$/) === -1) {
       logger.fatal(
@@ -710,6 +713,16 @@ class ArgParser {
     // background behaviors to apply
     const behaviorOpts: { [key: string]: string | boolean } = {};
     if (argv.behaviors.length > 0) {
+      if (argv.clickSelector) {
+        try {
+          parser(argv.clickSelector);
+        } catch (e) {
+          logger.fatal("Invalid Autoclick CSS Selector", {
+            selector: argv.clickSelector,
+          });
+        }
+      }
+
       argv.behaviors.forEach((x: string) => {
         if (BEHAVIOR_TYPES.includes(x)) {
           behaviorOpts[x] = true;
@@ -760,8 +773,6 @@ class ArgParser {
     }
 
     let selectLinks: ExtractSelector[];
-
-    const parser = createParser();
 
     if (argv.selectLinks) {
       selectLinks = argv.selectLinks.map((x: string) => {
