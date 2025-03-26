@@ -150,3 +150,18 @@ test("test crawl exits if behavior not fetched from git repo", async () => {
   // logger fatal exit code
   expect(status).toBe(17);
 });
+
+test("test crawl exits if not custom behaviors collected from local path", async () => {
+  let status = 0;
+
+  try {
+    child_process.execSync(
+      "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/invalid-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --url https://example.org/ --url https://old.webrecorder.net/ --customBehaviors /custom-behaviors/doesntexist --scopeType page",
+    );
+  } catch (e) {
+    status = e.status;
+  }
+
+  // logger fatal exit code
+  expect(status).toBe(17);
+});

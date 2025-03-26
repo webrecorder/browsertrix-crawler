@@ -153,6 +153,14 @@ async function collectLocalPathBehaviors(
     }
   }
 
+  if (!behaviors && depth === 0) {
+    logger.fatal(
+      "No custom behaviors found at specified path",
+      { path: resolvedPath },
+      "behavior",
+    );
+  }
+
   return behaviors;
 }
 
