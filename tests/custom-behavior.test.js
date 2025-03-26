@@ -126,7 +126,7 @@ test("test crawl exits if behavior not fetched from url", async () => {
 
   try {
     child_process.execSync(
-      "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/invalid-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --url https://example.org/ --url https://old.webrecorder.net/ --customBehaviors https://webrecorder.net/doesntexist/custombehavior.js --scopeType page",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com --customBehaviors https://webrecorder.net/doesntexist/custombehavior.js --scopeType page",
     );
   } catch (e) {
     status = e.status;
@@ -141,7 +141,7 @@ test("test crawl exits if behavior not fetched from git repo", async () => {
 
   try {
     child_process.execSync(
-      "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/invalid-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --url https://example.org/ --url https://old.webrecorder.net/ --customBehaviors git+https://github.com/webrecorder/doesntexist --scopeType page",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com --customBehaviors git+https://github.com/webrecorder/doesntexist --scopeType page",
     );
   } catch (e) {
     status = e.status;
@@ -156,7 +156,7 @@ test("test crawl exits if not custom behaviors collected from local path", async
 
   try {
     child_process.execSync(
-      "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/invalid-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://example.com/ --url https://example.org/ --url https://old.webrecorder.net/ --customBehaviors /custom-behaviors/doesntexist --scopeType page",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com --customBehaviors /custom-behaviors/doesntexist --scopeType page",
     );
   } catch (e) {
     status = e.status;
