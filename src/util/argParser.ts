@@ -85,7 +85,7 @@ class ArgParser {
         crawlId: {
           alias: "id",
           describe:
-            "A user provided ID for this crawl or crawl configuration (can also be set via CRAWL_ID env var, defaults to hostname)",
+            "A user provided ID for this crawl or crawl configuration (can also be set via CRAWL_ID env var, defaults to Docker container hostname)",
           type: "string",
         },
 
