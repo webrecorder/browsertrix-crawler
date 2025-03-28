@@ -5035,10 +5035,10 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.4.0, warcio@^2.4.3:
-  version "2.4.3"
-  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.3.tgz#37ff95c2358d0d5ddb16e924fe200c4774b3903d"
-  integrity sha512-c397HNfLE7yJsyVF3XKXB+Yh3q3WKljhdYRPkKF9eyZMtB+HIxj1aBqgq0nTYz492KMKtzygBo0Gx+Gi0fJ9dg==
+warcio@^2.4.0, warcio@^2.4.3, warcio@^2.4.4:
+  version "2.4.4"
+  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.4.tgz#6c0c030bb55c0f0b824f854fa9e6718ca25d333d"
+  integrity sha512-FrWOhv1qLNhPBPGEMm24Yo+DtkipK5DxK3ckVGbOf0OJ/UqaxAhiiby74q+GW70dsJV0wF+RA1ToK6CKseTshA==
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"
