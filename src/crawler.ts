@@ -74,7 +74,7 @@ import {
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 
-const behaviors = fs.readFileSync(
+const btrixBehaviors = fs.readFileSync(
   new URL(
     "../node_modules/browsertrix-behaviors/dist/behaviors.js",
     import.meta.url,
@@ -773,13 +773,15 @@ export class Crawler {
       (url: string) => callbacks.addLink && callbacks.addLink(url),
     );
 
+    // used for both behaviors and link extraction now
+    await this.browser.addInitScript(page, btrixBehaviors);
+
     if (this.params.behaviorOpts) {
       await page.exposeFunction(
         BEHAVIOR_LOG_FUNC,
         (logdata: { data: string; type: string }) =>
           this._behaviorLog(logdata, page.url(), workerid),
       );
-      await this.browser.addInitScript(page, behaviors);
 
       const initScript = `
 self.__bx_behaviors.init(${this.params.behaviorOpts}, false);
@@ -2212,6 +2214,9 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async awaitPageLoad(frame: Frame, logDetails: LogDetails) {
+    if (!this.params.behaviorOpts) {
+      return;
+    }
     logger.debug(
       "Waiting for custom page load via behavior",
       logDetails,
@@ -2257,46 +2262,16 @@ self.__bx_behaviors.selectMainBehavior();
       );
     };
 
-    const loadLinks = (options: {
-      selector: string;
-      extract: string;
-      isAttribute: boolean;
-      addLinkFunc: string;
-    }) => {
-      const { selector, extract, isAttribute, addLinkFunc } = options;
-      const urls = new Set<string>();
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const getAttr = (elem: any) => urls.add(elem.getAttribute(extract));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const getProp = (elem: any) => urls.add(elem[extract]);
-
-      const getter = isAttribute ? getAttr : getProp;
-
-      document.querySelectorAll(selector).forEach(getter);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const func = (window as any)[addLinkFunc] as (
-        url: string,
-      ) => NonNullable<unknown>;
-      urls.forEach((url) => func.call(this, url));
-
-      return true;
-    };
-
     const frames = filteredFrames || page.frames();
 
     try {
-      for (const { selector, extract, isAttribute } of selectors) {
+      for (const { selector, extract } of selectors) {
         await Promise.allSettled(
           frames.map((frame) => {
             const getLinks = frame
-              .evaluate(loadLinks, {
-                selector,
-                extract,
-                isAttribute,
-                addLinkFunc: ADD_LINK_FUNC,
-              })
+              .evaluate(
+                `self.__bx_behaviors.loadLinks("${selector}", "${extract}")`,
+              )
               .catch((e) =>
                 logger.warn("Link Extraction failed in frame", {
                   frameUrl: frame.url,
