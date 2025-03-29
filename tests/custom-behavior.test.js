@@ -120,3 +120,48 @@ test("test invalid behavior exit", async () => {
   // logger fatal exit code
   expect(status).toBe(17);
 });
+
+test("test crawl exits if behavior not fetched from url", async () => {
+  let status = 0;
+
+  try {
+    child_process.execSync(
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com --customBehaviors https://webrecorder.net/doesntexist/custombehavior.js --scopeType page",
+    );
+  } catch (e) {
+    status = e.status;
+  }
+
+  // logger fatal exit code
+  expect(status).toBe(17);
+});
+
+test("test crawl exits if behavior not fetched from git repo", async () => {
+  let status = 0;
+
+  try {
+    child_process.execSync(
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com --customBehaviors git+https://github.com/webrecorder/doesntexist --scopeType page",
+    );
+  } catch (e) {
+    status = e.status;
+  }
+
+  // logger fatal exit code
+  expect(status).toBe(17);
+});
+
+test("test crawl exits if not custom behaviors collected from local path", async () => {
+  let status = 0;
+
+  try {
+    child_process.execSync(
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com --customBehaviors /custom-behaviors/doesntexist --scopeType page",
+    );
+  } catch (e) {
+    status = e.status;
+  }
+
+  // logger fatal exit code
+  expect(status).toBe(17);
+});
