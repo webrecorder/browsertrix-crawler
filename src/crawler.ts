@@ -71,6 +71,7 @@ import {
 } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
+import { runFlowStep } from "./util/flowbehavior.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -822,6 +823,8 @@ self.__bx_behaviors.init(${this.params.behaviorOpts}, false);
 ${this.customBehaviors}
 self.__bx_behaviors.selectMainBehavior();
 `;
+      console.log(initScript);
+
       if (!this.behaviorsChecked && this.customBehaviors) {
         await this.checkBehaviorScripts(cdp);
         this.behaviorsChecked = true;
@@ -912,6 +915,11 @@ self.__bx_behaviors.selectMainBehavior();
     await page.exposeFunction(BxFunctionBindings.AddToSeenSet, (data: string) =>
       this.crawlState.addToUserSet(data),
     );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await page.exposeFunction(BxFunctionBindings.RunFlowStep, (params: any) => {
+      return runFlowStep(page, params);
+    });
 
     // await page.exposeFunction("__bx_hasSet", (data: string) => this.crawlState.hasUserSet(data));
   }

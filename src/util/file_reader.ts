@@ -7,13 +7,14 @@ import { exec as execCallback } from "child_process";
 
 import { logger } from "./logger.js";
 import { getProxyDispatcher } from "./proxy.js";
+import { parseRecorderFlowJson } from "./flowbehavior.js";
 
 const exec = util.promisify(execCallback);
 
 const MAX_DEPTH = 5;
 
 // Add .ts to allowed extensions when we can support it
-const ALLOWED_EXTS = [".js"];
+const ALLOWED_EXTS = [".js", ".json"];
 
 export type FileSource = {
   path: string;
@@ -130,7 +131,16 @@ async function collectLocalPathBehaviors(
     if (stat.isFile() && ALLOWED_EXTS.includes(path.extname(resolvedPath))) {
       source = source ?? filename;
       logger.info("Custom behavior script added", { source }, "behavior");
-      const contents = await fsp.readFile(resolvedPath);
+      let contents = await fsp.readFile(resolvedPath);
+      if (path.extname(resolvedPath) === ".json") {
+        try {
+          contents = parseRecorderFlowJson(contents);
+          //console.log(contents);
+        } catch (e) {
+          console.log("Unable to parse recorder flow JSON, ignored");
+        }
+      }
+
       return [
         {
           path: resolvedPath,
