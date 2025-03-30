@@ -27,6 +27,7 @@ export enum BxFunctionBindings {
   AddLinkFunc = "__bx_addLink",
   FetchFunc = "__bx_fetch",
   AddToSeenSet = "__bx_addSet",
+  RunFlowStep = "__bx_runFlowStep",
 }
 
 export const MAX_DEPTH = 1000000;
