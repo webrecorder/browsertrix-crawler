@@ -40,15 +40,13 @@ import { collectCustomBehaviors, getInfoString } from "./util/file_reader.js";
 import { Browser } from "./util/browser.js";
 
 import {
-  ADD_LINK_FUNC,
-  BEHAVIOR_LOG_FUNC,
-  FETCH_FUNC,
   DISPLAY,
   ExtractSelector,
   PAGE_OP_TIMEOUT_SECS,
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
   ExitCodes,
   InterruptReason,
+  BxFunctionBindings,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -769,7 +767,7 @@ export class Crawler {
     }
 
     await page.exposeFunction(
-      ADD_LINK_FUNC,
+      BxFunctionBindings.AddLinkFunc,
       (url: string) => callbacks.addLink && callbacks.addLink(url),
     );
 
@@ -778,7 +776,7 @@ export class Crawler {
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(
-        BEHAVIOR_LOG_FUNC,
+        BxFunctionBindings.BehaviorLogFunc,
         (logdata: { data: string; type: string }) =>
           this._behaviorLog(logdata, page.url(), workerid),
       );
@@ -793,7 +791,7 @@ self.__bx_behaviors.selectMainBehavior();
         this.behaviorsChecked = true;
       }
 
-      await page.exposeFunction(FETCH_FUNC, (url: string) => {
+      await page.exposeFunction(BxFunctionBindings.FetchFunc, (url: string) => {
         return recorder ? recorder.addExternalFetch(url, cdp) : true;
       });
 
@@ -875,7 +873,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    await page.exposeFunction("__bx_addSet", (data: string) =>
+    await page.exposeFunction(BxFunctionBindings.AddToSeenSet, (data: string) =>
       this.crawlState.addToUserSet(data),
     );
 
