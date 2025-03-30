@@ -77,7 +77,7 @@ test("test valid autoclick selector passes validation", async () => {
     failed = true;
   }
 
-  // logger fatal exit code
+  // valid clickSelector
   expect(failed).toBe(false);
 });
 
