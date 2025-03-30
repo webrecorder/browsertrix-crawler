@@ -2265,12 +2265,14 @@ self.__bx_behaviors.selectMainBehavior();
     const frames = filteredFrames || page.frames();
 
     try {
-      for (const { selector, extract } of selectors) {
+      for (const { selector, extract, attrOnly } of selectors) {
         await Promise.allSettled(
           frames.map((frame) => {
             const getLinks = frame
               .evaluate(
-                `self.__bx_behaviors.loadLinks("${selector}", "${extract}")`,
+                `self.__bx_behaviors.extractLinks(${JSON.stringify(
+                  selector,
+                )}, ${JSON.stringify(extract)}, ${attrOnly})`,
               )
               .catch((e) =>
                 logger.warn("Link Extraction failed in frame", {

@@ -36,14 +36,14 @@ export const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
 export type ExtractSelector = {
   selector: string;
   extract: string;
-  isAttribute: boolean;
+  attrOnly: boolean;
 };
 
 export const DEFAULT_SELECTORS: ExtractSelector[] = [
   {
     selector: "a[href]",
     extract: "href",
-    isAttribute: false,
+    attrOnly: false,
   },
 ];
 
