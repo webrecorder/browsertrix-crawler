@@ -55,7 +55,7 @@ RUN mkdir -p /app/behaviors
 WORKDIR /crawls
 
 # enable to test custom behaviors build (from browsertrix-behaviors)
-COPY behaviors.js /app/node_modules/browsertrix-behaviors/dist/behaviors.js
+# COPY behaviors.js /app/node_modules/browsertrix-behaviors/dist/behaviors.js
 
 # add brave/chromium group policies
 RUN mkdir -p /etc/brave/policies/managed/
