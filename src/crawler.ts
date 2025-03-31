@@ -792,7 +792,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
 
       await page.exposeFunction(BxFunctionBindings.FetchFunc, (url: string) => {
-        return recorder ? recorder.addExternalFetch(url, cdp) : true;
+        return recorder ? recorder.addExternalFetch(url, cdp) : false;
       });
 
       await this.browser.addInitScript(page, initScript);

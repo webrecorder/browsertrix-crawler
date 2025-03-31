@@ -868,6 +868,11 @@ export class Recorder {
   }
 
   addExternalFetch(url: string, cdp: CDPSession) {
+    logger.debug(
+      "Handling fetch from behavior",
+      { url, ...this.logDetails },
+      "recorder",
+    );
     const reqresp = new RequestResponseInfo("0");
     reqresp.url = url;
     reqresp.method = "GET";
