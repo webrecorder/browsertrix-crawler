@@ -10,7 +10,6 @@ import { hideBin } from "yargs/helpers";
 import { createParser } from "css-selector-parser";
 
 import {
-  BEHAVIOR_LOG_FUNC,
   WAIT_UNTIL_OPTS,
   EXTRACT_TEXT_TYPES,
   SERVICE_WORKER_OPTS,
@@ -18,6 +17,7 @@ import {
   BEHAVIOR_TYPES,
   ExtractSelector,
   DEFAULT_MAX_RETRIES,
+  BxFunctionBindings,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
@@ -734,7 +734,7 @@ class ArgParser {
           );
         }
       });
-      behaviorOpts.log = BEHAVIOR_LOG_FUNC;
+      behaviorOpts.log = BxFunctionBindings.BehaviorLogFunc;
       behaviorOpts.startEarly = true;
       behaviorOpts.clickSelector = argv.clickSelector;
       argv.behaviorOpts = JSON.stringify(behaviorOpts);

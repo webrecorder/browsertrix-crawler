@@ -40,15 +40,13 @@ import { collectCustomBehaviors, getInfoString } from "./util/file_reader.js";
 import { Browser } from "./util/browser.js";
 
 import {
-  ADD_LINK_FUNC,
-  BEHAVIOR_LOG_FUNC,
-  FETCH_FUNC,
   DISPLAY,
   ExtractSelector,
   PAGE_OP_TIMEOUT_SECS,
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
   ExitCodes,
   InterruptReason,
+  BxFunctionBindings,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -74,7 +72,7 @@ import {
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 
-const behaviors = fs.readFileSync(
+const btrixBehaviors = fs.readFileSync(
   new URL(
     "../node_modules/browsertrix-behaviors/dist/behaviors.js",
     import.meta.url,
@@ -769,17 +767,19 @@ export class Crawler {
     }
 
     await page.exposeFunction(
-      ADD_LINK_FUNC,
+      BxFunctionBindings.AddLinkFunc,
       (url: string) => callbacks.addLink && callbacks.addLink(url),
     );
 
+    // used for both behaviors and link extraction now
+    await this.browser.addInitScript(page, btrixBehaviors);
+
     if (this.params.behaviorOpts) {
       await page.exposeFunction(
-        BEHAVIOR_LOG_FUNC,
+        BxFunctionBindings.BehaviorLogFunc,
         (logdata: { data: string; type: string }) =>
           this._behaviorLog(logdata, page.url(), workerid),
       );
-      await this.browser.addInitScript(page, behaviors);
 
       const initScript = `
 self.__bx_behaviors.init(${this.params.behaviorOpts}, false);
@@ -791,8 +791,8 @@ self.__bx_behaviors.selectMainBehavior();
         this.behaviorsChecked = true;
       }
 
-      await page.exposeFunction(FETCH_FUNC, (url: string) => {
-        return recorder ? recorder.addExternalFetch(url, cdp) : true;
+      await page.exposeFunction(BxFunctionBindings.FetchFunc, (url: string) => {
+        return recorder ? recorder.addExternalFetch(url, cdp) : false;
       });
 
       await this.browser.addInitScript(page, initScript);
@@ -873,7 +873,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    await page.exposeFunction("__bx_addSet", (data: string) =>
+    await page.exposeFunction(BxFunctionBindings.AddToSeenSet, (data: string) =>
       this.crawlState.addToUserSet(data),
     );
 
@@ -2212,22 +2212,24 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async awaitPageLoad(frame: Frame, logDetails: LogDetails) {
-    logger.debug(
-      "Waiting for custom page load via behavior",
-      logDetails,
-      "behavior",
-    );
-    try {
-      await timedRun(
-        frame.evaluate(
-          "self.__bx_behaviors && self.__bx_behaviors.awaitPageLoad();",
-        ),
-        PAGE_OP_TIMEOUT_SECS,
-        "Custom page load check timed out",
+    if (this.params.behaviorOpts) {
+      logger.debug(
+        "Waiting for custom page load via behavior",
         logDetails,
+        "behavior",
       );
-    } catch (e) {
-      logger.warn("Waiting for custom page load failed", e, "behavior");
+      try {
+        await timedRun(
+          frame.evaluate(
+            "self.__bx_behaviors && self.__bx_behaviors.awaitPageLoad();",
+          ),
+          PAGE_OP_TIMEOUT_SECS,
+          "Custom page load check timed out",
+          logDetails,
+        );
+      } catch (e) {
+        logger.warn("Waiting for custom page load failed", e, "behavior");
+      }
     }
 
     if (this.params.postLoadDelay) {
@@ -2257,46 +2259,18 @@ self.__bx_behaviors.selectMainBehavior();
       );
     };
 
-    const loadLinks = (options: {
-      selector: string;
-      extract: string;
-      isAttribute: boolean;
-      addLinkFunc: string;
-    }) => {
-      const { selector, extract, isAttribute, addLinkFunc } = options;
-      const urls = new Set<string>();
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const getAttr = (elem: any) => urls.add(elem.getAttribute(extract));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const getProp = (elem: any) => urls.add(elem[extract]);
-
-      const getter = isAttribute ? getAttr : getProp;
-
-      document.querySelectorAll(selector).forEach(getter);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const func = (window as any)[addLinkFunc] as (
-        url: string,
-      ) => NonNullable<unknown>;
-      urls.forEach((url) => func.call(this, url));
-
-      return true;
-    };
-
     const frames = filteredFrames || page.frames();
 
     try {
-      for (const { selector, extract, isAttribute } of selectors) {
+      for (const { selector, extract, attrOnly } of selectors) {
         await Promise.allSettled(
           frames.map((frame) => {
             const getLinks = frame
-              .evaluate(loadLinks, {
-                selector,
-                extract,
-                isAttribute,
-                addLinkFunc: ADD_LINK_FUNC,
-              })
+              .evaluate(
+                `self.__bx_behaviors.extractLinks(${JSON.stringify(
+                  selector,
+                )}, ${JSON.stringify(extract)}, ${attrOnly})`,
+              )
               .catch((e) =>
                 logger.warn("Link Extraction failed in frame", {
                   frameUrl: frame.url,

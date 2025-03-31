@@ -22,9 +22,12 @@ export const DETECT_SITEMAP = "<detect>";
 
 export const EXTRACT_TEXT_TYPES = ["to-pages", "to-warc", "final-to-warc"];
 
-export const BEHAVIOR_LOG_FUNC = "__bx_log";
-export const ADD_LINK_FUNC = "__bx_addLink";
-export const FETCH_FUNC = "__bx_fetch";
+export enum BxFunctionBindings {
+  BehaviorLogFunc = "__bx_log",
+  AddLinkFunc = "__bx_addLink",
+  FetchFunc = "__bx_fetch",
+  AddToSeenSet = "__bx_addSet",
+}
 
 export const MAX_DEPTH = 1000000;
 export const DEFAULT_MAX_RETRIES = 2;
@@ -36,14 +39,14 @@ export const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
 export type ExtractSelector = {
   selector: string;
   extract: string;
-  isAttribute: boolean;
+  attrOnly: boolean;
 };
 
 export const DEFAULT_SELECTORS: ExtractSelector[] = [
   {
     selector: "a[href]",
     extract: "href",
-    isAttribute: false,
+    attrOnly: false,
   },
 ];
 
