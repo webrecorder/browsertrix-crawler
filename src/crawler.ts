@@ -407,7 +407,7 @@ export class Crawler {
       logger.setLogBehaviorsToRedis(true);
     }
 
-    if (this.param.logErrorsToRedis || this.params.logBehaviorsToRedis) {
+    if (this.params.logErrorsToRedis || this.params.logBehaviorsToRedis) {
       logger.setCrawlState(this.crawlState);
     }
 
