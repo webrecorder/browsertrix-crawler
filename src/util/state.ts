@@ -181,6 +181,7 @@ export class RedisCrawlState {
   dkey: string;
   fkey: string;
   ekey: string;
+  bkey: string;
   pageskey: string;
   esKey: string;
   esMap: string;
@@ -212,6 +213,8 @@ export class RedisCrawlState {
     this.fkey = this.key + ":f";
     // crawler errors
     this.ekey = this.key + ":e";
+    // crawler behavior script messages
+    this.bkey = this.key + ":b";
     // pages
     this.pageskey = this.key + ":pages";
 
@@ -929,6 +932,10 @@ return inx;
 
   async logError(error: string) {
     return await this.redis.lpush(this.ekey, error);
+  }
+
+  async logBehavior(behaviorLog: string) {
+    return await this.redis.lpush(this.bkey, behaviorLog);
   }
 
   async writeToPagesQueue(

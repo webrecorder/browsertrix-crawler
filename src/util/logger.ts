@@ -70,6 +70,7 @@ class Logger {
   logStream: Writable | null = null;
   debugLogging = false;
   logErrorsToRedis = false;
+  logBehaviorsToRedis = false;
   logLevels: string[] = [];
   contexts: LogContext[] = [];
   excludeContexts: LogContext[] = [];
@@ -90,6 +91,10 @@ class Logger {
 
   setLogErrorsToRedis(logErrorsToRedis: boolean) {
     this.logErrorsToRedis = logErrorsToRedis;
+  }
+
+  setLogBehaviorsToRedis(logBehaviorsToRedis: boolean) {
+    this.logBehaviorsToRedis = logBehaviorsToRedis;
   }
 
   setLogLevel(logLevels: string[]) {
@@ -152,13 +157,23 @@ class Logger {
       //
     }
 
-    const toLogToRedis = ["error", "fatal"];
+    const redisErrorLogLevels = ["error", "fatal"];
     if (
       this.logErrorsToRedis &&
       this.crawlState &&
-      toLogToRedis.includes(logLevel)
+      redisErrorLogLevels.includes(logLevel)
     ) {
       this.crawlState.logError(string).catch(() => {});
+    }
+
+    const redisBehaviorLogLevels = ["info", "error"];
+    if (
+      this.logBehaviorsToRedis &&
+      this.crawlState &&
+      context == "behaviorScript" &&
+      redisBehaviorLogLevels.includes(logLevel)
+    ) {
+      this.crawlState.logBehavior(string).catch(() => {});
     }
   }
 
