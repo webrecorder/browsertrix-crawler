@@ -14,6 +14,7 @@ import {
   selectorToPElementSelector,
 } from "@puppeteer/replay";
 import { logger } from "./logger.js";
+import { Recorder } from "./recorder.js";
 
 type SingleSiteScript = {
   url: string;
@@ -37,6 +38,7 @@ enum StepResult {
   NotHandled = 1,
   TimedOut = 2,
   OtherError = 3,
+  Repeat = 4,
 }
 
 export function parseRecorderFlowJson(contents: string): string {
@@ -132,11 +134,18 @@ function formatSteps(steps: any[]) {
 // ============================================================================
 class Flow {
   id: number;
+  lastId = "";
+  recorder: Recorder | null;
   steps: FlowStepParams[];
+  repeatSteps = new Map<string, number>();
   currStep = 0;
 
-  constructor(id: number, steps: FlowStepParams[]) {
+  timeoutSec = 5;
+  pauseSec = 2;
+
+  constructor(id: number, recorder: Recorder | null, steps: FlowStepParams[]) {
     this.id = id;
+    this.recorder = recorder;
     this.steps = steps;
     this.currStep = 0;
   }
@@ -159,13 +168,18 @@ class Flow {
         msg += "processed";
         return { done: false, msg };
 
+      case StepResult.Repeat:
+        msg += "processed, repeating";
+        this.currStep--;
+        return { done: false, msg };
+
       case StepResult.NotHandled:
         msg += "not supported, ignoring";
         return { done: false, msg };
 
       case StepResult.TimedOut:
-        msg += "not found, stopping";
-        return { done: true, msg };
+        msg += "not found, not stopping";
+        return { done: false, msg };
 
       case StepResult.OtherError:
         msg += "errored, stopping";
@@ -174,11 +188,9 @@ class Flow {
   }
 
   async runFlowStep(page: Page, params: FlowStepParams): Promise<StepResult> {
-    const timeoutSec = 5;
-
     try {
-      const res = await this.runStep(page, params as Step, timeoutSec);
-      await sleep(2.0);
+      const res = await this.runStep(page, params as Step, this.timeoutSec);
+      await sleep(this.pauseSec);
       return res;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -190,6 +202,36 @@ class Flow {
         return StepResult.OtherError;
       }
     }
+  }
+
+  private async shouldRepeat(step: ClickStep) {
+    if (!this.recorder) {
+      return false;
+    }
+
+    const id = step.selectors
+      .map((x) => selectorToPElementSelector(x))
+      .join("|");
+    if (id !== this.lastId) {
+      //this.repeatSteps.delete(this.lastId);
+    }
+    const count = (this.repeatSteps.get(id) || 0) + 1;
+    this.repeatSteps.set(id, count);
+    this.lastId = id;
+    if (count < 3) {
+      return false;
+    }
+
+    // await for new network requests
+    const p = new Promise<boolean>((resolve) => {
+      this.recorder!.once("fetching", () => {
+        resolve(true);
+      });
+    });
+
+    const fetched = await Promise.race([p, sleep(this.timeoutSec)]);
+
+    return fetched;
   }
 
   private async runStep(
@@ -250,6 +292,9 @@ class Flow {
               y: step.offsetY,
             },
           });
+        if (await this.shouldRepeat(step)) {
+          return StepResult.Repeat;
+        }
         break;
 
       case StepType.Hover:
@@ -335,10 +380,13 @@ let flowCounter = 0;
 const flows = new Map<number, Flow>();
 
 // ============================================================================
-export async function initFlow(steps: FlowStepParams[]) {
+export async function initFlow(
+  steps: FlowStepParams[],
+  recorder: Recorder | null,
+) {
   const id = flowCounter++;
   logger.debug("Init Flow Called", { id }, "behavior");
-  flows.set(id, new Flow(id, steps));
+  flows.set(id, new Flow(id, recorder, steps));
   return id;
 }
 

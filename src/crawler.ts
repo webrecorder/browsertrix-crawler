@@ -918,7 +918,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await page.exposeFunction(BxFunctionBindings.InitFlow, (params: any) => {
-      return initFlow(params);
+      return initFlow(params, recorder);
     });
 
     await page.exposeFunction(BxFunctionBindings.NextFlowStep, (id: number) => {
