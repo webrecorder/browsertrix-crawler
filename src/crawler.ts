@@ -2212,25 +2212,24 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async awaitPageLoad(frame: Frame, logDetails: LogDetails) {
-    if (!this.params.behaviorOpts) {
-      return;
-    }
-    logger.debug(
-      "Waiting for custom page load via behavior",
-      logDetails,
-      "behavior",
-    );
-    try {
-      await timedRun(
-        frame.evaluate(
-          "self.__bx_behaviors && self.__bx_behaviors.awaitPageLoad();",
-        ),
-        PAGE_OP_TIMEOUT_SECS,
-        "Custom page load check timed out",
+    if (this.params.behaviorOpts) {
+      logger.debug(
+        "Waiting for custom page load via behavior",
         logDetails,
+        "behavior",
       );
-    } catch (e) {
-      logger.warn("Waiting for custom page load failed", e, "behavior");
+      try {
+        await timedRun(
+          frame.evaluate(
+            "self.__bx_behaviors && self.__bx_behaviors.awaitPageLoad();",
+          ),
+          PAGE_OP_TIMEOUT_SECS,
+          "Custom page load check timed out",
+          logDetails,
+        );
+      } catch (e) {
+        logger.warn("Waiting for custom page load failed", e, "behavior");
+      }
     }
 
     if (this.params.postLoadDelay) {
