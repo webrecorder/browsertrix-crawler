@@ -50,7 +50,7 @@ export const DEFAULT_SELECTORS: ExtractSelector[] = [
   },
 ];
 
-export const DEFAULT_CRAWL_ID = "@hostname-@id";
+export const DEFAULT_CRAWL_ID_TEMPLATE = "@hostname-@id";
 
 export const BEHAVIOR_TYPES = [
   "autoplay",
