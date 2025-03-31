@@ -71,7 +71,7 @@ import {
 } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
-import { runFlowStep } from "./util/flowbehavior.js";
+import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -917,8 +917,12 @@ self.__bx_behaviors.selectMainBehavior();
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await page.exposeFunction(BxFunctionBindings.RunFlowStep, (params: any) => {
-      return runFlowStep(page, params);
+    await page.exposeFunction(BxFunctionBindings.InitFlow, (params: any) => {
+      return initFlow(params);
+    });
+
+    await page.exposeFunction(BxFunctionBindings.NextFlowStep, (id: number) => {
+      return nextFlowStep(id, page);
     });
 
     // await page.exposeFunction("__bx_hasSet", (data: string) => this.crawlState.hasUserSet(data));
