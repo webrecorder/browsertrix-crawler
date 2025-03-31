@@ -25,6 +25,7 @@ import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
 import { ScopedSeed } from "./seeds.js";
+import EventEmitter from "events";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -117,7 +118,7 @@ export type ResponseStreamAsyncFetchOptions = NetworkLoadAsyncFetchOptions & {
 };
 
 // =================================================================
-export class Recorder {
+export class Recorder extends EventEmitter {
   workerid: WorkerId;
 
   crawler: Crawler;
@@ -162,6 +163,7 @@ export class Recorder {
     writer: WARCWriter;
     crawler: Crawler;
   }) {
+    super();
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
@@ -540,6 +542,7 @@ export class Recorder {
         !responseErrorReason &&
         !this.shouldSkip(headers, url, method, resourceType)
       ) {
+        this.emit("fetching", { url });
         continued = await this.handleFetchResponse(
           params,
           cdp,
