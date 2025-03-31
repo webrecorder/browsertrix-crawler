@@ -17,8 +17,10 @@ Options:
                                             llel           [number] [default: 1]
       --crawlId, --id                       A user provided ID for this crawl or
                                              crawl configuration (can also be se
-                                            t via CRAWL_ID env var, defaults to
-                                            Docker container hostname)  [string]
+                                            t via CRAWL_ID env var), defaults to
+                                             combination of Docker container hos
+                                            tname and collection
+                                             [string] [default: "@hostname-@id"]
       --waitUntil                           Puppeteer page.goto() condition to w
                                             ait for before continuing, can be mu
                                             ltiple separated by ','
@@ -72,17 +74,14 @@ Options:
       --adBlockMessage                      If specified, when an ad is blocked,
                                              a record with this error message is
                                              added instead[string] [default: ""]
-  -c, --collection                          Collection name to crawl to (replay
-                                            will be accessible under this name i
-                                            n pywb preview)
-                                                 [string] [default: "crawl-@ts"]
+  -c, --collection                          Collection name / directory to crawl
+                                             into[string] [default: "crawl-@ts"]
       --headless                            Run in headless mode, otherwise star
                                             t xvfb    [boolean] [default: false]
       --driver                              Custom driver for the crawler, if an
                                             y                           [string]
-      --generateCDX, --generatecdx, --gene  If set, generate index (CDXJ) for us
-      rateCdx                               e with pywb after crawl is done
-                                                      [boolean] [default: false]
+      --generateCDX, --generatecdx, --gene  If set, generate merged index in CDX
+      rateCdx                               J format  [boolean] [default: false]
       --combineWARC, --combinewarc, --comb  If set, combine the warcs
       ineWarc                                         [boolean] [default: false]
       --rolloverSize                        If set, declare the rollover size
@@ -116,9 +115,8 @@ Options:
                                             record(s)
                        [array] [choices: "to-pages", "to-warc", "final-to-warc"]
       --cwd                                 Crawl working directory for captures
-                                             (pywb root). If not set, defaults t
-                                            o process.cwd()
-                                                   [string] [default: "/crawls"]
+                                            . If not set, defaults to process.cw
+                                            d()    [string] [default: "/crawls"]
       --mobileDevice                        Emulate mobile device by name from:
                                             https://github.com/puppeteer/puppete
                                             er/blob/main/src/common/DeviceDescri
