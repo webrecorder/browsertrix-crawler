@@ -878,6 +878,11 @@ return inx;
     return await this.redis.lrange(this.ekey, 0, -1);
   }
 
+  // TODO: Remove before merging, just for testing
+  async getBehaviorList() {
+    return await this.redis.lrange(this.bkey, 0, -1);
+  }
+
   async clearOwnPendingLocks() {
     try {
       const pendingUrls = await this.redis.hkeys(this.pkey);

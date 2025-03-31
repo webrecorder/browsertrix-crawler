@@ -1477,6 +1477,10 @@ self.__bx_behaviors.selectMainBehavior();
   async setStatusAndExit(exitCode: ExitCodes, status: string) {
     logger.info(`Exiting, Crawl status: ${status}`);
 
+    // TODO: Remove before merging, just for testing
+    const behaviorsLoggedToRedis = await this.crawlState.getBehaviorList();
+    logger.info("Behavior lines logged to Redis", { behaviorsLoggedToRedis });
+
     await this.closeLog();
 
     if (this.crawlState && status) {
