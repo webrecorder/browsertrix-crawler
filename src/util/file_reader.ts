@@ -5,7 +5,7 @@ import { fetch } from "undici";
 import util from "util";
 import { exec as execCallback } from "child_process";
 
-import { logger } from "./logger.js";
+import { formatErr, logger } from "./logger.js";
 import { getProxyDispatcher } from "./proxy.js";
 import { parseRecorderFlowJson } from "./flowbehavior.js";
 
@@ -135,9 +135,13 @@ async function collectLocalPathBehaviors(
       if (path.extname(resolvedPath) === ".json") {
         try {
           contents = parseRecorderFlowJson(contents);
-          //console.log(contents);
+          console.log(contents);
         } catch (e) {
-          console.log("Unable to parse recorder flow JSON, ignored");
+          logger.fatal(
+            "Unable to parse recorder flow JSON, ignored",
+            formatErr(e),
+            "behavior",
+          );
         }
       }
 
