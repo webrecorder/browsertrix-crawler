@@ -17,6 +17,7 @@ import {
   ExtractSelector,
   DEFAULT_MAX_RETRIES,
   BxFunctionBindings,
+  DEFAULT_CRAWL_ID_TEMPLATE,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
@@ -86,7 +87,6 @@ class ArgParser {
           describe:
             "A user provided ID for this crawl or crawl configuration (can also be set via CRAWL_ID env var), defaults to combination of Docker container hostname and collection",
           type: "string",
-          default: "@hostname-@id",
         },
 
         waitUntil: {
@@ -697,7 +697,7 @@ class ArgParser {
   validateArgs(argv: any, isQA: boolean) {
     argv.collection = interpolateFilename(argv.collection, "");
     argv.crawlId = interpolateFilename(
-      argv.crawlId || process.env.CRAWL_ID,
+      argv.crawlId || process.env.CRAWL_ID || DEFAULT_CRAWL_ID_TEMPLATE,
       argv.collection,
     );
 
