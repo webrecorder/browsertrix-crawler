@@ -140,7 +140,7 @@ class Flow {
   repeatSteps = new Map<string, number>();
   currStep = 0;
 
-  timeoutSec = 5;
+  timeoutSec = 10;
   pauseSec = 2;
 
   constructor(id: number, recorder: Recorder | null, steps: FlowStepParams[]) {
@@ -204,7 +204,7 @@ class Flow {
     }
   }
 
-  private async shouldRepeat(step: ClickStep) {
+  private async shouldRepeat(step: ClickStep, activity: Promise<boolean>) {
     if (!this.recorder) {
       return false;
     }
@@ -212,9 +212,9 @@ class Flow {
     const id = step.selectors
       .map((x) => selectorToPElementSelector(x))
       .join("|");
-    if (id !== this.lastId) {
-      //this.repeatSteps.delete(this.lastId);
-    }
+    // if (id !== this.lastId) {
+    //   //this.repeatSteps.delete(this.lastId);
+    // }
     const count = (this.repeatSteps.get(id) || 0) + 1;
     this.repeatSteps.set(id, count);
     this.lastId = id;
@@ -222,14 +222,10 @@ class Flow {
       return false;
     }
 
-    // await for new network requests
-    const p = new Promise<boolean>((resolve) => {
-      this.recorder!.once("fetching", () => {
-        resolve(true);
-      });
-    });
-
-    const fetched = await Promise.race([p, sleep(this.timeoutSec)]);
+    const fetched = await Promise.race([activity, sleep(this.timeoutSec)]);
+    if (!fetched) {
+      logger.debug("Flow repeat ended, not found / timed out");
+    }
 
     return fetched;
   }
@@ -239,7 +235,10 @@ class Flow {
     step: Step,
     timeout: number,
   ): Promise<StepResult> {
-    const localFrame = page.mainFrame();
+    const localFrame =
+      step.target === "main" || !step.target
+        ? page.mainFrame()
+        : await page.waitForFrame(step.target, { timeout });
 
     function locator(
       step:
@@ -280,7 +279,14 @@ class Flow {
           });
         break;
 
-      case StepType.Click:
+      case StepType.Click: {
+        // await for new network requests
+        const p = new Promise<boolean>((resolve) => {
+          this.recorder!.once("fetching", () => {
+            resolve(true);
+          });
+        });
+
         await locator(step)
           .setTimeout(timeout * 1000)
           //.on('action', () => startWaitingForEvents())
@@ -292,10 +298,11 @@ class Flow {
               y: step.offsetY,
             },
           });
-        if (await this.shouldRepeat(step)) {
+        if (await this.shouldRepeat(step, p)) {
           return StepResult.Repeat;
         }
         break;
+      }
 
       case StepType.Hover:
         await locator(step)
