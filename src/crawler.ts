@@ -2739,13 +2739,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     this.lastSaveTime = now.getTime();
 
-    const ts = now.toISOString().slice(0, 19).replace(/[T:-]/g, "");
-
     const crawlDir = path.join(this.collDir, "crawls");
 
     await fsp.mkdir(crawlDir, { recursive: true });
 
-    const filenameOnly = `crawl-${ts}-${this.crawlId}.yaml`;
+    const filenameOnly = `crawl-${this.crawlId}.yaml`;
 
     const filename = path.join(crawlDir, filenameOnly);
 
