@@ -1202,7 +1202,8 @@ self.__bx_behaviors.selectMainBehavior();
   async pageFinished(data: PageState) {
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url, pageSkipped } = data;
+    const { loadState, logDetails, depth, url, pageSkipped, skipRetries } =
+      data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       await this.writePage(data);
@@ -1222,7 +1223,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
       } else {
-        const retry = await this.crawlState.markFailed(url);
+        const retry = await this.crawlState.markFailed(url, skipRetries);
 
         if (this.healthChecker) {
           this.healthChecker.incError();
@@ -1974,9 +1975,13 @@ self.__bx_behaviors.selectMainBehavior();
     let firstResponse: HTTPResponse | null = null;
     let fullLoadedResponse: HTTPResponse | null = null;
 
+    let isErrStatusCode = false;
+
     // Detect if failure is actually caused by trying to load a non-page (eg. downloadable PDF),
     // store the downloadResponse, if any
     page.once("requestfailed", (req: HTTPRequest) => {
+      isErrStatusCode =
+        req.failure()?.errorText === "net::ERR_HTTP_RESPONSE_CODE_FAILURE";
       downloadResponse = getDownloadResponse(req);
     });
 
@@ -2103,6 +2108,12 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (failed) {
+      // failure due to status code, don't retry
+      if (isErrStatusCode) {
+        data.skipRetries = true;
+        return;
+      }
+
       return this.pageFailed(
         isChromeError ? "Page Crashed on Load" : "Page Invalid Status",
         retry,

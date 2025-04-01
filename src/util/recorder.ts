@@ -468,6 +468,13 @@ export class Recorder {
         }
         break;
 
+      case "net::ERR_HTTP_RESPONSE_CODE_FAILURE":
+        if (reqresp.status !== 200) {
+          this.removeReqResp(requestId);
+          return this.serializeToWARC(reqresp);
+        }
+        break;
+
       default:
         logger.warn(
           "Request failed",
