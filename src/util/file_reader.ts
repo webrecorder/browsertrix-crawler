@@ -10,7 +10,7 @@ import { getProxyDispatcher } from "./proxy.js";
 
 const exec = util.promisify(execCallback);
 
-const MAX_DEPTH = 2;
+const MAX_DEPTH = 5;
 
 // Add .ts to allowed extensions when we can support it
 const ALLOWED_EXTS = [".js"];
