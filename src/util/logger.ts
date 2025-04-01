@@ -166,11 +166,12 @@ class Logger {
       this.crawlState.logError(string).catch(() => {});
     }
 
-    const redisBehaviorLogLevels = ["info", "error"];
+    const redisBehaviorLogLevels = ["info", "warn", "error"];
+    const behaviorContexts = ["behavior", "behaviorScript"];
     if (
       this.logBehaviorsToRedis &&
       this.crawlState &&
-      context == "behaviorScript" &&
+      behaviorContexts.includes(context) &&
       redisBehaviorLogLevels.includes(logLevel)
     ) {
       this.crawlState.logBehavior(string).catch(() => {});
