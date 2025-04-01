@@ -72,7 +72,7 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
     );
     return await collectLocalPathBehaviors(pathToCollect);
   } catch (e) {
-    logger.error(
+    logger.fatal(
       "Error downloading custom behaviors from Git repo",
       { url: urlStripped, error: e },
       "behavior",
@@ -96,7 +96,7 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
     );
     return await collectLocalPathBehaviors(behaviorFilepath);
   } catch (e) {
-    logger.error(
+    logger.fatal(
       "Error downloading custom behavior from URL",
       { url, error: e },
       "behavior",
@@ -120,37 +120,56 @@ async function collectLocalPathBehaviors(
     return [];
   }
 
-  const stat = await fsp.stat(resolvedPath);
-
-  if (stat.isFile() && ALLOWED_EXTS.includes(path.extname(resolvedPath))) {
-    const contents = await fsp.readFile(resolvedPath);
-    return [
-      {
-        path: resolvedPath,
-        contents: `/* src: ${resolvedPath} */\n\n${contents}`,
-      },
-    ];
-  }
-
   const behaviors: FileSources = [];
 
-  const isDir = stat.isDirectory();
+  try {
+    const stat = await fsp.stat(resolvedPath);
 
-  if (!isDir && depth === 0) {
-    logger.warn(
-      "The provided path is not a .js file or directory",
-      { path: resolvedPath },
+    if (stat.isFile() && ALLOWED_EXTS.includes(path.extname(resolvedPath))) {
+      const contents = await fsp.readFile(resolvedPath);
+      return [
+        {
+          path: resolvedPath,
+          contents: `/* src: ${resolvedPath} */\n\n${contents}`,
+        },
+      ];
+    }
+
+    const isDir = stat.isDirectory();
+
+    if (!isDir && depth === 0) {
+      logger.warn(
+        "The provided path is not a .js file or directory",
+        { path: resolvedPath },
+        "behavior",
+      );
+    }
+
+    if (isDir) {
+      const files = await fsp.readdir(resolvedPath);
+      for (const file of files) {
+        const filePath = path.join(resolvedPath, file);
+        const newBehaviors = await collectLocalPathBehaviors(
+          filePath,
+          depth + 1,
+        );
+        behaviors.push(...newBehaviors);
+      }
+    }
+  } catch (e) {
+    logger.fatal(
+      "Error fetching local custom behaviors",
+      { path: resolvedPath, error: e },
       "behavior",
     );
   }
 
-  if (isDir) {
-    const files = await fsp.readdir(resolvedPath);
-    for (const file of files) {
-      const filePath = path.join(resolvedPath, file);
-      const newBehaviors = await collectLocalPathBehaviors(filePath, depth + 1);
-      behaviors.push(...newBehaviors);
-    }
+  if (!behaviors && depth === 0) {
+    logger.fatal(
+      "No custom behaviors found at specified path",
+      { path: resolvedPath },
+      "behavior",
+    );
   }
 
   return behaviors;
