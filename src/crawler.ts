@@ -215,7 +215,7 @@ export class Crawler {
     this.logDir = path.join(this.collDir, "logs");
     this.logFilename = path.join(
       this.logDir,
-      `${interpolateFilename("$ts", "")}.log`,
+      `${interpolateFilename("@ts", "")}.log`,
     );
 
     const debugLogging = this.params.logging.includes("debug");
@@ -2743,7 +2743,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await fsp.mkdir(crawlDir, { recursive: true });
 
-    const filenameOnly = `${interpolateFilename("$ts-$id", this.crawlId)}.yaml`;
+    const filenameOnly = `${interpolateFilename("@ts-@id", this.crawlId)}.yaml`;
 
     const filename = path.join(crawlDir, filenameOnly);
 
