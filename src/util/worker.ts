@@ -237,6 +237,9 @@ export class PageWorker {
             throw new Error("Unable to load new page, browser needs restart");
           } else {
             this.crawler.browser.killBrowser();
+            // retry again after killing browser
+            retry = 0;
+            await sleep(2.0);
           }
         }
 
