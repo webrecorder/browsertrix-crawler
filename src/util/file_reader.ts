@@ -110,6 +110,7 @@ async function collectLocalPathBehaviors(
   depth = 0,
 ): Promise<FileSources> {
   const resolvedPath = path.resolve(fileOrDir);
+  const filename = path.basename(resolvedPath);
 
   if (depth >= MAX_DEPTH) {
     logger.warn(
@@ -136,6 +137,11 @@ async function collectLocalPathBehaviors(
     }
 
     const isDir = stat.isDirectory();
+
+    // ignore .git directory of git repositories
+    if (isDir && filename === ".git") {
+      return [];
+    }
 
     if (!isDir && depth === 0) {
       logger.warn(
