@@ -85,6 +85,9 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
   const filename = crypto.randomBytes(4).toString("hex") + ".js";
   const behaviorFilepath = `/app/behaviors/${filename}`;
 
+  const fileUrl = new URL(url);
+  const originalFilename = path.basename(fileUrl.pathname);
+
   try {
     const res = await fetch(url, { dispatcher: getProxyDispatcher() });
     const fileContents = await res.text();
@@ -94,7 +97,11 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
       { url, path: behaviorFilepath },
       "behavior",
     );
-    return await collectLocalPathBehaviors(behaviorFilepath);
+    return await collectLocalPathBehaviors(
+      behaviorFilepath,
+      0,
+      originalFilename,
+    );
   } catch (e) {
     logger.fatal(
       "Error downloading custom behavior from URL",
@@ -108,6 +115,7 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
 async function collectLocalPathBehaviors(
   fileOrDir: string,
   depth = 0,
+  originalFilename?: string,
 ): Promise<FileSources> {
   const resolvedPath = path.resolve(fileOrDir);
   const filename = path.basename(resolvedPath);
@@ -127,7 +135,15 @@ async function collectLocalPathBehaviors(
     const stat = await fsp.stat(resolvedPath);
 
     if (stat.isFile() && ALLOWED_EXTS.includes(path.extname(resolvedPath))) {
-      logger.info("Custom behavior script added", { filename }, "behavior");
+      if (originalFilename) {
+        logger.info(
+          "Custom behavior script added",
+          { filename: originalFilename },
+          "behavior",
+        );
+      } else {
+        logger.info("Custom behavior script added", { filename }, "behavior");
+      }
       const contents = await fsp.readFile(resolvedPath);
       return [
         {
