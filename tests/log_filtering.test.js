@@ -26,7 +26,7 @@ test("check that log files exist and were filtered according to options", () => 
   const logDir = "test-crawls/collections/wr-specs-logs/logs/";
   const logFiles = [];
   fs.readdirSync(logDir).forEach((file) => {
-    if (file.startsWith("crawl-") && file.endsWith(".log")) {
+    if (file.endsWith(".log")) {
       logFiles.push(path.join(logDir, file));
     }
   });
