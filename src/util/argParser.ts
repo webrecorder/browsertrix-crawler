@@ -1,6 +1,5 @@
 import path from "path";
 import fs from "fs";
-import os from "os";
 
 import yaml from "js-yaml";
 import { KnownDevices as devices } from "puppeteer-core";
@@ -18,6 +17,7 @@ import {
   ExtractSelector,
   DEFAULT_MAX_RETRIES,
   BxFunctionBindings,
+  DEFAULT_CRAWL_ID_TEMPLATE,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
@@ -85,7 +85,7 @@ class ArgParser {
         crawlId: {
           alias: "id",
           describe:
-            "A user provided ID for this crawl or crawl configuration (can also be set via CRAWL_ID env var, defaults to Docker container hostname)",
+            "A user provided ID for this crawl or crawl configuration (can also be set via CRAWL_ID env var), defaults to combination of Docker container hostname and collection",
           type: "string",
         },
 
@@ -213,8 +213,7 @@ class ArgParser {
 
         collection: {
           alias: "c",
-          describe:
-            "Collection name to crawl to (replay will be accessible under this name in pywb preview)",
+          describe: "Collection name / directory to crawl into",
           type: "string",
           default: "crawl-@ts",
         },
@@ -232,8 +231,7 @@ class ArgParser {
 
         generateCDX: {
           alias: ["generatecdx", "generateCdx"],
-          describe:
-            "If set, generate index (CDXJ) for use with pywb after crawl is done",
+          describe: "If set, generate merged index in CDXJ format",
           type: "boolean",
           default: false,
         },
@@ -309,7 +307,7 @@ class ArgParser {
 
         cwd: {
           describe:
-            "Crawl working directory for captures (pywb root). If not set, defaults to process.cwd()",
+            "Crawl working directory for captures. If not set, defaults to process.cwd()",
           type: "string",
           default: process.cwd(),
         },
@@ -697,8 +695,11 @@ class ArgParser {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   validateArgs(argv: any, isQA: boolean) {
-    argv.crawlId = argv.crawlId || process.env.CRAWL_ID || os.hostname();
-    argv.collection = interpolateFilename(argv.collection, argv.crawlId);
+    argv.collection = interpolateFilename(argv.collection, "");
+    argv.crawlId = interpolateFilename(
+      argv.crawlId || process.env.CRAWL_ID || DEFAULT_CRAWL_ID_TEMPLATE,
+      argv.collection,
+    );
 
     // css selector parser
     const parser = createParser();

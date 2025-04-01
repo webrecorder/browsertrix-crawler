@@ -204,6 +204,8 @@ export class Crawler {
     this.params = args as CrawlerArgs;
     this.origConfig = this.params.origConfig;
 
+    this.crawlId = this.params.crawlId;
+
     // root collections dir
     this.collDir = path.join(
       this.params.cwd,
@@ -213,7 +215,7 @@ export class Crawler {
     this.logDir = path.join(this.collDir, "logs");
     this.logFilename = path.join(
       this.logDir,
-      `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`,
+      `${interpolateFilename("@ts", "")}.log`,
     );
 
     const debugLogging = this.params.logging.includes("debug");
@@ -242,8 +244,6 @@ export class Crawler {
 
     // pages file
     this.pagesFH = null;
-
-    this.crawlId = this.params.crawlId;
 
     this.startTime = Date.now();
 
@@ -2739,13 +2739,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     this.lastSaveTime = now.getTime();
 
-    const ts = now.toISOString().slice(0, 19).replace(/[T:-]/g, "");
-
     const crawlDir = path.join(this.collDir, "crawls");
 
     await fsp.mkdir(crawlDir, { recursive: true });
 
-    const filenameOnly = `crawl-${ts}-${this.crawlId}.yaml`;
+    const filenameOnly = `${interpolateFilename("@ts-@id", this.crawlId)}.yaml`;
 
     const filename = path.join(crawlDir, filenameOnly);
 
