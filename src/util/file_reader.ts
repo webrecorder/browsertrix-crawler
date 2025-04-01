@@ -127,11 +127,7 @@ async function collectLocalPathBehaviors(
     const stat = await fsp.stat(resolvedPath);
 
     if (stat.isFile() && ALLOWED_EXTS.includes(path.extname(resolvedPath))) {
-      logger.info(
-        "Custom behavior script added",
-        { filename },
-        "behavior"
-      );
+      logger.info("Custom behavior script added", { filename }, "behavior");
       const contents = await fsp.readFile(resolvedPath);
       return [
         {
