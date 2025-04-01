@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { Locator, Page } from "puppeteer-core";
+import { CDPSession, Locator, Page } from "puppeteer-core";
 import { sleep } from "./timing.js";
 import {
   ChangeStep,
@@ -15,6 +15,7 @@ import {
 } from "@puppeteer/replay";
 import { logger } from "./logger.js";
 import { Recorder } from "./recorder.js";
+import { deepStrictEqual } from "assert";
 
 type SingleSiteScript = {
   url: string;
@@ -136,16 +137,23 @@ class Flow {
   id: number;
   lastId = "";
   recorder: Recorder | null;
+  cdp: CDPSession;
   steps: FlowStepParams[];
   repeatSteps = new Map<string, number>();
   currStep = 0;
 
-  timeoutSec = 10;
-  pauseSec = 2;
+  timeoutSec = 5;
+  pauseSec = 0.5;
 
-  constructor(id: number, recorder: Recorder | null, steps: FlowStepParams[]) {
+  constructor(
+    id: number,
+    recorder: Recorder | null,
+    cdp: CDPSession,
+    steps: FlowStepParams[],
+  ) {
     this.id = id;
     this.recorder = recorder;
+    this.cdp = cdp;
     this.steps = steps;
     this.currStep = 0;
   }
@@ -204,7 +212,12 @@ class Flow {
     }
   }
 
-  private async shouldRepeat(step: ClickStep, activity: Promise<boolean>) {
+  private async shouldRepeat(
+    step: ClickStep,
+    activity: Promise<boolean>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    snap: any,
+  ) {
     if (!this.recorder) {
       return false;
     }
@@ -222,12 +235,31 @@ class Flow {
       return false;
     }
 
-    const fetched = await Promise.race([activity, sleep(this.timeoutSec)]);
+    let fetched = await Promise.race([activity, sleep(this.timeoutSec)]);
+
     if (!fetched) {
-      logger.debug("Flow repeat ended, not found / timed out");
+      const newSnap = await this.getSnap();
+      fetched = !this.deepEqual(snap, newSnap);
+      logger.debug("Snapshot changed", { equal: fetched }, "behavior");
+    }
+
+    if (!fetched) {
+      logger.debug("Flow repeat ended, not found / timed out", "behavior");
+    } else {
+      //await page.waitForNetworkIdle();
     }
 
     return fetched;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  deepEqual(a: any, b: any) {
+    try {
+      deepStrictEqual(a, b);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   private async runStep(
@@ -281,11 +313,13 @@ class Flow {
 
       case StepType.Click: {
         // await for new network requests
-        const p = new Promise<boolean>((resolve) => {
+        const activity = new Promise<boolean>((resolve) => {
           this.recorder!.once("fetching", () => {
             resolve(true);
           });
         });
+
+        const snap = await this.getSnap();
 
         await locator(step)
           .setTimeout(timeout * 1000)
@@ -298,7 +332,7 @@ class Flow {
               y: step.offsetY,
             },
           });
-        if (await this.shouldRepeat(step, p)) {
+        if (await this.shouldRepeat(step, activity, snap)) {
           return StepResult.Repeat;
         }
         break;
@@ -379,6 +413,12 @@ class Flow {
 
     return StepResult.Success;
   }
+
+  async getSnap() {
+    return await this.cdp.send("DOMSnapshot.captureSnapshot", {
+      computedStyles: [],
+    });
+  }
 }
 
 // ============================================================================
@@ -390,10 +430,11 @@ const flows = new Map<number, Flow>();
 export async function initFlow(
   steps: FlowStepParams[],
   recorder: Recorder | null,
+  cdp: CDPSession,
 ) {
   const id = flowCounter++;
   logger.debug("Init Flow Called", { id }, "behavior");
-  flows.set(id, new Flow(id, recorder, steps));
+  flows.set(id, new Flow(id, recorder, cdp, steps));
   return id;
 }
 
