@@ -168,7 +168,11 @@ class Logger {
     }
 
     const redisBehaviorLogLevels = ["info", "warn", "error"];
-    const behaviorContexts = ["behavior", "behaviorScript"];
+    const behaviorContexts = [
+      "behavior",
+      "behaviorScript",
+      "behaviorScriptCustom",
+    ];
     if (
       this.logBehaviorsToRedis &&
       this.crawlState &&
