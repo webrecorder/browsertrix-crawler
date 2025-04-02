@@ -215,6 +215,7 @@ class Flow {
   private async shouldRepeat(
     step: ClickStep,
     activity: Promise<boolean>,
+    page: Page,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     snap: any,
   ) {
@@ -246,7 +247,7 @@ class Flow {
     if (!fetched) {
       logger.debug("Flow repeat ended, not found / timed out", "behavior");
     } else {
-      //await page.waitForNetworkIdle();
+      await page.waitForNetworkIdle();
     }
 
     return fetched;
@@ -332,7 +333,7 @@ class Flow {
               y: step.offsetY,
             },
           });
-        if (await this.shouldRepeat(step, activity, snap)) {
+        if (await this.shouldRepeat(step, activity, page, snap)) {
           return StepResult.Repeat;
         }
         break;
