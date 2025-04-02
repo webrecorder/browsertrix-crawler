@@ -2762,7 +2762,9 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    this.saveStateFiles.push(filename);
+    if (!this.saveStateFiles.includes(filename)) {
+      this.saveStateFiles.push(filename);
+    }
 
     if (this.saveStateFiles.length > this.params.saveStateHistory) {
       const oldFilename = this.saveStateFiles.shift();
@@ -2775,9 +2777,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.storage && done && this.params.saveState === "always") {
-      const targetFilename = interpolateFilename(filenameOnly, this.crawlId);
-
-      await this.storage.uploadFile(filename, targetFilename);
+      await this.storage.uploadFile(filename, filenameOnly);
     }
   }
 
