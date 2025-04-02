@@ -142,15 +142,14 @@ export class ReplayServer {
         opts.start = total - opts.end;
         opts.end = total - 1;
       } else if (isNaN(opts.end)) {
-        opts.end = undefined;
+        opts.end = total - 1;
       }
-      const end = opts.end || total - 1;
-      contentRange = `bytes ${opts.start}-${end}/${total}`;
+      contentRange = `bytes ${opts.start}-${opts.end}/${total}`;
       return {
         status: 206,
         opts,
         contentRange,
-        contentLength: end - opts.start + 1,
+        contentLength: opts.end - opts.start + 1,
       };
     }
     return { status: 200, opts, contentRange, contentLength: total };
