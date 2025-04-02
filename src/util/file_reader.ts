@@ -131,7 +131,7 @@ async function collectLocalPathBehaviors(
     if (stat.isFile() && ALLOWED_EXTS.includes(path.extname(resolvedPath))) {
       source = source ?? filename;
       logger.info("Custom behavior script added", { source }, "behavior");
-      let contents = await fsp.readFile(resolvedPath);
+      let contents = await fsp.readFile(resolvedPath, { encoding: "utf-8" });
       if (path.extname(resolvedPath) === ".json") {
         try {
           contents = parseRecorderFlowJson(contents);
