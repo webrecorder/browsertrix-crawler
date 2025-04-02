@@ -212,6 +212,7 @@ async function main() {
       ],
     },
     recording: false,
+    keepScrollbars: true,
   });
 
   if (params.interactive) {

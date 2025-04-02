@@ -47,6 +47,7 @@ import {
   ExitCodes,
   InterruptReason,
   BxFunctionBindings,
+  ServiceWorkerOpt,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -1626,14 +1627,14 @@ self.__bx_behaviors.selectMainBehavior();
       profileUrl: this.params.profile,
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
-      swOpt: this.params.serviceWorker,
+      swOpt: this.params.serviceWorker as ServiceWorkerOpt,
+      signals: false,
       chromeOptions: {
         proxy: this.proxyServer,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs(),
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ondisconnect: (err: any) => {
+      ondisconnect: (err: unknown) => {
         this.markBrowserCrashed();
         logger.error(
           "Browser disconnected (crashed?), interrupting crawl",
@@ -1643,8 +1644,9 @@ self.__bx_behaviors.selectMainBehavior();
       },
 
       recording: this.recording,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+      // keep scrollbars (for QA only)
+      keepScrollbars: this.params.keepScrollbars && !!this.params.qaSource,
+    });
 
     // --------------
     // Run Crawl Here!

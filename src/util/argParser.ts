@@ -637,6 +637,13 @@ class ArgParser {
           type: "boolean",
         },
 
+        keepScrollbars: {
+          describe:
+            "if specified, will keep scrollbars for screenshots. Used for compatibility for QA",
+          type: "boolean",
+          default: false,
+        },
+
         sshProxyPrivateKeyFile: {
           describe:
             "path to SSH private key for SOCKS5 over SSH proxy connection",

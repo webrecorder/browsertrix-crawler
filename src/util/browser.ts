@@ -35,7 +35,7 @@ type BtrixChromeOpts = {
 };
 
 type LaunchOpts = {
-  profileUrl: string;
+  profileUrl?: string;
   chromeOptions: BtrixChromeOpts;
   signals: boolean;
   headless: boolean;
@@ -43,11 +43,13 @@ type LaunchOpts = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   emulateDevice?: Record<string, any>;
 
-  ondisconnect?: ((err: unknown) => NonNullable<unknown>) | null;
+  ondisconnect?: ((err: unknown) => void) | null;
 
   swOpt?: ServiceWorkerOpt;
 
   recording: boolean;
+
+  keepScrollbars: boolean;
 };
 
 // fixed height of the browser UI (may need to be adjusted in the future)
@@ -97,6 +99,7 @@ export class Browser {
     swOpt = "disabled",
     ondisconnect = null,
     recording = true,
+    keepScrollbars = false,
   }: LaunchOpts) {
     if (this.isLaunched()) {
       return;
@@ -125,11 +128,16 @@ export class Browser {
       height: this.screenHeight - (recording ? 0 : BROWSER_HEIGHT_OFFSET),
     };
 
+    const ignoreDefaultArgs = ["--enable-automation"];
+    if (keepScrollbars) {
+      ignoreDefaultArgs.push("--hide-scrollbars");
+    }
+
     const launchOpts: LaunchOptions = {
       args,
       headless,
       executablePath: this.getBrowserExe(),
-      ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
+      ignoreDefaultArgs,
       acceptInsecureCerts: true,
       handleSIGHUP: signals,
       handleSIGINT: signals,
