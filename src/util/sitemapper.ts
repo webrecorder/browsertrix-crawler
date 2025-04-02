@@ -304,13 +304,13 @@ export class SitemapReader extends EventEmitter {
         }
       } else if (!otherTags) {
         if (parsingUrl) {
-          console.warn("text in url, ignoring");
+          logger.debug("text in url, ignoring", {}, "sitemap");
         } else if (parsingUrlset) {
-          console.warn("text in urlset, ignoring");
+          logger.debug("text in urlset, ignoring", {}, "sitemap");
         } else if (parsingSitemap) {
-          console.warn("text in sitemap, ignoring");
+          logger.debug("text in sitemap, ignoring", {}, "sitemap");
         } else if (parsingSitemapIndex) {
-          console.warn("text in sitemapindex, ignoring");
+          logger.debug("text in sitemapindex, ignoring", {}, "sitemap");
         }
       }
     };

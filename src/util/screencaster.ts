@@ -195,8 +195,6 @@ class ScreenCaster {
     this.transport = transport;
     this.transport.caster = this;
 
-    console.log("RATIO", ratio);
-
     if (ratio) {
       this.maxHeight = this.maxWidth / ratio;
     }

@@ -2871,7 +2871,6 @@ function getDownloadResponse(req: HTTPRequest) {
       return resp;
     }
   } catch (e) {
-    console.log(e);
     // ignore
   }
 

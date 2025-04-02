@@ -285,7 +285,11 @@ export class ReplayCrawler extends Crawler {
     try {
       pageData = JSON.parse(page);
     } catch (e) {
-      console.log(page, e);
+      logger.error(
+        "Error parsing page data",
+        { data: page, ...formatErr(e) },
+        "replay",
+      );
       return;
     }
 
