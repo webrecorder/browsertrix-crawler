@@ -28,6 +28,7 @@ export class WARCWriter implements IndexerOffsetLength {
   filenameTemplate: string;
   filename?: string;
   gzip: boolean;
+  useSHA1: boolean;
   logDetails: Record<string, string>;
 
   offset = 0;
@@ -49,6 +50,7 @@ export class WARCWriter implements IndexerOffsetLength {
     filenameTemplate,
     rolloverSize = DEFAULT_ROLLOVER_SIZE,
     gzip,
+    useSHA1,
     logDetails,
   }: {
     archivesDir: string;
@@ -56,12 +58,14 @@ export class WARCWriter implements IndexerOffsetLength {
     filenameTemplate: string;
     rolloverSize?: number;
     gzip: boolean;
+    useSHA1: boolean;
     logDetails: Record<string, string>;
   }) {
     this.archivesDir = archivesDir;
     this.warcCdxDir = warcCdxDir;
     this.logDetails = logDetails;
     this.gzip = gzip;
+    this.useSHA1 = useSHA1;
     this.rolloverSize = rolloverSize;
 
     this.filenameTemplate = filenameTemplate;
@@ -145,7 +149,18 @@ export class WARCWriter implements IndexerOffsetLength {
     requestRecord: WARCRecord,
     responseSerializer: WARCSerializer | undefined = undefined,
   ) {
-    const opts = { gzip: this.gzip };
+    const opts = this.useSHA1
+      ? {
+          gzip: this.gzip,
+          digest: {
+            algo: "sha-1",
+            prefix: "sha1:",
+            base32: true,
+          },
+        }
+      : {
+          gzip: this.gzip,
+        };
 
     if (!responseSerializer) {
       responseSerializer = new WARCSerializer(responseRecord, opts);
