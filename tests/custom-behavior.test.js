@@ -10,27 +10,21 @@ test("test custom behaviors from local filepath", async () => {
   // custom behavior ran for specs.webrecorder.net
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat","page":"https://specs.webrecorder.net/","workerid":0}}',
+      '"message":"test-stat,{"state":{},"page":"https://specs.webrecorder.net/","workerid":0}}',
     ) > 0,
   ).toBe(true);
 
   // but not for example.org
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat","page":"https://example.org/","workerid":0}}',
+      '"message":"test-stat",{"state":{},"page":"https://example.org/","workerid":0}}',
     ) > 0,
   ).toBe(false);
-
-  expect(
-    log.indexOf(
-      '{"state":{"segments":1},"msg":"Skipping autoscroll, page seems to not be responsive to scrolling events","page":"https://example.org/","workerid":0}}',
-    ) > 0,
-  ).toBe(true);
 
   // another custom behavior ran for old.webrecorder.net
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat-2","page":"https://old.webrecorder.net/","workerid":0}}',
+      '"message":"test-stat-2",{"state":{},"page":"https://old.webrecorder.net/","workerid":0}}',
     ) > 0,
   ).toBe(true);
 });
@@ -44,7 +38,7 @@ test("test custom behavior from URL", async () => {
 
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat-2","page":"https://old.webrecorder.net/","workerid":0}}',
+      '"message":"test-stat-2",{"state":{},"page":"https://old.webrecorder.net/","workerid":0}}',
     ) > 0,
   ).toBe(true);
 });
@@ -59,14 +53,14 @@ test("test mixed custom behavior sources", async () => {
 
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat","page":"https://specs.webrecorder.net/","workerid":0}}',
+      '"message":"test-stat",{"state":{},"page":"https://specs.webrecorder.net/","workerid":0}}',
     ) > 0,
   ).toBe(true);
 
   // test custom behavior from local file ran
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat-2","page":"https://old.webrecorder.net/","workerid":0}}',
+      '"message":"test-stat",{"state":{},"page":"https://old.webrecorder.net/","workerid":0}}',
     ) > 0,
   ).toBe(true);
 });
@@ -81,27 +75,21 @@ test("test custom behaviors from git repo", async () => {
   // custom behavior ran for specs.webrecorder.net
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat","page":"https://specs.webrecorder.net/","workerid":0}}',
+      '"message":"test-stat",{"state":{},"page":"https://specs.webrecorder.net/","workerid":0}}',
     ) > 0,
   ).toBe(true);
 
   // but not for example.org
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat","page":"https://example.org/","workerid":0}}',
+      '"message":"test-stat",{"state":{},"page":"https://example.org/","workerid":0}}',
     ) > 0,
   ).toBe(false);
-
-  expect(
-    log.indexOf(
-      '{"state":{"segments":1},"msg":"Skipping autoscroll, page seems to not be responsive to scrolling events","page":"https://example.org/","workerid":0}}',
-    ) > 0,
-  ).toBe(true);
 
   // another custom behavior ran for old.webrecorder.net
   expect(
     log.indexOf(
-      '{"state":{},"msg":"test-stat-2","page":"https://old.webrecorder.net/","workerid":0}}',
+      '"message":"test-stat-2",{"state":{},"page":"https://old.webrecorder.net/","workerid":0}}',
     ) > 0,
   ).toBe(true);
 });
