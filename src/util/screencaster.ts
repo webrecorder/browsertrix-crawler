@@ -191,9 +191,13 @@ class ScreenCaster {
     browsers: number;
   };
 
-  constructor(transport: WSTransport, numWorkers: number) {
+  constructor(transport: WSTransport, numWorkers: number, ratio?: number) {
     this.transport = transport;
     this.transport.caster = this;
+
+    if (ratio) {
+      this.maxHeight = this.maxWidth / ratio;
+    }
 
     this.initMsg = {
       msg: "init",

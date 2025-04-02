@@ -70,6 +70,10 @@ export class Browser {
 
   crashed = false;
 
+  screenWidth?: number;
+  screenHeight?: number;
+  screenWHRatio?: number;
+
   constructor() {
     this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
   }
@@ -111,9 +115,13 @@ export class Browser {
     if (process.env.GEOMETRY) {
       const geom = process.env.GEOMETRY.split("x");
 
+      this.screenWidth = Number(geom[0]);
+      this.screenHeight = Number(geom[1]);
+      this.screenWHRatio = this.screenWidth / this.screenHeight;
+
       defaultViewport = {
-        width: Number(geom[0]),
-        height: Number(geom[1]) - (recording ? 0 : BROWSER_HEIGHT_OFFSET),
+        width: this.screenWidth,
+        height: this.screenHeight - (recording ? 0 : BROWSER_HEIGHT_OFFSET),
       };
     }
 
