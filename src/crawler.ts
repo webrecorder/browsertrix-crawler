@@ -32,7 +32,7 @@ import {
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
-import { logger, formatErr, LogDetails } from "./util/logger.js";
+import { logger, formatErr, LogDetails, LogContext } from "./util/logger.js";
 import { WorkerState, closeWorkers, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectCustomBehaviors, getInfoString } from "./util/file_reader.js";
@@ -652,6 +652,8 @@ export class Crawler {
 
     const logDetails = { page: pageUrl, workerid };
 
+    let context: LogContext = "behaviorScript";
+
     if (typeof data === "string") {
       message = data;
       details = logDetails;
@@ -670,24 +672,37 @@ export class Crawler {
         typeof data === "object"
           ? { ...(data as object), ...logDetails }
           : logDetails;
+
+      if (typeof data === "object") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const objData = data as any;
+        if (objData.siteSpecific) {
+          context = "behaviorScriptCustom";
+        }
+        message = objData.msg || message;
+        delete objData.msg;
+        details = { ...objData, ...logDetails };
+      } else {
+        details = logDetails;
+      }
     }
 
     switch (type) {
       case "info":
         behaviorLine = JSON.stringify(data);
         if (behaviorLine !== this.behaviorLastLine) {
-          logger.info(message, details, "behaviorScript");
+          logger.info(message, details, context);
           this.behaviorLastLine = behaviorLine;
         }
         break;
 
       case "error":
-        logger.error(message, details, "behaviorScript");
+        logger.error(message, details, context);
         break;
 
       case "debug":
       default:
-        logger.debug(message, details, "behaviorScript");
+        logger.debug(message, details, context);
     }
   }
 
