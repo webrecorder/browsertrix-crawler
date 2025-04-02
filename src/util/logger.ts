@@ -45,6 +45,7 @@ export const LOG_CONTEXT_TYPES = [
   "blocking",
   "behavior",
   "behaviorScript",
+  "behaviorScriptCustom",
   "jsError",
   "fetch",
   "pageStatus",
