@@ -656,7 +656,16 @@ export class Crawler {
       message = data;
       details = logDetails;
     } else {
-      message = type === "info" ? "Behavior log" : "Behavior debug";
+      switch (type) {
+        case "error":
+          message = "Behavior error";
+          break;
+        case "debug":
+          message = "Behavior debug";
+          break;
+        default:
+          message = "Behavior log";
+      }
       details =
         typeof data === "object"
           ? { ...(data as object), ...logDetails }
