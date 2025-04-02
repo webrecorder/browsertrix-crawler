@@ -129,7 +129,7 @@ export class ReplayServer {
 
   getRespOptsForRequest(request: IncomingMessage, total: number) {
     const range = request.headers["range"] || "";
-    const array = range.match(/bytes=(\d+)-(\d*)/);
+    const array = range.match(/bytes=(\d+)?-(\d*)/);
     let contentRange = undefined;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,16 +137,19 @@ export class ReplayServer {
     if (array) {
       opts.start = parseInt(array[1]);
       opts.end = parseInt(array[2]);
-      if (isNaN(opts.end)) {
-        opts.end = undefined;
+      // negative value, subtract from end
+      if (isNaN(opts.start) && !isNaN(opts.end)) {
+        opts.start = total - opts.end;
+        opts.end = total - 1;
+      } else if (isNaN(opts.end)) {
+        opts.end = total - 1;
       }
-      const end = opts.end || total - 1;
-      contentRange = `bytes ${opts.start}-${end}/${total}`;
+      contentRange = `bytes ${opts.start}-${opts.end}/${total}`;
       return {
         status: 206,
         opts,
         contentRange,
-        contentLength: end - opts.start + 1,
+        contentLength: opts.end - opts.start + 1,
       };
     }
     return { status: 200, opts, contentRange, contentLength: total };
