@@ -183,7 +183,7 @@ class ScreenCaster {
   urls = new Map<WorkerId, string>();
   cdps = new Map<WorkerId, CDPSession>();
   maxWidth = 640;
-  maxHeight = 360;
+  maxHeight = 480;
   initMsg: {
     msg: "init";
     width: number;
