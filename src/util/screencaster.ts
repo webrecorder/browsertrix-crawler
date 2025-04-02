@@ -1,13 +1,18 @@
-import ws, { WebSocket } from "ws";
-import http, { IncomingMessage, ServerResponse } from "http";
+import ws, { type WebSocket } from "ws";
+import http, {
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "http";
 import url from "url";
 import fs from "fs";
 
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
-import { Duplex } from "stream";
-import { CDPSession, Page } from "puppeteer-core";
-import { WorkerId } from "./state.js";
+import { type Duplex } from "stream";
+import { type CDPSession, type Page } from "puppeteer-core";
+import { type WorkerId } from "./state.js";
+import type Redis from "ioredis";
 
 const indexHTML = fs.readFileSync(
   new URL("../../html/screencast.html", import.meta.url),
@@ -20,9 +25,7 @@ class WSTransport {
   // eslint-disable-next-line no-use-before-define
   caster!: ScreenCaster;
   wss: ws.Server;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  httpServer: any;
+  httpServer: Server;
 
   constructor(port: number) {
     this.allWS = new Set();
@@ -94,9 +97,7 @@ class WSTransport {
     });
   }
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  sendAll(packet: Record<any, any>) {
+  sendAll(packet: unknown) {
     const packetStr = JSON.stringify(packet);
     for (const ws of this.allWS) {
       ws.send(packetStr);
@@ -115,9 +116,7 @@ class RedisPubSubTransport {
   // eslint-disable-next-line no-use-before-define
   caster!: ScreenCaster;
   ctrlChannel: string;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  redis: any;
+  redis!: Redis;
 
   constructor(redisUrl: string, crawlId: string) {
     this.castChannel = `c:${crawlId}:cast`;
@@ -162,17 +161,20 @@ class RedisPubSubTransport {
     });
   }
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async sendAll(packet: Record<any, any>) {
+  async sendAll(packet: unknown) {
     await this.redis.publish(this.castChannel, JSON.stringify(packet));
   }
 
   async isActive() {
-    const result = await this.redis.pubsub("numsub", this.castChannel);
+    const result = (await this.redis.pubsub(
+      "NUMSUB",
+      this.castChannel,
+    )) as number[];
     return result.length > 1 ? result[1] > 0 : false;
   }
 }
+
+type CDPSessionWithCastInfo = CDPSession & { _startedCast?: boolean };
 
 // ===========================================================================
 class ScreenCaster {
@@ -182,13 +184,22 @@ class ScreenCaster {
   cdps = new Map<WorkerId, CDPSession>();
   maxWidth = 640;
   maxHeight = 480;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  initMsg: { [key: string]: any };
+  initMsg: {
+    msg: "init";
+    width: number;
+    height: number;
+    browsers: number;
+  };
 
-  constructor(transport: WSTransport, numWorkers: number) {
+  constructor(transport: WSTransport, numWorkers: number, ratio?: number) {
     this.transport = transport;
     this.transport.caster = this;
+
+    console.log("RATIO", ratio);
+
+    if (ratio) {
+      this.maxHeight = this.maxWidth / ratio;
+    }
 
     this.initMsg = {
       msg: "init",
@@ -276,15 +287,11 @@ class ScreenCaster {
   }
 
   async startCast(cdp: CDPSession, id: WorkerId) {
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((cdp as any)._startedCast) {
+    if ((cdp as CDPSessionWithCastInfo)._startedCast) {
       return;
     }
 
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (cdp as any)._startedCast = true;
+    (cdp as CDPSessionWithCastInfo)._startedCast = true;
 
     logger.info("Started Screencast", { workerid: id }, "screencast");
 
@@ -297,15 +304,11 @@ class ScreenCaster {
   }
 
   async stopCast(cdp: CDPSession, id: WorkerId) {
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (!(cdp as any)._startedCast) {
+    if (!(cdp as CDPSessionWithCastInfo)._startedCast) {
       return;
     }
 
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (cdp as any)._startedCast = false;
+    (cdp as CDPSessionWithCastInfo)._startedCast = false;
 
     logger.info("Stopping Screencast", { workerid: id }, "screencast");
 

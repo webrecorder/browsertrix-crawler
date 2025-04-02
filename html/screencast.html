@@ -25,6 +25,17 @@
         resp = JSON.parse(resp);
 
         switch (resp.msg) {
+          case "init":
+            if (resp.width && resp.height) {
+              try {
+                self.document.styleSheets[0].rules[1].style.width = resp.width + "px";
+                self.document.styleSheets[0].rules[1].style.height = resp.height + "px";
+              } catch (e) {
+                console.log("Error adjusting stylesheet: ", e);
+              }
+            }
+            break;
+
           case "screencast":
             img = createImage(resp.id);
             if (resp.data) {

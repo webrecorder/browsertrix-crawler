@@ -436,7 +436,11 @@ export class Crawler {
       return null;
     }
 
-    return new ScreenCaster(transport, this.params.workers);
+    return new ScreenCaster(
+      transport,
+      this.params.workers,
+      this.browser.screenWHRatio,
+    );
   }
 
   launchRedis() {
