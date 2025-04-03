@@ -678,6 +678,7 @@ export class Crawler {
         const objData = data as any;
         if (objData.siteSpecific) {
           context = "behaviorScriptCustom";
+          delete objData.siteSpecific;
         }
         message = objData.msg || message;
         delete objData.msg;
