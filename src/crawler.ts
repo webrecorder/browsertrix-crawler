@@ -1502,7 +1502,6 @@ self.__bx_behaviors.selectMainBehavior();
   async setStatusAndExit(exitCode: ExitCodes, status: string) {
     logger.info(`Exiting, Crawl status: ${status}`);
 
-
     await this.closeLog();
 
     if (this.crawlState && status) {
