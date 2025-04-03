@@ -199,7 +199,6 @@ test("test pushing behavior logs to redis", async () => {
       expect(["https://specs.webrecorder.net/", "https://old.webrecorder.net/"]).toContain(json.details.page);
       customLogLineCount++;
     }
-    break;
   }
 
   expect(customLogLineCount).toEqual(2);
