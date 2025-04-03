@@ -162,7 +162,7 @@ test("test crawl exits if not custom behaviors collected from local path", async
 });
 
 test("test pushing behavior logs to redis", async () => {
-  const child = child_process.exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ -e CRAWL_ID=behavior-logs-redis-test -p 36399:6379 --rm webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://old.webrecorder.net/ --customBehaviors https://raw.githubusercontent.com/webrecorder/browsertrix-crawler/refs/heads/main/tests/custom-behaviors/custom-2.js --customBehaviors /custom-behaviors/custom.js --scopeType page --logBehaviorsToRedis");
+  const child = child_process.exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ -e CRAWL_ID=behavior-logs-redis-test -p 36399:6379 --rm webrecorder/browsertrix-crawler crawl --debugAccessRedis --url https://specs.webrecorder.net/ --url https://old.webrecorder.net/ --customBehaviors https://raw.githubusercontent.com/webrecorder/browsertrix-crawler/refs/heads/main/tests/custom-behaviors/custom-2.js --customBehaviors /custom-behaviors/custom.js --scopeType page --logBehaviorsToRedis");
 
   let resolve = null;
   const crawlFinished = new Promise(r => resolve = r);
