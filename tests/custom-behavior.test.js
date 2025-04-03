@@ -194,12 +194,12 @@ test("test pushing behavior logs to redis", async () => {
     expect(["behavior", "behaviorScript", "behaviorScriptCustom"]).toContain(json.context)
 
     if (json.context === "behaviorScriptCustom") {
-      expect(["test-stat", "test-stat-2"]).toContain(json.message);
+      expect(["test-stat", "test-stat-2", "done!"]).toContain(json.message);
       expect(["TestBehavior", "TestBehavior2"]).toContain(json.details.behavior);
       expect(["https://specs.webrecorder.net/", "https://old.webrecorder.net/"]).toContain(json.details.page);
       customLogLineCount++;
     }
   }
 
-  expect(customLogLineCount).toEqual(2);
+  expect(customLogLineCount).toEqual(4);
 });
