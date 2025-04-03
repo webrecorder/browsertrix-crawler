@@ -256,6 +256,13 @@ class ArgParser {
           default: false,
         },
 
+        useSHA1: {
+          describe:
+            "If set, sha-1 instead of sha-256 hashes will be used for creating records",
+          type: "boolean",
+          default: false,
+        },
+
         logging: {
           describe:
             "Logging options for crawler, can include: stats (enabled by default), jserrors, debug",

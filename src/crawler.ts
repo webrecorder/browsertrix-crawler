@@ -2808,6 +2808,7 @@ self.__bx_behaviors.selectMainBehavior();
     logDetails: Record<string, string>,
   ) {
     const filenameTemplate = `${filenameBase}.warc${gzip ? ".gz" : ""}`;
+    const useSHA1 = this.params.useSHA1;
 
     return new WARCWriter({
       archivesDir: this.archivesDir,
@@ -2815,6 +2816,7 @@ self.__bx_behaviors.selectMainBehavior();
       filenameTemplate,
       rolloverSize: this.params.rolloverSize,
       gzip,
+      useSHA1,
       logDetails,
     });
   }
