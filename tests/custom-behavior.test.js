@@ -180,7 +180,7 @@ test("test pushing behavior logs to redis", async () => {
 
   await redis.connect({ maxRetriesPerRequest: 50 });
 
-  let logLineCount = 0;
+  let customLogLineCount = 0;
 
   while (!crawler_exited) {
     const res = await redis.lpop("behavior-logs-redis-test:b");
@@ -191,13 +191,16 @@ test("test pushing behavior logs to redis", async () => {
     const json = JSON.parse(res);
     expect(json).toHaveProperty("timestamp");
     expect(json.logLevel).toBe("info");
-    expect(json.context).toBe("behaviorScriptCustom")
-    expect(["test-stat", "test-stat-2"]).toContain(json.message);
-    expect(["TestBehavior", "TestBehavior2"]).toContain(json.details.behavior);
-    expect(["https://specs.webrecorder.net/", "https://old.webrecorder.net/"]).toContain(json.details.page);
-    logLineCount++;
+    expect(["behavior", "behaviorScript", "behaviorScriptCustom"]).toContain(json.context)
+
+    if (json.context === "behaviorScriptCustom") {
+      expect(["test-stat", "test-stat-2"]).toContain(json.message);
+      expect(["TestBehavior", "TestBehavior2"]).toContain(json.details.behavior);
+      expect(["https://specs.webrecorder.net/", "https://old.webrecorder.net/"]).toContain(json.details.page);
+      customLogLineCount++;
+    }
     break;
   }
 
-  expect(logLineCount).toEqual(2);
+  expect(customLogLineCount).toEqual(2);
 });
