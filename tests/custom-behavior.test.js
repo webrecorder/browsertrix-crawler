@@ -190,12 +190,12 @@ test("test pushing behavior logs to redis", async () => {
     }
     const json = JSON.parse(res);
     expect(json).toHaveProperty("timestamp");
-    expect(json.logLevel).toBe("info")
+    expect(json.logLevel).toBe("info");
     expect(json.context).toBe("behaviorScriptCustom")
-    expect(["test-stat", "test-stat-2"]).toContain(json.message)
-    expect(["TestBehavior", "TestBehavior2"]).toContain(json.details.behavior)
-    expect(["https://specs.webrecorder.net/", "https://old.webrecorder.net/"]).toContain(json.details.page)
-    logLineCount++
+    expect(["test-stat", "test-stat-2"]).toContain(json.message);
+    expect(["TestBehavior", "TestBehavior2"]).toContain(json.details.behavior);
+    expect(["https://specs.webrecorder.net/", "https://old.webrecorder.net/"]).toContain(json.details.page);
+    logLineCount++;
     break;
   }
 
