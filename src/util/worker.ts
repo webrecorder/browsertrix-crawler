@@ -232,13 +232,12 @@ export class PageWorker {
         }
 
         if (retry >= 2) {
-          this.crawler.markBrowserCrashed();
-          if (this.crawler.params.restartsOnError) {
+          if (this.crawler.params.restartsOnError || retry >= 5) {
+            this.crawler.markBrowserCrashed();
             throw new Error("Unable to load new page, browser needs restart");
           } else {
+            // see if killing the browser may help, retry a couple more times
             this.crawler.browser.killBrowser();
-            // retry again after killing browser
-            retry = 0;
             await sleep(2.0);
           }
         }
