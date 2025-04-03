@@ -162,17 +162,20 @@ test("test crawl exits if not custom behaviors collected from local path", async
 });
 
 test("test pushing behavior logs to redis", async () => {
-  const child = child_process.exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ -e CRAWL_ID=behavior-logs-redis-test -p 36399:6379 --rm webrecorder/browsertrix-crawler crawl --debugAccessRedis --url https://specs.webrecorder.net/ --url https://old.webrecorder.net/ --customBehaviors https://raw.githubusercontent.com/webrecorder/browsertrix-crawler/refs/heads/main/tests/custom-behaviors/custom-2.js --customBehaviors /custom-behaviors/custom.js --scopeType page --logBehaviorsToRedis");
+  child_process.execSync("docker network create crawl");
+
+  const redisId = child_process.execSync("docker run --rm --network=crawl -p 36399:6379 --name redis -d redis");
+
+  const child = child_process.exec("docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ -e CRAWL_ID=behavior-logs-redis-test --network=crawl --rm webrecorder/browsertrix-crawler crawl --debugAccessRedis --redisStoreUrl redis://redis:6379 --url https://specs.webrecorder.net/ --url https://old.webrecorder.net/ --customBehaviors https://raw.githubusercontent.com/webrecorder/browsertrix-crawler/refs/heads/main/tests/custom-behaviors/custom-2.js --customBehaviors /custom-behaviors/custom.js --scopeType page --logBehaviorsToRedis");
 
   let resolve = null;
   const crawlFinished = new Promise(r => resolve = r);
 
-  // detect crawler exit
-  let crawler_exited = false;
   child.on("exit", function () {
-    crawler_exited = true;
     resolve();
   });
+
+  await crawlFinished;
 
   const redis = new Redis("redis://127.0.0.1:36399/0", { lazyConnect: true, retryStrategy: () => null });
 
@@ -182,29 +185,29 @@ test("test pushing behavior logs to redis", async () => {
 
   let customLogLineCount = 0;
 
-  while (!crawler_exited) {
-    try {
-      const res = await redis.lpop("behavior-logs-redis-test:b");
-      if (!res) {
-        await sleep(100);
-        continue;
-      }
-      const json = JSON.parse(res);
-      expect(json).toHaveProperty("timestamp");
-      expect(json.logLevel).toBe("info");
-      expect(["behavior", "behaviorScript", "behaviorScriptCustom"]).toContain(json.context)
-
-      if (json.context === "behaviorScriptCustom") {
-        expect(["test-stat", "test-stat-2", "done!"]).toContain(json.message);
-        expect(["TestBehavior", "TestBehavior2"]).toContain(json.details.behavior);
-        expect(["https://specs.webrecorder.net/", "https://old.webrecorder.net/"]).toContain(json.details.page);
-        customLogLineCount++;
-      }
-    } catch (e) {
+  while (true) {
+    const res = await redis.lpop("behavior-logs-redis-test:b");
+    if (!res) {
       break;
     }
-    
+    const json = JSON.parse(res);
+    expect(json).toHaveProperty("timestamp");
+    expect(json.logLevel).toBe("info");
+    expect(["behavior", "behaviorScript", "behaviorScriptCustom"]).toContain(json.context)
+
+    if (json.context === "behaviorScriptCustom") {
+      expect(["test-stat", "test-stat-2", "done!"]).toContain(json.message);
+      expect(["TestBehavior", "TestBehavior2"]).toContain(json.details.behavior);
+      expect(["https://specs.webrecorder.net/", "https://old.webrecorder.net/"]).toContain(json.details.page);
+      customLogLineCount++;
+    }
   }
 
-  expect(customLogLineCount).toBeGreaterThanOrEqual(2);
+  expect(customLogLineCount).toEqual(4);
+
+  child_process.execSync(`docker kill ${redisId}`);
+
+  await sleep(3000);
+
+  child_process.execSync("docker network rm crawl");
 });
