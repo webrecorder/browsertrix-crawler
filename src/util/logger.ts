@@ -45,6 +45,7 @@ export const LOG_CONTEXT_TYPES = [
   "blocking",
   "behavior",
   "behaviorScript",
+  "behaviorScriptCustom",
   "jsError",
   "fetch",
   "pageStatus",
@@ -70,6 +71,7 @@ class Logger {
   logStream: Writable | null = null;
   debugLogging = false;
   logErrorsToRedis = false;
+  logBehaviorsToRedis = false;
   logLevels: string[] = [];
   contexts: LogContext[] = [];
   excludeContexts: LogContext[] = [];
@@ -90,6 +92,10 @@ class Logger {
 
   setLogErrorsToRedis(logErrorsToRedis: boolean) {
     this.logErrorsToRedis = logErrorsToRedis;
+  }
+
+  setLogBehaviorsToRedis(logBehaviorsToRedis: boolean) {
+    this.logBehaviorsToRedis = logBehaviorsToRedis;
   }
 
   setLogLevel(logLevels: string[]) {
@@ -152,13 +158,26 @@ class Logger {
       //
     }
 
-    const toLogToRedis = ["error", "fatal"];
+    const redisErrorLogLevels = ["error", "fatal"];
     if (
       this.logErrorsToRedis &&
       this.crawlState &&
-      toLogToRedis.includes(logLevel)
+      redisErrorLogLevels.includes(logLevel)
     ) {
       this.crawlState.logError(string).catch(() => {});
+    }
+
+    const redisBehaviorLogLevels = ["info", "warn", "error"];
+    const behaviorContexts = ["behavior", "behaviorScript"];
+    if (
+      this.logBehaviorsToRedis &&
+      this.crawlState &&
+      ((behaviorContexts.includes(context) &&
+        redisBehaviorLogLevels.includes(logLevel)) ||
+        //always include behaviorScriptCustom
+        context === "behaviorScriptCustom")
+    ) {
+      this.crawlState.logBehavior(string).catch(() => {});
     }
   }
 

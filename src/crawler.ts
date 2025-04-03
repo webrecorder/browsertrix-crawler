@@ -32,7 +32,7 @@ import {
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { initRedis } from "./util/redis.js";
-import { logger, formatErr, LogDetails } from "./util/logger.js";
+import { logger, formatErr, LogDetails, LogContext } from "./util/logger.js";
 import { WorkerState, closeWorkers, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectCustomBehaviors, getInfoString } from "./util/file_reader.js";
@@ -401,6 +401,13 @@ export class Crawler {
 
     if (this.params.logErrorsToRedis) {
       logger.setLogErrorsToRedis(true);
+    }
+
+    if (this.params.logBehaviorsToRedis) {
+      logger.setLogBehaviorsToRedis(true);
+    }
+
+    if (this.params.logErrorsToRedis || this.params.logBehaviorsToRedis) {
       logger.setCrawlState(this.crawlState);
     }
 
@@ -645,33 +652,58 @@ export class Crawler {
 
     const logDetails = { page: pageUrl, workerid };
 
+    let context: LogContext = "behaviorScript";
+
     if (typeof data === "string") {
       message = data;
       details = logDetails;
     } else {
-      message = type === "info" ? "Behavior log" : "Behavior debug";
+      switch (type) {
+        case "error":
+          message = "Behavior error";
+          break;
+        case "debug":
+          message = "Behavior debug";
+          break;
+        default:
+          message = "Behavior log";
+      }
       details =
         typeof data === "object"
           ? { ...(data as object), ...logDetails }
           : logDetails;
+
+      if (typeof data === "object") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const objData = data as any;
+        if (objData.siteSpecific) {
+          context = "behaviorScriptCustom";
+          delete objData.siteSpecific;
+        }
+        message = objData.msg || message;
+        delete objData.msg;
+        details = { ...objData, ...logDetails };
+      } else {
+        details = logDetails;
+      }
     }
 
     switch (type) {
       case "info":
         behaviorLine = JSON.stringify(data);
         if (behaviorLine !== this.behaviorLastLine) {
-          logger.info(message, details, "behaviorScript");
+          logger.info(message, details, context);
           this.behaviorLastLine = behaviorLine;
         }
         break;
 
       case "error":
-        logger.error(message, details, "behaviorScript");
+        logger.error(message, details, context);
         break;
 
       case "debug":
       default:
-        logger.debug(message, details, "behaviorScript");
+        logger.debug(message, details, context);
     }
   }
 

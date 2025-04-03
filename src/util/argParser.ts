@@ -549,6 +549,12 @@ class ArgParser {
           default: false,
         },
 
+        logBehaviorsToRedis: {
+          describe: "If set, write behavior script messages to redis",
+          type: "boolean",
+          default: false,
+        },
+
         writePagesToRedis: {
           describe: "If set, write page objects to redis",
           type: "boolean",
