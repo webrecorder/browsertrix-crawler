@@ -18,7 +18,7 @@
   "dependencies": {
     "@novnc/novnc": "1.4.0",
     "@webrecorder/wabac": "^2.22.9",
-    "browsertrix-behaviors": "^0.8.2",
+    "browsertrix-behaviors": "^0.8.3",
     "client-zip": "^2.4.5",
     "css-selector-parser": "^3.0.5",
     "fetch-socks": "^1.3.0",
