@@ -45,7 +45,7 @@ test("test custom behavior from URL", async () => {
 
   expect(
     log.indexOf(
-      '"logLevel":"info","context":"behaviorScriptCustom","message":"test-stat-2","details":{"state":{},"behavior":"TestBehavior"2,"page":"https://old.webrecorder.net/","workerid":0}}',
+      '"logLevel":"info","context":"behaviorScriptCustom","message":"test-stat-2","details":{"state":{},"behavior":"TestBehavior2","page":"https://old.webrecorder.net/","workerid":0}}',
     ) > 0,
   ).toBe(true);
 });
