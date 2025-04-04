@@ -102,32 +102,38 @@ There should be a single class per file, and it should be of the following forma
 ```javascript
 class MyBehavior
 {
-  // required: an id for this behavior, will be displayed in the logs when the behavior is run.
+  // required: an id for this behavior, will be displayed in the logs
+  // when the behavior is run.
   static id = "My Behavior Id";
 
-  // required: a function that checks if a behavior should be run for a given page.
-  // This function can check the DOM / window.location to determine what page it is on.
-  //
-  // The first behavior that returns 'true' for a given site is used on that page.
+  // required: a function that checks if a behavior should be run
+  // for a given page.
+  // This function can check the DOM / window.location to determine
+  // what page it is on. The first behavior that returns 'true'
+  // for a given page is used on that page.
   static isMatch() {
     return window.location.href === "https://my-site.example.com/";
   }
 
-  // optional: if true, will also check isMatch() and possibly run this behavior in each iframes.
+  // optional: if true, will also check isMatch() and possibly run
+  // this behavior in each iframes.
   // if false, or not defined, this behavior will not be skipped for iframes.
   static runInIframes = false;
 
-  // optional: if defined, provides a way to define a custom way to determine when a page has finished loading
-  // beyond the standard 'load' event.
+  // optional: if defined, provides a way to define a custom way to determine
+  // when a page has finished loading beyond the standard 'load' event.
   //
-  // if defined, the crawler will await 'awaitPageLoad()' before moving on to post-crawl processing operations,
-  // including link-extraction, screenshots, and running main behavior
+  // if defined, the crawler will await 'awaitPageLoad()' before moving on to
+  // post-crawl processing operations, including link-extraction, screenshots,
+  // and running main behavior
   async awaitPageLoad() {
 
   }
 
-  // required: the main behavior async interator, which should yield for each 'step' in the behavior.
-  // when the iterator finishes, the behavior is done. (See below for more info)
+  // required: the main behavior async iterator, which should yield for
+  // each 'step' in the behavior.
+  // When the iterator finishes, the behavior is done.
+  // (See below for more info)
   async* run(ctx) {
     //... yield ctx.getState("starting behavior");
 
