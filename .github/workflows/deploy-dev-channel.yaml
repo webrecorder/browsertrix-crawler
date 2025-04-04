@@ -7,10 +7,10 @@ on:
         description: Crawler Channel
         type: choice
         required: true
-          default: dev
-          options: 
-            - dev
-            - dev-2
+        default: dev
+        options: 
+          - dev
+          - dev-2
 
 jobs:
   build_do_images:
