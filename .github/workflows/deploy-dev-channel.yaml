@@ -2,14 +2,15 @@ name: "*** Deploy Crawler to Dev Channel ***"
 
 on:
   workflow_dispatch:
-  inputs:
-    channel:
-      type: choice
-      required: true
-        default: dev
-        options: 
-          - dev
-          - dev-2
+    inputs:
+      channel:
+        description: Crawler Channel
+        type: choice
+        required: true
+          default: dev
+          options: 
+            - dev
+            - dev-2
 
 jobs:
   build_do_images:
