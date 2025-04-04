@@ -6,7 +6,7 @@ on:
     channel:
       type: choice
       required: true
-        default: 'dev'
+        default: dev
         options: 
           - dev
           - dev-2
