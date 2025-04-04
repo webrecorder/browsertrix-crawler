@@ -83,7 +83,9 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
 
 async function collectOnlineBehavior(url: string): Promise<FileSources> {
   const filename = crypto.randomBytes(4).toString("hex") + ".js";
-  const behaviorFilepath = `/app/behaviors/${filename}`;
+  const tmpDir = `/tmp/behaviors-${crypto.randomBytes(4).toString("hex")}`;
+  await fsp.mkdir(tmpDir, { recursive: true });
+  const behaviorFilepath = path.join(tmpDir, filename);
 
   try {
     const res = await fetch(url, { dispatcher: getProxyDispatcher() });
