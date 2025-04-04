@@ -74,7 +74,7 @@ Only key-based authentication is supposed for SSH proxies for now.
 
 ## Browser Profiles
 
-The above proxy settings also apply to [Browser Profile Creation](../browser-profiles), and browser profiles can also be created using proxies, for example:
+The above proxy settings also apply to [Browser Profile Creation](browser-profiles.md), and browser profiles can also be created using proxies, for example:
 
 ```sh
 docker run -p 6080:6080 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles -v $PWD/my-proxy-private-key:/tmp/private-key -v $PWD/known_hosts:/tmp/known_hosts webrecorder/browsertrix-crawler create-login-profile --url https://example.com/ --proxyServer ssh://user@path-to-ssh-host.example.com --sshProxyPrivateKeyFile /tmp/private-key --sshProxyKnownHostsFile /tmp/known_hosts

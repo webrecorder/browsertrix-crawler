@@ -88,16 +88,16 @@ docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --u
 docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com/ --customBehaviors "git+https://git.example.com/custom-behaviors?branch=dev&path=path/to/behaviors"
 ```
 
-# Creating Custom Behaviors
+## Creating Custom Behaviors
 
 The custom behavior file can be in one of the following supported formats.
 
-## JS Behaviors
+### JS Behaviors
 
 The main native format of custom behaviors is a Javascript class.
 There should be a single class per file, and it should be of the following format:
 
-### Behavior Class
+#### Behavior Class
 
 ```javascript
 class MyBehavior
@@ -138,4 +138,5 @@ class MyBehavior
 }
 ```
 
-### Behavior run() loop
+#### Behavior run() loop
+
