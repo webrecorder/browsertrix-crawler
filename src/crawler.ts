@@ -1165,7 +1165,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.behaviorOpts && data.status < 400) {
       if (data.skipBehaviors) {
-        logger.info("Skipping behaviors for slow page", logDetails, "behavior");
+        logger.warn("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
         const res = await timedRun(
           this.runBehaviors(
@@ -2249,11 +2249,6 @@ self.__bx_behaviors.selectMainBehavior();
 
   async awaitPageLoad(frame: Frame, logDetails: LogDetails) {
     if (this.params.behaviorOpts) {
-      logger.debug(
-        "Waiting for custom page load via behavior",
-        logDetails,
-        "behavior",
-      );
       try {
         await timedRun(
           frame.evaluate(
