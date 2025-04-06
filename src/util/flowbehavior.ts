@@ -40,6 +40,7 @@ enum StepResult {
   TimedOut = 2,
   OtherError = 3,
   Repeat = 4,
+  NotFound = 5,
 }
 
 export function parseRecorderFlowJson(contents: string): string {
@@ -63,7 +64,10 @@ export function parseRecorderFlowJson(contents: string): string {
         break;
 
       default:
-        currScript?.steps.push(step);
+        if (!currScript) {
+          currScript = { url: "", steps: [] };
+        }
+        currScript.steps.push(step);
     }
   }
 
@@ -82,17 +86,20 @@ export function parseRecorderFlowJson(contents: string): string {
 
 function formatScript(script: SingleSiteScript) {
   const url = script.url;
-  const urlJSON = JSON.stringify(url);
+  const urlJSON = url ? JSON.stringify(url) : "";
 
   const suffix = crypto.randomBytes(4).toString("hex");
+  const id = url ? url + "-" + suffix : "any-" + suffix;
 
   return `\
 class BehaviorScript_${suffix}
 {
-  static id = "${url}-${suffix}";
+  static id = "${id}";
 
   static isMatch() {
-    return window.location.href.startsWith(${urlJSON}) && window === window.top;
+    return ${
+      urlJSON ? `window.location.href.startsWith(${urlJSON}) &&` : ""
+    } window === window.top;
   }
 
   static init() {
@@ -185,6 +192,10 @@ class Flow {
         msg += "not supported, ignoring";
         return { done: false, msg };
 
+      case StepResult.NotFound:
+        msg += "not found, stopping";
+        return { done: true, msg };
+
       case StepResult.TimedOut:
         msg += "not found, not stopping";
         return { done: false, msg };
@@ -204,7 +215,7 @@ class Flow {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       if (e.toString().startsWith("TimeoutError")) {
-        return StepResult.TimedOut;
+        return this.currStep === 0 ? StepResult.NotFound : StepResult.TimedOut;
       } else {
         logger.warn(e.toString(), { params }, "behavior");
         return StepResult.OtherError;
@@ -224,7 +235,7 @@ class Flow {
     }
 
     const id = step.selectors
-      .map((x) => selectorToPElementSelector(x))
+      .map((x: string[] | string) => selectorToPElementSelector(x))
       .join("|");
     // if (id !== this.lastId) {
     //   //this.repeatSteps.delete(this.lastId);
@@ -283,7 +294,7 @@ class Flow {
         | WaitForElementStep,
     ) {
       return Locator.race(
-        step.selectors.map((selector) => {
+        step.selectors.map((selector: string[] | string) => {
           return localFrame.locator(selectorToPElementSelector(selector));
         }),
       );
@@ -386,20 +397,10 @@ class Flow {
         }
         break;
       }
-      case StepType.WaitForElement: {
-        try {
-          //startWaitingForEvents();
-          //await waitForElement(step, localFrame, timeout);
-          await locator(step).wait();
-        } catch (err) {
-          if ((err as Error).message === "Timed out") {
-            return StepResult.TimedOut;
-          } else {
-            return StepResult.OtherError;
-          }
-        }
+      case StepType.WaitForElement:
+        await locator(step).wait();
         break;
-      }
+
       case StepType.WaitForExpression: {
         //startWaitingForEvents();
         await localFrame.waitForFunction(step.expression, {
