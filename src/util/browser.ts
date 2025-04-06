@@ -341,7 +341,7 @@ export class Browser {
       return;
     }
 
-    const isTopFrame = !!frame.parentFrame();
+    const isTopFrame = !frame.parentFrame();
 
     if (isTopFrame) {
       logger.info("Run Script Started", details, contextName);
@@ -375,7 +375,7 @@ export class Browser {
       if (isTopFrame) {
         logger.info("Run Script Finished", details, contextName);
       } else {
-        logger.info("Run Script Finished in iframe", details, contextName);
+        logger.debug("Run Script Finished in iframe", details, contextName);
       }
     }
 
