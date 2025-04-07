@@ -134,7 +134,7 @@ async function collectLocalPathBehaviors(
       let contents = await fsp.readFile(resolvedPath, { encoding: "utf-8" });
       if (path.extname(resolvedPath) === ".json") {
         try {
-          contents = parseRecorderFlowJson(contents);
+          contents = parseRecorderFlowJson(contents, source);
           console.log(contents);
         } catch (e) {
           logger.fatal(

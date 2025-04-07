@@ -4,6 +4,7 @@ import { sleep } from "./timing.js";
 import {
   ChangeStep,
   ClickStep,
+  CustomStep,
   DoubleClickStep,
   HoverStep,
   ScrollElementStep,
@@ -16,8 +17,11 @@ import {
 import { logger } from "./logger.js";
 import { Recorder } from "./recorder.js";
 import { deepStrictEqual } from "assert";
+import { basename } from "path";
+import { RedisCrawlState } from "./state.js";
 
 type SingleSiteScript = {
+  id: string;
   url: string;
   steps: {
     type: string;
@@ -34,6 +38,11 @@ type FlowStepParams = {
   offsetX?: number;
 };
 
+type FlowCommand = {
+  id: string;
+  steps: FlowStepParams[];
+};
+
 enum StepResult {
   Success = 0,
   NotHandled = 1,
@@ -43,12 +52,17 @@ enum StepResult {
   NotFound = 5,
 }
 
-export function parseRecorderFlowJson(contents: string): string {
+export function parseRecorderFlowJson(
+  contents: string,
+  source: string,
+): string {
   const flow = JSON.parse(contents);
 
   const allScripts: SingleSiteScript[] = [];
 
   let currScript: SingleSiteScript | null = null;
+
+  let counter = 0;
 
   for (const step of flow.steps) {
     switch (step.type) {
@@ -60,12 +74,17 @@ export function parseRecorderFlowJson(contents: string): string {
         if (currScript) {
           allScripts.push(currScript);
         }
-        currScript = { url: step.url, steps: [] };
+        counter += 1;
+        currScript = {
+          url: step.url,
+          steps: [],
+          id: source + (counter > 1 ? "_" + counter : ""),
+        };
         break;
 
       default:
         if (!currScript) {
-          currScript = { url: "", steps: [] };
+          currScript = { url: "", id: source, steps: [] };
         }
         currScript.steps.push(step);
     }
@@ -88,8 +107,11 @@ function formatScript(script: SingleSiteScript) {
   const url = script.url;
   const urlJSON = url ? JSON.stringify(url) : "";
 
-  const suffix = crypto.randomBytes(4).toString("hex");
-  const id = url ? url + "-" + suffix : "any-" + suffix;
+  const id = script.id;
+  const suffix =
+    basename(id).replace(/[^\w]/g, "_") +
+    "_" +
+    crypto.randomBytes(4).toString("hex");
 
   return `\
 class BehaviorScript_${suffix}
@@ -110,7 +132,7 @@ class BehaviorScript_${suffix}
     const { Lib } = ctx;
     const { getState, initFlow, nextFlowStep } = Lib;
 
-    const flowId = await initFlow(${formatSteps(script.steps)});
+    const flowId = await initFlow(${formatSteps(id, script.steps)});
 
     while (true) {
       const {done, msg} = await nextFlowStep(flowId);
@@ -124,7 +146,7 @@ class BehaviorScript_${suffix}
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function formatSteps(steps: any[]) {
+function formatSteps(id: string, steps: any[]) {
   for (const step of steps) {
     if (step.selectors) {
       try {
@@ -136,33 +158,42 @@ function formatSteps(steps: any[]) {
       }
     }
   }
-  return JSON.stringify(steps, null, 2);
+  const resp = { id, steps };
+  return JSON.stringify(resp, null, 2);
 }
 
 // ============================================================================
 class Flow {
-  id: number;
   lastId = "";
   recorder: Recorder | null;
   cdp: CDPSession;
   steps: FlowStepParams[];
   repeatSteps = new Map<string, number>();
   currStep = 0;
+  state: RedisCrawlState;
 
   timeoutSec = 5;
   pauseSec = 0.5;
+  flowId: string;
+
+  runOnce = false;
+  runOncePercentDone = 1.0;
+
+  notFoundCount = 0;
 
   constructor(
-    id: number,
+    id: string,
     recorder: Recorder | null,
     cdp: CDPSession,
     steps: FlowStepParams[],
+    state: RedisCrawlState,
   ) {
-    this.id = id;
     this.recorder = recorder;
     this.cdp = cdp;
     this.steps = steps;
     this.currStep = 0;
+    this.state = state;
+    this.flowId = id;
   }
 
   async nextFlowStep(page: Page) {
@@ -210,12 +241,16 @@ class Flow {
     try {
       const res = await this.runStep(page, params as Step, this.timeoutSec);
       await sleep(this.pauseSec);
+      this.notFoundCount = 0;
       return res;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       if (e.toString().startsWith("TimeoutError")) {
-        return this.currStep === 0 ? StepResult.NotFound : StepResult.TimedOut;
+        this.notFoundCount++;
+        return this.notFoundCount >= 4
+          ? StepResult.NotFound
+          : StepResult.TimedOut;
       } else {
         logger.warn(e.toString(), { params }, "behavior");
         return StepResult.OtherError;
@@ -305,7 +340,6 @@ class Flow {
       case StepType.Navigate:
       case StepType.SetViewport:
       case StepType.Close:
-      case StepType.CustomStep:
         return StepResult.NotHandled;
 
       case StepType.DoubleClick:
@@ -409,6 +443,9 @@ class Flow {
         break;
       }
 
+      case StepType.CustomStep:
+        return await this.handleCustomStep(step);
+
       default:
         return StepResult.NotHandled;
     }
@@ -421,27 +458,82 @@ class Flow {
       computedStyles: [],
     });
   }
+
+  async handleCustomStep(step: CustomStep) {
+    const id = this.flowId;
+    switch (step.name) {
+      case "runOncePerCrawl":
+        if (await this.state.isInUserSet(id)) {
+          logger.info(
+            "Skipping behavior, already ran for crawl",
+            { id },
+            "behaviorScript",
+          );
+          return StepResult.NotFound;
+        }
+        logger.info(
+          "Behavior will run once if completed",
+          { id },
+          "behaviorScript",
+        );
+        this.runOnce = true;
+
+        this.runOncePercentDone =
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ((step.parameters || {}) as any).percentDone ?? 0.5;
+        return StepResult.Success;
+
+      default:
+        return StepResult.NotHandled;
+    }
+  }
+
+  async checkRunOnce() {
+    if (!this.runOnce) {
+      return;
+    }
+
+    const id = this.flowId;
+
+    const minSteps = this.steps.length * this.runOncePercentDone;
+
+    if (this.currStep >= minSteps) {
+      const actualPercentDone = this.currStep / this.steps.length;
+      await this.state.addToUserSet(id);
+      logger.info(
+        "Behavior ran once per crawl to % done, will not run again",
+        {
+          id,
+          currStep: this.currStep,
+          total: this.steps.length,
+          minPercentDone: this.runOncePercentDone,
+          actualPercentDone,
+          minSteps,
+        },
+        "behaviorScript",
+      );
+    }
+  }
 }
 
 // ============================================================================
-let flowCounter = 0;
 
-const flows = new Map<number, Flow>();
+const flows = new Map<string, Flow>();
 
 // ============================================================================
 export async function initFlow(
-  steps: FlowStepParams[],
+  { id, steps }: FlowCommand,
   recorder: Recorder | null,
   cdp: CDPSession,
+  state: RedisCrawlState,
 ) {
-  const id = flowCounter++;
   logger.debug("Init Flow Called", { id }, "behavior");
-  flows.set(id, new Flow(id, recorder, cdp, steps));
+  flows.set(id, new Flow(id, recorder, cdp, steps, state));
   return id;
 }
 
 // ============================================================================
-export async function nextFlowStep(id: number, page: Page) {
+export async function nextFlowStep(id: string, page: Page) {
   const flow = flows.get(id);
   if (!flow) {
     logger.debug("Flow Not Found", { id }, "behavior");
@@ -450,6 +542,7 @@ export async function nextFlowStep(id: number, page: Page) {
   logger.debug("Next Flow Step", { id }, "behavior");
   const res = await flow.nextFlowStep(page);
   if (res.done) {
+    await flow.checkRunOnce();
     flows.delete(id);
   }
   return res;
