@@ -100,11 +100,11 @@ export function parseRecorderFlowJson(
     content += formatScript(script);
   }
 
-  logger.debug(
-    "Compiled workflow from: " + source,
-    { content },
-    "behaviorScript",
-  );
+  // logger.debug(
+  //   "Compiled workflow from: " + source,
+  //   { content },
+  //   "behaviorScript",
+  // );
 
   return content;
 }
@@ -140,9 +140,12 @@ class BehaviorScript_${suffix}
 
     const flowId = await initFlow(${formatSteps(id, script.steps)});
 
+    let steps = 0;
+
     while (true) {
       const {done, state} = await nextFlowStep(flowId);
-      yield state;
+      yield {steps, ...state};
+      steps++;
       if (done) {
         break;
       }
@@ -216,7 +219,6 @@ class Flow {
     const res = await this.runFlowStep(page, step);
 
     this.currStep++;
-    this.count++;
     let done = false;
 
     switch (res) {
