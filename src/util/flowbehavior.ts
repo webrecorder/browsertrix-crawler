@@ -205,7 +205,7 @@ class Flow {
 
     const step = this.steps[this.currStep];
 
-    let msg = `${step.type} step - `;
+    let msg = `flow step "${step.type}" - `;
 
     const res = await this.runFlowStep(page, step);
 
@@ -551,7 +551,6 @@ export async function nextFlowStep(id: string, page: Page) {
     logger.debug("Flow Not Found", { id }, "behavior");
     return { done: true, msg: "Invalid Flow" };
   }
-  logger.debug("Next Flow Step", { id }, "behavior");
   const res = await flow.nextFlowStep(page);
   if (res.done) {
     flows.delete(id);
