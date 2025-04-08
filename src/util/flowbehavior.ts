@@ -50,6 +50,7 @@ enum StepResult {
   OtherError = 3,
   Repeat = 4,
   NotFound = 5,
+  Done = 6,
 }
 
 export function parseRecorderFlowJson(
@@ -99,12 +100,6 @@ export function parseRecorderFlowJson(
   for (const script of allScripts) {
     content += formatScript(script);
   }
-
-  // logger.debug(
-  //   "Compiled workflow from: " + source,
-  //   { content },
-  //   "behaviorScript",
-  // );
 
   return content;
 }
@@ -240,6 +235,11 @@ class Flow {
         done = true;
         break;
 
+      case StepResult.Done:
+        msg += "processed, done";
+        done = true;
+        break;
+
       case StepResult.TimedOut:
         msg += "not found, not stopping";
         break;
@@ -302,21 +302,24 @@ class Flow {
       return false;
     }
 
-    let fetched = await Promise.race([activity, sleep(this.timeoutSec)]);
+    let changed = await Promise.race([activity, sleep(this.timeoutSec)]);
 
-    if (!fetched) {
+    if (!changed) {
       const newSnap = await this.getSnap();
-      fetched = !this.deepEqual(snap, newSnap);
-      logger.debug("Snapshot changed", { equal: fetched }, "behavior");
+      changed = !this.deepEqual(snap, newSnap);
+      logger.debug("Flow behavior page change check", { changed }, "behavior");
     }
 
-    if (!fetched) {
-      logger.debug("Flow repeat ended, not found / timed out", "behavior");
+    if (!changed) {
+      logger.debug(
+        "Flow Behavior repeat ended, not found / timed out",
+        "behavior",
+      );
     } else {
       await page.waitForNetworkIdle();
     }
 
-    return fetched;
+    return changed;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -487,15 +490,11 @@ class Flow {
           logger.info(
             "Skipping behavior, already ran for crawl",
             { id },
-            "behaviorScript",
+            "behavior",
           );
-          return StepResult.NotFound;
+          return StepResult.Done;
         }
-        logger.info(
-          "Behavior will run once if completed",
-          { id },
-          "behaviorScript",
-        );
+        logger.info("Behavior will run once if completed", { id }, "behavior");
         this.runOnce = true;
 
         this.runOncePercentDone =
@@ -521,7 +520,7 @@ class Flow {
       const actualPercentDone = this.currStep / this.steps.length;
       await this.state.addToUserSet(id);
       logger.info(
-        "Behavior ran once per crawl to % done, will not run again",
+        "Flow Behavior ran once per crawl to % done, will not run again",
         {
           id,
           currStep: this.currStep,
@@ -530,7 +529,7 @@ class Flow {
           actualPercentDone,
           minSteps,
         },
-        "behaviorScript",
+        "behavior",
       );
     }
   }
@@ -547,7 +546,7 @@ export async function initFlow(
   cdp: CDPSession,
   state: RedisCrawlState,
 ) {
-  logger.debug("Init Flow Called", { id }, "behavior");
+  logger.debug("Init Flow Behavior Called", { id }, "behavior");
   flows.set(id, new Flow(id, recorder, cdp, steps, state));
   return id;
 }
@@ -556,7 +555,7 @@ export async function initFlow(
 export async function nextFlowStep(id: string, page: Page) {
   const flow = flows.get(id);
   if (!flow) {
-    logger.debug("Flow Not Found", { id }, "behavior");
+    logger.error("Flow Behavior Not Found", { id }, "behavior");
     return { done: true, msg: "Invalid Flow" };
   }
   const res = await flow.nextFlowStep(page);

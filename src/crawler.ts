@@ -1317,7 +1317,7 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       frames = frames || page.frames();
 
-      logger.info(
+      logger.debug(
         "Running behaviors",
         {
           frames: frames.length,
@@ -1356,7 +1356,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
 
-      logger.info(
+      logger.debug(
         "Behaviors finished",
         { finished: results.length, ...logDetails },
         "behavior",
