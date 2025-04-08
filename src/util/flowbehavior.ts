@@ -487,7 +487,7 @@ class Flow {
     switch (step.name) {
       case "runOncePerCrawl":
         if (await this.state.isInUserSet(id)) {
-          logger.info(
+          logger.debug(
             "Skipping behavior, already ran for crawl",
             { id },
             "behavior",
