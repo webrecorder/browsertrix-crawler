@@ -204,7 +204,7 @@ class Flow {
 
   async nextFlowStep(page: Page) {
     if (this.currStep >= this.steps.length) {
-      return { done: true, msg: "All Steps Done!" };
+      return { state: { msg: "All Steps Done!" }, done: true };
     }
 
     const step = this.steps[this.currStep];
