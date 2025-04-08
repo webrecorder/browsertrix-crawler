@@ -916,11 +916,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await page.exposeFunction(BxFunctionBindings.InitFlow, (params: any) => {
-      return initFlow(params, recorder, cdp, this.crawlState);
+      return initFlow(params, recorder, cdp, this.crawlState, workerid);
     });
 
     await page.exposeFunction(BxFunctionBindings.NextFlowStep, (id: string) => {
-      return nextFlowStep(id, page);
+      return nextFlowStep(id, page, workerid);
     });
 
     // await page.exposeFunction("__bx_hasSet", (data: string) => this.crawlState.hasUserSet(data));

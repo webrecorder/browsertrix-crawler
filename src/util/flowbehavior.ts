@@ -187,7 +187,7 @@ class Flow {
   notFoundCount = 0;
 
   constructor(
-    id: string,
+    flowId: string,
     recorder: Recorder | null,
     cdp: CDPSession,
     steps: FlowStepParams[],
@@ -199,7 +199,7 @@ class Flow {
     this.currStep = 0;
     this.count = 0;
     this.state = state;
-    this.flowId = id;
+    this.flowId = flowId;
   }
 
   async nextFlowStep(page: Page) {
@@ -545,22 +545,25 @@ export async function initFlow(
   recorder: Recorder | null,
   cdp: CDPSession,
   state: RedisCrawlState,
+  workerid: number,
 ) {
-  logger.debug("Init Flow Behavior Called", { id }, "behavior");
-  flows.set(id, new Flow(id, recorder, cdp, steps, state));
+  const uid = id + "-" + workerid;
+  logger.debug("Init Flow Behavior Called", { id, workerid }, "behavior");
+  flows.set(uid, new Flow(id, recorder, cdp, steps, state));
   return id;
 }
 
 // ============================================================================
-export async function nextFlowStep(id: string, page: Page) {
-  const flow = flows.get(id);
+export async function nextFlowStep(id: string, page: Page, workerid: number) {
+  const uid = id + "-" + workerid;
+  const flow = flows.get(uid);
   if (!flow) {
-    logger.error("Flow Behavior Not Found", { id }, "behavior");
+    logger.error("Flow Behavior Not Found", { id, workerid }, "behavior");
     return { done: true, msg: "Invalid Flow" };
   }
   const res = await flow.nextFlowStep(page);
   if (res.done) {
-    flows.delete(id);
+    flows.delete(uid);
   }
   return res;
 }
