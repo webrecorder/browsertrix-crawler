@@ -135,7 +135,6 @@ async function collectLocalPathBehaviors(
       if (path.extname(resolvedPath) === ".json") {
         try {
           contents = parseRecorderFlowJson(contents, source);
-          console.log(contents);
         } catch (e) {
           logger.fatal(
             "Unable to parse recorder flow JSON, ignored",

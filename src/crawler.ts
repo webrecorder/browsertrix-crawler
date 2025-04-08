@@ -823,8 +823,6 @@ self.__bx_behaviors.init(${this.params.behaviorOpts}, false);
 ${this.customBehaviors}
 self.__bx_behaviors.selectMainBehavior();
 `;
-      console.log(initScript);
-
       if (!this.behaviorsChecked && this.customBehaviors) {
         await this.checkBehaviorScripts(cdp);
         this.behaviorsChecked = true;

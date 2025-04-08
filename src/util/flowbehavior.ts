@@ -135,8 +135,8 @@ class BehaviorScript_${suffix}
     const flowId = await initFlow(${formatSteps(id, script.steps)});
 
     while (true) {
-      const {done, msg} = await nextFlowStep(flowId);
-      yield getState(ctx, msg, "steps");
+      const {done} = await nextFlowStep(flowId);
+      yield null;
       if (done) {
         break;
       }
@@ -170,6 +170,7 @@ class Flow {
   steps: FlowStepParams[];
   repeatSteps = new Map<string, number>();
   currStep = 0;
+  count = 0;
   state: RedisCrawlState;
 
   timeoutSec = 5;
@@ -192,6 +193,7 @@ class Flow {
     this.cdp = cdp;
     this.steps = steps;
     this.currStep = 0;
+    this.count = 0;
     this.state = state;
     this.flowId = id;
   }
@@ -208,33 +210,43 @@ class Flow {
     const res = await this.runFlowStep(page, step);
 
     this.currStep++;
+    this.count++;
+    let done = false;
 
     switch (res) {
       case StepResult.Success:
         msg += "processed";
-        return { done: false, msg };
+        break;
 
       case StepResult.Repeat:
         msg += "processed, repeating";
         this.currStep--;
-        return { done: false, msg };
+        break;
 
       case StepResult.NotHandled:
         msg += "not supported, ignoring";
-        return { done: false, msg };
+        break;
 
       case StepResult.NotFound:
         msg += "not found, stopping";
-        return { done: true, msg };
+        done = true;
+        break;
 
       case StepResult.TimedOut:
         msg += "not found, not stopping";
-        return { done: false, msg };
+        break;
 
       case StepResult.OtherError:
         msg += "errored, stopping";
-        return { done: true, msg };
+        done = true;
+        break;
     }
+
+    logger.info(msg, { ...step, count: this.count }, "behaviorScript");
+    if (done) {
+      await this.checkRunOnce();
+    }
+    return { msg, done };
   }
 
   async runFlowStep(page: Page, params: FlowStepParams): Promise<StepResult> {
@@ -542,7 +554,6 @@ export async function nextFlowStep(id: string, page: Page) {
   logger.debug("Next Flow Step", { id }, "behavior");
   const res = await flow.nextFlowStep(page);
   if (res.done) {
-    await flow.checkRunOnce();
     flows.delete(id);
   }
   return res;
