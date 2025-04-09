@@ -476,8 +476,6 @@ export class Crawler {
   }
 
   async bootstrap() {
-    await this.initCrawlState();
-
     if (await isDiskFull(this.params.cwd)) {
       logger.fatal(
         "Out of disk space, exiting",
@@ -497,6 +495,8 @@ export class Crawler {
     ) {
       subprocesses.push(this.launchRedis());
     }
+
+    await this.initCrawlState();
 
     await fsp.mkdir(this.logDir, { recursive: true });
 
