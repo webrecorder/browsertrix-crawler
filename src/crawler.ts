@@ -225,13 +225,6 @@ export class Crawler {
     logger.setContext(this.params.logContext);
     logger.setExcludeContext(this.params.logExcludeContext);
 
-    // if automatically restarts on error exit code,
-    // exit with 0 from fatal by default, to avoid unnecessary restart
-    // otherwise, exit with default fatal exit code
-    if (this.params.restartsOnError) {
-      logger.setDefaultFatalExitCode(0);
-    }
-
     logger.debug("Writing log to: " + this.logFilename, {}, "general");
 
     this.recording = !this.params.dryRun;
@@ -410,6 +403,13 @@ export class Crawler {
 
     if (this.params.logErrorsToRedis || this.params.logBehaviorsToRedis) {
       logger.setCrawlState(this.crawlState);
+    }
+
+    // if automatically restarts on error exit code,
+    // exit with 0 from fatal by default, to avoid unnecessary restart
+    // otherwise, exit with default fatal exit code
+    if (this.params.restartsOnError) {
+      logger.setDefaultFatalExitCode(0);
     }
 
     return this.crawlState;
