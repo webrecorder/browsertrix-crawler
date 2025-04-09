@@ -71,6 +71,7 @@ import {
 } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
+import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -224,13 +225,6 @@ export class Crawler {
     logger.setContext(this.params.logContext);
     logger.setExcludeContext(this.params.logExcludeContext);
 
-    // if automatically restarts on error exit code,
-    // exit with 0 from fatal by default, to avoid unnecessary restart
-    // otherwise, exit with default fatal exit code
-    if (this.params.restartsOnError) {
-      logger.setDefaultFatalExitCode(0);
-    }
-
     logger.debug("Writing log to: " + this.logFilename, {}, "general");
 
     this.recording = !this.params.dryRun;
@@ -380,6 +374,29 @@ export class Crawler {
       this.params.maxPageRetries,
     );
 
+    if (this.params.logErrorsToRedis) {
+      logger.setLogErrorsToRedis(true);
+    }
+
+    if (this.params.logBehaviorsToRedis) {
+      logger.setLogBehaviorsToRedis(true);
+    }
+
+    if (this.params.logErrorsToRedis || this.params.logBehaviorsToRedis) {
+      logger.setCrawlState(this.crawlState);
+    }
+
+    // if automatically restarts on error exit code,
+    // exit with 0 from fatal by default, to avoid unnecessary restart
+    // otherwise, exit with default fatal exit code
+    if (this.params.restartsOnError) {
+      logger.setDefaultFatalExitCode(0);
+    }
+
+    return this.crawlState;
+  }
+
+  async loadCrawlState() {
     // load full state from config
     if (this.params.state) {
       await this.crawlState.load(this.params.state, this.seeds, true);
@@ -398,20 +415,6 @@ export class Crawler {
         "state",
       );
     }
-
-    if (this.params.logErrorsToRedis) {
-      logger.setLogErrorsToRedis(true);
-    }
-
-    if (this.params.logBehaviorsToRedis) {
-      logger.setLogBehaviorsToRedis(true);
-    }
-
-    if (this.params.logErrorsToRedis || this.params.logBehaviorsToRedis) {
-      logger.setCrawlState(this.crawlState);
-    }
-
-    return this.crawlState;
   }
 
   async loadExtraSeeds() {
@@ -473,6 +476,8 @@ export class Crawler {
   }
 
   async bootstrap() {
+    await this.initCrawlState();
+
     if (await isDiskFull(this.params.cwd)) {
       logger.fatal(
         "Out of disk space, exiting",
@@ -578,6 +583,8 @@ export class Crawler {
     if (this.params.text && !this.params.dryRun) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
     }
+
+    await this.loadCrawlState();
   }
 
   extraChromeArgs() {
@@ -913,6 +920,15 @@ self.__bx_behaviors.selectMainBehavior();
       this.crawlState.addToUserSet(data),
     );
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await page.exposeFunction(BxFunctionBindings.InitFlow, (params: any) => {
+      return initFlow(params, recorder, cdp, this.crawlState, workerid);
+    });
+
+    await page.exposeFunction(BxFunctionBindings.NextFlowStep, (id: string) => {
+      return nextFlowStep(id, page, workerid);
+    });
+
     // await page.exposeFunction("__bx_hasSet", (data: string) => this.crawlState.hasUserSet(data));
   }
 
@@ -1165,7 +1181,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.params.behaviorOpts && data.status < 400) {
       if (data.skipBehaviors) {
-        logger.info("Skipping behaviors for slow page", logDetails, "behavior");
+        logger.warn("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
         const res = await timedRun(
           this.runBehaviors(
@@ -1307,7 +1323,7 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       frames = frames || page.frames();
 
-      logger.info(
+      logger.debug(
         "Running behaviors",
         {
           frames: frames.length,
@@ -1346,7 +1362,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
 
-      logger.info(
+      logger.debug(
         "Behaviors finished",
         { finished: results.length, ...logDetails },
         "behavior",
@@ -1569,8 +1585,6 @@ self.__bx_behaviors.selectMainBehavior();
         return;
       }
     }
-
-    await this.initCrawlState();
 
     let initState = await this.crawlState.getStatus();
 
@@ -2249,11 +2263,6 @@ self.__bx_behaviors.selectMainBehavior();
 
   async awaitPageLoad(frame: Frame, logDetails: LogDetails) {
     if (this.params.behaviorOpts) {
-      logger.debug(
-        "Waiting for custom page load via behavior",
-        logDetails,
-        "behavior",
-      );
       try {
         await timedRun(
           frame.evaluate(

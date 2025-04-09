@@ -1,0 +1,55 @@
+{
+    "title": "test WR create click + enter URL",
+    "steps": [
+        {
+            "type": "navigate",
+            "url": "https://webrecorder.net/"
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "aria/[role=\"main\"]",
+                    "aria/[role=\"textbox\"]"
+                ],
+                [
+                    "#archive-url"
+                ],
+                [
+                    "xpath///*[@id=\"archive-url\"]"
+                ],
+                [
+                    "pierce/#archive-url"
+                ]
+            ],
+            "offsetY": 19.0078125,
+            "offsetX": 310.5
+        },
+        {
+            "type": "change",
+            "value": "https://example.com/",
+            "selectors": [
+                [
+                    "aria/[role=\"main\"]",
+                    "aria/[role=\"textbox\"]"
+                ],
+                [
+                    "#archive-url"
+                ],
+                [
+                    "xpath///*[@id=\"archive-url\"]"
+                ],
+                [
+                    "pierce/#archive-url"
+                ]
+            ],
+            "target": "main"
+        },
+        {
+            "type": "keyDown",
+            "target": "main",
+            "key": "Enter"
+        }
+    ]
+}

@@ -319,7 +319,7 @@ export class Browser {
     let details: Record<string, any> = { frameUrl, ...logData };
 
     if (!frameUrl || frame.detached) {
-      logger.info(
+      logger.debug(
         "Run Script Skipped, frame no longer attached or has no URL",
         details,
         contextName,
@@ -341,7 +341,13 @@ export class Browser {
       return;
     }
 
-    logger.info("Run Script Started", details, contextName);
+    const isTopFrame = !frame.parentFrame();
+
+    if (isTopFrame) {
+      logger.debug("Run Script Started", details, contextName);
+    } else {
+      logger.debug("Run Script Started in iframe", details, contextName);
+    }
 
     // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
     //const contextId = context._contextId;
@@ -366,7 +372,11 @@ export class Browser {
       }
       logger.error("Run Script Failed", details, contextName);
     } else {
-      logger.info("Run Script Finished", details, contextName);
+      if (isTopFrame) {
+        logger.debug("Run Script Finished", details, contextName);
+      } else {
+        logger.debug("Run Script Finished in iframe", details, contextName);
+      }
     }
 
     return result.value;

@@ -5,15 +5,16 @@ import { fetch } from "undici";
 import util from "util";
 import { exec as execCallback } from "child_process";
 
-import { logger } from "./logger.js";
+import { formatErr, logger } from "./logger.js";
 import { getProxyDispatcher } from "./proxy.js";
+import { parseRecorderFlowJson } from "./flowbehavior.js";
 
 const exec = util.promisify(execCallback);
 
 const MAX_DEPTH = 5;
 
 // Add .ts to allowed extensions when we can support it
-const ALLOWED_EXTS = [".js"];
+const ALLOWED_EXTS = [".js", ".json"];
 
 export type FileSource = {
   path: string;
@@ -82,7 +83,7 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
 }
 
 async function collectOnlineBehavior(url: string): Promise<FileSources> {
-  const filename = crypto.randomBytes(4).toString("hex") + ".js";
+  const filename = path.basename(new URL(url).pathname);
   const tmpDir = `/tmp/behaviors-${crypto.randomBytes(4).toString("hex")}`;
   await fsp.mkdir(tmpDir, { recursive: true });
   const behaviorFilepath = path.join(tmpDir, filename);
@@ -132,7 +133,19 @@ async function collectLocalPathBehaviors(
     if (stat.isFile() && ALLOWED_EXTS.includes(path.extname(resolvedPath))) {
       source = source ?? filename;
       logger.info("Custom behavior script added", { source }, "behavior");
-      const contents = await fsp.readFile(resolvedPath);
+      let contents = await fsp.readFile(resolvedPath, { encoding: "utf-8" });
+      if (path.extname(resolvedPath) === ".json") {
+        try {
+          contents = parseRecorderFlowJson(contents, source);
+        } catch (e) {
+          logger.fatal(
+            "Unable to parse recorder flow JSON, ignored",
+            formatErr(e),
+            "behavior",
+          );
+        }
+      }
+
       return [
         {
           path: resolvedPath,
