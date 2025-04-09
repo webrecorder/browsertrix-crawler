@@ -374,25 +374,6 @@ export class Crawler {
       this.params.maxPageRetries,
     );
 
-    // load full state from config
-    if (this.params.state) {
-      await this.crawlState.load(this.params.state, this.seeds, true);
-      // otherwise, just load extra seeds
-    } else {
-      await this.loadExtraSeeds();
-    }
-
-    // clear any pending URLs from this instance
-    await this.crawlState.clearOwnPendingLocks();
-
-    if (this.params.saveState === "always" && this.params.saveStateInterval) {
-      logger.debug(
-        `Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`,
-        {},
-        "state",
-      );
-    }
-
     if (this.params.logErrorsToRedis) {
       logger.setLogErrorsToRedis(true);
     }
@@ -413,6 +394,27 @@ export class Crawler {
     }
 
     return this.crawlState;
+  }
+
+  async loadCrawlState() {
+    // load full state from config
+    if (this.params.state) {
+      await this.crawlState.load(this.params.state, this.seeds, true);
+      // otherwise, just load extra seeds
+    } else {
+      await this.loadExtraSeeds();
+    }
+
+    // clear any pending URLs from this instance
+    await this.crawlState.clearOwnPendingLocks();
+
+    if (this.params.saveState === "always" && this.params.saveStateInterval) {
+      logger.debug(
+        `Saving crawl state every ${this.params.saveStateInterval} seconds, keeping last ${this.params.saveStateHistory} states`,
+        {},
+        "state",
+      );
+    }
   }
 
   async loadExtraSeeds() {
@@ -474,6 +476,8 @@ export class Crawler {
   }
 
   async bootstrap() {
+    await this.initCrawlState();
+
     if (await isDiskFull(this.params.cwd)) {
       logger.fatal(
         "Out of disk space, exiting",
@@ -579,6 +583,8 @@ export class Crawler {
     if (this.params.text && !this.params.dryRun) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
     }
+
+    await this.loadCrawlState();
   }
 
   extraChromeArgs() {
@@ -1579,8 +1585,6 @@ self.__bx_behaviors.selectMainBehavior();
         return;
       }
     }
-
-    await this.initCrawlState();
 
     let initState = await this.crawlState.getStatus();
 
