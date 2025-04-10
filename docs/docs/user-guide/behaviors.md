@@ -192,9 +192,7 @@ For example, a behavior that iterates over elements and then clicks them either 
   }
 ```
 
-This behavior will run to completion and log every time a click event is made.
-However, this behavior can not be paused and resumed (supported in ArchiveWeb.page)
-and generally can not be interrupted.
+This behavior will run to completion and log every time a click event is made. However, this behavior can not be paused and resumed (supported in ArchiveWeb.page) and generally can not be interrupted.
 
 One approach is to yield after every major 'step' in the behavior, for example:
 
@@ -227,7 +225,8 @@ interrupted after each logical 'step'.
 #### getState() function.
 
 A common pattern is to increment a particular counter, and then return the whole state.
-A convenience function `getState()` is provided to simplify this, and tp avoid the need to create custom counters.
+
+A convenience function `getState()` is provided to simplify this and avoid the need to create custom counters.
 
 Using this standard function, the above code might be condensed as follows:
 
@@ -249,8 +248,7 @@ Using this standard function, the above code might be condensed as follows:
 
 #### Utility Functions
 
-In addition to `getState()`, Browsertrix Behaviors includes
-[a small library of other utility functions](https://github.com/webrecorder/browsertrix-behaviors/blob/main/src/lib/utils.ts) which are available to behaviors under `ctx.Lib`.
+In addition to `getState()`, Browsertrix Behaviors includes [a small library of other utility functions](https://github.com/webrecorder/browsertrix-behaviors/blob/main/src/lib/utils.ts) which are available to behaviors under `ctx.Lib`.
 
 Some of these functions which may be of use to behaviors authors are:
 
