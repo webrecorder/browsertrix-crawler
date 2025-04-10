@@ -1,25 +1,24 @@
 # Browser Behaviors
 
-Browsertrix Crawler supports automatically running customized behaviors on each page. These include several different kinds of behaviors, including built-in, background and site-specific behaviors as well as ability to add fully user-defined custom behaviors that can be added to trigger custom actions on certain pages.
+Browsertrix Crawler supports automatically running customized behaviors on each page. These include several different kinds of behaviors, including built-in, background, and site-specific behaviors. It is also possible to add fully user-defined custom behaviors that can be added to trigger specific actions on certain pages.
 
 ## Built-In Behaviors
 
- The built-in behaviors include the following background behaviors which run 'in the background' checking for changes:
+ The built-in behaviors include the following background behaviors which run 'in the background' continually checking for changes:
  
- - Autoplay: find and start playing (when possible) and video or audio on the page (and in each iframe).
- - Autofetch: find and start fetching any URLs that may not be fetched by default, such as other resolutions in `img` tags, `data-*`, lazy-loaded resources, etc...
- - Autoclick: selector all tags (default: `a` tag, customizable via `--clickSelector`) that may be clickable and attempt to click them, while avoiding navigation away from the page.
+ - Autoplay: find and start playing (when possible) any video or audio on the page (and in each iframe).
+ - Autofetch: find and start fetching any URLs that may not be fetched by default, such as other resolutions in `img` tags, `data-*`, lazy-loaded resources, etc.
+ - Autoclick: select all tags (default: `a` tag, customizable via `--clickSelector`) that may be clickable and attempt to click them while avoiding navigation away from the page.
 
  There is also a built-in 'main' behavior, which runs to completion (or until a timeout is reached):
 
- - Autoscroll: Determine if a page might need scrolling, and scroll either up or down, while new elements are being added. Continue until timeout or scrolling is no longer possible.
+ - Autoscroll: Determine if a page might need scrolling, and scroll either up or down while new elements are being added. Continue until timeout is reached or scrolling is no longer possible.
 
- ## Site Specific Behaviors
+ ## Site-Specific Behaviors
 
- Browsertrix also comes with several 'site-specific' behaviors, which run only on specific sites. These behaviors will run instead of Autoscroll 
- and will run until completion or timeout. Currently, site-specific behaviors include major social media sites.
+ Browsertrix also comes with several 'site-specific' behaviors, which run only on specific sites. These behaviors will run instead of Autoscroll and will run until completion or timeout. Currently, site-specific behaviors include major social media sites.
 
- Refer to [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for latest list of site-specific behaviors.
+ Refer to [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for the latest list of site-specific behaviors.
 
  User-defined custom behaviors are also considered site-specific.
  
@@ -29,25 +28,23 @@ To enable built-in behaviors, specify them via a comma-separated list passed to 
 
 To only use Autoclick but not Autoscroll, use `--behaviors autoclick,autoplay,autofetch,siteSpecific`.
 
-The `--siteSpecific` flag enables all site-specific behaviors to be enabled, but only one behavior can be run per site, each behavior specifies which
-site it should run on.
+The `--siteSpecific` flag enables all site-specific behaviors to be enabled, but only one behavior can be run per site. Each site-specific behavior specifies which site it should run on.
 
 To disable all behaviors, use `--behaviors ""`.
 
 ## Behavior and Page Timeouts
 
-Browsertrix includes a number of timeouts, include before, during and after running behaviors.
+Browsertrix includes a number of timeouts, including before, during and after running behaviors.
 The timeouts are as follows:
 
-- `--waitUntil` - how long to wait for page to finish loading, *before* doing anything else.
-- `--postLoadDelay` - how long to wait *before* starting any behaviors, but after page has finished loading. A custom behavior can customize override this (see below)
-- `--behaviorTimeout` - maximum time to spend on running behaviors site-specific / Autoscroll behaviors (can be less if behavior finishes early).
-- `--pageExtraDelay` - how long to wait *after* finishing behaviors (or `behaviorTimeout` has reached) before moving on to next page.
+- `--waitUntil`: how long to wait for page to finish loading, *before* doing anything else.
+- `--postLoadDelay`: how long to wait *before* starting any behaviors, but after page has finished loading. A custom behavior can override this (see below).
+- `--behaviorTimeout`: maximum time to spend on running site-specific / Autoscroll behaviors (can be less if behavior finishes early).
+- `--pageExtraDelay`: how long to wait *after* finishing behaviors (or after `behaviorTimeout` has been reached) before moving on to next page.
 
+A site-specific behavior (or Autoscroll) will start after the page is loaded (at most after `--waitUntil` seconds) and exactly after `--postLoadDelay` seconds.
 
-A site-specific behavior (or Autoscroll) will start the page is loaded (at most after `--waitUnitl` seconds) and exactly after `--postLoadDelay` seconds.
-
-The behavior will then run until finished or at most until `--behaviorTimeout` is reached (90 seconds by default.)
+The behavior will then run until finished or at most until `--behaviorTimeout` is reached (90 seconds by default).
 
 ## Loading Custom Behaviors
 
@@ -90,22 +87,23 @@ docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --u
 
 ## Creating Custom Behaviors
 
-The custom behavior file can be in one of the following supported formats, JSON flow format or Javascript/Typescript.
+A custom behavior file can be in one of the following supported formats:
+- JSON User Flow
+- JavaScript / Typescript (compiled to JavaScript)
 
 ### JSON Flow Behaviors
 
 Browsertrix Crawler 1.6 and up supports replaying the JSON User Flow format generated by [DevTools Recorder](https://developer.chrome.com/docs/devtools/recorder), which is built-in to Chrome devtools.
 
 This format can be generated by using the DevTools Recorder to create a series of steps, which are serialized to JSON.
+
 The format represents a series of steps that should happen on a particular page.
 
-The recorded is capable of picking the right selectors interactively and supports events such as `click`, `change`,
-`waitForElement` and more. See the [feature reference](https://developer.chrome.com/docs/devtools/recorder/reference)
-for a more complete list.
+The recorder is capable of picking the right selectors interactively and supports events such as `click`, `change`, `waitForElement` and more. See the [feature reference](https://developer.chrome.com/docs/devtools/recorder/reference) for a more complete list.
 
 #### User Flow Extensions
 
-Browsertrix extends the functionality compared to DevTools Recorder in the following way:
+Browsertrix extends the functionality compared to DevTools Recorder in the following ways:
 
 - Browsertrix Crawler will attempt to continue even if initial step fails, for up to 3 failures.
 
@@ -117,9 +115,10 @@ Browsertrix extends the functionality compared to DevTools Recorder in the follo
 
 - A `customStep` step with name `runOncePerCrawl` can be added to indicate that a user flow should run only once for a given crawl.
 
-### JS Behaviors
+### JavaScript Behaviors
 
 The main native format of custom behaviors is a Javascript class.
+
 There should be a single class per file, and it should be of the following format:
 
 #### Behavior Class
@@ -141,15 +140,15 @@ class MyBehavior
   }
 
   // optional: if true, will also check isMatch() and possibly run
-  // this behavior in each iframes.
-  // if false, or not defined, this behavior will not be skipped for iframes.
+  // this behavior in each iframe.
+  // if false, or not defined, this behavior will be skipped for iframes.
   static runInIframes = false;
 
   // optional: if defined, provides a way to define a custom way to determine
   // when a page has finished loading beyond the standard 'load' event.
   //
   // if defined, the crawler will await 'awaitPageLoad()' before moving on to
-  // post-crawl processing operations, including link-extraction, screenshots,
+  // post-crawl processing operations, including link extraction, screenshots,
   // and running main behavior
   async awaitPageLoad() {
 
@@ -171,9 +170,9 @@ class MyBehavior
 
 #### Behavior run() loop
 
-The `run()` loop provides the main loop for the behavior to run. It must be an [async iterator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncIterator) which means that it can optionally call `yield` to return state to the crawler and allow it to print the state.
+The `run()` loop provides the main loop for the behavior to run. It must be an [async iterator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncIterator), which means that it can optionally call `yield` to return state to the crawler and allow it to print the state.
 
-For example, a behavior that iterates over elements and then clicks them either one or twice (based on value of a custom `.clickTwice` property) could be written as follows:
+For example, a behavior that iterates over elements and then clicks them either once or twice (based on the value of a custom `.clickTwice` property) could be written as follows:
 
 ```javascript
   async* run(ctx) {
@@ -228,7 +227,7 @@ interrupted after each logical 'step'.
 #### getState() function.
 
 A common pattern is to increment a particular counter, and then return the whole state.
-A convenience function `getState()` is provided to simplify this, and avoid creating custom counters.
+A convenience function `getState()` is provided to simplify this, and tp avoid the need to create custom counters.
 
 Using this standard function, the above code might be condensed as follows:
 
@@ -255,18 +254,18 @@ In addition to `getState()`, Browsertrix Behaviors includes
 
 Some of these functions which may be of use to behaviors authors are:
 
-- `scrollAndClick` - scroll element into view and click
-- `sleep` - sleep for specified timeout (ms)
-- `waitUntil` - wait until a certain predicate is true
-- `waitUntilNode` - wait until a DOM node exists
-- `xpathNode` - find a DOM node by xpath
-- `xpathNodes` - find and iterate all DOM nodes by xpath
-- `xpathString` - find a string attribute by xpath
-- `iterChildElem` - iterate over all child elements of given element
-- `iterChildMatches` - iterate over all child elements that match a specific xpath
-- `isInViewport` - determine if a given element is in the visible viewport
-- `scrollToOffset` - scroll to particular offset
-- `scrollIntoView` - smoothly scroll particular element into view.
-- `getState` - increment a state counter and return all state counters + string message.
+- `scrollAndClick`: scroll element into view and click
+- `sleep`: sleep for specified timeout (ms)
+- `waitUntil`: wait until a certain predicate is true
+- `waitUntilNode`: wait until a DOM node exists
+- `xpathNode`: find a DOM node by xpath
+- `xpathNodes`: find and iterate all DOM nodes by xpath
+- `xpathString`: find a string attribute by xpath
+- `iterChildElem`: iterate over all child elements of given element
+- `iterChildMatches`: iterate over all child elements that match a specific xpath
+- `isInViewport`: determine if a given element is in the visible viewport
+- `scrollToOffset`: scroll to particular offset
+- `scrollIntoView`: smoothly scroll particular element into view
+- `getState`: increment a state counter and return all state counters + string message
 
-More detailed reference will be added in the future.
+More detailed references will be added in the future.
