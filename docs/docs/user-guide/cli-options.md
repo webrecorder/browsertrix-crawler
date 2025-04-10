@@ -19,8 +19,7 @@ Options:
                                              crawl configuration (can also be se
                                             t via CRAWL_ID env var), defaults to
                                              combination of Docker container hos
-                                            tname and collection
-                                             [string] [default: "@hostname-@id"]
+                                            tname and collection        [string]
       --waitUntil                           Puppeteer page.goto() condition to w
                                             ait for before continuing, can be mu
                                             ltiple separated by ','
@@ -88,6 +87,9 @@ Options:
                                                   [number] [default: 1000000000]
       --generateWACZ, --generatewacz, --ge  If set, generate WACZ on disk
       nerateWacz                                      [boolean] [default: false]
+      --useSHA1                             If set, sha-1 instead of sha-256 has
+                                            hes will be used for creating record
+                                            s         [boolean] [default: false]
       --logging                             Logging options for crawler, can inc
                                             lude: stats (enabled by default), js
                                             errors, debug
@@ -100,16 +102,17 @@ Options:
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
-  orScript", "jsError", "fetch", "pageStatus", "memoryStatus", "crawlStatus", "l
-                      inks", "sitemap", "wacz", "replay", "proxy"] [default: []]
+  orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
+  atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy"] [default:
+                                                                             []]
       --logExcludeContext                   Comma-separated list of contexts to
                                             NOT include in logs
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
-  orScript", "jsError", "fetch", "pageStatus", "memoryStatus", "crawlStatus", "l
-  inks", "sitemap", "wacz", "replay", "proxy"] [default: ["recorderNetwork","jsE
-                                                            rror","screencast"]]
+  orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
+  atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy"] [default:
+                                     ["recorderNetwork","jsError","screencast"]]
       --text                                Extract initial (default) or final t
                                             ext to pages.jsonl or WARC resource
                                             record(s)
@@ -236,6 +239,9 @@ Options:
                                                            [array] [default: []]
       --logErrorsToRedis                    If set, write error messages to redi
                                             s         [boolean] [default: false]
+      --logBehaviorsToRedis                 If set, write behavior script messag
+                                            es to redis
+                                                      [boolean] [default: false]
       --writePagesToRedis                   If set, write page objects to redis
                                                       [boolean] [default: false]
       --maxPageRetries, --retries           If set, number of times to retry a p
