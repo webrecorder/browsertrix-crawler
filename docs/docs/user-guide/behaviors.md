@@ -222,7 +222,7 @@ The data that is yielded will be logged in the `behaviorScriptCustom` context.
 This allows for the behavior to log the current state of the behavior and allow for it to be gracefully
 interrupted after each logical 'step'.
 
-#### getState() function.
+#### getState() function
 
 A common pattern is to increment a particular counter, and then return the whole state.
 
