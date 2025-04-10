@@ -4,23 +4,23 @@ Browsertrix Crawler supports automatically running customized behaviors on each 
 
 ## Built-In Behaviors
 
- The built-in behaviors include the following background behaviors which run 'in the background' continually checking for changes:
+The built-in behaviors include the following background behaviors which run 'in the background' continually checking for changes:
  
- - Autoplay: find and start playing (when possible) any video or audio on the page (and in each iframe).
- - Autofetch: find and start fetching any URLs that may not be fetched by default, such as other resolutions in `img` tags, `data-*`, lazy-loaded resources, etc.
- - Autoclick: select all tags (default: `a` tag, customizable via `--clickSelector`) that may be clickable and attempt to click them while avoiding navigation away from the page.
+- Autoplay: find and start playing (when possible) any video or audio on the page (and in each iframe).
+- Autofetch: find and start fetching any URLs that may not be fetched by default, such as other resolutions in `img` tags, `data-*`, lazy-loaded resources, etc.
+- Autoclick: select all tags (default: `a` tag, customizable via `--clickSelector`) that may be clickable and attempt to click them while avoiding navigation away from the page.
 
- There is also a built-in 'main' behavior, which runs to completion (or until a timeout is reached):
+There is also a built-in 'main' behavior, which runs to completion (or until a timeout is reached):
 
- - Autoscroll: Determine if a page might need scrolling, and scroll either up or down while new elements are being added. Continue until timeout is reached or scrolling is no longer possible.
+- Autoscroll: Determine if a page might need scrolling, and scroll either up or down while new elements are being added. Continue until timeout is reached or scrolling is no longer possible.
 
- ## Site-Specific Behaviors
+## Site-Specific Behaviors
 
- Browsertrix also comes with several 'site-specific' behaviors, which run only on specific sites. These behaviors will run instead of Autoscroll and will run until completion or timeout. Currently, site-specific behaviors include major social media sites.
+Browsertrix also comes with several 'site-specific' behaviors, which run only on specific sites. These behaviors will run instead of Autoscroll and will run until completion or timeout. Currently, site-specific behaviors include major social media sites.
 
- Refer to [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for the latest list of site-specific behaviors.
+Refer to [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for the latest list of site-specific behaviors.
 
- User-defined custom behaviors are also considered site-specific.
+User-defined custom behaviors are also considered site-specific.
  
 ## Enabling Behaviors
 
