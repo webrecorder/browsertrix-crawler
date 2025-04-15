@@ -7,5 +7,6 @@
     "URLBlocklist": [
         "file://*"
     ],
-    "DownloadDirectory": "/dev/null"
+    "DownloadDirectory": "/dev/null",
+    "SpellcheckEnabled": false
 }
