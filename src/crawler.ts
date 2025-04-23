@@ -47,6 +47,7 @@ import {
   ExitCodes,
   InterruptReason,
   BxFunctionBindings,
+  DIRECT_FETCH_EXT,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -1012,19 +1013,17 @@ self.__bx_behaviors.selectMainBehavior();
     return "";
   }
 
-  skipDirectFetchByExt(url: string) {
+  shouldDirectFetchByExt(url: string) {
     const urlFull = new URL(url);
     const extParts = urlFull.pathname.split(".");
     if (extParts.length <= 1) {
-      return true;
+      return false;
     }
     const ext = extParts[1];
-    if (["html", "htm", "asp", "php"].includes(ext)) {
-      return true;
-    }
 
-    if (["pdf", "xml", "jpg", "webm", "docx", "mp4", "zip"].includes(ext)) {
-      return false;
+    // known files that should be direct fetched
+    if (DIRECT_FETCH_EXT.includes(ext)) {
+      return true;
     }
 
     return false;
@@ -1051,7 +1050,7 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    if (recorder && !this.skipDirectFetchByExt(url)) {
+    if (recorder && this.shouldDirectFetchByExt(url)) {
       try {
         const headers = auth
           ? { Authorization: auth, ...this.headers }
