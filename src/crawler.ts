@@ -585,6 +585,8 @@ export class Crawler {
     }
 
     await this.loadCrawlState();
+
+    await this.crawlState.trimToLimit(this.pageLimit);
   }
 
   extraChromeArgs() {

@@ -109,6 +109,13 @@ declare module "ioredis" {
       limit: number,
     ): Result<number, Context>;
 
+    trimqueue(
+      qkey: string,
+      pkey: string,
+      skey: string,
+      limit: number,
+    ): Result<number, Context>;
+
     getnext(qkey: string, pkey: string): Result<string, Context>;
 
     markstarted(
@@ -242,6 +249,25 @@ redis.call('zadd', KEYS[2], ARGV[2], ARGV[3]);
 redis.call('hdel', KEYS[1], ARGV[1]);
 return 0;
 `,
+    });
+
+    redis.defineCommand("trimqueue", {
+      numberOfKeys: 3,
+      lua: `
+      local limit = tonumber(ARGV[1]);
+      if redis.call('zcard', KEYS[1]) <= limit then
+        return 0
+      end
+      local res = redis.call('zpopmax', KEYS[1]);
+      local json = res[1];
+
+      if json then
+        local data = cjson.decode(json);
+        redis.call('hdel', KEYS[2], data.url);
+        redis.call('srem', KEYS[3], data.url);
+      end
+      return 1;
+      `,
     });
 
     redis.defineCommand("getnext", {
@@ -410,6 +436,24 @@ return inx;
 
   async isFinished() {
     return (await this.queueSize()) == 0 && (await this.numDone()) > 0;
+  }
+
+  async trimToLimit(limit: number) {
+    const totalComplete =
+      (await this.numPending()) +
+      (await this.numDone()) +
+      (await this.numFailed());
+    if (!totalComplete) {
+      return;
+    }
+    const remain = Math.max(0, limit - totalComplete);
+    // trim queue until size <= remain
+    while (
+      (await this.redis.trimqueue(this.qkey, this.pkey, this.skey, remain)) ===
+      1
+    ) {
+      /* ignore */
+    }
   }
 
   async setStatus(status_: string) {
