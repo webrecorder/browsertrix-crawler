@@ -8,5 +8,6 @@
         "file://*"
     ],
     "DownloadDirectory": "/dev/null",
-    "SpellcheckEnabled": false
+    "SpellcheckEnabled": false,
+    "HttpsUpgradesEnabled": false
 }
