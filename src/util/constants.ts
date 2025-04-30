@@ -88,4 +88,5 @@ export enum InterruptReason {
   DiskUtilization = 4,
   BrowserCrashed = 5,
   SignalInterrupted = 6,
+  CrawlPaused = 7,
 }
