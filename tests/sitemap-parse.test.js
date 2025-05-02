@@ -68,15 +68,15 @@ async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessTh
 }
 
 test("test sitemap fully finish", async () => {
-  await runCrawl(3500, "https://www.mozilla.org/", "", 0);
+  await runCrawl(3500, "https://developer.mozilla.org/", "", 0);
 });
 
 test("test sitemap with limit", async () => {
-  await runCrawl(1900, "https://www.mozilla.org/", "", 2000);
+  await runCrawl(1900, "https://developer.mozilla.org/", "", 2000);
 });
 
 test("test sitemap with limit, specific URL", async () => {
-  await runCrawl(1900, "https://www.mozilla.org/", "https://www.mozilla.org/sitemap.xml", 2000);
+  await runCrawl(1900, "https://developer.mozilla.org/", "https://developer.mozilla.org/sitemap.xml", 2000);
 });
 
 test("test sitemap with application/xml content-type", async () => {
