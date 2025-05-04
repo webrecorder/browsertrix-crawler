@@ -1134,16 +1134,16 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@webrecorder/wabac@^2.22.15":
-  version "2.22.15"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.22.15.tgz#2b5c31cf16fdd2055e7bae331fa26488359df9cd"
-  integrity sha512-GJvFNCnDdvpij1mBNRRpT4zfr66W5td4NpNKEPmBtEwTPdlRyNlU96ZSL3NRVtzvg7RG6LpI6Oa86lKd6EUpBA==
+"@webrecorder/wabac@^2.22.16":
+  version "2.22.16"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.22.16.tgz#8b9684569b373b8e930852bce4512e2bd2810d65"
+  integrity sha512-n39kwNOD/bKpAFwQ8AXImFqOUhfqUYoz41E0baGfoXydnJc2LKiS7SMqg3wDHazZH3y2DVlUpPknrD7UM75g0A==
   dependencies:
     "@peculiar/asn1-ecc" "^2.3.4"
     "@peculiar/asn1-schema" "^2.3.3"
     "@peculiar/x509" "^1.9.2"
     "@types/js-levenshtein" "^1.1.3"
-    "@webrecorder/wombat" "^3.8.11"
+    "@webrecorder/wombat" "^3.8.12"
     acorn "^8.10.0"
     auto-js-ipfs "^2.1.1"
     base64-js "^1.5.1"
@@ -1164,10 +1164,10 @@
     stream-browserify "^3.0.0"
     warcio "^2.4.3"
 
-"@webrecorder/wombat@^3.8.11":
-  version "3.8.11"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.8.11.tgz#392a3a7003fdb41f5b214d4571d5f38f9978f2c8"
-  integrity sha512-Sg97woFtMFPh0PJ60WV9sze4nw5aPEq+BE9dFwdd6WpA45da0pkjCVX9z+YXejQLxdvKy24U9+rDPA9W6XqIGQ==
+"@webrecorder/wombat@^3.8.12":
+  version "3.8.12"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.8.12.tgz#8d44ce0b1bda57ae496f2cf44d4d967feaa019fd"
+  integrity sha512-4lbjp0XKPBRjyxEZBDZTPEGO6msBX8+irkRzbgFcmnxs5Ln4O9QbYDAr/RB4vTsFlytWcC68VBLwZx2SfIE8dw==
   dependencies:
     warcio "^2.4.0"
 
@@ -1595,10 +1595,10 @@ browserslist@^4.24.0:
     node-releases "^2.0.18"
     update-browserslist-db "^1.1.1"
 
-browsertrix-behaviors@^0.8.4:
-  version "0.8.4"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.8.4.tgz#f9fb08281195a811b0082dcddb2d2a06f52b10b2"
-  integrity sha512-YkX677WR616QoLXB/LGutcYmD037bhzD04yYoSI7IxmDFOVDE0xoVBc6QH0lqeupUWiosihAR7YVmwsrqrWPfQ==
+browsertrix-behaviors@^0.8.5:
+  version "0.8.5"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.8.5.tgz#f93dc6fed15cb2266664c85eec7f0796c1634fa5"
+  integrity sha512-v6wv6NLJEhj3NbrmGEfOWyXf2TuJgj95Em+KfCTPRJxakTtsvH/A7n2FSNvqMhwusqrjpIR4ch6cEkDp4hblvQ==
   dependencies:
     query-selector-shadow-dom "^1.0.1"
 

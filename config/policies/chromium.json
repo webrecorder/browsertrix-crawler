@@ -4,6 +4,10 @@
     "RestoreOnStartup": 5,
     "IncognitoModeAvailability": 1,
     "AllowFileSelectionDialogs": false,
+    "AutoLaunchProtocolsFromOrigins": [{
+      "allowed_origins":["https://t.me"],
+      "protocol": "tg"
+    }],
     "URLBlocklist": [
         "file://*"
     ],
