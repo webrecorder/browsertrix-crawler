@@ -1497,6 +1497,10 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
+    if (await this.crawlState.isCrawlPaused()) {
+      interrupt = InterruptReason.CrawlPaused;
+    }
+
     if (interrupt) {
       this.uploadAndDeleteLocal = true;
       this.gracefulFinishOnInterrupt(interrupt);
@@ -1859,12 +1863,9 @@ self.__bx_behaviors.selectMainBehavior();
       if (isFinished || (await this.crawlState.isCrawlCanceled())) {
         return;
       }
-      // if stopped, won't get anymore data
-      if (await this.crawlState.isCrawlStopped()) {
-        // possibly restarted after committing, so assume done here!
-        if ((await this.crawlState.numDone()) > 0) {
-          return;
-        }
+      // possibly restarted after committing, so assume done here!
+      if ((await this.crawlState.numDone()) > 0) {
+        return;
       }
       // fail crawl otherwise
       logger.fatal("No WARC Files, assuming crawl failed");

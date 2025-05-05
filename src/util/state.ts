@@ -521,6 +521,14 @@ return inx;
     return false;
   }
 
+  async isCrawlPaused() {
+    if ((await this.redis.get(`${this.key}:paused`)) === "1") {
+      return true;
+    }
+
+    return false;
+  }
+
   async isCrawlCanceled() {
     return (await this.redis.get(`${this.key}:canceled`)) === "1";
   }
