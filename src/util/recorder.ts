@@ -1,6 +1,6 @@
 import PQueue from "p-queue";
 
-import { logger, formatErr } from "./logger.js";
+import { logger, formatErr, LogDetails } from "./logger.js";
 import { sleep, timedRun } from "./timing.js";
 import {
   RequestResponseInfo,
@@ -20,7 +20,7 @@ import {
 import { WARCRecord } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
-import { RedisCrawlState, WorkerId } from "./state.js";
+import { LoadState, PageState, RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
@@ -98,6 +98,8 @@ export type DirectFetchRequest = {
   url: string;
   headers: Record<string, string>;
   cdp: CDPSession;
+  data: PageState;
+  logDetails: LogDetails;
 };
 
 // =================================================================
@@ -1381,7 +1383,9 @@ export class Recorder extends EventEmitter {
     url,
     headers,
     cdp,
-  }: DirectFetchRequest): Promise<DirectFetchResponse> {
+    data,
+    logDetails,
+  }: DirectFetchRequest): Promise<boolean> {
     const reqresp = new RequestResponseInfo("0");
     const ts = new Date();
 
@@ -1397,6 +1401,9 @@ export class Recorder extends EventEmitter {
 
     let mime: string = "";
 
+    let loadInBrowser: (value: boolean) => void;
+    const p = new Promise<boolean>((resolve) => (loadInBrowser = resolve));
+
     const filter = (resp: Response) => {
       // only direct load 200 responses
       if (resp.status !== 200) {
@@ -1408,7 +1415,7 @@ export class Recorder extends EventEmitter {
         mime = ct.split(";")[0];
       }
 
-      const result = !isHTMLMime(mime);
+      const result = !!mime && !isHTMLMime(mime);
 
       if (result) {
         logger.info(
@@ -1416,6 +1423,8 @@ export class Recorder extends EventEmitter {
           { url, ...this.logDetails },
           "fetch",
         );
+
+        loadInBrowser(!result);
       }
 
       return result;
@@ -1431,25 +1440,42 @@ export class Recorder extends EventEmitter {
       ignoreDupe: true,
       manualRedirect: true,
     });
-    const res = await fetcher.load();
 
-    // if we get here, resource was not filtered out, has status code of 200
+    return await Promise.race([
+      p,
+      fetcher.load().then((res) => {
+        // if we get here, resource was not filtered out, has status code of 200
+        this.addPageRecord(reqresp);
 
-    this.addPageRecord(reqresp);
+        const fetched = res === "fetched";
 
-    const fetched = res === "fetched";
+        if (
+          url === this.pageUrl &&
+          fetched &&
+          (!this.pageInfo.ts || 200 < this.pageInfo.tsStatus)
+        ) {
+          logger.debug("Setting page timestamp", { ts, url, status: 200 });
+          this.pageInfo.ts = ts;
+          this.pageInfo.tsStatus = 200;
+        }
 
-    if (
-      url === this.pageUrl &&
-      fetched &&
-      (!this.pageInfo.ts || 200 < this.pageInfo.tsStatus)
-    ) {
-      logger.debug("Setting page timestamp", { ts, url, status: 200 });
-      this.pageInfo.ts = ts;
-      this.pageInfo.tsStatus = 200;
-    }
-
-    return { fetched, mime, ts };
+        if (mime) {
+          data.mime = mime;
+          data.isHTMLPage = !!mime && isHTMLMime(mime);
+        }
+        if (fetched) {
+          data.loadState = LoadState.FULL_PAGE_LOADED;
+          data.status = 200;
+          data.ts = ts || new Date();
+          logger.info(
+            "Direct fetch successful",
+            { url, mime, ...logDetails },
+            "fetch",
+          );
+        }
+        return false;
+      }),
+    ]);
   }
 
   async getCookieString(cdp: CDPSession, url: string): Promise<string> {

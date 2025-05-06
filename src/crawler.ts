@@ -1057,7 +1057,7 @@ self.__bx_behaviors.selectMainBehavior();
           : this.headers;
 
         const result = await timedRun(
-          recorder.directFetchCapture({ url, headers, cdp }),
+          recorder.directFetchCapture({ url, headers, cdp, data, logDetails }),
           this.params.pageLoadTimeout,
           "Direct fetch of page URL timed out",
           logDetails,
@@ -1065,25 +1065,8 @@ self.__bx_behaviors.selectMainBehavior();
         );
 
         // fetched timed out, already logged, don't retry in browser
+        // OR direct fetch successful, also don't retry
         if (!result) {
-          return;
-        }
-
-        const { fetched, mime, ts } = result;
-
-        if (mime) {
-          data.mime = mime;
-          data.isHTMLPage = isHTMLMime(mime);
-        }
-        if (fetched) {
-          data.loadState = LoadState.FULL_PAGE_LOADED;
-          data.status = 200;
-          data.ts = ts || new Date();
-          logger.info(
-            "Direct fetch successful",
-            { url, mime, ...logDetails },
-            "fetch",
-          );
           return;
         }
       } catch (e) {
