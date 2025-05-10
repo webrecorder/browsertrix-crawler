@@ -766,6 +766,8 @@ export class Crawler {
 
     await this.setupExecContextEvents(cdp, frameIdToExecId);
 
+    console.log("SetupExecContext finished");
+
     if (
       (this.adBlockRules && this.params.blockAds) ||
       this.blockRules ||
@@ -916,6 +918,8 @@ self.__bx_behaviors.selectMainBehavior();
           );
         });
       }
+
+      console.log("Setup Page Finished");
     }
 
     await page.exposeFunction(BxFunctionBindings.AddToSeenSet, (data: string) =>

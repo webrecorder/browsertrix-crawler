@@ -161,6 +161,7 @@ export class Browser {
       case "disabled":
         logger.debug("Service Workers: always disabled", {}, "browser");
         await page.setBypassServiceWorker(true);
+        logger.debug("Service Workers updated", {}, "browser");
         break;
 
       case "disabled-if-profile":
