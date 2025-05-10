@@ -918,8 +918,6 @@ self.__bx_behaviors.selectMainBehavior();
           );
         });
       }
-
-      console.log("Setup Page Finished");
     }
 
     await page.exposeFunction(BxFunctionBindings.AddToSeenSet, (data: string) =>
@@ -936,6 +934,7 @@ self.__bx_behaviors.selectMainBehavior();
     });
 
     // await page.exposeFunction("__bx_hasSet", (data: string) => this.crawlState.hasUserSet(data));
+    console.log("Setup Page Finished");
   }
 
   async setupExecContextEvents(
