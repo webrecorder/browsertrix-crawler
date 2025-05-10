@@ -389,12 +389,15 @@ export class ReplayCrawler extends Crawler {
   }
 
   async crawlPage(opts: WorkerState): Promise<void> {
+    logger.info("Begin replay crawlPage");
+
     await this.writeStats();
 
     const { page, data, workerid } = opts;
     const { url, ts, pageid } = data;
 
     if (!ts) {
+      logger.info("No TS!");
       return;
     }
 
