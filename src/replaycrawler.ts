@@ -143,13 +143,17 @@ export class ReplayCrawler extends Crawler {
   }
 
   async awaitRWPLoad(page: Page) {
-    console.log("Awaiting RWP load");
     await page.goto(this.replayServer.homePage);
+    let count = 0;
 
     // wait until content frame is available
     while (page.frames().length <= SKIP_FRAMES) {
       console.log("Awaiting RWP Frame", page.frames().length);
       await sleep(5);
+      if (++count % 5 === 0) {
+        console.log("reload");
+        await page.goto(this.replayServer.homePage);
+      }
     }
 
     const frame = page.frames()[1];
