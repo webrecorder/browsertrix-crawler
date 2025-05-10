@@ -68,7 +68,7 @@ export class SitemapReader extends EventEmitter {
     while (true) {
       const resp = await fetch(url, {
         headers: this.headers,
-        dispatcher: getProxyDispatcher(),
+        dispatcher: getProxyDispatcher(url),
       });
 
       if (resp.ok) {

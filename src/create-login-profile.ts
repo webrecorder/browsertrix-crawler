@@ -161,7 +161,7 @@ async function main() {
 
   process.on("SIGTERM", () => handleTerminate("SIGTERM"));
 
-  const proxyServer = await initProxy(params, false);
+  const { proxyServer, proxyPacUrl } = await initProxy(params, false);
 
   if (!params.headless) {
     logger.debug("Launching XVFB");
@@ -203,7 +203,8 @@ async function main() {
     headless: params.headless,
     signals: false,
     chromeOptions: {
-      proxy: proxyServer,
+      proxyServer,
+      proxyPacUrl,
       extraArgs: [
         "--window-position=0,0",
         `--window-size=${params.windowSize}`,

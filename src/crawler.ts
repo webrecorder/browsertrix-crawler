@@ -187,6 +187,7 @@ export class Crawler {
   maxHeapTotal = 0;
 
   proxyServer?: string;
+  proxyPacUrl?: string;
 
   driver:
     | ((opts: {
@@ -509,7 +510,9 @@ export class Crawler {
     setWARCInfo(this.infoString, this.params.warcInfo);
     logger.info(this.infoString);
 
-    this.proxyServer = await initProxy(this.params, RUN_DETACHED);
+    const res = await initProxy(this.params, RUN_DETACHED);
+    this.proxyServer = res.proxyServer;
+    this.proxyPacUrl = res.proxyPacUrl;
 
     this.seeds = await parseSeeds(this.params);
     this.numOriginalSeeds = this.seeds.length;
@@ -1709,7 +1712,8 @@ self.__bx_behaviors.selectMainBehavior();
       emulateDevice: this.emulateDevice,
       swOpt: this.params.serviceWorker,
       chromeOptions: {
-        proxy: this.proxyServer,
+        proxyServer: this.proxyServer,
+        proxyPacUrl: this.proxyPacUrl,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs(),
       },

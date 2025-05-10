@@ -51,6 +51,8 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   state?: SaveState;
 
   warcInfo?: Record<string, string>;
+
+  proxyMap?: Map<string, string>;
 };
 
 // ============================================================================
@@ -641,6 +643,12 @@ class ArgParser {
           type: "string",
         },
 
+        proxyServerConfig: {
+          describe:
+            "if set, path to yaml/json file that configures multiple path servers per URL regex",
+          type: "string",
+        },
+
         dryRun: {
           describe:
             "If true, no archive data is written to disk, only pages and logs (and optionally saved state).",
@@ -776,6 +784,15 @@ class ArgParser {
       }
     } else {
       argv.emulateDevice = { viewport: null };
+    }
+
+    if (argv.proxyServerConfig) {
+      const proxies = yaml.load(
+        fs.readFileSync(argv.proxyServerConfig, "utf8"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ) as any;
+      argv.proxyMap = proxies.proxies;
+      console.log(argv.proxyMap);
     }
 
     if (argv.lang) {

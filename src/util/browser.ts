@@ -29,7 +29,8 @@ import { timedRun } from "./timing.js";
 import assert from "node:assert";
 
 type BtrixChromeOpts = {
-  proxy?: string;
+  proxyServer?: string;
+  proxyPacUrl?: string;
   userAgent?: string | null;
   extraArgs?: string[];
 };
@@ -243,7 +244,8 @@ export class Browser {
   }
 
   chromeArgs({
-    proxy = "",
+    proxyServer = "",
+    proxyPacUrl = "",
     userAgent = null,
     extraArgs = [],
   }: BtrixChromeOpts) {
@@ -262,14 +264,14 @@ export class Browser {
       ...extraArgs,
     ];
 
-    if (proxy) {
-      const proxyString = getSafeProxyString(proxy);
+    if (proxyServer) {
+      const proxyString = getSafeProxyString(proxyServer);
       logger.info("Using proxy", { proxy: proxyString }, "browser");
-    }
 
-    if (proxy) {
       args.push("--ignore-certificate-errors");
-      args.push(`--proxy-server=${proxy}`);
+      args.push(`--proxy-server=${proxyServer}`);
+    } else if (proxyPacUrl) {
+      args.push("--proxy-pac-url=" + proxyPacUrl);
     }
 
     return args;
