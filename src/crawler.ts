@@ -788,7 +788,8 @@ export class Crawler {
       }
     }
 
-    if (this.params.logging.includes("jserrors")) {
+    // eslint-disable-next-line no-constant-condition
+    if (this.params.logging.includes("jserrors") || true) {
       page.on("console", (msg) => {
         if (msg.type() === "error") {
           logger.warn(
