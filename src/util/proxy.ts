@@ -75,22 +75,18 @@ export async function initProxy(
   const singleProxy = params.proxyServer || getEnvProxyUrl();
 
   if (singleProxy) {
-    const result = await initSingleProxy(
+    defaultProxyEntry = await initSingleProxy(
       singleProxy,
-      localPort,
+      localPort++,
       detached,
       sshProxyPrivateKeyFile,
       sshProxyKnownHostsFile,
     );
-    if (result) {
-      defaultProxyEntry = result;
-      return { proxyServer: result.proxyUrl };
-    }
-    return {};
   }
 
   if (!params.proxyMap) {
-    return {};
+    logger.debug("Using Single Proxy", {}, "proxy");
+    return { proxyServer: defaultProxyEntry?.proxyUrl };
   }
 
   const origToEntry = new Map<string, ProxyEntry>();
@@ -117,6 +113,8 @@ export async function initProxy(
   }
 
   const p = new ProxyPacServer();
+
+  logger.debug("Using Proxy PAC script", {}, "proxy");
 
   return { proxyPacUrl: `http://localhost:${p.port}/proxy.pac` };
 }
