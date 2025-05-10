@@ -591,7 +591,12 @@ export class Crawler {
 
   extraChromeArgs() {
     const args = [];
-    if (this.params.lang) {
+    if (this.params.profile) {
+      logger.warn(
+        "Ignoring --lang option with profile, using language configured in the profile",
+        { lang: this.params.lang },
+      );
+    } else {
       args.push(`--accept-lang=${this.params.lang}`);
     }
     return args;

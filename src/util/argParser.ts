@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import ISO6391 from "iso-639-1";
 
 import yaml from "js-yaml";
 import { KnownDevices as devices } from "puppeteer-core";
@@ -768,6 +769,12 @@ class ArgParser {
       }
     } else {
       argv.emulateDevice = { viewport: null };
+    }
+
+    if (argv.lang) {
+      if (!ISO6391.validate(argv.lang)) {
+        logger.fatal("Invalid ISO-639-1 country code for --lang: " + argv.lang);
+      }
     }
 
     if (argv.seedFile) {
