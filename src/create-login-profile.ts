@@ -8,6 +8,7 @@ import readline from "readline";
 import child_process from "child_process";
 
 import yargs from "yargs";
+import yaml from "js-yaml";
 
 import { logger } from "./util/logger.js";
 
@@ -123,6 +124,12 @@ function initArgs() {
         type: "string",
       },
 
+      proxyServerConfig: {
+        describe:
+          "if set, path to yaml/json file that configures multiple path servers per URL regex",
+        type: "string",
+      },
+
       sshProxyPrivateKeyFile: {
         describe:
           "path to SSH private key for SOCKS5 over SSH proxy connection",
@@ -160,6 +167,14 @@ async function main() {
   process.on("SIGINT", () => handleTerminate("SIGINT"));
 
   process.on("SIGTERM", () => handleTerminate("SIGTERM"));
+
+  if (params.proxyServerConfig) {
+    const proxies = yaml.load(
+      fs.readFileSync(params.proxyServerConfig, "utf8"),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ) as any;
+    params.proxyMap = proxies.proxies;
+  }
 
   const { proxyServer, proxyPacUrl } = await initProxy(params, false);
 

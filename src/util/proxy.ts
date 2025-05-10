@@ -24,7 +24,6 @@ type ProxyEntry = {
 
 const proxyMap = new Map<RegExp, ProxyEntry>();
 let defaultProxyEntry: ProxyEntry | null = null;
-let proxyPacText = "";
 
 export function getEnvProxyUrl() {
   if (process.env.PROXY_SERVER) {
@@ -87,7 +86,11 @@ export async function initProxy(
       defaultProxyEntry = result;
       return { proxyServer: result.proxyUrl };
     }
-    return { proxyServer: undefined };
+    return {};
+  }
+
+  if (!params.proxyMap) {
+    return {};
   }
 
   const origToEntry = new Map<string, ProxyEntry>();
@@ -113,38 +116,9 @@ export async function initProxy(
     }
   }
 
-  generateProxyPac();
-
   const p = new ProxyPacServer();
 
   return { proxyPacUrl: `http://localhost:${p.port}/proxy.pac` };
-}
-
-function generateProxyPac() {
-  const urlToProxy = (proxyUrl: string) => {
-    const url = new URL(proxyUrl);
-    const hostport = url.href.slice(url.protocol.length + 2);
-    const type = url.protocol.slice(0, -1).toUpperCase();
-    return `"${type} ${hostport}"`;
-  };
-
-  proxyPacText = `
-
-function FindProxyForURL(url, host) {
-
-`;
-
-  proxyMap.forEach(({ proxyUrl }, k) => {
-    proxyPacText += `  if (url.match(/${k.source}/)) { return ${urlToProxy(
-      proxyUrl,
-    )}; }\n`;
-  });
-
-  proxyPacText += `\n  return ${
-    defaultProxyEntry ? urlToProxy(defaultProxyEntry.proxyUrl) : `"DIRECT"`
-  };
-}
-  `;
 }
 
 export async function initSingleProxy(
@@ -359,20 +333,48 @@ export async function runSSHD(
 }
 
 class ProxyPacServer {
-  port = 10278;
+  port = 20278;
+
+  proxyPacText = "";
 
   constructor() {
     const httpServer = http.createServer((req, res) =>
       this.handleRequest(req, res),
     );
     httpServer.listen(this.port);
+    this.generateProxyPac();
   }
 
   async handleRequest(request: IncomingMessage, response: ServerResponse) {
-    console.log(proxyPacText);
     response.writeHead(200, {
       "Content-Type": "application/x-ns-proxy-autoconfig",
     });
-    response.end(proxyPacText);
+    response.end(this.proxyPacText);
+  }
+
+  generateProxyPac() {
+    const urlToProxy = (proxyUrl: string) => {
+      const url = new URL(proxyUrl);
+      const hostport = url.href.slice(url.protocol.length + 2);
+      const type = url.protocol.slice(0, -1).toUpperCase();
+      return `"${type} ${hostport}"`;
+    };
+
+    this.proxyPacText = `
+
+function FindProxyForURL(url, host) {
+
+`;
+    proxyMap.forEach(({ proxyUrl }, k) => {
+      this.proxyPacText += `  if (url.match(/${
+        k.source
+      }/)) { return ${urlToProxy(proxyUrl)}; }\n`;
+    });
+
+    this.proxyPacText += `\n  return ${
+      defaultProxyEntry ? urlToProxy(defaultProxyEntry.proxyUrl) : `"DIRECT"`
+    };
+}
+`;
   }
 }
