@@ -22,6 +22,24 @@ type ProxyEntry = {
   dispatcher: Dispatcher;
 };
 
+export type ProxyServerConfig = {
+  matchHosts: Record<string, string>;
+  proxies: Record<
+    string,
+    string | { url: string; privateKeyFile?: string; publicHostsFile?: string }
+  >;
+};
+
+export type ProxyCLIArgs = {
+  sshProxyPrivateKeyFile?: string;
+  sshProxyKnownHostsFile?: string;
+  sshProxyLocalPort?: number;
+
+  proxyServer?: string;
+
+  proxyMap?: ProxyServerConfig;
+};
+
 const proxyMap = new Map<RegExp, ProxyEntry>();
 let defaultProxyEntry: ProxyEntry | null = null;
 
@@ -64,8 +82,7 @@ export function getSafeProxyString(proxyString: string): string {
 }
 
 export async function initProxy(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  params: Record<string, any>,
+  params: ProxyCLIArgs,
   detached: boolean,
 ): Promise<{ proxyServer?: string; proxyPacUrl?: string }> {
   const { sshProxyPrivateKeyFile, sshProxyKnownHostsFile, sshProxyLocalPort } =
@@ -85,26 +102,56 @@ export async function initProxy(
   }
 
   if (!params.proxyMap) {
-    logger.debug("Using Single Proxy", {}, "proxy");
+    if (defaultProxyEntry) {
+      logger.debug("Using Single Proxy", {}, "proxy");
+    }
     return { proxyServer: defaultProxyEntry?.proxyUrl };
   }
 
-  const origToEntry = new Map<string, ProxyEntry>();
+  const nameToProxy = new Map<string, ProxyEntry>();
 
-  for (const rx of Object.keys(params.proxyMap)) {
-    const value = params.proxyMap[rx];
+  for (const [name, value] of Object.entries(params.proxyMap.proxies)) {
+    let proxyUrl = "";
+    let privateKeyFile: string | undefined = "";
+    let publicHostsFile: string | undefined = "";
 
-    let entry = origToEntry.get(value);
-    if (!entry) {
-      entry = await initSingleProxy(
-        value,
-        localPort++,
-        detached,
-        sshProxyPrivateKeyFile,
-        sshProxyKnownHostsFile,
-      );
-      origToEntry.set(value, entry);
+    if (typeof value === "string") {
+      proxyUrl = value;
+    } else {
+      proxyUrl = value.url;
+      privateKeyFile = value.privateKeyFile;
+      publicHostsFile = value.publicHostsFile;
     }
+
+    privateKeyFile = privateKeyFile || sshProxyPrivateKeyFile;
+    publicHostsFile = publicHostsFile || sshProxyKnownHostsFile;
+
+    logger.debug("Initing proxy", {
+      url: getSafeProxyString(proxyUrl),
+      localPort,
+      privateKeyFile,
+      publicHostsFile,
+    });
+
+    const entry = await initSingleProxy(
+      proxyUrl,
+      localPort++,
+      detached,
+      privateKeyFile,
+      publicHostsFile,
+    );
+
+    nameToProxy.set(name, entry);
+  }
+
+  for (const [rx, name] of Object.entries(params.proxyMap.matchHosts)) {
+    const entry = nameToProxy.get(name);
+
+    if (!entry) {
+      logger.fatal("Proxy specified but not found in proxies list: " + name);
+      return {};
+    }
+
     if (rx) {
       proxyMap.set(new RegExp(rx), entry);
     } else {
@@ -123,8 +170,8 @@ export async function initSingleProxy(
   proxyUrl: string,
   localPort: number,
   detached: boolean,
-  sshProxyPrivateKeyFile: string,
-  sshProxyKnownHostsFile: string,
+  sshProxyPrivateKeyFile?: string,
+  sshProxyKnownHostsFile?: string,
 ): Promise<{ proxyUrl: string; dispatcher: Dispatcher }> {
   if (proxyUrl && proxyUrl.startsWith("ssh://")) {
     proxyUrl = await runSSHD(
@@ -191,7 +238,7 @@ export async function runSSHD(
   proxyServer: string,
   localPort: number,
   detached: boolean,
-  privateKey: string,
+  privateKey?: string,
   publicKnownHost?: string,
 ) {
   if (!proxyServer || !proxyServer.startsWith("ssh://")) {
@@ -212,8 +259,6 @@ export async function runSSHD(
     port + "",
     "-D",
     localPort + "",
-    "-i",
-    privateKey,
     "-o",
     "IdentitiesOnly=yes",
     "-o",
@@ -227,6 +272,11 @@ export async function runSSHD(
     args.push(`UserKnownHostsFile=${publicKnownHost}`);
   } else {
     args.push("StrictHostKeyChecking=no");
+  }
+
+  if (privateKey) {
+    args.push("-i");
+    args.push(privateKey);
   }
 
   args.push("-M", "0", "-N", "-T");
