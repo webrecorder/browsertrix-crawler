@@ -787,12 +787,19 @@ class ArgParser {
     }
 
     if (argv.proxyServerConfig) {
-      const proxies = yaml.load(
-        fs.readFileSync(argv.proxyServerConfig, "utf8"),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ) as any;
-      argv.proxyMap = proxies.proxies;
-      console.log(argv.proxyMap);
+      const proxyServerConfig = argv.proxyServerConfig;
+      try {
+        const proxies = yaml.load(
+          fs.readFileSync(proxyServerConfig, "utf8"),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ) as any;
+        argv.proxyMap = proxies.matchHostProxies;
+        logger.debug("Proxy host match config loaded", { proxyServerConfig });
+      } catch (e) {
+        logger.warn("Proxy host match config file not found, ignoring", {
+          proxyServerConfig,
+        });
+      }
     }
 
     if (argv.lang) {
