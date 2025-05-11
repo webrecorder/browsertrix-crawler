@@ -169,11 +169,19 @@ async function main() {
   process.on("SIGTERM", () => handleTerminate("SIGTERM"));
 
   if (params.proxyServerConfig) {
-    const proxies = yaml.load(
-      fs.readFileSync(params.proxyServerConfig, "utf8"),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any;
-    params.proxyMap = proxies.proxies;
+    const proxyServerConfig = params.proxyServerConfig;
+    try {
+      const proxies = yaml.load(
+        fs.readFileSync(proxyServerConfig, "utf8"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ) as any;
+      params.proxyMap = proxies;
+      logger.debug("Proxy host match config loaded", { proxyServerConfig });
+    } catch (e) {
+      logger.warn("Proxy host match config file not found, ignoring", {
+        proxyServerConfig,
+      });
+    }
   }
 
   const { proxyServer, proxyPacUrl } = await initProxy(params, false);

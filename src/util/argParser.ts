@@ -50,8 +50,6 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   state?: SaveState;
 
   warcInfo?: Record<string, string>;
-
-  proxyMap?: Map<string, string>;
 };
 
 // ============================================================================
@@ -786,7 +784,7 @@ class ArgParser {
           fs.readFileSync(proxyServerConfig, "utf8"),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ) as any;
-        argv.proxyMap = proxies.matchHostProxies;
+        argv.proxyMap = proxies;
         logger.debug("Proxy host match config loaded", { proxyServerConfig });
       } catch (e) {
         logger.warn("Proxy host match config file not found, ignoring", {
