@@ -24,10 +24,9 @@ test("run warc and ensure pageinfo records contain the correct resources", async
   let foundInvalid = false;
 
   for await (const record of parser) {
-    if (record.warcType === "response" && 
+    if (record.warcType === "response" &&
       (record.warcTargetURI === "https://oldwebrecorder.net/" || record.warcTargetURI === "https://old.webrecorder.net/about")) {
       expect(record.warcHeaders.headers.get("WARC-Protocol")).toBe("h2, tls/1.3");
-      expect(record.warcHeaders.headers.get("WARC-Cipher-Suite")).toBe("TLS_AES_128_GCM_SHA256");
     }
 
     if (

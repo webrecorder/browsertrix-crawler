@@ -2,9 +2,8 @@ import { getCustomRewriter, getStatusText } from "@webrecorder/wabac";
 
 import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
-import { Response } from "undici";
-
 import { HTML_TYPES } from "./constants.js";
+import { Response } from "undici";
 
 const CONTENT_LENGTH = "content-length";
 const CONTENT_RANGE = "content-range";
@@ -27,6 +26,8 @@ export class RequestResponseInfo {
   method?: string;
   url!: string;
 
+  // protocol for WARC record
+  httpProtocol = "HTTP/1.1";
   protocols: string[] = [];
 
   mimeType?: string;
@@ -135,6 +136,9 @@ export class RequestResponseInfo {
     this.setStatus(response.status, response.statusText);
 
     if (response.protocol) {
+      if (response.protocol === "http/1.0") {
+        this.httpProtocol = "HTTP/1.0";
+      }
       this.protocols.push(response.protocol);
     }
 

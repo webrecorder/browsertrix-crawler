@@ -1880,7 +1880,7 @@ function createResponse(
 
   const url = reqresp.url;
   const warcVersion = "WARC/1.1";
-  const statusline = `HTTP/1.1 ${reqresp.status} ${reqresp.statusText}`;
+  const statusline = `${reqresp.httpProtocol} ${reqresp.status} ${reqresp.statusText}`;
   const date = new Date(reqresp.ts).toISOString();
 
   if (!reqresp.payload) {
@@ -1939,7 +1939,9 @@ function createRequest(
 
   const urlParsed = new URL(url);
 
-  const statusline = `${method} ${url.slice(urlParsed.origin.length)} HTTP/1.1`;
+  const statusline = `${method} ${url.slice(urlParsed.origin.length)} ${
+    reqresp.httpProtocol
+  }`;
 
   const requestBody = reqresp.postData
     ? [encoder.encode(reqresp.postData)]
