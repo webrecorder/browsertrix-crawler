@@ -1900,10 +1900,6 @@ function createResponse(
     );
   }
 
-  if (reqresp.cipher) {
-    warcHeaders["WARC-Cipher-Suite"] = reqresp.cipher;
-  }
-
   if (reqresp.resourceType) {
     warcHeaders["WARC-Resource-Type"] = reqresp.resourceType;
   }
