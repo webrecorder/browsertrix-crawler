@@ -1263,7 +1263,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async pageFinished(data: PageState) {
+  async pageFinished(data: PageState, errorCode = 0) {
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
     const { loadState, logDetails, depth, url, pageSkipped } = data;
@@ -1302,7 +1302,7 @@ self.__bx_behaviors.selectMainBehavior();
               "Seed Page Load Failed, failing crawl",
               {},
               "general",
-              1,
+              errorCode || ExitCodes.GenericError,
             );
           }
         }

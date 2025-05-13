@@ -8,7 +8,6 @@ import readline from "readline";
 import child_process from "child_process";
 
 import yargs from "yargs";
-import yaml from "js-yaml";
 
 import { logger } from "./util/logger.js";
 
@@ -17,7 +16,7 @@ import { initStorage } from "./util/storage.js";
 import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
 import { getInfoString } from "./util/file_reader.js";
 import { DISPLAY, ExitCodes } from "./util/constants.js";
-import { initProxy } from "./util/proxy.js";
+import { initProxy, loadProxyConfig } from "./util/proxy.js";
 //import { sleep } from "./util/timing.js";
 
 const profileHTML = fs.readFileSync(
@@ -168,21 +167,7 @@ async function main() {
 
   process.on("SIGTERM", () => handleTerminate("SIGTERM"));
 
-  if (params.proxyServerConfig) {
-    const proxyServerConfig = params.proxyServerConfig;
-    try {
-      const proxies = yaml.load(
-        fs.readFileSync(proxyServerConfig, "utf8"),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ) as any;
-      params.proxyMap = proxies;
-      logger.debug("Proxy host match config loaded", { proxyServerConfig });
-    } catch (e) {
-      logger.warn("Proxy host match config file not found, ignoring", {
-        proxyServerConfig,
-      });
-    }
-  }
+  loadProxyConfig(params);
 
   const { proxyServer, proxyPacUrl } = await initProxy(params, false);
 

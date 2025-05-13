@@ -1,7 +1,9 @@
 import net from "net";
-import { Agent, Dispatcher, ProxyAgent } from "undici";
-
 import child_process from "child_process";
+import fs from "fs";
+
+import { Agent, Dispatcher, ProxyAgent } from "undici";
+import yaml from "js-yaml";
 
 import { logger } from "./logger.js";
 
@@ -23,8 +25,8 @@ type ProxyEntry = {
 };
 
 export type ProxyServerConfig = {
-  matchHosts: Record<string, string>;
-  proxies: Record<
+  matchHosts?: Record<string, string>;
+  proxies?: Record<
     string,
     string | { url: string; privateKeyFile?: string; publicHostsFile?: string }
   >;
@@ -54,6 +56,27 @@ export function getEnvProxyUrl() {
   }
 
   return "";
+}
+
+export function loadProxyConfig(params: {
+  proxyServerConfig?: string;
+  proxyMap?: ProxyServerConfig;
+}) {
+  if (params.proxyServerConfig) {
+    const proxyServerConfig = params.proxyServerConfig;
+    try {
+      const proxies = yaml.load(
+        fs.readFileSync(proxyServerConfig, "utf8"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ) as any;
+      params.proxyMap = proxies;
+      logger.debug("Proxy host match config loaded", { proxyServerConfig });
+    } catch (e) {
+      logger.warn("Proxy host match config file not found, ignoring", {
+        proxyServerConfig,
+      });
+    }
+  }
 }
 
 export function getSafeProxyString(proxyString: string): string {
@@ -101,7 +124,7 @@ export async function initProxy(
     );
   }
 
-  if (!params.proxyMap) {
+  if (!params.proxyMap?.matchHosts || !params.proxyMap?.proxies) {
     if (defaultProxyEntry) {
       logger.debug("Using Single Proxy", {}, "proxy");
     }
