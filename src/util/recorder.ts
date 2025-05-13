@@ -17,7 +17,7 @@ import {
   rewriteHLS,
 } from "@webrecorder/wabac";
 
-import { WARCRecord } from "warcio";
+import { WARCRecord, multiValueHeader } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
 import { RedisCrawlState, WorkerId } from "./state.js";
@@ -1880,7 +1880,7 @@ function createResponse(
 
   const url = reqresp.url;
   const warcVersion = "WARC/1.1";
-  const statusline = `HTTP/1.1 ${reqresp.status} ${reqresp.statusText}`;
+  const statusline = `${reqresp.httpProtocol} ${reqresp.status} ${reqresp.statusText}`;
   const date = new Date(reqresp.ts).toISOString();
 
   if (!reqresp.payload) {
@@ -1892,6 +1892,13 @@ function createResponse(
   const warcHeaders: Record<string, string> = {
     "WARC-Page-ID": pageid,
   };
+
+  if (reqresp.protocols.length) {
+    warcHeaders["WARC-Protocol"] = multiValueHeader(
+      "WARC-Protocol",
+      reqresp.protocols,
+    );
+  }
 
   if (reqresp.resourceType) {
     warcHeaders["WARC-Resource-Type"] = reqresp.resourceType;
@@ -1932,7 +1939,9 @@ function createRequest(
 
   const urlParsed = new URL(url);
 
-  const statusline = `${method} ${url.slice(urlParsed.origin.length)} HTTP/1.1`;
+  const statusline = `${method} ${url.slice(urlParsed.origin.length)} ${
+    reqresp.httpProtocol
+  }`;
 
   const requestBody = reqresp.postData
     ? [encoder.encode(reqresp.postData)]
