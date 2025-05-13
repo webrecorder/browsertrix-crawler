@@ -40,7 +40,6 @@ afterAll(async () => {
   execSync("docker network rm proxy-test-net");
 });
 
-/*
 describe("socks5 + https proxy tests", () => {
   for (const scheme of ["socks5", "http"]) {
     const port = scheme === "socks5" ? SOCKS_PORT : HTTP_PORT;
@@ -134,13 +133,13 @@ test("http proxy set, but not running, cli arg", () => {
   }
   expect(status).toBe(PROXY_EXIT_CODE);
 });
-*/
+
 
 test("ssh socks proxy with custom user", () => {
   execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/proxy-key:/keys/proxy-key webrecorder/browsertrix-crawler crawl --proxyServer ssh://user@ssh-proxy:2222 --sshProxyPrivateKeyFile /keys/proxy-key --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
 });
 
-/*
+
 test("ssh socks proxy, wrong user", () => {
   let status = 0;
 
@@ -194,4 +193,3 @@ test("proxy with config file, correct auth or no match", () => {
   execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-good-auth.pac --url ${PDF} ${extraArgs}`, {encoding: "utf-8"});
 
 });
-*/
