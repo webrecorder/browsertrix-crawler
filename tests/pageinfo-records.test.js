@@ -25,7 +25,7 @@ test("run warc and ensure pageinfo records contain the correct resources", async
 
   for await (const record of parser) {
     if (record.warcType === "response" &&
-      (record.warcTargetURI === "https://oldwebrecorder.net/" || record.warcTargetURI === "https://old.webrecorder.net/about")) {
+      (record.warcTargetURI === "https://old.webrecorder.net/" || record.warcTargetURI === "https://old.webrecorder.net/about")) {
       expect(record.warcHeaders.headers.get("WARC-Protocol")).toBe("h2, tls/1.3");
     }
 
