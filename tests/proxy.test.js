@@ -27,7 +27,7 @@ beforeAll(() => {
 
   proxyNoAuthId = execSync(`docker run -d --rm --network=proxy-test-net --name proxy-no-auth ${PROXY_IMAGE}`, {encoding: "utf-8"});
 
-  proxySSHId = execSync(`docker run -d --rm -e DOCKER_MODS=linuxserver/mods:openssh-server-ssh-tunnel -e USER_NAME=user -e PUBLIC_KEY_FILE=/keys/proxy-key.pub -v $PWD/tests/fixtures/proxy-key.pub:/keys/proxy-key.pub --network=proxy-test-net --name ssh-proxy ${SSH_PROXY_IMAGE}`);
+  proxySSHId = execSync(`docker run -d --rm -e DOCKER_MODS=linuxserver/mods:openssh-server-ssh-tunnel -e USER_NAME=user -e PUBLIC_KEY_FILE=/keys/proxy-key.pub -v $PWD/tests/fixtures/proxies/proxy-key.pub:/keys/proxy-key.pub --network=proxy-test-net --name ssh-proxy ${SSH_PROXY_IMAGE}`);
 });
 
 afterAll(async () => {
@@ -134,7 +134,7 @@ test("http proxy set, but not running, cli arg", () => {
 
 
 test("ssh socks proxy with custom user", () => {
-  execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxy-key:/keys/proxy-key webrecorder/browsertrix-crawler crawl --proxyServer ssh://user@ssh-proxy:2222 --sshProxyPrivateKeyFile /keys/proxy-key --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
+  execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/proxy-key:/keys/proxy-key webrecorder/browsertrix-crawler crawl --proxyServer ssh://user@ssh-proxy:2222 --sshProxyPrivateKeyFile /keys/proxy-key --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
 });
 
 
@@ -164,4 +164,30 @@ test("ensure logged proxy string does not include any credentials", () => {
 });
 
 
+test("proxy with config file, wrong auth or no match", () => {
+  let status = 0;
+  try {
+    execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-bad-auth.pac --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
+  } catch (e) {
+    status = e.status;
+  }
+  expect(status).toBe(21);
 
+  // success, no match for PDF
+  execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-bad-auth.pac --url ${PDF} ${extraArgs}`, {encoding: "utf-8"});
+});
+
+
+test("proxy with config file, correct auth or no match", () => {
+  let status = 0;
+  try {
+    execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-good-auth.pac --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
+  } catch (e) {
+    status = e.status;
+  }
+  expect(status).toBe(0);
+
+  // success, no match for PDF
+  execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-good-auth.pac --url ${PDF} ${extraArgs}`, {encoding: "utf-8"});
+
+});

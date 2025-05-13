@@ -29,6 +29,7 @@ import {
   logger,
 } from "./logger.js";
 import { SaveState } from "./state.js";
+import { loadProxyConfig } from "./proxy.js";
 
 // ============================================================================
 export type CrawlerArgs = ReturnType<typeof parseArgs> & {
@@ -784,21 +785,7 @@ class ArgParser {
       argv.emulateDevice = { viewport: null };
     }
 
-    if (argv.proxyServerConfig) {
-      const proxyServerConfig = argv.proxyServerConfig;
-      try {
-        const proxies = yaml.load(
-          fs.readFileSync(proxyServerConfig, "utf8"),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ) as any;
-        argv.proxyMap = proxies;
-        logger.debug("Proxy host match config loaded", { proxyServerConfig });
-      } catch (e) {
-        logger.warn("Proxy host match config file not found, ignoring", {
-          proxyServerConfig,
-        });
-      }
-    }
+    loadProxyConfig(argv);
 
     if (argv.lang) {
       if (!ISO6391.validate(argv.lang)) {
