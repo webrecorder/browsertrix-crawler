@@ -311,7 +311,7 @@ export class PageWorker {
       }
 
       await timedRun(
-        this.crawler.pageFinished(data, this.recorder?.lastErrorText),
+        this.crawler.pageFinished(data, this.recorder?.errorCode),
         FINISHED_TIMEOUT,
         "Page Finished Timed Out",
         this.logDetails,
