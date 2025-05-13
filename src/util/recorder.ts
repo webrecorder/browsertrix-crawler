@@ -26,7 +26,10 @@ import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
 import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
+<<<<<<< HEAD
 import { ExitCodes, DEFAULT_MAX_RETRIES } from "./constants.js";
+=======
+>>>>>>> 488126c8 (check for error status to determine if proxy error)
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -144,7 +147,7 @@ export class Recorder extends EventEmitter {
 
   pageFinished = false;
 
-  errorCode = 0;
+  lastErrorText = "";
 
   gzip = true;
 
@@ -482,13 +485,8 @@ export class Recorder extends EventEmitter {
         }
         break;
 
-      case "net::ERR_SOCKS_CONNECTION_FAILED":
-      case "net::SOCKS_CONNECTION_HOST_UNREACHABLE":
-      case "net::ERR_PROXY_CONNECTION_FAILED":
-        this.errorCode = ExitCodes.ProxyError;
-      //fallthrough
-
       default:
+        this.lastErrorText = errorText;
         logger.warn(
           "Request failed",
           { url, errorText, type, status: reqresp.status, ...this.logDetails },
@@ -961,7 +959,7 @@ export class Recorder extends EventEmitter {
     this.pageid = pageid;
     this.pageUrl = url;
     this.finalPageUrl = this.pageUrl;
-    this.errorCode = 0;
+    this.lastErrorText = "";
     this.logDetails = { page: url, workerid: this.workerid };
     if (this.pendingRequests && this.pendingRequests.size) {
       logger.debug(
