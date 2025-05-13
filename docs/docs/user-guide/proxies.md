@@ -71,6 +71,7 @@ The `autossh` utility is used to automatically restart the SSH connection, if ne
 
 Only key-based authentication is supposed for SSH proxies for now.
 
+
 ## Browser Profiles
 
 The above proxy settings also apply to [Browser Profile Creation](browser-profiles.md), and browser profiles can also be created using proxies, for example:
