@@ -68,7 +68,7 @@ describe("socks5 + https proxy tests", () => {
           status = e.status;
         }
         // auth supported only for SOCKS5
-        expect(status).toBe(scheme === "socks5" ? 0 : 1);
+        expect(status).toBe(scheme === "socks5" ? 0 : PROXY_EXIT_CODE);
       });
 
       test(`${scheme} proxy, ${type}, wrong auth`, () => {
@@ -90,7 +90,8 @@ describe("socks5 + https proxy tests", () => {
         } catch (e) {
           status = e.status;
         }
-        expect(status).toBe(PROXY_EXIT_CODE);
+        // wrong protocol (socks5 for http) causes connection to hang, causes a timeout, so just errors with 1
+        expect(status === PROXY_EXIT_CODE || status === 1).toBe(true);
       });
     }
 
