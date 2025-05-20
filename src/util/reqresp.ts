@@ -25,7 +25,10 @@ export class RequestResponseInfo {
 
   method?: string;
   url!: string;
-  protocol?: string = "HTTP/1.1";
+
+  // protocol for WARC record
+  httpProtocol = "HTTP/1.1";
+  protocols: string[] = [];
 
   mimeType?: string;
 
@@ -132,7 +135,12 @@ export class RequestResponseInfo {
 
     this.setStatus(response.status, response.statusText);
 
-    this.protocol = response.protocol;
+    if (response.protocol) {
+      if (response.protocol === "http/1.0") {
+        this.httpProtocol = "HTTP/1.0";
+      }
+      this.protocols.push(response.protocol);
+    }
 
     if (resourceType) {
       this.resourceType = resourceType.toLowerCase();
@@ -153,11 +161,16 @@ export class RequestResponseInfo {
 
     this.fromServiceWorker = !!response.fromServiceWorker;
 
-    if (response.securityDetails) {
-      const issuer: string = response.securityDetails.issuer || "";
+    const { securityDetails } = response;
+
+    if (securityDetails) {
+      const securityProtocol = securityDetails.protocol
+        .replaceAll(" ", "/")
+        .toLowerCase();
+      this.protocols.push(securityProtocol);
+      const issuer: string = securityDetails.issuer || "";
       const ctc: string =
-        response.securityDetails.certificateTransparencyCompliance ===
-        "compliant"
+        securityDetails.certificateTransparencyCompliance === "compliant"
           ? "1"
           : "0";
       this.extraOpts.cert = { issuer, ctc };
@@ -202,21 +215,6 @@ export class RequestResponseInfo {
     params: Protocol.Network.RequestWillBeSentExtraInfoEvent,
   ) {
     this.requestHeaders = params.headers;
-  }
-
-  getResponseHeadersText() {
-    let headers = `${this.protocol} ${this.status} ${this.statusText}\r\n`;
-
-    if (this.responseHeaders) {
-      for (const header of Object.keys(this.responseHeaders)) {
-        headers += `${header}: ${this.responseHeaders[header].replace(
-          /\n/g,
-          ", ",
-        )}\r\n`;
-      }
-    }
-    headers += "\r\n";
-    return headers;
   }
 
   hasRequest() {
