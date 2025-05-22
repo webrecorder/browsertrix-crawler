@@ -450,7 +450,7 @@ export class ReplayCrawler extends Crawler {
     // optionally reload (todo: reevaluate if this is needed)
     // await page.reload();
 
-    await this.awaitPageLoad(replayFrame, logDetails);
+    await this.awaitPageLoad(replayFrame, 0, logDetails);
 
     data.isHTMLPage = true;
 
