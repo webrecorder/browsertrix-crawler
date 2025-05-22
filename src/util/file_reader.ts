@@ -89,7 +89,7 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
   const behaviorFilepath = path.join(tmpDir, filename);
 
   try {
-    const res = await fetch(url, { dispatcher: getProxyDispatcher() });
+    const res = await fetch(url, { dispatcher: getProxyDispatcher(url) });
     const fileContents = await res.text();
     await fsp.writeFile(behaviorFilepath, fileContents);
     logger.info(

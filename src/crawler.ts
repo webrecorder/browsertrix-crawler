@@ -187,6 +187,7 @@ export class Crawler {
   maxHeapTotal = 0;
 
   proxyServer?: string;
+  proxyPacUrl?: string;
 
   driver:
     | ((opts: {
@@ -512,7 +513,9 @@ export class Crawler {
     setWARCInfo(this.infoString, this.params.warcInfo);
     logger.info(this.infoString);
 
-    this.proxyServer = await initProxy(this.params, RUN_DETACHED);
+    const res = await initProxy(this.params, RUN_DETACHED);
+    this.proxyServer = res.proxyServer;
+    this.proxyPacUrl = res.proxyPacUrl;
 
     logger.info("Seeds", this.seeds);
 
@@ -1260,7 +1263,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async pageFinished(data: PageState) {
+  async pageFinished(data: PageState, lastErrorText = "") {
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
     const { loadState, logDetails, depth, url, pageSkipped } = data;
@@ -1295,11 +1298,28 @@ self.__bx_behaviors.selectMainBehavior();
           await this.serializeConfig();
 
           if (depth === 0 && this.params.failOnFailedSeed) {
+            let errorCode = ExitCodes.GenericError;
+
+            switch (lastErrorText) {
+              case "net::ERR_SOCKS_CONNECTION_FAILED":
+              case "net::SOCKS_CONNECTION_HOST_UNREACHABLE":
+              case "net::ERR_PROXY_CONNECTION_FAILED":
+              case "net::ERR_TUNNEL_CONNECTION_FAILED":
+                errorCode = ExitCodes.ProxyError;
+                break;
+
+              case "net::ERR_TIMED_OUT":
+              case "net::ERR_INVALID_AUTH_CREDENTIALS":
+                if (this.proxyServer || this.proxyPacUrl) {
+                  errorCode = ExitCodes.ProxyError;
+                }
+                break;
+            }
             logger.fatal(
               "Seed Page Load Failed, failing crawl",
               {},
               "general",
-              1,
+              errorCode,
             );
           }
         }
@@ -1687,7 +1707,8 @@ self.__bx_behaviors.selectMainBehavior();
       emulateDevice: this.emulateDevice,
       swOpt: this.params.serviceWorker,
       chromeOptions: {
-        proxy: this.proxyServer,
+        proxyServer: this.proxyServer,
+        proxyPacUrl: this.proxyPacUrl,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs(),
       },
