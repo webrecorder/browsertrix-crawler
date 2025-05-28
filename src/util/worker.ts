@@ -351,7 +351,7 @@ export class PageWorker {
     let loggedWaiting = false;
 
     while (await this.crawler.isCrawlRunning()) {
-      await crawlState.processMessage(this.crawler.params.scopedSeeds);
+      await crawlState.processMessage(this.crawler.seeds);
 
       const data = await crawlState.nextFromQueue();
 

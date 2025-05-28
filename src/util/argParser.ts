@@ -20,7 +20,6 @@ import {
   BxFunctionBindings,
   DEFAULT_CRAWL_ID_TEMPLATE,
 } from "./constants.js";
-import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
 import {
@@ -36,8 +35,6 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   logContext: LogContext[];
   logExcludeContext: LogContext[];
   text: string[];
-
-  scopedSeeds: ScopedSeed[];
 
   customBehaviors: string[];
 
@@ -776,22 +773,6 @@ class ArgParser {
       }
     }
 
-    if (argv.seedFile) {
-      const urlSeedFile = fs.readFileSync(argv.seedFile, "utf8");
-      const urlSeedFileList = urlSeedFile.split("\n");
-
-      if (typeof argv.seeds === "string") {
-        argv.seeds = [argv.seeds];
-      }
-
-      for (const seed of urlSeedFileList) {
-        if (seed) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (argv.seeds as any).push(seed);
-        }
-      }
-    }
-
     let selectLinks: ExtractSelector[];
 
     if (argv.selectLinks) {
@@ -823,49 +804,9 @@ class ArgParser {
       //logger.debug(`Set netIdleWait to ${argv.netIdleWait} seconds`);
     }
 
-    const scopedSeeds: ScopedSeed[] = [];
-
-    if (!isQA) {
-      const scopeOpts = {
-        scopeType: argv.scopeType,
-        sitemap: argv.sitemap,
-        include: argv.include,
-        exclude: argv.exclude,
-        depth: argv.depth,
-        extraHops: argv.extraHops,
-      };
-
-      for (const seed of argv.seeds) {
-        const newSeed = typeof seed === "string" ? { url: seed } : seed;
-
-        try {
-          scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...newSeed }));
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (e: any) {
-          logger.error("Failed to create seed", {
-            error: e.toString(),
-            ...scopeOpts,
-            ...newSeed,
-          });
-          if (argv.failOnFailedSeed) {
-            logger.fatal(
-              "Invalid seed specified, aborting crawl",
-              { url: newSeed.url },
-              "general",
-              1,
-            );
-          }
-        }
-      }
-
-      if (!scopedSeeds.length) {
-        logger.fatal("No valid seeds specified, aborting crawl");
-      }
-    } else if (!argv.qaSource) {
+    if (isQA && !argv.qaSource) {
       logger.fatal("--qaSource required for QA mode");
     }
-
-    argv.scopedSeeds = scopedSeeds;
 
     // Resolve statsFilename
     if (argv.statsFilename) {
