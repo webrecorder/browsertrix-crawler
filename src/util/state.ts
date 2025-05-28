@@ -25,6 +25,15 @@ export enum QueueState {
 }
 
 // ============================================================================
+// treat 0 or 206 as 200 for purposes of dedup
+function normalizeDedupStatus(status: number): number {
+  if (status === 0 || status === 206) {
+    return 200;
+  }
+  return status;
+}
+
+// ============================================================================
 export type WorkerId = number;
 
 // ============================================================================
@@ -971,11 +980,14 @@ return inx;
   }
 
   async addIfNoDupe(key: string, url: string, status: number) {
-    return (await this.redis.sadd(key, status + "|" + url)) === 1;
+    return (
+      (await this.redis.sadd(key, normalizeDedupStatus(status) + "|" + url)) ===
+      1
+    );
   }
 
   async removeDupe(key: string, url: string, status: number) {
-    return await this.redis.srem(key, status + "|" + url);
+    return await this.redis.srem(key, normalizeDedupStatus(status) + "|" + url);
   }
 
   async isInUserSet(value: string) {
