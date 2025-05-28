@@ -181,7 +181,7 @@ export class Browser {
   }
 
   async loadProfile(profileFilename: string): Promise<boolean> {
-    const targetFilename = "/tmp/profile.tar.gz";
+    const targetFilename = path.join(os.tmpdir(), "profile.tar.gz");
 
     if (
       profileFilename &&

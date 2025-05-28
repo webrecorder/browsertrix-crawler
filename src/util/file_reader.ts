@@ -1,5 +1,6 @@
 import fsp from "fs/promises";
 import path from "path";
+import os from "os";
 import crypto from "crypto";
 import { fetch } from "undici";
 import util from "util";
@@ -51,7 +52,10 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
   const relPath = params.get("path") || "";
   const urlStripped = url.split("?")[0];
 
-  const tmpDir = `/tmp/behaviors-repo-${crypto.randomBytes(4).toString("hex")}`;
+  const tmpDir = path.join(
+    os.tmpdir(),
+    `behaviors-repo-${crypto.randomBytes(4).toString("hex")}`,
+  );
 
   let cloneCommand = "git clone ";
   if (branch) {
@@ -84,7 +88,10 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
 
 async function collectOnlineBehavior(url: string): Promise<FileSources> {
   const filename = path.basename(new URL(url).pathname);
-  const tmpDir = `/tmp/behaviors-${crypto.randomBytes(4).toString("hex")}`;
+  const tmpDir = path.join(
+    os.tmpdir(),
+    `/tmp/behaviors-${crypto.randomBytes(4).toString("hex")}`,
+  );
   await fsp.mkdir(tmpDir, { recursive: true });
   const behaviorFilepath = path.join(tmpDir, filename);
 

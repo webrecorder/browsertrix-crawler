@@ -469,7 +469,7 @@ export class Crawler {
     }
 
     return child_process.spawn("redis-server", redisArgs, {
-      cwd: "/tmp/",
+      cwd: os.tmpdir(),
       stdio: redisStdio,
       detached: RUN_DETACHED,
     });
