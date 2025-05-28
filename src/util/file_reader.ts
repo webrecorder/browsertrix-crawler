@@ -24,6 +24,35 @@ export type FileSource = {
 
 export type FileSources = FileSource[];
 
+async function getTempFile(
+  filename: string,
+  dirPrefix: string,
+): Promise<string> {
+  const tmpDir = `/tmp/${dirPrefix}-${crypto.randomBytes(4).toString("hex")}`;
+  await fsp.mkdir(tmpDir, { recursive: true });
+  return path.join(tmpDir, filename);
+}
+
+async function writeUrlContentsToFile(url: string, filepath: string) {
+  const res = await fetch(url, { dispatcher: getProxyDispatcher() });
+  const fileContents = await res.text();
+  await fsp.writeFile(filepath, fileContents);
+}
+
+export async function collectOnlineSeedFile(url: string): Promise<string> {
+  const filename = path.basename(new URL(url).pathname);
+  const filepath = await getTempFile(filename, "seeds-");
+
+  try {
+    await writeUrlContentsToFile(url, filepath);
+    logger.info("Seed file downloaded", { url, path: filepath });
+  } catch (e) {
+    logger.fatal("Error downloading seed file from URL", { url, error: e });
+  }
+
+  return filepath;
+}
+
 export async function collectCustomBehaviors(
   sources: string[],
 ): Promise<FileSources> {
@@ -88,17 +117,10 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
 
 async function collectOnlineBehavior(url: string): Promise<FileSources> {
   const filename = path.basename(new URL(url).pathname);
-  const tmpDir = path.join(
-    os.tmpdir(),
-    `behaviors-${crypto.randomBytes(4).toString("hex")}`,
-  );
-  await fsp.mkdir(tmpDir, { recursive: true });
-  const behaviorFilepath = path.join(tmpDir, filename);
+  const behaviorFilepath = await getTempFile(filename, "behaviors-");
 
   try {
-    const res = await fetch(url, { dispatcher: getProxyDispatcher() });
-    const fileContents = await res.text();
-    await fsp.writeFile(behaviorFilepath, fileContents);
+    await writeUrlContentsToFile(url, behaviorFilepath);
     logger.info(
       "Custom behavior file downloaded",
       { url, path: behaviorFilepath },

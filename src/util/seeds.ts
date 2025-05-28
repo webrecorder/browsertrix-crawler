@@ -1,5 +1,8 @@
-import { logger } from "./logger.js";
+import fs from "fs";
+
 import { MAX_DEPTH } from "./constants.js";
+import { collectOnlineSeedFile } from "./file_reader.js";
+import { logger } from "./logger.js";
 
 type ScopeType =
   | "prefix"
@@ -298,6 +301,71 @@ export class ScopedSeed {
 
     return false;
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function parseSeeds(params: any): Promise<ScopedSeed[]> {
+  let seeds = params.seeds;
+  const scopedSeeds: ScopedSeed[] = [];
+
+  if (params.seedFile) {
+    let seedFilePath = params.seedFile;
+    if (params.seedFile.startsWith("http")) {
+      seedFilePath = await collectOnlineSeedFile(params.seedFile as string);
+    }
+
+    const urlSeedFile = fs.readFileSync(seedFilePath, "utf8");
+    const urlSeedFileList = urlSeedFile.split("\n");
+
+    if (typeof seeds === "string") {
+      seeds = [seeds];
+    }
+
+    for (const seed of urlSeedFileList) {
+      if (seed) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (seeds as any).push(seed);
+      }
+    }
+  }
+
+  const scopeOpts = {
+    scopeType: params.scopeType,
+    sitemap: params.sitemap,
+    include: params.include,
+    exclude: params.exclude,
+    depth: params.depth,
+    extraHops: params.extraHops,
+  };
+
+  for (const seed of seeds) {
+    const newSeed = typeof seed === "string" ? { url: seed } : seed;
+
+    try {
+      scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...newSeed }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
+      logger.error("Failed to create seed", {
+        error: e.toString(),
+        ...scopeOpts,
+        ...newSeed,
+      });
+      if (params.failOnFailedSeed) {
+        logger.fatal(
+          "Invalid seed specified, aborting crawl",
+          { url: newSeed.url },
+          "general",
+          1,
+        );
+      }
+    }
+  }
+
+  if (!scopedSeeds.length) {
+    logger.fatal("No valid seeds specified, aborting crawl");
+  }
+
+  return scopedSeeds;
 }
 
 export function rxEscape(string: string) {
