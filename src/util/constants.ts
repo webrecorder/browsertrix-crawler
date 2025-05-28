@@ -38,6 +38,7 @@ export const DEFAULT_MAX_RETRIES = 2;
 export const FETCH_HEADERS_TIMEOUT_SECS = 30;
 export const PAGE_OP_TIMEOUT_SECS = 5;
 export const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
+export const SEED_REDIRECT_ADD_DELAY = 20;
 
 export type ExtractSelector = {
   selector: string;
