@@ -90,7 +90,7 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
   const filename = path.basename(new URL(url).pathname);
   const tmpDir = path.join(
     os.tmpdir(),
-    `/tmp/behaviors-${crypto.randomBytes(4).toString("hex")}`,
+    `behaviors-${crypto.randomBytes(4).toString("hex")}`,
   );
   await fsp.mkdir(tmpDir, { recursive: true });
   const behaviorFilepath = path.join(tmpDir, filename);
