@@ -20,6 +20,7 @@ import {
   BxFunctionBindings,
   DEFAULT_CRAWL_ID_TEMPLATE,
 } from "./constants.js";
+import { collectOnlineSeedFile } from "./file_reader.js";
 import { ScopedSeed } from "./seeds.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -778,18 +779,34 @@ class ArgParser {
     }
 
     if (argv.seedFile) {
-      const urlSeedFile = fs.readFileSync(argv.seedFile, "utf8");
+      let seedFilePath = argv.seedFile;
+      if (seedFilePath.startsWith("http")) {
+        seedFilePath = await collectOnlineSeedFile(seedFilePath);
+      }
+
+      const urlSeedFile = fs.readFileSync(seedFilePath, "utf8");
       const urlSeedFileList = urlSeedFile.split("\n");
 
       if (typeof argv.seeds === "string") {
         argv.seeds = [argv.seeds];
       }
 
+      let lineIndex = 1;
       for (const seed of urlSeedFileList) {
         if (seed) {
+          try {
+            const url = new URL(seed);
+            logger.debug("URL in seed file passed validation", { url });
+          } catch (e) {
+            logger.fatal("Invalid seed detected in seed file", {
+              seed,
+              lineIndex,
+            });
+          }
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (argv.seeds as any).push(seed);
         }
+        lineIndex++;
       }
     }
 
