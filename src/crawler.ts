@@ -62,7 +62,7 @@ import {
 } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
-import { ScopedSeed } from "./util/seeds.js";
+import { ScopedSeed, parseSeeds } from "./util/seeds.js";
 import {
   WARCWriter,
   createWARCInfo,
@@ -134,7 +134,7 @@ export class Crawler {
 
   maxPageTime: number;
 
-  seeds: ScopedSeed[];
+  seeds: ScopedSeed[] = [];
   numOriginalSeeds = 0;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -254,9 +254,6 @@ export class Crawler {
 
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
-
-    this.seeds = this.params.scopedSeeds as ScopedSeed[];
-    this.numOriginalSeeds = this.seeds.length;
 
     // sum of page load + behavior timeouts + 2 x pageop timeouts (for cloudflare, link extraction) + extra page delay
     // if exceeded, will interrupt and move on to next page (likely behaviors or some other operation is stuck)
@@ -513,6 +510,9 @@ export class Crawler {
     logger.info(this.infoString);
 
     this.proxyServer = await initProxy(this.params, RUN_DETACHED);
+
+    this.seeds = await parseSeeds(this.params);
+    this.numOriginalSeeds = this.seeds.length;
 
     logger.info("Seeds", this.seeds);
 
