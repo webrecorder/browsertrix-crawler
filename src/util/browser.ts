@@ -577,11 +577,11 @@ export class Browser {
       }
 
       if (!foundRecorder) {
-        logger.warn(
-          "Skipping URL from unknown frame",
-          { url, frameId },
-          "recorder",
-        );
+        // logger.warn(
+        //   "Skipping URL from unknown frame",
+        //   { url, frameId },
+        //   "recorder",
+        // );
 
         try {
           await this.firstCDP.send("Fetch.continueResponse", { requestId });
