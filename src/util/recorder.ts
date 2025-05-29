@@ -804,18 +804,6 @@ export class Recorder extends EventEmitter {
 
     const rewritten = await this.rewriteResponse(reqresp, mimeType);
 
-    // if in browser context, and not also intercepted in page context
-    // serialize here, as won't be getting a loadingFinished message for it
-    // if (
-    //   isBrowserContext &&
-    //   !reqresp.inPageContext &&
-    //   !reqresp.asyncLoading &&
-    //   reqresp.payload
-    // ) {
-    //   this.removeReqResp(networkId);
-    //   await this.serializeToWARC(reqresp);
-    // }
-
     // not rewritten, and not streaming, return false to continue
     if (!rewritten && !streamingConsume) {
       if (!reqresp.payload) {
