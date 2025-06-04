@@ -1,6 +1,5 @@
 import fs from "fs";
 
-import { CrawlerArgs } from "./argParser.js";
 import { MAX_DEPTH } from "./constants.js";
 import { collectOnlineSeedFile } from "./file_reader.js";
 import { logger } from "./logger.js";
@@ -304,7 +303,8 @@ export class ScopedSeed {
   }
 }
 
-export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function parseSeeds(params: any): Promise<ScopedSeed[]> {
   let seeds = params.seeds;
   const scopedSeeds: ScopedSeed[] = [];
 
@@ -339,7 +339,7 @@ export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
   };
 
   for (const seed of seeds) {
-    const newSeed = typeof seed === "string" ? { url: seed } : (seed as object);
+    const newSeed = typeof seed === "string" ? { url: seed } : seed;
 
     try {
       scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...newSeed }));
