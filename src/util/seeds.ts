@@ -311,7 +311,7 @@ export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
   if (params.seedFile) {
     let seedFilePath = params.seedFile;
     if (params.seedFile.startsWith("http")) {
-      seedFilePath = await collectOnlineSeedFile(params.seedFilePath);
+      seedFilePath = await collectOnlineSeedFile(params.seedFilePath as string);
     }
 
     const urlSeedFile = fs.readFileSync(seedFilePath, "utf8");
@@ -339,7 +339,7 @@ export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
   };
 
   for (const seed of seeds) {
-    const newSeed = typeof seed === "string" ? { url: seed } : seed;
+    const newSeed = typeof seed === "string" ? { url: seed } : seed as object;
 
     try {
       scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...newSeed }));
