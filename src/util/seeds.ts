@@ -339,7 +339,7 @@ export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
   };
 
   for (const seed of seeds) {
-    const newSeed = typeof seed === "string" ? { url: seed } : seed as object;
+    const newSeed = typeof seed === "string" ? { url: seed } : (seed as object);
 
     try {
       scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...newSeed }));
