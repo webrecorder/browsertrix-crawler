@@ -303,7 +303,7 @@ export class ScopedSeed {
   }
 }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function parseSeeds(params: any): Promise<ScopedSeed[]> {
   let seeds = params.seeds;
   const scopedSeeds: ScopedSeed[] = [];
