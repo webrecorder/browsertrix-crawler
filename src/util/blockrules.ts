@@ -272,7 +272,9 @@ export class BlockRules {
     logDetails: Record<string, any>,
   ) {
     try {
-      const res = await fetch(reqUrl, { dispatcher: getProxyDispatcher() });
+      const res = await fetch(reqUrl, {
+        dispatcher: getProxyDispatcher(reqUrl),
+      });
       const text = await res.text();
 
       return !!text.match(frameTextMatch);
@@ -303,7 +305,7 @@ export class BlockRules {
       method: "PUT",
       headers: { "Content-Type": "text/html" },
       body,
-      dispatcher: getProxyDispatcher(),
+      dispatcher: getProxyDispatcher(putUrl.href),
     });
   }
 }
