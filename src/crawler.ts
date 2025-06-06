@@ -1312,7 +1312,7 @@ self.__bx_behaviors.selectMainBehavior();
               "Seed Page Load Failed, failing crawl",
               {},
               "general",
-              ExitCodes.Failed,
+              ExitCodes.GenericError,
             );
           }
         }
