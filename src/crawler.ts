@@ -2291,7 +2291,7 @@ self.__bx_behaviors.selectMainBehavior();
           frame.evaluate(
             "self.__bx_behaviors && self.__bx_behaviors.awaitPageLoad();",
           ),
-          PAGE_OP_TIMEOUT_SECS,
+          PAGE_OP_TIMEOUT_SECS * 4,
           "Custom page load check timed out",
           logDetails,
         );
