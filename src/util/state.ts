@@ -465,6 +465,10 @@ return inx;
     }
   }
 
+  async setFailReason(reason: string) {
+    await this.redis.set(`${this.key}:failReason`, reason);
+  }
+
   async setStatus(status_: string) {
     await this.redis.hset(`${this.key}:status`, this.uid, status_);
   }

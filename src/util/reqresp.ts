@@ -4,6 +4,7 @@ import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
 import { HTML_TYPES } from "./constants.js";
 import { Response } from "undici";
+import { ExtraOpts } from "@webrecorder/wabac/swlib";
 
 const CONTENT_LENGTH = "content-length";
 const CONTENT_RANGE = "content-range";
@@ -66,9 +67,7 @@ export class RequestResponseInfo {
 
   resourceType?: string;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  extraOpts: Record<string, any> = {};
+  extraOpts: ExtraOpts = {};
 
   // stats
   readSize: number = 0;

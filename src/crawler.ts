@@ -938,7 +938,20 @@ self.__bx_behaviors.selectMainBehavior();
       return nextFlowStep(id, page, workerid);
     });
 
-    // await page.exposeFunction("__bx_hasSet", (data: string) => this.crawlState.hasUserSet(data));
+    if (this.params.failOnContentCheck) {
+      await page.exposeFunction(
+        BxFunctionBindings.ContentCheckFailed,
+        (reason: string) => {
+          void this.crawlState.setFailReason(reason);
+          logger.fatal(
+            "Content check failed, failing crawl",
+            { reason },
+            "behavior",
+            ExitCodes.Failed,
+          );
+        },
+      );
+    }
   }
 
   async setupExecContextEvents(
@@ -1299,7 +1312,7 @@ self.__bx_behaviors.selectMainBehavior();
               "Seed Page Load Failed, failing crawl",
               {},
               "general",
-              1,
+              ExitCodes.Failed,
             );
           }
         }
