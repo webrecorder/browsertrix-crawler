@@ -447,6 +447,15 @@ return inx;
     return (await this.queueSize()) == 0 && (await this.numDone()) > 0;
   }
 
+  async isFailed() {
+    return (
+      (await this.numDone()) === 0 &&
+      (await this.queueSize()) === 0 &&
+      (await this.numPending()) === 0 &&
+      (await this.numFailed()) > 0
+    );
+  }
+
   async trimToLimit(limit: number) {
     const totalComplete =
       (await this.numPending()) +
