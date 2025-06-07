@@ -644,7 +644,8 @@ export class Crawler {
               break;
           }
         }
-      } else if (await this.crawlState.isFailed()) {
+      }
+      if (await this.crawlState.isFailed()) {
         logger.error("Crawl failed, no pages crawled successfully");
         status = "failed";
         exitCode = ExitCodes.Failed;
