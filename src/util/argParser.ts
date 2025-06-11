@@ -392,13 +392,6 @@ class ArgParser {
           type: "number",
         },
 
-        dedupPolicy: {
-          describe: "Deduplication policy",
-          default: "skip",
-          type: "string",
-          choices: ["skip", "revisit", "keep"],
-        },
-
         profile: {
           describe:
             "Path or HTTP(S) URL to tar.gz file which contains the browser profile directory",
