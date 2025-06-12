@@ -510,7 +510,7 @@ export class Recorder extends EventEmitter {
       return;
     }
 
-    if (url === this.pageUrl && this.pageInfo.tsStatus === 200) {
+    if (url === this.pageUrl) {
       await this.loadStorage(reqresp, cdp);
     }
 
@@ -539,6 +539,11 @@ export class Recorder extends EventEmitter {
           session: session.entries,
         });
       }
+      logger.debug(
+        "Got Storage",
+        { local: local.entries, session: session.entries },
+        "recorder",
+      );
     } catch (e) {
       logger.warn("Error getting local/session storage", e, "recorder");
     }
