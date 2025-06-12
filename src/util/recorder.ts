@@ -510,10 +510,8 @@ export class Recorder extends EventEmitter {
       return;
     }
 
-    if (url === this.pageUrl || reqresp.ts === this.pageInfo.ts) {
+    if (url === this.pageUrl) {
       await this.loadStorage(reqresp, cdp);
-    } else {
-      console.log("not page", url, reqresp.ts);
     }
 
     try {
