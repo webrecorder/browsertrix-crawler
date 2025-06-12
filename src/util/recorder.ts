@@ -219,7 +219,7 @@ export class Recorder extends EventEmitter {
 
     // Loading
     cdp.on("Network.loadingFinished", (params) =>
-      this.handleLoadingFinished(params),
+      this.handleLoadingFinished(params, cdp),
     );
 
     cdp.on("Network.loadingFailed", (params) =>
@@ -484,7 +484,10 @@ export class Recorder extends EventEmitter {
     this.removeReqResp(requestId);
   }
 
-  handleLoadingFinished(params: Protocol.Network.LoadingFinishedEvent) {
+  async handleLoadingFinished(
+    params: Protocol.Network.LoadingFinishedEvent,
+    cdp: CDPSession,
+  ) {
     const { requestId } = params;
 
     const reqresp = this.pendingReqResp(requestId, true);
@@ -507,9 +510,38 @@ export class Recorder extends EventEmitter {
       return;
     }
 
-    this.serializeToWARC(reqresp).catch((e) =>
-      logger.warn("Error Serializing to WARC", e, "recorder"),
-    );
+    if (url === this.pageUrl && this.pageInfo.tsStatus === 200) {
+      await this.loadStorage(reqresp, cdp);
+    }
+
+    try {
+      await this.serializeToWARC(reqresp);
+    } catch (e) {
+      logger.warn("Error Serializing to WARC", e, "recorder");
+    }
+  }
+
+  async loadStorage(reqresp: RequestResponseInfo, cdp: CDPSession) {
+    try {
+      const { url, extraOpts } = reqresp;
+      const securityOrigin = new URL(url).origin;
+
+      const local = await cdp.send("DOMStorage.getDOMStorageItems", {
+        storageId: { securityOrigin, isLocalStorage: true },
+      });
+      const session = await cdp.send("DOMStorage.getDOMStorageItems", {
+        storageId: { securityOrigin, isLocalStorage: false },
+      });
+
+      if (local.entries.length || session.entries.length) {
+        extraOpts.storage = JSON.stringify({
+          local: local.entries,
+          session: session.entries,
+        });
+      }
+    } catch (e) {
+      logger.warn("Error getting local/session storage", e, "recorder");
+    }
   }
 
   async handleRequestPaused(
