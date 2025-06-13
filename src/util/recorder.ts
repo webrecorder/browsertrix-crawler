@@ -539,11 +539,11 @@ export class Recorder extends EventEmitter {
           session: session.entries,
         });
       }
-      logger.debug(
-        "Got Storage",
-        { local: local.entries, session: session.entries },
-        "recorder",
-      );
+      // logger.debug(
+      //   "Got Storage",
+      //   { local: local.entries, session: session.entries },
+      //   "recorder",
+      // );
     } catch (e) {
       logger.warn("Error getting local/session storage", e, "recorder");
     }
