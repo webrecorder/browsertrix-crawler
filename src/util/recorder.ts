@@ -41,7 +41,7 @@ const WRITE_DUPE_KEY = "s:writedupe";
 const MIME_EVENT_STREAM = "text/event-stream";
 
 const RW_MIME_TYPES = [
-  "application/x-mpegURL",
+  "application/x-mpegurl",
   "application/vnd.apple.mpegurl",
   "application/dash+xml",
   "text/html",
@@ -1117,11 +1117,13 @@ export class Recorder extends EventEmitter {
       return false;
     }
 
+    contentType = contentType.toLowerCase();
+
     let newString = null;
     let string = null;
 
     switch (contentType) {
-      case "application/x-mpegURL":
+      case "application/x-mpegurl":
       case "application/vnd.apple.mpegurl":
         string = payload.toString();
         newString = rewriteHLS(string, { save: extraOpts });
@@ -1171,7 +1173,7 @@ export class Recorder extends EventEmitter {
       return true;
     }
 
-    if (RW_MIME_TYPES.includes(contentType)) {
+    if (RW_MIME_TYPES.includes(contentType.toLowerCase())) {
       return true;
     }
 
