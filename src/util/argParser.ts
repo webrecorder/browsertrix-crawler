@@ -475,7 +475,7 @@ class ArgParser {
           describe:
             "If set, save state and exit if disk utilization exceeds this percentage value",
           type: "number",
-          default: 90,
+          default: 0,
         },
 
         timeLimit: {
