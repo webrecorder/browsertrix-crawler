@@ -200,7 +200,7 @@ Options:
                                                            [number] [default: 0]
       --diskUtilization                     If set, save state and exit if disk
                                             utilization exceeds this percentage
-                                            value         [number] [default: 90]
+                                            value          [number] [default: 0]
       --timeLimit                           If set, save state and exit after ti
                                             me limit, in seconds
                                                            [number] [default: 0]
