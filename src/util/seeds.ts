@@ -361,7 +361,7 @@ export async function parseSeeds(params: any): Promise<ScopedSeed[]> {
     }
   }
 
-  if (!scopedSeeds.length) {
+  if (!params.qaSource && !scopedSeeds.length) {
     logger.fatal("No valid seeds specified, aborting crawl");
   }
 
