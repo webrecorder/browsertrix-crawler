@@ -38,3 +38,39 @@ test("check that URLs in seed-list are crawled", async () => {
   }
   expect(foundSeedUrl).toBe(true);
 });
+
+
+test("check that URLs in seed-list hosted at URL are crawled", async () => {
+  try {
+    await exec(
+      'docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection onlinefilelisttest --urlFile "https://raw.githubusercontent.com/webrecorder/browsertrix-crawler/refs/heads/main/tests/fixtures/urlSeedFile.txt" --timeout 90000',
+    );
+  } catch (error) {
+    console.log(error);
+  }
+
+  let crawled_pages = fs.readFileSync(
+    "test-crawls/collections/onlinefilelisttest/pages/pages.jsonl",
+    "utf8",
+  );
+  let seed_file = fs
+    .readFileSync("tests/fixtures/urlSeedFile.txt", "utf8")
+    .split("\n")
+    .sort();
+
+  let seed_file_list = [];
+  for (var j = 0; j < seed_file.length; j++) {
+    if (seed_file[j] != undefined) {
+      seed_file_list.push(seed_file[j]);
+    }
+  }
+
+  let foundSeedUrl = true;
+
+  for (var i = 1; i < seed_file_list.length; i++) {
+    if (crawled_pages.indexOf(seed_file_list[i]) == -1) {
+      foundSeedUrl = false;
+    }
+  }
+  expect(foundSeedUrl).toBe(true);
+});

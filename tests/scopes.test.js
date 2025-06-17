@@ -1,8 +1,9 @@
 import { parseArgs } from "../dist/util/argParser.js";
+import { parseSeeds } from "../dist/util/seeds.js";
 
 import fs from "fs";
 
-function getSeeds(config) {
+async function getSeeds(config) {
   const orig = fs.readFileSync;
 
   fs.readFileSync = (name, ...args) => {
@@ -12,12 +13,12 @@ function getSeeds(config) {
     return orig(name, ...args);
   };
 
-  const res = parseArgs(["node", "crawler", "--config", "stdinconfig"]);
-  return res.scopedSeeds;
+  const params = parseArgs(["node", "crawler", "--config", "stdinconfig"]);
+  return await parseSeeds(params);
 }
 
 test("default scope", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 seeds:
    - https://example.com/
 
@@ -30,7 +31,7 @@ seeds:
 });
 
 test("default scope + exclude", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 seeds:
    - https://example.com/
 
@@ -45,7 +46,7 @@ exclude: https://example.com/pathexclude
 });
 
 test("default scope + exclude is numeric", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 seeds:
    - https://example.com/
 
@@ -60,7 +61,7 @@ exclude: "2022"
 });
 
 test("prefix scope global + exclude", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 seeds:
    - https://example.com/
 
@@ -76,7 +77,7 @@ exclude: https://example.com/pathexclude
 });
 
 test("prefix scope per seed + exclude", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 seeds:
    - url: https://example.com/
      scopeType: prefix
@@ -92,7 +93,7 @@ exclude: https://example.com/pathexclude
 });
 
 test("host scope and domain scope", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 
 seeds:
    - url: https://example.com/
@@ -127,7 +128,7 @@ seeds:
 });
 
 test("domain scope drop www.", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 seeds:
    - url: https://www.example.com/
      scopeType: domain
@@ -139,7 +140,7 @@ seeds:
 });
 
 test("custom scope", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 seeds:
    - url: https://example.com/
      include: https?://example.com/(path|other)
@@ -153,7 +154,7 @@ seeds:
 });
 
 test("inherit scope", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 
 seeds:
    - url: https://example.com/1
@@ -177,7 +178,7 @@ exclude: https://example.com/pathexclude
 });
 
 test("override scope", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 
 seeds:
    - url: https://example.com/1
@@ -220,7 +221,7 @@ include: https://example.com/onlythispath
 });
 
 test("override scope with exclude", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 
 seeds:
    - url: https://example.com/1
@@ -275,7 +276,7 @@ exclude:
 });
 
 test("with exclude non-string types", async () => {
-  const seeds = getSeeds(`
+  const seeds = await getSeeds(`
 seeds:
    - url: https://example.com/
      exclude: "2023"
