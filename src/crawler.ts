@@ -47,6 +47,7 @@ import {
   ExitCodes,
   InterruptReason,
   BxFunctionBindings,
+  SEED_REDIRECT_ADD_DELAY,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -2131,6 +2132,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     const respUrl = resp.url().split("#")[0];
     const isChromeError = page.url().startsWith("chrome-error://");
+    let thisPageDelay = 0;
+    let originalSeedId = null;
 
     if (
       depth === 0 &&
@@ -2139,6 +2142,7 @@ self.__bx_behaviors.selectMainBehavior();
       respUrl + "/" !== url &&
       !downloadResponse
     ) {
+      originalSeedId = data.seedId;
       data.seedId = await this.crawlState.addExtraSeed(
         this.seeds,
         this.numOriginalSeeds,
@@ -2150,6 +2154,7 @@ self.__bx_behaviors.selectMainBehavior();
         newUrl: respUrl,
         seedId: data.seedId,
       });
+      thisPageDelay = SEED_REDIRECT_ADD_DELAY;
     }
 
     const status = resp.status();
@@ -2236,7 +2241,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.netIdle(page, logDetails);
 
-    await this.awaitPageLoad(page.mainFrame(), logDetails);
+    await this.awaitPageLoad(page.mainFrame(), thisPageDelay, logDetails);
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth, extraHops)) {
@@ -2249,6 +2254,27 @@ self.__bx_behaviors.selectMainBehavior();
       { selectors: this.params.selectLinks, ...logDetails },
       "links",
     );
+
+    const pageUrl = page.url().split("#")[0];
+
+    if (depth === 0 && respUrl !== urlNoHash) {
+      if (pageUrl === urlNoHash && originalSeedId !== null) {
+        logger.info("Seed page redirected back to original seed", { pageUrl });
+        data.seedId = originalSeedId;
+      } else {
+        data.seedId = await this.crawlState.addExtraSeed(
+          this.seeds,
+          this.numOriginalSeeds,
+          data.seedId,
+          pageUrl,
+        );
+        logger.info("Seed page redirected, adding redirected seed", {
+          origUrl: respUrl,
+          newUrl: pageUrl,
+          seedId: data.seedId,
+        });
+      }
+    }
 
     await this.extractLinks(page, data, this.params.selectLinks, logDetails);
   }
@@ -2271,7 +2297,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async awaitPageLoad(frame: Frame, logDetails: LogDetails) {
+  async awaitPageLoad(frame: Frame, tempDelay: number, logDetails: LogDetails) {
     if (this.params.behaviorOpts) {
       try {
         await timedRun(
@@ -2287,11 +2313,13 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.postLoadDelay) {
+    const delay = tempDelay + this.params.postLoadDelay;
+
+    if (delay) {
       logger.info("Awaiting post load delay", {
-        seconds: this.params.postLoadDelay,
+        seconds: delay,
       });
-      await sleep(this.params.postLoadDelay);
+      await sleep(delay);
     }
   }
 
