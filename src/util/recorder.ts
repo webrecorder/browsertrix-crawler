@@ -1351,7 +1351,11 @@ export class Recorder extends EventEmitter {
       url &&
       method === "GET" &&
       !isRedirectStatus(status) &&
-      !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, status))
+      !(await this.crawlState.addIfNoDupe(
+        WRITE_DUPE_KEY,
+        url,
+        status === 206 || !status ? 200 : status,
+      ))
     ) {
       logNetwork("Skipping dupe", { url, status, ...this.logDetails });
       return;
@@ -1505,7 +1509,11 @@ class AsyncFetcher {
       if (
         reqresp.method === "GET" &&
         url &&
-        !(await crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url, status))
+        !(await crawlState.addIfNoDupe(
+          ASYNC_FETCH_DUPE_KEY,
+          url,
+          status === 206 || !status ? 200 : status,
+        ))
       ) {
         if (!this.ignoreDupe) {
           this.reqresp.asyncLoading = false;
