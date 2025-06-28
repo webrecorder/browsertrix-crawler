@@ -596,6 +596,12 @@ class ArgParser {
           default: [],
         },
 
+        saveStorage: {
+          describe:
+            "if set, will store the localStorage/sessionStorage data for each page as part of WARC-JSON-Metadata field",
+          type: "boolean",
+        },
+
         debugAccessRedis: {
           describe:
             "if set, runs internal redis without protected mode to allow external access (for debugging)",
@@ -868,6 +874,10 @@ class ArgParser {
 
     if (argv.diskUtilization < 0 || argv.diskUtilization > 99) {
       argv.diskUtilization = 90;
+    }
+
+    if (argv.saveStorage) {
+      logger.info("Saving localStorage and sessionStorage");
     }
 
     return true;
