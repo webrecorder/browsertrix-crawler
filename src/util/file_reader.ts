@@ -43,7 +43,7 @@ async function writeUrlContentsToFile(url: string, filepath: string) {
 }
 
 export async function collectOnlineSeedFile(url: string): Promise<string> {
-  const filename = path.basename(new URL(url).pathname);
+  const filename = path.basename(new URL(url).pathname) || "index.html";
   const filepath = await getTempFile(filename, "seeds-");
 
   try {
@@ -119,7 +119,7 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
 }
 
 async function collectOnlineBehavior(url: string): Promise<FileSources> {
-  const filename = path.basename(new URL(url).pathname);
+  const filename = path.basename(new URL(url).pathname) || "index.html";
   const behaviorFilepath = await getTempFile(filename, "behaviors-");
 
   try {
