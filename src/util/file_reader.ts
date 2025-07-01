@@ -17,6 +17,15 @@ const MAX_DEPTH = 5;
 // Add .ts to allowed extensions when we can support it
 const ALLOWED_EXTS = [".js", ".json"];
 
+const BEHAVIOR_MIMES = [
+  "application/json",
+  "text/javascript",
+  "application/javascript",
+  "application/x-javascript",
+];
+
+const SEED_LIST_MIMES = ["text/plain"];
+
 export type FileSource = {
   path: string;
   contents: string;
@@ -36,24 +45,46 @@ async function getTempFile(
   return path.join(tmpDir, filename);
 }
 
-async function writeUrlContentsToFile(url: string, filepath: string) {
+async function writeUrlContentsToFile(
+  url: string,
+  pathPrefix: string,
+  allowedMimes: string[],
+  pathDefaultExt: string,
+) {
   const res = await fetch(url, { dispatcher: getProxyDispatcher() });
+  const ct = res.headers.get("content-type") || "";
+  if (!allowedMimes.includes(ct)) {
+    throw new Error(
+      `Invalid Content-Type: ${ct}, expected one of: ${allowedMimes.join(",")}`,
+    );
+  }
   const fileContents = await res.text();
+
+  const filename =
+    path.basename(new URL(url).pathname) || "index." + pathDefaultExt;
+  const filepath = await getTempFile(filename, pathPrefix);
+
   await fsp.writeFile(filepath, fileContents);
+  return filepath;
 }
 
 export async function collectOnlineSeedFile(url: string): Promise<string> {
-  const filename = path.basename(new URL(url).pathname) || "index.html";
-  const filepath = await getTempFile(filename, "seeds-");
-
   try {
-    await writeUrlContentsToFile(url, filepath);
+    const filepath = await writeUrlContentsToFile(
+      url,
+      "seeds-",
+      SEED_LIST_MIMES,
+      ".txt",
+    );
     logger.info("Seed file downloaded", { url, path: filepath });
+    return filepath;
   } catch (e) {
-    logger.fatal("Error downloading seed file from URL", { url, error: e });
+    logger.fatal("Error downloading seed file from URL", {
+      url,
+      ...formatErr(e),
+    });
+    throw e;
   }
-
-  return filepath;
 }
 
 export async function collectCustomBehaviors(
@@ -111,7 +142,7 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
   } catch (e) {
     logger.fatal(
       "Error downloading custom behaviors from Git repo",
-      { url: urlStripped, error: e },
+      { url: urlStripped, ...formatErr(e) },
       "behavior",
     );
   }
@@ -119,11 +150,13 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
 }
 
 async function collectOnlineBehavior(url: string): Promise<FileSources> {
-  const filename = path.basename(new URL(url).pathname) || "index.html";
-  const behaviorFilepath = await getTempFile(filename, "behaviors-");
-
   try {
-    await writeUrlContentsToFile(url, behaviorFilepath);
+    const behaviorFilepath = await writeUrlContentsToFile(
+      url,
+      "behaviors-",
+      BEHAVIOR_MIMES,
+      ".js",
+    );
     logger.info(
       "Custom behavior file downloaded",
       { url, path: behaviorFilepath },
@@ -133,7 +166,7 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
   } catch (e) {
     logger.fatal(
       "Error downloading custom behavior from URL",
-      { url, error: e },
+      { url, ...formatErr(e) },
       "behavior",
     );
   }
@@ -215,7 +248,7 @@ async function collectLocalPathBehaviors(
   } catch (e) {
     logger.fatal(
       "Error fetching local custom behaviors",
-      { path: resolvedPath, error: e },
+      { path: resolvedPath, ...formatErr(e) },
       "behavior",
     );
   }
