@@ -3,6 +3,7 @@ import fs from "fs";
 import { MAX_DEPTH } from "./constants.js";
 import { collectOnlineSeedFile } from "./file_reader.js";
 import { logger } from "./logger.js";
+import { type CrawlerArgs } from "./argParser.js";
 
 type ScopeType =
   | "prefix"
@@ -42,14 +43,14 @@ export class ScopedSeed {
     auth = null,
   }: {
     url: string;
-    scopeType: ScopeType;
+    scopeType: ScopeType | undefined;
     include: string[];
     exclude: string[];
     allowHash?: boolean;
     depth?: number;
     sitemap?: string | boolean | null;
     extraHops?: number;
-    auth: string | null;
+    auth?: string | null;
   }) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
@@ -65,14 +66,14 @@ export class ScopedSeed {
     this.url = parsedUrl.href;
     this.include = parseRx(include);
     this.exclude = parseRx(exclude);
-    this.scopeType = scopeType;
 
     this._includeStr = include;
     this._excludeStr = exclude;
 
-    if (!this.scopeType) {
-      this.scopeType = this.include.length ? "custom" : "prefix";
+    if (!scopeType) {
+      scopeType = this.include.length ? "custom" : "prefix";
     }
+    this.scopeType = scopeType;
 
     if (this.scopeType !== "custom") {
       const [includeNew, allowHashNew] = this.scopeFromType(
@@ -303,15 +304,17 @@ export class ScopedSeed {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function parseSeeds(params: any): Promise<ScopedSeed[]> {
-  let seeds = params.seeds;
+export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
+  let seeds = params.seeds as string[];
   const scopedSeeds: ScopedSeed[] = [];
 
   if (params.seedFile) {
-    let seedFilePath = params.seedFile;
-    if (params.seedFile.startsWith("http")) {
-      seedFilePath = await collectOnlineSeedFile(params.seedFile as string);
+    let seedFilePath = params.seedFile as string;
+    if (
+      seedFilePath.startsWith("http://") ||
+      seedFilePath.startsWith("https://")
+    ) {
+      seedFilePath = await collectOnlineSeedFile(seedFilePath);
     }
 
     const urlSeedFile = fs.readFileSync(seedFilePath, "utf8");
@@ -323,14 +326,13 @@ export async function parseSeeds(params: any): Promise<ScopedSeed[]> {
 
     for (const seed of urlSeedFileList) {
       if (seed) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (seeds as any).push(seed);
+        seeds.push(seed);
       }
     }
   }
 
   const scopeOpts = {
-    scopeType: params.scopeType,
+    scopeType: params.scopeType as ScopeType | undefined,
     sitemap: params.sitemap,
     include: params.include,
     exclude: params.exclude,

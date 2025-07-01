@@ -40,6 +40,10 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
 
   selectLinks: ExtractSelector[];
 
+  include: string[];
+  exclude: string[];
+  sitemap: boolean;
+
   crawlId: string;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
