@@ -52,7 +52,7 @@ async function writeUrlContentsToFile(
   pathDefaultExt: string,
 ) {
   const res = await fetch(url, { dispatcher: getProxyDispatcher() });
-  const ct = res.headers.get("content-type") || "";
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
   if (!allowedMimes.includes(ct)) {
     throw new Error(
       `Invalid Content-Type: ${ct}, expected one of: ${allowedMimes.join(",")}`,
