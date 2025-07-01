@@ -28,7 +28,7 @@ async function getTempFile(
   filename: string,
   dirPrefix: string,
 ): Promise<string> {
-  const tmpDir = `/tmp/${dirPrefix}-${crypto.randomBytes(4).toString("hex")}`;
+  const tmpDir = path.join(os.tmpdir(), `${dirPrefix}-${crypto.randomBytes(4).toString("hex")}`);
   await fsp.mkdir(tmpDir, { recursive: true });
   return path.join(tmpDir, filename);
 }
