@@ -148,11 +148,14 @@ export class Recorder extends EventEmitter {
   writer: WARCWriter;
 
   pageUrl!: string;
+  finalPageUrl = "";
   pageid!: string;
 
   pageSeed?: ScopedSeed;
 
   frameIdToExecId: Map<string, number> | null;
+
+  shouldSaveStorage = false;
 
   constructor({
     workerid,
@@ -167,6 +170,8 @@ export class Recorder extends EventEmitter {
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
+
+    this.shouldSaveStorage = !!crawler.params.saveStorage;
 
     this.writer = writer;
 
@@ -219,7 +224,7 @@ export class Recorder extends EventEmitter {
 
     // Loading
     cdp.on("Network.loadingFinished", (params) =>
-      this.handleLoadingFinished(params),
+      this.handleLoadingFinished(params, cdp),
     );
 
     cdp.on("Network.loadingFailed", (params) =>
@@ -407,6 +412,10 @@ export class Recorder extends EventEmitter {
       return;
     }
 
+    if (reqresp.url === this.finalPageUrl) {
+      this.finalPageUrl = reqresp.getRedirectUrl();
+    }
+
     this.serializeToWARC(reqresp).catch((e) =>
       logger.warn("Error Serializing to WARC", e, "recorder"),
     );
@@ -484,7 +493,10 @@ export class Recorder extends EventEmitter {
     this.removeReqResp(requestId);
   }
 
-  handleLoadingFinished(params: Protocol.Network.LoadingFinishedEvent) {
+  async handleLoadingFinished(
+    params: Protocol.Network.LoadingFinishedEvent,
+    cdp: CDPSession,
+  ) {
     const { requestId } = params;
 
     const reqresp = this.pendingReqResp(requestId, true);
@@ -507,9 +519,38 @@ export class Recorder extends EventEmitter {
       return;
     }
 
-    this.serializeToWARC(reqresp).catch((e) =>
-      logger.warn("Error Serializing to WARC", e, "recorder"),
-    );
+    if (this.shouldSaveStorage && url === this.finalPageUrl) {
+      await this.saveStorage(reqresp, cdp);
+    }
+
+    try {
+      await this.serializeToWARC(reqresp);
+    } catch (e) {
+      logger.warn("Error Serializing to WARC", e, "recorder");
+    }
+  }
+
+  async saveStorage(reqresp: RequestResponseInfo, cdp: CDPSession) {
+    try {
+      const { url, extraOpts } = reqresp;
+      const securityOrigin = new URL(url).origin;
+
+      const local = await cdp.send("DOMStorage.getDOMStorageItems", {
+        storageId: { securityOrigin, isLocalStorage: true },
+      });
+      const session = await cdp.send("DOMStorage.getDOMStorageItems", {
+        storageId: { securityOrigin, isLocalStorage: false },
+      });
+
+      if (local.entries.length || session.entries.length) {
+        extraOpts.storage = JSON.stringify({
+          local: local.entries,
+          session: session.entries,
+        });
+      }
+    } catch (e) {
+      logger.warn("Error getting local/session storage", e, "recorder");
+    }
   }
 
   async handleRequestPaused(
@@ -910,6 +951,7 @@ export class Recorder extends EventEmitter {
   startPage({ pageid, url }: { pageid: string; url: string }) {
     this.pageid = pageid;
     this.pageUrl = url;
+    this.finalPageUrl = this.pageUrl;
     this.logDetails = { page: url, workerid: this.workerid };
     if (this.pendingRequests && this.pendingRequests.size) {
       logger.debug(
