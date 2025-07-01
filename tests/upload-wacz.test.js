@@ -72,7 +72,7 @@ test("run crawl with upload", async () => {
   }
 
   // ensure bucket is public
-  execSync(`docker exec ${minioId.trim()} mc config host add local http://127.0.0.1:9000 minioadmin minioadmin`);
+  execSync(`docker exec ${minioId.trim()} mc alias set local http://127.0.0.1:9000 minioadmin minioadmin`);
   execSync(`docker exec ${minioId.trim()} mc anonymous set download local/test-bucket`);
 
   // wait for crawler to finish
