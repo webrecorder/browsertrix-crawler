@@ -17,15 +17,6 @@ const MAX_DEPTH = 5;
 // Add .ts to allowed extensions when we can support it
 const ALLOWED_EXTS = [".js", ".json"];
 
-const BEHAVIOR_MIMES = [
-  "application/json",
-  "text/javascript",
-  "application/javascript",
-  "application/x-javascript",
-];
-
-const SEED_LIST_MIMES = ["text/plain"];
-
 export type FileSource = {
   path: string;
   contents: string;
@@ -48,18 +39,10 @@ async function getTempFile(
 async function writeUrlContentsToFile(
   url: string,
   pathPrefix: string,
-  allowedMimes: string[],
   pathDefaultExt: string,
 ) {
   const res = await fetch(url, { dispatcher: getProxyDispatcher() });
-  const ct = (res.headers.get("content-type") || "")
-    .toLowerCase()
-    .split(";")[0];
-  if (!allowedMimes.includes(ct)) {
-    throw new Error(
-      `Invalid Content-Type: ${ct}, expected one of: ${allowedMimes.join(",")}`,
-    );
-  }
+
   const fileContents = await res.text();
 
   const filename =
@@ -72,12 +55,7 @@ async function writeUrlContentsToFile(
 
 export async function collectOnlineSeedFile(url: string): Promise<string> {
   try {
-    const filepath = await writeUrlContentsToFile(
-      url,
-      "seeds-",
-      SEED_LIST_MIMES,
-      ".txt",
-    );
+    const filepath = await writeUrlContentsToFile(url, "seeds-", ".txt");
     logger.info("Seed file downloaded", { url, path: filepath });
     return filepath;
   } catch (e) {
@@ -156,7 +134,6 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
     const behaviorFilepath = await writeUrlContentsToFile(
       url,
       "behaviors-",
-      BEHAVIOR_MIMES,
       ".js",
     );
     logger.info(
