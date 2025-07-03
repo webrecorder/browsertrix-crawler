@@ -76,7 +76,11 @@ export class Browser {
   screenWHRatio: number;
 
   constructor() {
-    this.profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-"));
+    this.profileDir = path.join(os.tmpdir(), "btrixProfile");
+    if (fs.existsSync(this.profileDir)) {
+      fs.rmSync(this.profileDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(this.profileDir);
 
     // must be provided, part of Dockerfile
     assert(process.env.GEOMETRY);
