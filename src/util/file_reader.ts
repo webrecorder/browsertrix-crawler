@@ -24,6 +24,48 @@ export type FileSource = {
 
 export type FileSources = FileSource[];
 
+async function getTempFile(
+  filename: string,
+  dirPrefix: string,
+): Promise<string> {
+  const tmpDir = path.join(
+    os.tmpdir(),
+    `${dirPrefix}-${crypto.randomBytes(4).toString("hex")}`,
+  );
+  await fsp.mkdir(tmpDir, { recursive: true });
+  return path.join(tmpDir, filename);
+}
+
+async function writeUrlContentsToFile(
+  url: string,
+  pathPrefix: string,
+  pathDefaultExt: string,
+) {
+  const res = await fetch(url, { dispatcher: getProxyDispatcher() });
+  const fileContents = await res.text();
+
+  const filename =
+    path.basename(new URL(url).pathname) || "index." + pathDefaultExt;
+  const filepath = await getTempFile(filename, pathPrefix);
+
+  await fsp.writeFile(filepath, fileContents);
+  return filepath;
+}
+
+export async function collectOnlineSeedFile(url: string): Promise<string> {
+  try {
+    const filepath = await writeUrlContentsToFile(url, "seeds-", ".txt");
+    logger.info("Seed file downloaded", { url, path: filepath });
+    return filepath;
+  } catch (e) {
+    logger.fatal("Error downloading seed file from URL", {
+      url,
+      ...formatErr(e),
+    });
+    throw e;
+  }
+}
+
 export async function collectCustomBehaviors(
   sources: string[],
 ): Promise<FileSources> {
@@ -79,7 +121,7 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
   } catch (e) {
     logger.fatal(
       "Error downloading custom behaviors from Git repo",
-      { url: urlStripped, error: e },
+      { url: urlStripped, ...formatErr(e) },
       "behavior",
     );
   }
@@ -87,18 +129,12 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
 }
 
 async function collectOnlineBehavior(url: string): Promise<FileSources> {
-  const filename = path.basename(new URL(url).pathname);
-  const tmpDir = path.join(
-    os.tmpdir(),
-    `behaviors-${crypto.randomBytes(4).toString("hex")}`,
-  );
-  await fsp.mkdir(tmpDir, { recursive: true });
-  const behaviorFilepath = path.join(tmpDir, filename);
-
   try {
-    const res = await fetch(url, { dispatcher: getProxyDispatcher() });
-    const fileContents = await res.text();
-    await fsp.writeFile(behaviorFilepath, fileContents);
+    const behaviorFilepath = await writeUrlContentsToFile(
+      url,
+      "behaviors-",
+      ".js",
+    );
     logger.info(
       "Custom behavior file downloaded",
       { url, path: behaviorFilepath },
@@ -108,7 +144,7 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
   } catch (e) {
     logger.fatal(
       "Error downloading custom behavior from URL",
-      { url, error: e },
+      { url, ...formatErr(e) },
       "behavior",
     );
   }
@@ -190,7 +226,7 @@ async function collectLocalPathBehaviors(
   } catch (e) {
     logger.fatal(
       "Error fetching local custom behaviors",
-      { path: resolvedPath, error: e },
+      { path: resolvedPath, ...formatErr(e) },
       "behavior",
     );
   }
