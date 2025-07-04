@@ -1134,10 +1134,10 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@webrecorder/wabac@^2.23.3":
-  version "2.23.3"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.23.3.tgz#405f53649183c54fd116e334eae2666d6514a341"
-  integrity sha512-NlPNGNmilNf/NEqHbCNPcib4GNnZKQJKK3PIiI0BvEdem/TEjvcn5wEBbUntTYn+VwrhX36QY2HC7Iag+dVnvw==
+"@webrecorder/wabac@^2.23.6":
+  version "2.23.6"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.23.6.tgz#cfcf9ef071732de0b71d49b0d3276711e88788a7"
+  integrity sha512-eyRew3ddm0PzzD81racFf1REwTQeoMHAQLreG5+B5OBWBdfFblzlbsUTp4KqiFKHMZ14WXjIxznFcYwCUpkA6w==
   dependencies:
     "@peculiar/asn1-ecc" "^2.3.4"
     "@peculiar/asn1-schema" "^2.3.3"
@@ -1595,10 +1595,10 @@ browserslist@^4.24.0:
     node-releases "^2.0.18"
     update-browserslist-db "^1.1.1"
 
-browsertrix-behaviors@^0.8.5:
-  version "0.8.5"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.8.5.tgz#f93dc6fed15cb2266664c85eec7f0796c1634fa5"
-  integrity sha512-v6wv6NLJEhj3NbrmGEfOWyXf2TuJgj95Em+KfCTPRJxakTtsvH/A7n2FSNvqMhwusqrjpIR4ch6cEkDp4hblvQ==
+browsertrix-behaviors@^0.9.0:
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.9.0.tgz#3789a07fdf43ca76b4cb4794119d082189338c6a"
+  integrity sha512-rfpgW7r9ApwwH20IbpQrJaWupsfbVgxQRRuARs4m8nzIdF/WKTv38fTHDbYci8wJulcdu8D/eAlzyIBPwhrkkA==
   dependencies:
     query-selector-shadow-dom "^1.0.1"
 

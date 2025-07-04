@@ -1,4 +1,8 @@
-import { getCustomRewriter, getStatusText } from "@webrecorder/wabac";
+import {
+  getCustomRewriter,
+  getStatusText,
+  ExtraOpts,
+} from "@webrecorder/wabac";
 
 import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
@@ -66,9 +70,7 @@ export class RequestResponseInfo {
 
   resourceType?: string;
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  extraOpts: Record<string, any> = {};
+  extraOpts: ExtraOpts = {};
 
   // stats
   readSize: number = 0;

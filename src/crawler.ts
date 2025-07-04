@@ -645,6 +645,11 @@ export class Crawler {
           }
         }
       }
+      if (await this.crawlState.isFailed()) {
+        logger.error("Crawl failed, no pages crawled successfully");
+        status = "failed";
+        exitCode = ExitCodes.Failed;
+      }
     } catch (e) {
       logger.error("Crawl failed", e);
       exitCode = ExitCodes.Failed;
@@ -938,7 +943,24 @@ self.__bx_behaviors.selectMainBehavior();
       return nextFlowStep(id, page, workerid);
     });
 
-    // await page.exposeFunction("__bx_hasSet", (data: string) => this.crawlState.hasUserSet(data));
+    if (this.params.failOnContentCheck) {
+      await page.exposeFunction(
+        BxFunctionBindings.ContentCheckFailed,
+        (reason: string) => {
+          // if called outside of awaitPageLoad(), ignore
+          if (!opts.data.contentCheckAllowed) {
+            return;
+          }
+          void this.crawlState.setFailReason(reason);
+          logger.fatal(
+            "Content check failed, failing crawl",
+            { reason },
+            "behavior",
+            ExitCodes.Failed,
+          );
+        },
+      );
+    }
   }
 
   async setupExecContextEvents(
@@ -1299,7 +1321,7 @@ self.__bx_behaviors.selectMainBehavior();
               "Seed Page Load Failed, failing crawl",
               {},
               "general",
-              1,
+              ExitCodes.GenericError,
             );
           }
         }
@@ -2236,7 +2258,12 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.netIdle(page, logDetails);
 
+    // allow failing crawl via script only within awaitPageLoad() for now
+    data.contentCheckAllowed = true;
+
     await this.awaitPageLoad(page.mainFrame(), logDetails);
+
+    data.contentCheckAllowed = false;
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth, extraHops)) {
@@ -2278,7 +2305,7 @@ self.__bx_behaviors.selectMainBehavior();
           frame.evaluate(
             "self.__bx_behaviors && self.__bx_behaviors.awaitPageLoad();",
           ),
-          PAGE_OP_TIMEOUT_SECS,
+          PAGE_OP_TIMEOUT_SECS * 4,
           "Custom page load check timed out",
           logDetails,
         );
