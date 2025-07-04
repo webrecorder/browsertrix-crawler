@@ -96,8 +96,6 @@ export class ReplayCrawler extends Crawler {
     // skip text from first two frames, as they are RWP boilerplate
     this.skipTextDocs = SKIP_FRAMES;
 
-    this.params.scopedSeeds = [];
-
     this.params.screenshot = ["view"];
     this.params.text = ["to-warc"];
 

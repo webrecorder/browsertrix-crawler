@@ -181,19 +181,22 @@ export class RequestResponseInfo {
     return isRedirectStatus(this.status);
   }
 
+  getRedirectUrl() {
+    try {
+      const headers = new Headers(this.getResponseHeadersDict());
+      const location = headers.get("location") || "";
+      return new URL(location, this.url).href;
+    } catch (e) {
+      return "";
+    }
+  }
+
   isSelfRedirect() {
     if (!this.isRedirectStatus()) {
       return false;
     }
 
-    try {
-      const headers = new Headers(this.getResponseHeadersDict());
-      const location = headers.get("location") || "";
-      const redirUrl = new URL(location, this.url).href;
-      return this.url === redirUrl;
-    } catch (e) {
-      return false;
-    }
+    return this.url === this.getRedirectUrl();
   }
 
   fillResponseReceivedExtraInfo(
