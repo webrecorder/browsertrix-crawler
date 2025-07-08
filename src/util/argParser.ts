@@ -587,6 +587,13 @@ class ArgParser {
           default: false,
         },
 
+        failOnContentCheck: {
+          describe:
+            "If set, allows for behaviors to fail a crawl with custom reason based on content (e.g. logged out)",
+          type: "boolean",
+          default: false,
+        },
+
         customBehaviors: {
           describe:
             "Custom behavior files to inject. Valid values: URL to file, path to file, path to directory" +
