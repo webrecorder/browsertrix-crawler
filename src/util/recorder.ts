@@ -1714,6 +1714,8 @@ class AsyncFetcher {
           reqresp.status = 0;
           reqresp.errorText = e.message;
         }
+        // if we get here, successful (or out of retries), break out of loop
+        break;
       }
     } finally {
       recorder.addPageRecord(reqresp);
