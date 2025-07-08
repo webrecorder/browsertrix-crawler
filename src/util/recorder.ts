@@ -790,31 +790,25 @@ export class Recorder extends EventEmitter {
         mimeType,
       )
     ) {
-      const opts: ResponseStreamAsyncFetchOptions = {
-        reqresp,
-        expectedSize: contentLen,
-        recorder: this,
-        networkId,
-        cdp,
-        requestId,
-      };
-
-      // fetching using response stream as first attempt,
-      // await here and then either call fulFill, or if dupe, return false
-      const fetcher = new ResponseStreamAsyncFetcher(opts);
-      const res = await fetcher.load();
-      switch (res) {
-        case "dupe":
-          this.removeReqResp(networkId);
-          return false;
-
-        case "fetched":
-          streamingConsume = true;
-          break;
+      if (await this.isDupe(reqresp)) {
+        this.removeReqResp(networkId);
+        return false;
       }
+
+      streamingConsume = await this.fetchResponseBody(networkId, reqresp, cdp);
 
       // if not consumed via takeStream, attempt async loading
       if (!streamingConsume) {
+        this.removeReqResp(networkId);
+
+        const opts: NetworkLoadAsyncFetchOptions = {
+          reqresp,
+          expectedSize: contentLen,
+          recorder: this,
+          networkId,
+          cdp,
+        };
+
         this.addAsyncFetch(opts, contentLen);
         return false;
       }
@@ -1499,13 +1493,154 @@ export class Recorder extends EventEmitter {
       return "";
     }
   }
+
+  async fetchResponseBody(
+    requestId: string,
+    reqresp: RequestResponseInfo,
+    cdp: CDPSession,
+  ) {
+    const { url } = reqresp;
+    try {
+      logger.debug("Async started: takeStream", { url }, "recorder");
+
+      const { stream } = await cdp.send("Fetch.takeResponseBodyAsStream", {
+        requestId,
+      });
+
+      const { pageid, gzip } = this;
+
+      const responseRecord = createResponse(
+        reqresp,
+        pageid,
+        this.takeStreamIter(reqresp, cdp, stream),
+      );
+      const requestRecord = createRequest(reqresp, responseRecord, pageid);
+
+      const serializer = new WARCSerializer(responseRecord, {
+        gzip,
+        maxMemSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
+      });
+
+      this.commitRecords(reqresp, responseRecord, requestRecord, serializer);
+
+      this.removeReqResp(requestId);
+    } catch (e) {
+      logger.warn(
+        "Fetch responseBodyAsStream failed",
+        { url, ...formatErr(e), ...this.logDetails },
+        "recorder",
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  async *takeStreamIter(
+    reqresp: RequestResponseInfo,
+    cdp: CDPSession,
+    stream: Protocol.IO.StreamHandle,
+  ) {
+    let size = 0;
+    try {
+      while (true) {
+        const { data, base64Encoded, eof } = await cdp.send("IO.read", {
+          handle: stream,
+          size: TAKE_STREAM_BUFF_SIZE,
+        });
+        const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
+
+        size += buff.length;
+        yield buff;
+
+        if (eof) {
+          break;
+        }
+      }
+    } catch (e) {
+      logger.warn(
+        "takeStream interrupted",
+        {
+          size,
+          url: reqresp.url,
+          ...formatErr(e),
+          ...this.logDetails,
+        },
+        "recorder",
+      );
+      reqresp.truncated = "disconnect";
+    }
+  }
+
+  async isDupe(reqresp: RequestResponseInfo) {
+    const { url, method, status } = reqresp;
+    if (
+      method === "GET" &&
+      url &&
+      !(await this.crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url, status))
+    ) {
+      reqresp.asyncLoading = false;
+      return true;
+    }
+
+    return false;
+  }
+
+  commitRecords(
+    reqresp: RequestResponseInfo,
+    responseRecord: WARCRecord,
+    requestRecord: WARCRecord,
+    serializer: WARCSerializer,
+  ) {
+    const externalBuffer: TempFileBuffer =
+      serializer.externalBuffer as TempFileBuffer;
+
+    const { url } = reqresp;
+
+    if (externalBuffer) {
+      const { currSize, buffers, fh } = externalBuffer;
+
+      // if fully buffered in memory, then populate the payload to return to browser
+      if (buffers && buffers.length && !fh) {
+        reqresp.payload = Buffer.concat(buffers, currSize);
+        externalBuffer.buffers = [reqresp.payload];
+      } else if (fh) {
+        logger.debug(
+          "Large payload written to WARC, but not returned to browser (would require rereading into memory)",
+          {
+            url,
+            actualSize: reqresp.readSize,
+            maxSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
+          },
+          "recorder",
+        );
+      }
+    }
+
+    if (reqresp.truncated) {
+      responseRecord.warcHeaders.headers.set(
+        "WARC-Truncated",
+        reqresp.truncated,
+      );
+    }
+
+    if (Object.keys(reqresp.extraOpts).length) {
+      responseRecord.warcHeaders.headers.set(
+        "WARC-JSON-Metadata",
+        JSON.stringify(reqresp.extraOpts),
+      );
+    }
+
+    this.writer.writeRecordPair(responseRecord, requestRecord, serializer);
+
+    this.addPageRecord(reqresp);
+  }
 }
 
 // =================================================================
 class AsyncFetcher {
   reqresp: RequestResponseInfo;
 
-  networkId: string;
   filter?: (resp: Response) => boolean;
   ignoreDupe = false;
 
@@ -1521,7 +1656,6 @@ class AsyncFetcher {
     reqresp,
     expectedSize = -1,
     recorder,
-    networkId,
     filter = undefined,
     ignoreDupe = false,
     maxFetchSize = MAX_BROWSER_DEFAULT_FETCH_SIZE,
@@ -1531,7 +1665,6 @@ class AsyncFetcher {
     this.reqresp.expectedSize = expectedSize;
     this.reqresp.asyncLoading = true;
 
-    this.networkId = networkId;
     this.filter = filter;
     this.ignoreDupe = ignoreDupe;
 
@@ -1543,7 +1676,7 @@ class AsyncFetcher {
   }
 
   async load() {
-    const { reqresp, recorder, networkId } = this;
+    const { reqresp, recorder } = this;
     const { url, status } = reqresp;
 
     const { pageid, crawlState, gzip, logDetails } = recorder;
@@ -1551,15 +1684,8 @@ class AsyncFetcher {
     let fetched = "notfetched";
 
     try {
-      if (
-        reqresp.method === "GET" &&
-        url &&
-        !(await crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url, status))
-      ) {
-        if (!this.ignoreDupe) {
-          this.reqresp.asyncLoading = false;
-          return "dupe";
-        }
+      if ((await this.recorder.isDupe(reqresp)) && !this.ignoreDupe) {
+        return "dupe";
       }
 
       let retries = 0;
@@ -1630,7 +1756,6 @@ class AsyncFetcher {
               {
                 size: reqresp.readSize,
                 expected: reqresp.expectedSize,
-                networkId,
                 url,
                 ...logDetails,
               },
@@ -1707,7 +1832,7 @@ class AsyncFetcher {
           const retry = retries < this.maxRetries;
           logger.debug(
             "Streaming Fetch Error",
-            { url, networkId, retry, ...formatErr(e), ...logDetails },
+            { url, retry, ...formatErr(e), ...logDetails },
             "recorder",
           );
           if (retry) {
@@ -1723,10 +1848,6 @@ class AsyncFetcher {
       }
     } finally {
       recorder.addPageRecord(reqresp);
-      // exclude direct fetch request with fake id
-      if (networkId !== "0") {
-        recorder.removeReqResp(networkId);
-      }
     }
 
     return fetched;
@@ -1818,65 +1939,33 @@ class AsyncFetcher {
       this.reqresp.truncated = "disconnect";
     }
   }
-
-  async *takeStreamIter(cdp: CDPSession, stream: Protocol.IO.StreamHandle) {
-    let size = 0;
-    try {
-      while (true) {
-        const { data, base64Encoded, eof } = await cdp.send("IO.read", {
-          handle: stream,
-          size: TAKE_STREAM_BUFF_SIZE,
-        });
-        const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
-
-        size += buff.length;
-        yield buff;
-
-        if (eof) {
-          break;
-        }
-      }
-    } catch (e) {
-      logger.warn(
-        "takeStream interrupted",
-        {
-          size,
-          url: this.reqresp.url,
-          ...formatErr(e),
-          ...this.recorder.logDetails,
-        },
-        "recorder",
-      );
-      this.reqresp.truncated = "disconnect";
-    }
-  }
 }
 
 // =================================================================
-class ResponseStreamAsyncFetcher extends AsyncFetcher {
-  cdp: CDPSession;
-  requestId: string;
+// class ResponseStreamAsyncFetcher extends AsyncFetcher {
+//   cdp: CDPSession;
+//   requestId: string;
 
-  constructor(opts: ResponseStreamAsyncFetchOptions) {
-    super(opts);
-    this.cdp = opts.cdp;
-    this.requestId = opts.requestId;
-    // can't retry this type of fetch
-    this.maxRetries = 0;
-  }
+//   constructor(opts: ResponseStreamAsyncFetchOptions) {
+//     super(opts);
+//     this.cdp = opts.cdp;
+//     this.requestId = opts.requestId;
+//     // can't retry this type of fetch
+//     this.maxRetries = 0;
+//   }
 
-  async _doFetch() {
-    const { requestId, reqresp, cdp } = this;
-    const { url } = reqresp;
-    logger.debug("Async started: takeStream", { url }, "recorder");
+//   async _doFetch() {
+//     const { requestId, reqresp, cdp } = this;
+//     const { url } = reqresp;
+//     logger.debug("Async started: takeStream", { url }, "recorder");
 
-    const { stream } = await cdp.send("Fetch.takeResponseBodyAsStream", {
-      requestId,
-    });
+//     const { stream } = await cdp.send("Fetch.takeResponseBodyAsStream", {
+//       requestId,
+//     });
 
-    return this.takeStreamIter(cdp, stream);
-  }
-}
+//     return this.takeStreamIter(cdp, stream);
+//   }
+// }
 
 // =================================================================
 class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
@@ -1947,7 +2036,7 @@ class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
     reqresp.setStatus(httpStatusCode || 200);
     reqresp.responseHeaders = headers || {};
 
-    return this.takeStreamIter(cdp, stream);
+    return this.recorder.takeStreamIter(reqresp, cdp, stream);
   }
 }
 
