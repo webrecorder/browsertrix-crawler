@@ -589,9 +589,9 @@ class ArgParser {
 
         failOnContentCheck: {
           describe:
-            "If set, allows for behaviors to fail a crawl with custom reason based on content, (eg. logged out, limited, etc...)",
+            "If set, allows for behaviors to fail a crawl with custom reason based on content (e.g. logged out)",
           type: "boolean",
-          default: true,
+          default: false,
         },
 
         customBehaviors: {
