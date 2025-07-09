@@ -1438,7 +1438,8 @@ export class Recorder extends EventEmitter {
     }
 
     const mime = reqresp.getMimeType();
-    if (reqresp.status !== 200 || isHTMLMime(mime || "")) {
+    // cancel if not 200 or mime is html
+    if (reqresp.status !== 200 || !mime || isHTMLMime(mime)) {
       await fetcher.doCancel();
       return false;
     }
@@ -1759,10 +1760,10 @@ class AsyncFetcher {
     }
     if (this.useBrowserNetwork) {
       success = await this.loadHeadersNetwork();
-      if (!success) {
-        this.useBrowserNetwork = false;
-        success = await this.loadHeadersFetch();
-      }
+    }
+    if (!success) {
+      this.useBrowserNetwork = false;
+      success = await this.loadHeadersFetch();
     }
 
     return success;
