@@ -1752,58 +1752,80 @@ class AsyncFetcher {
 
   async loadHeaders() {
     let success = false;
-    if (this.useBrowserNetwork) {
-      const { method, expectedSize, inPageContext } = this.reqresp;
-      if (
-        method !== "GET" ||
-        expectedSize > MAX_NETWORK_LOAD_SIZE ||
-        !inPageContext
-      ) {
-        this.useBrowserNetwork = false;
+    try {
+      if (this.useBrowserNetwork) {
+        const { method, expectedSize, inPageContext } = this.reqresp;
+        if (
+          method !== "GET" ||
+          expectedSize > MAX_NETWORK_LOAD_SIZE ||
+          !inPageContext
+        ) {
+          this.useBrowserNetwork = false;
+        }
       }
-    }
-    if (this.useBrowserNetwork) {
-      success = await this.loadHeadersNetwork();
-    }
-    if (!success) {
-      this.useBrowserNetwork = false;
-      success = await this.loadHeadersFetch();
+      if (this.useBrowserNetwork) {
+        success = await this.loadHeadersNetwork();
+      }
+      if (!success) {
+        this.useBrowserNetwork = false;
+        success = await this.loadHeadersFetch();
+      }
+    } catch (e) {
+      logger.warn(
+        "Async load headers failed",
+        { ...formatErr(e), ...this.recorder.logDetails },
+        "fetch",
+      );
     }
 
     return success;
   }
 
   async loadBody() {
-    const { reqresp, useBrowserNetwork, resp, stream, cdp, recorder } = this;
-    const { pageid, gzip } = recorder;
-    const { url, expectedSize, status } = reqresp;
+    try {
+      const { reqresp, useBrowserNetwork, resp, stream, cdp, recorder } = this;
+      const { pageid, gzip } = recorder;
+      const { url, expectedSize, status } = reqresp;
 
-    let iter: AsyncIterable<Uint8Array> | undefined;
-    if (expectedSize === 0) {
-      iter = undefined;
-    } else if (stream && useBrowserNetwork && cdp) {
-      iter = recorder.takeStreamIter(this.reqresp, cdp, stream);
-    } else if (resp && resp.body) {
-      iter = this.takeReader(resp.body.getReader());
-    } else {
-      throw new Error("resp body missing");
-    }
-    const responseRecord = createResponse(reqresp, pageid, iter);
-    const requestRecord = createRequest(reqresp, responseRecord, pageid);
+      let iter: AsyncIterable<Uint8Array> | undefined;
+      if (expectedSize === 0) {
+        iter = undefined;
+      } else if (stream && useBrowserNetwork && cdp) {
+        iter = recorder.takeStreamIter(this.reqresp, cdp, stream);
+      } else if (resp && resp.body) {
+        iter = this.takeReader(resp.body.getReader());
+      } else {
+        throw new Error("resp body missing");
+      }
+      const responseRecord = createResponse(reqresp, pageid, iter);
+      const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
-    const serializer = new WARCSerializer(responseRecord, {
-      gzip,
-      maxMemSize: this.maxFetchSize,
-    });
+      const serializer = new WARCSerializer(responseRecord, {
+        gzip,
+        maxMemSize: this.maxFetchSize,
+      });
 
-    if (!(await recorder.checkRecords(reqresp, serializer, false))) {
-      serializer.externalBuffer?.purge();
-      await recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
+      if (!(await recorder.checkRecords(reqresp, serializer, false))) {
+        serializer.externalBuffer?.purge();
+        await recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
+        return false;
+      }
+
+      recorder.commitRecords(
+        reqresp,
+        responseRecord,
+        requestRecord,
+        serializer,
+      );
+      return true;
+    } catch (e) {
+      logger.warn(
+        "Async load body failed",
+        { ...formatErr(e), ...this.recorder.logDetails },
+        "fetch",
+      );
       return false;
     }
-
-    recorder.commitRecords(reqresp, responseRecord, requestRecord, serializer);
-    return true;
   }
 
   async doCancel() {
