@@ -20,7 +20,7 @@ import {
 import { WARCRecord, multiValueHeader } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
-import { RedisCrawlState, WorkerId } from "./state.js";
+import { LoadState, PageState, RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
@@ -87,11 +87,13 @@ export type AsyncFetchOptions = {
   expectedSize?: number;
   // eslint-disable-next-line no-use-before-define
   recorder: Recorder;
-  networkId: string;
-  filter?: (resp: Response) => boolean;
+  //networkId: string;
+  //filter?: (resp: Response) => boolean;
   ignoreDupe?: boolean;
   maxFetchSize?: number;
   manualRedirect?: boolean;
+  useBrowserNetwork?: boolean;
+  cdp?: CDPSession;
 };
 
 // =================================================================
@@ -99,24 +101,26 @@ export type DirectFetchRequest = {
   url: string;
   headers: Record<string, string>;
   cdp: CDPSession;
+  state: PageState;
+  crawler: Crawler;
 };
 
 // =================================================================
-export type DirectFetchResponse = {
-  fetched: boolean;
-  mime: string;
-  ts: Date;
-};
+// export type DirectFetchResponse = {
+//   fetched: boolean;
+//   mime: string;
+//   ts: Date;
+// };
 
 // =================================================================
-export type NetworkLoadAsyncFetchOptions = AsyncFetchOptions & {
-  cdp: CDPSession;
-};
+// export type NetworkLoadAsyncFetchOptions = AsyncFetchOptions & {
+//   cdp: CDPSession;
+// };
 
-// =================================================================
-export type ResponseStreamAsyncFetchOptions = NetworkLoadAsyncFetchOptions & {
-  requestId: string;
-};
+// // =================================================================
+// export type ResponseStreamAsyncFetchOptions = NetworkLoadAsyncFetchOptions & {
+//   requestId: string;
+// };
 
 // =================================================================
 export class Recorder extends EventEmitter {
@@ -471,13 +475,8 @@ export class Recorder extends EventEmitter {
           reqresp.deleteRange();
           reqresp.requestId = "0";
 
-          const fetcher = new AsyncFetcher({
-            reqresp,
-            expectedSize: reqresp.expectedSize ? reqresp.expectedSize : -1,
-            recorder: this,
-            networkId: "0",
-          });
-          void this.fetcherQ.add(() => fetcher.load());
+          const expectedSize = reqresp.expectedSize ? reqresp.expectedSize : -1;
+          this.addAsyncFetch({ reqresp, expectedSize, recorder: this });
           return;
         }
         break;
@@ -670,16 +669,12 @@ export class Recorder extends EventEmitter {
           reqrespNew.deleteRange();
           reqrespNew.frameId = params.frameId;
 
-          this.addAsyncFetch(
-            {
-              reqresp: reqrespNew,
-              expectedSize: parseInt(range.split("/")[1]),
-              recorder: this,
-              networkId: "0",
-              cdp,
-            },
-            contentLen,
-          );
+          this.addAsyncFetch({
+            reqresp: reqrespNew,
+            expectedSize: parseInt(range.split("/")[1]),
+            recorder: this,
+            cdp,
+          });
         }
 
         return false;
@@ -722,7 +717,6 @@ export class Recorder extends EventEmitter {
           this.addAsyncFetch({
             reqresp: reqrespNew,
             recorder: this,
-            networkId: "0",
             cdp,
           });
         }
@@ -801,15 +795,14 @@ export class Recorder extends EventEmitter {
       if (!streamingConsume) {
         this.removeReqResp(networkId);
 
-        const opts: NetworkLoadAsyncFetchOptions = {
+        const opts: AsyncFetchOptions = {
           reqresp,
           expectedSize: contentLen,
           recorder: this,
-          networkId,
           cdp,
         };
 
-        this.addAsyncFetch(opts, contentLen);
+        this.addAsyncFetch(opts);
         return false;
       }
     } else {
@@ -882,18 +875,8 @@ export class Recorder extends EventEmitter {
     return true;
   }
 
-  addAsyncFetch(opts: NetworkLoadAsyncFetchOptions, contentLen: number = -1) {
-    let fetcher: AsyncFetcher;
-
-    if (
-      opts.reqresp.method !== "GET" ||
-      contentLen > MAX_NETWORK_LOAD_SIZE ||
-      !opts.reqresp.inPageContext
-    ) {
-      fetcher = new AsyncFetcher(opts);
-    } else {
-      fetcher = new NetworkLoadStreamAsyncFetcher(opts);
-    }
+  addAsyncFetch(opts: AsyncFetchOptions) {
+    const fetcher = new AsyncFetcher(opts);
     void this.fetcherQ.add(() => fetcher.load());
   }
 
@@ -907,13 +890,7 @@ export class Recorder extends EventEmitter {
     reqresp.url = url;
     reqresp.method = "GET";
     reqresp.frameId = this.mainFrameId || undefined;
-    const fetcher = new NetworkLoadStreamAsyncFetcher({
-      reqresp,
-      recorder: this,
-      cdp,
-      networkId: "0",
-    });
-    void this.fetcherQ.add(() => fetcher.load());
+    this.addAsyncFetch({ reqresp, recorder: this, cdp });
     // return true if successful
     return true;
   }
@@ -1408,7 +1385,9 @@ export class Recorder extends EventEmitter {
     url,
     headers,
     cdp,
-  }: DirectFetchRequest): Promise<DirectFetchResponse> {
+    crawler,
+    state,
+  }: DirectFetchRequest): Promise<boolean> {
     const reqresp = new RequestResponseInfo("0");
     const ts = new Date();
 
@@ -1422,61 +1401,54 @@ export class Recorder extends EventEmitter {
     reqresp.requestHeaders = headers;
     reqresp.ts = ts;
 
-    let mime: string = "";
+    //let mime: string = "";
 
-    const filter = (resp: Response) => {
-      // only direct load 200 responses
-      if (resp.status !== 200) {
-        return false;
-      }
+    // const filter = (resp: Response) => {
+    //   // only direct load 200 responses
+    //   if (resp.status !== 200) {
+    //     return false;
+    //   }
 
-      const ct = resp.headers.get("content-type");
-      if (ct) {
-        mime = ct.split(";")[0];
-      }
+    //   const ct = resp.headers.get("content-type");
+    //   if (ct) {
+    //     mime = ct.split(";")[0];
+    //   }
 
-      const result = !isHTMLMime(mime);
+    //   const result = !isHTMLMime(mime);
 
-      if (result) {
-        logger.info(
-          "Directly fetching page URL without browser",
-          { url, ...this.logDetails },
-          "fetch",
-        );
-      }
+    //   if (result) {
+    //     logger.info(
+    //       "Directly fetching page URL without browser",
+    //       { url, ...this.logDetails },
+    //       "fetch",
+    //     );
+    //   }
 
-      return result;
-    };
+    //   return result;
+    // };
 
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
     // should not get here, as dupe pages tracked via seen list
     const fetcher = new AsyncFetcher({
       reqresp,
       recorder: this,
-      networkId: "0",
-      filter,
       ignoreDupe: true,
       manualRedirect: true,
+      useBrowserNetwork: false,
     });
-    const res = await fetcher.load();
 
-    // if we get here, resource was not filtered out, has status code of 200
-
-    this.addPageRecord(reqresp);
-
-    const fetched = res === "fetched";
-
-    if (
-      url === this.pageUrl &&
-      fetched &&
-      (!this.pageInfo.ts || 200 < this.pageInfo.tsStatus)
-    ) {
-      logger.debug("Setting page timestamp", { ts, url, status: 200 });
-      this.pageInfo.ts = ts;
-      this.pageInfo.tsStatus = 200;
+    if (!(await fetcher.loadHeaders())) {
+      return false;
     }
 
-    return { fetched, mime, ts };
+    const mime = reqresp.getMimeType();
+    if (reqresp.status !== 200 || isHTMLMime(mime || "")) {
+      await fetcher.doCancel();
+      return false;
+    }
+    state.asyncLoading = true;
+    void this.fetcherQ.add(() => fetcher.loadDirectPage(state, crawler));
+    return true;
   }
 
   async getCookieString(cdp: CDPSession, url: string): Promise<string> {
@@ -1520,6 +1492,16 @@ export class Recorder extends EventEmitter {
         gzip,
         maxMemSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
       });
+
+      if (!(await this.checkRecords(reqresp, serializer, false))) {
+        serializer.externalBuffer?.purge();
+        await this.crawlState.removeDupe(
+          ASYNC_FETCH_DUPE_KEY,
+          url,
+          reqresp.status,
+        );
+        return false;
+      }
 
       this.commitRecords(reqresp, responseRecord, requestRecord, serializer);
 
@@ -1586,6 +1568,70 @@ export class Recorder extends EventEmitter {
     return false;
   }
 
+  async checkRecords(
+    reqresp: RequestResponseInfo,
+    serializer: WARCSerializer,
+    canRetry: boolean,
+  ) {
+    const { url } = reqresp;
+    const { logDetails } = this;
+    try {
+      let readSize = await serializer.digestRecord();
+      if (serializer.httpHeadersBuff) {
+        readSize -= serializer.httpHeadersBuff.length;
+      }
+      reqresp.readSize = readSize;
+      // set truncated field and recompute header buff
+      if (reqresp.truncated) {
+        logger.warn(
+          "Response truncated",
+          { url, canRetry, ...logDetails },
+          "recorder",
+        );
+        // if retries available, just retry
+        if (canRetry) {
+          return false;
+        }
+      }
+    } catch (e) {
+      logger.error(
+        "Error reading + digesting payload",
+        { url, canRetry, ...formatErr(e), ...logDetails },
+        "recorder",
+      );
+      return false;
+    }
+
+    if (reqresp.readSize === reqresp.expectedSize || reqresp.expectedSize < 0) {
+      logger.debug(
+        "Async fetch: streaming done",
+        {
+          size: reqresp.readSize,
+          expected: reqresp.expectedSize,
+          url,
+          ...logDetails,
+        },
+        "recorder",
+      );
+    } else {
+      logger.warn(
+        "Async fetch: possible response size mismatch",
+        {
+          type: this.constructor.name,
+          size: reqresp.readSize,
+          expected: reqresp.expectedSize,
+          url,
+          canRetry,
+          ...logDetails,
+        },
+        "recorder",
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   commitRecords(
     reqresp: RequestResponseInfo,
     responseRecord: WARCRecord,
@@ -1617,17 +1663,27 @@ export class Recorder extends EventEmitter {
       }
     }
 
+    let modified = false;
+
     if (reqresp.truncated) {
       responseRecord.warcHeaders.headers.set(
         "WARC-Truncated",
         reqresp.truncated,
       );
+      modified = true;
     }
 
     if (Object.keys(reqresp.extraOpts).length) {
       responseRecord.warcHeaders.headers.set(
         "WARC-JSON-Metadata",
         JSON.stringify(reqresp.extraOpts),
+      );
+      modified = true;
+    }
+
+    if (modified) {
+      serializer.warcHeadersBuff = encoder.encode(
+        responseRecord.warcHeaders.toString(),
       );
     }
 
@@ -1641,8 +1697,13 @@ export class Recorder extends EventEmitter {
 class AsyncFetcher {
   reqresp: RequestResponseInfo;
 
-  filter?: (resp: Response) => boolean;
   ignoreDupe = false;
+  useBrowserNetwork = true;
+
+  cdp: CDPSession | null = null;
+
+  stream?: string;
+  resp?: Response;
 
   maxFetchSize: number;
 
@@ -1656,17 +1717,17 @@ class AsyncFetcher {
     reqresp,
     expectedSize = -1,
     recorder,
-    filter = undefined,
     ignoreDupe = false,
     maxFetchSize = MAX_BROWSER_DEFAULT_FETCH_SIZE,
     manualRedirect = false,
+    useBrowserNetwork = true,
   }: AsyncFetchOptions) {
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
     this.reqresp.asyncLoading = true;
 
-    this.filter = filter;
     this.ignoreDupe = ignoreDupe;
+    this.useBrowserNetwork = useBrowserNetwork;
 
     this.recorder = recorder;
 
@@ -1676,184 +1737,87 @@ class AsyncFetcher {
   }
 
   async load() {
-    const { reqresp, recorder } = this;
-    const { url, status } = reqresp;
-
-    const { pageid, crawlState, gzip, logDetails } = recorder;
-
-    let fetched = "notfetched";
-
-    try {
-      if ((await this.recorder.isDupe(reqresp)) && !this.ignoreDupe) {
-        return "dupe";
+    for (let i = 0; i < DEFAULT_MAX_RETRIES; i++) {
+      if (!(await this.loadHeaders())) {
+        continue;
       }
-
-      let retries = 0;
-
-      while (retries <= this.maxRetries) {
-        try {
-          reqresp.truncated = undefined;
-          const body = await this._doFetch();
-          fetched = "fetched";
-
-          const responseRecord = createResponse(reqresp, pageid, body);
-          const requestRecord = createRequest(reqresp, responseRecord, pageid);
-
-          const serializer = new WARCSerializer(responseRecord, {
-            gzip,
-            maxMemSize: this.maxFetchSize,
-          });
-
-          try {
-            let readSize = await serializer.digestRecord();
-            if (serializer.httpHeadersBuff) {
-              readSize -= serializer.httpHeadersBuff.length;
-            }
-            reqresp.readSize = readSize;
-            // set truncated field and recompute header buff
-            if (reqresp.truncated) {
-              const retry = retries < this.maxRetries;
-              logger.warn(
-                "Response truncated",
-                { url, retry, ...logDetails },
-                "recorder",
-              );
-              // if retries available, just retry
-              if (retry) {
-                void serializer.externalBuffer?.purge();
-                retries++;
-                continue;
-              }
-              responseRecord.warcHeaders.headers.set(
-                "WARC-Truncated",
-                reqresp.truncated,
-              );
-              // todo: keep this internal in warcio after adding new header
-              serializer.warcHeadersBuff = encoder.encode(
-                responseRecord.warcHeaders.toString(),
-              );
-            }
-          } catch (e) {
-            const retry = retries < this.maxRetries;
-            logger.error(
-              "Error reading + digesting payload",
-              { url, retry, ...formatErr(e), ...logDetails },
-              "recorder",
-            );
-            if (retry) {
-              void serializer.externalBuffer?.purge();
-              retries++;
-              continue;
-            }
-          }
-
-          if (
-            reqresp.readSize === reqresp.expectedSize ||
-            reqresp.expectedSize < 0
-          ) {
-            logger.debug(
-              "Async fetch: streaming done",
-              {
-                size: reqresp.readSize,
-                expected: reqresp.expectedSize,
-                url,
-                ...logDetails,
-              },
-              "recorder",
-            );
-          } else {
-            logger.warn(
-              "Async fetch: possible response size mismatch",
-              {
-                type: this.constructor.name,
-                size: reqresp.readSize,
-                expected: reqresp.expectedSize,
-                url,
-                retry:
-                  retries < this.maxRetries &&
-                  (status === 206 || status === 200),
-                ...logDetails,
-              },
-              "recorder",
-            );
-            if (status === 206 || status === 200) {
-              void serializer.externalBuffer?.purge();
-              await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
-              if (retries < this.maxRetries) {
-                retries++;
-                continue;
-              }
-              return "notfetched";
-            }
-          }
-
-          const externalBuffer: TempFileBuffer =
-            serializer.externalBuffer as TempFileBuffer;
-
-          if (externalBuffer) {
-            const { currSize, buffers, fh } = externalBuffer;
-
-            // if fully buffered in memory, then populate the payload to return to browser
-            if (buffers && buffers.length && !fh) {
-              reqresp.payload = Buffer.concat(buffers, currSize);
-              externalBuffer.buffers = [reqresp.payload];
-            } else if (fh) {
-              logger.debug(
-                "Large payload written to WARC, but not returned to browser (would require rereading into memory)",
-                {
-                  url,
-                  actualSize: reqresp.readSize,
-                  maxSize: this.maxFetchSize,
-                },
-                "recorder",
-              );
-            }
-          }
-
-          if (Object.keys(reqresp.extraOpts).length) {
-            responseRecord.warcHeaders.headers.set(
-              "WARC-JSON-Metadata",
-              JSON.stringify(reqresp.extraOpts),
-            );
-          }
-
-          recorder.writer.writeRecordPair(
-            responseRecord,
-            requestRecord,
-            serializer,
-          );
-
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (e: any) {
-          await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url!, status);
-          if (e.message === "response-filtered-out") {
-            throw e;
-          }
-          const retry = retries < this.maxRetries;
-          logger.debug(
-            "Streaming Fetch Error",
-            { url, retry, ...formatErr(e), ...logDetails },
-            "recorder",
-          );
-          if (retry) {
-            retries++;
-            continue;
-          }
-          // indicate response is ultimately not valid
-          reqresp.status = 0;
-          reqresp.errorText = e.message;
-        }
-        // if we get here, successful (or out of retries), break out of loop
-        break;
+      if (!(await this.loadBody())) {
+        continue;
       }
-    } finally {
-      recorder.addPageRecord(reqresp);
+      return true;
     }
-
-    return fetched;
+    return false;
   }
 
-  async _doFetch() {
+  async loadHeaders() {
+    let success = false;
+    if (this.useBrowserNetwork) {
+      const { method, expectedSize, inPageContext } = this.reqresp;
+      if (
+        method !== "GET" ||
+        expectedSize > MAX_NETWORK_LOAD_SIZE ||
+        !inPageContext
+      ) {
+        this.useBrowserNetwork = false;
+      }
+    }
+    if (this.useBrowserNetwork) {
+      success = await this.loadHeadersNetwork();
+      if (!success) {
+        this.useBrowserNetwork = false;
+        success = await this.loadHeadersFetch();
+      }
+    }
+
+    return success;
+  }
+
+  async loadBody() {
+    const { reqresp, useBrowserNetwork, resp, stream, cdp, recorder } = this;
+    const { pageid, gzip } = recorder;
+    const { url, expectedSize, status } = reqresp;
+
+    let iter: AsyncIterable<Uint8Array> | undefined;
+    if (expectedSize === 0) {
+      iter = undefined;
+    } else if (stream && useBrowserNetwork && cdp) {
+      iter = recorder.takeStreamIter(this.reqresp, cdp, stream);
+    } else if (resp && resp.body) {
+      iter = this.takeReader(resp.body.getReader());
+    } else {
+      throw new Error("resp body missing");
+    }
+    const responseRecord = createResponse(reqresp, pageid, iter);
+    const requestRecord = createRequest(reqresp, responseRecord, pageid);
+
+    const serializer = new WARCSerializer(responseRecord, {
+      gzip,
+      maxMemSize: this.maxFetchSize,
+    });
+
+    if (!(await recorder.checkRecords(reqresp, serializer, false))) {
+      serializer.externalBuffer?.purge();
+      await recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
+      return false;
+    }
+
+    recorder.commitRecords(reqresp, responseRecord, requestRecord, serializer);
+    return true;
+  }
+
+  async doCancel() {
+    const { resp, useBrowserNetwork } = this;
+    if (!useBrowserNetwork && resp) {
+      if (resp.status >= 300 && resp.status < 400) {
+        await resp.arrayBuffer();
+      } else {
+        // otherwise, just cancel
+        resp.body?.cancel().catch(() => {});
+      }
+    }
+  }
+
+  async loadHeadersFetch() {
     const { reqresp } = this;
     const { method, url } = reqresp;
     logger.debug("Async started: fetch", { url }, "recorder");
@@ -1881,16 +1845,16 @@ class AsyncFetcher {
       dispatcher,
     });
 
-    if (this.filter && !this.filter(resp)) {
-      // if redirect and cancelled, read whole buffer to avoid possible node error event
-      if (resp.status >= 300 && resp.status < 400) {
-        await resp.arrayBuffer();
-      } else {
-        // otherwise, just cancel
-        resp.body?.cancel().catch(() => {});
-      }
-      throw new Error("response-filtered-out");
-    }
+    // if (this.filter && !this.filter(resp)) {
+    //   // if redirect and cancelled, read whole buffer to avoid possible node error event
+    //   if (resp.status >= 300 && resp.status < 400) {
+    //     await resp.arrayBuffer();
+    //   } else {
+    //     // otherwise, just cancel
+    //     resp.body?.cancel().catch(() => {});
+    //   }
+    //   throw new Error("response-filtered-out");
+    // }
 
     if (
       reqresp.expectedSize < 0 &&
@@ -1903,15 +1867,322 @@ class AsyncFetcher {
     if (reqresp.expectedSize === 0) {
       reqresp.fillFetchResponse(resp);
       reqresp.payload = new Uint8Array();
-      return;
+      return true;
     } else if (!resp.body) {
-      throw new Error("fetch body missing, fetch aborted");
+      return false;
     }
 
     reqresp.fillFetchResponse(resp);
-
-    return this.takeReader(resp.body.getReader());
+    this.resp = resp;
+    return true;
   }
+
+  async loadHeadersNetwork() {
+    const { reqresp, cdp } = this;
+    if (!cdp) {
+      return false;
+    }
+    const { url } = reqresp;
+    logger.debug("Async started: loadNetworkResource", { url }, "recorder");
+
+    const options = { disableCache: false, includeCredentials: true };
+
+    let result = null;
+
+    try {
+      result = await cdp.send("Network.loadNetworkResource", {
+        frameId: reqresp.frameId,
+        url,
+        options,
+      });
+    } catch (e) {
+      logger.debug(
+        "Network.loadNetworkResource failed, attempting node fetch",
+        { url, ...formatErr(e), ...this.recorder.logDetails },
+        "recorder",
+      );
+      return false;
+    }
+
+    const { stream, headers, httpStatusCode, success, netError, netErrorName } =
+      result.resource;
+
+    if (!success || !stream) {
+      //await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
+      logger.debug(
+        "Network.loadNetworkResource failed, attempting node fetch",
+        {
+          url,
+          netErrorName,
+          netError,
+          httpStatusCode,
+          ...this.recorder.logDetails,
+        },
+        "recorder",
+      );
+      return false;
+    }
+
+    if (
+      reqresp.expectedSize < 0 &&
+      headers &&
+      headers["content-length"] &&
+      !headers["content-encoding"]
+    ) {
+      reqresp.expectedSize = Number(headers["content-length"] || -1);
+    }
+
+    if (reqresp.expectedSize === 0) {
+      reqresp.payload = new Uint8Array();
+      return true;
+    }
+
+    reqresp.setStatus(httpStatusCode || 200);
+    reqresp.responseHeaders = headers || {};
+
+    this.stream = stream;
+    return true;
+
+    //return this.recorder.takeStreamIter(reqresp, cdp, stream);
+  }
+
+  // async load() {
+  //   const { reqresp, recorder } = this;
+  //   const { url, status } = reqresp;
+
+  //   const { pageid, crawlState, gzip, logDetails } = recorder;
+
+  //   let fetched = "notfetched";
+
+  //   try {
+  //     if ((await this.recorder.isDupe(reqresp)) && !this.ignoreDupe) {
+  //       return "dupe";
+  //     }
+
+  //     let retries = 0;
+
+  //     while (retries <= this.maxRetries) {
+  //       try {
+  //         reqresp.truncated = undefined;
+  //         const body = await this._doFetch();
+  //         fetched = "fetched";
+
+  //         const responseRecord = createResponse(reqresp, pageid, body);
+  //         const requestRecord = createRequest(reqresp, responseRecord, pageid);
+
+  //         const serializer = new WARCSerializer(responseRecord, {
+  //           gzip,
+  //           maxMemSize: this.maxFetchSize,
+  //         });
+
+  //         try {
+  //           let readSize = await serializer.digestRecord();
+  //           if (serializer.httpHeadersBuff) {
+  //             readSize -= serializer.httpHeadersBuff.length;
+  //           }
+  //           reqresp.readSize = readSize;
+  //           // set truncated field and recompute header buff
+  //           if (reqresp.truncated) {
+  //             const retry = retries < this.maxRetries;
+  //             logger.warn(
+  //               "Response truncated",
+  //               { url, retry, ...logDetails },
+  //               "recorder",
+  //             );
+  //             // if retries available, just retry
+  //             if (retry) {
+  //               void serializer.externalBuffer?.purge();
+  //               retries++;
+  //               continue;
+  //             }
+  //             responseRecord.warcHeaders.headers.set(
+  //               "WARC-Truncated",
+  //               reqresp.truncated,
+  //             );
+  //             // todo: keep this internal in warcio after adding new header
+  //             serializer.warcHeadersBuff = encoder.encode(
+  //               responseRecord.warcHeaders.toString(),
+  //             );
+  //           }
+  //         } catch (e) {
+  //           const retry = retries < this.maxRetries;
+  //           logger.error(
+  //             "Error reading + digesting payload",
+  //             { url, retry, ...formatErr(e), ...logDetails },
+  //             "recorder",
+  //           );
+  //           if (retry) {
+  //             void serializer.externalBuffer?.purge();
+  //             retries++;
+  //             continue;
+  //           }
+  //         }
+
+  //         if (
+  //           reqresp.readSize === reqresp.expectedSize ||
+  //           reqresp.expectedSize < 0
+  //         ) {
+  //           logger.debug(
+  //             "Async fetch: streaming done",
+  //             {
+  //               size: reqresp.readSize,
+  //               expected: reqresp.expectedSize,
+  //               url,
+  //               ...logDetails,
+  //             },
+  //             "recorder",
+  //           );
+  //         } else {
+  //           logger.warn(
+  //             "Async fetch: possible response size mismatch",
+  //             {
+  //               type: this.constructor.name,
+  //               size: reqresp.readSize,
+  //               expected: reqresp.expectedSize,
+  //               url,
+  //               retry:
+  //                 retries < this.maxRetries &&
+  //                 (status === 206 || status === 200),
+  //               ...logDetails,
+  //             },
+  //             "recorder",
+  //           );
+  //           if (status === 206 || status === 200) {
+  //             void serializer.externalBuffer?.purge();
+  //             await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
+  //             if (retries < this.maxRetries) {
+  //               retries++;
+  //               continue;
+  //             }
+  //             return "notfetched";
+  //           }
+  //         }
+
+  //         const externalBuffer: TempFileBuffer =
+  //           serializer.externalBuffer as TempFileBuffer;
+
+  //         if (externalBuffer) {
+  //           const { currSize, buffers, fh } = externalBuffer;
+
+  //           // if fully buffered in memory, then populate the payload to return to browser
+  //           if (buffers && buffers.length && !fh) {
+  //             reqresp.payload = Buffer.concat(buffers, currSize);
+  //             externalBuffer.buffers = [reqresp.payload];
+  //           } else if (fh) {
+  //             logger.debug(
+  //               "Large payload written to WARC, but not returned to browser (would require rereading into memory)",
+  //               {
+  //                 url,
+  //                 actualSize: reqresp.readSize,
+  //                 maxSize: this.maxFetchSize,
+  //               },
+  //               "recorder",
+  //             );
+  //           }
+  //         }
+
+  //         if (Object.keys(reqresp.extraOpts).length) {
+  //           responseRecord.warcHeaders.headers.set(
+  //             "WARC-JSON-Metadata",
+  //             JSON.stringify(reqresp.extraOpts),
+  //           );
+  //         }
+
+  //         recorder.writer.writeRecordPair(
+  //           responseRecord,
+  //           requestRecord,
+  //           serializer,
+  //         );
+
+  //         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  //       } catch (e: any) {
+  //         await crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url!, status);
+  //         if (e.message === "response-filtered-out") {
+  //           throw e;
+  //         }
+  //         const retry = retries < this.maxRetries;
+  //         logger.debug(
+  //           "Streaming Fetch Error",
+  //           { url, retry, ...formatErr(e), ...logDetails },
+  //           "recorder",
+  //         );
+  //         if (retry) {
+  //           retries++;
+  //           continue;
+  //         }
+  //         // indicate response is ultimately not valid
+  //         reqresp.status = 0;
+  //         reqresp.errorText = e.message;
+  //       }
+  //       // if we get here, successful (or out of retries), break out of loop
+  //       break;
+  //     }
+  //   } finally {
+  //     recorder.addPageRecord(reqresp);
+  //   }
+
+  //   return fetched;
+  // }
+
+  // // async _doFetch() {
+  //   const { reqresp } = this;
+  //   const { method, url } = reqresp;
+  //   logger.debug("Async started: fetch", { url }, "recorder");
+
+  //   const headers = reqresp.getRequestHeadersDict();
+
+  //   let dispatcher = getProxyDispatcher();
+
+  //   if (dispatcher) {
+  //     dispatcher = dispatcher.compose((dispatch) => {
+  //       return (opts, handler) => {
+  //         if (opts.headers) {
+  //           reqresp.requestHeaders = opts.headers as Record<string, string>;
+  //         }
+  //         return dispatch(opts, handler);
+  //       };
+  //     });
+  //   }
+
+  //   const resp = await fetch(url!, {
+  //     method,
+  //     headers,
+  //     body: reqresp.postData || undefined,
+  //     redirect: this.manualRedirect ? "manual" : "follow",
+  //     dispatcher,
+  //   });
+
+  //   if (this.filter && !this.filter(resp)) {
+  //     // if redirect and cancelled, read whole buffer to avoid possible node error event
+  //     if (resp.status >= 300 && resp.status < 400) {
+  //       await resp.arrayBuffer();
+  //     } else {
+  //       // otherwise, just cancel
+  //       resp.body?.cancel().catch(() => {});
+  //     }
+  //     throw new Error("response-filtered-out");
+  //   }
+
+  //   if (
+  //     reqresp.expectedSize < 0 &&
+  //     resp.headers.get("content-length") &&
+  //     !resp.headers.get("content-encoding")
+  //   ) {
+  //     reqresp.expectedSize = Number(resp.headers.get("content-length") || -1);
+  //   }
+
+  //   if (reqresp.expectedSize === 0) {
+  //     reqresp.fillFetchResponse(resp);
+  //     reqresp.payload = new Uint8Array();
+  //     return;
+  //   } else if (!resp.body) {
+  //     throw new Error("fetch body missing, fetch aborted");
+  //   }
+
+  //   reqresp.fillFetchResponse(resp);
+
+  //   return this.takeReader(resp.body.getReader());
+  // }
 
   async *takeReader(reader: ReadableStreamDefaultReader<Uint8Array>) {
     let size = 0;
@@ -1938,6 +2209,43 @@ class AsyncFetcher {
       );
       this.reqresp.truncated = "disconnect";
     }
+  }
+
+  async loadDirectPage(state: PageState, crawler: Crawler) {
+    state.asyncLoading = true;
+
+    const success = await this.loadBody();
+
+    this.recorder.addPageRecord(this.reqresp);
+
+    // if (
+    //   url === this.pageUrl &&
+    //   fetched &&
+    //   (!this.pageInfo.ts || 200 < this.pageInfo.tsStatus)
+    // ) {
+    //   logger.debug("Setting page timestamp", { ts, url, status: 200 });
+    //   this.pageInfo.ts = ts;
+    //   this.pageInfo.tsStatus = 200;
+    // }
+
+    const mime = this.reqresp.getMimeType();
+
+    if (mime) {
+      state.mime = mime;
+      state.isHTMLPage = isHTMLMime(mime);
+    }
+    if (success) {
+      state.loadState = LoadState.FULL_PAGE_LOADED;
+      state.status = 200;
+      state.ts = this.reqresp.ts || new Date();
+      logger.info(
+        "Direct fetch successful",
+        { url: this.reqresp.url, mime, workerid: this.recorder.workerid },
+        "fetch",
+      );
+    }
+    state.asyncLoading = false;
+    await crawler.pageFinished(state);
   }
 }
 
@@ -1968,77 +2276,77 @@ class AsyncFetcher {
 // }
 
 // =================================================================
-class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
-  cdp: CDPSession;
+// class NetworkLoadStreamAsyncFetcher extends AsyncFetcher {
+//   cdp: CDPSession;
 
-  constructor(opts: NetworkLoadAsyncFetchOptions) {
-    super(opts);
-    this.cdp = opts.cdp;
-  }
+//   constructor(opts: NetworkLoadAsyncFetchOptions) {
+//     super(opts);
+//     this.cdp = opts.cdp;
+//   }
 
-  async _doFetch() {
-    const { reqresp, cdp } = this;
-    const { url } = reqresp;
-    logger.debug("Async started: loadNetworkResource", { url }, "recorder");
+//   async _doFetch() {
+//     const { reqresp, cdp } = this;
+//     const { url } = reqresp;
+//     logger.debug("Async started: loadNetworkResource", { url }, "recorder");
 
-    const options = { disableCache: false, includeCredentials: true };
+//     const options = { disableCache: false, includeCredentials: true };
 
-    let result = null;
+//     let result = null;
 
-    try {
-      result = await cdp.send("Network.loadNetworkResource", {
-        frameId: reqresp.frameId,
-        url,
-        options,
-      });
-    } catch (e) {
-      logger.debug(
-        "Network.loadNetworkResource failed, attempting node fetch",
-        { url, ...formatErr(e), ...this.recorder.logDetails },
-        "recorder",
-      );
-      return await super._doFetch();
-    }
+//     try {
+//       result = await cdp.send("Network.loadNetworkResource", {
+//         frameId: reqresp.frameId,
+//         url,
+//         options,
+//       });
+//     } catch (e) {
+//       logger.debug(
+//         "Network.loadNetworkResource failed, attempting node fetch",
+//         { url, ...formatErr(e), ...this.recorder.logDetails },
+//         "recorder",
+//       );
+//       return await super._doFetch();
+//     }
 
-    const { stream, headers, httpStatusCode, success, netError, netErrorName } =
-      result.resource;
+//     const { stream, headers, httpStatusCode, success, netError, netErrorName } =
+//       result.resource;
 
-    if (!success || !stream) {
-      //await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
-      logger.debug(
-        "Network.loadNetworkResource failed, attempting node fetch",
-        {
-          url,
-          netErrorName,
-          netError,
-          httpStatusCode,
-          ...this.recorder.logDetails,
-        },
-        "recorder",
-      );
-      return await super._doFetch();
-    }
+//     if (!success || !stream) {
+//       //await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
+//       logger.debug(
+//         "Network.loadNetworkResource failed, attempting node fetch",
+//         {
+//           url,
+//           netErrorName,
+//           netError,
+//           httpStatusCode,
+//           ...this.recorder.logDetails,
+//         },
+//         "recorder",
+//       );
+//       return await super._doFetch();
+//     }
 
-    if (
-      reqresp.expectedSize < 0 &&
-      headers &&
-      headers["content-length"] &&
-      !headers["content-encoding"]
-    ) {
-      reqresp.expectedSize = Number(headers["content-length"] || -1);
-    }
+//     if (
+//       reqresp.expectedSize < 0 &&
+//       headers &&
+//       headers["content-length"] &&
+//       !headers["content-encoding"]
+//     ) {
+//       reqresp.expectedSize = Number(headers["content-length"] || -1);
+//     }
 
-    if (reqresp.expectedSize === 0) {
-      reqresp.payload = new Uint8Array();
-      return;
-    }
+//     if (reqresp.expectedSize === 0) {
+//       reqresp.payload = new Uint8Array();
+//       return;
+//     }
 
-    reqresp.setStatus(httpStatusCode || 200);
-    reqresp.responseHeaders = headers || {};
+//     reqresp.setStatus(httpStatusCode || 200);
+//     reqresp.responseHeaders = headers || {};
 
-    return this.recorder.takeStreamIter(reqresp, cdp, stream);
-  }
-}
+//     return this.recorder.takeStreamIter(reqresp, cdp, stream);
+//   }
+// }
 
 // =================================================================
 // response
