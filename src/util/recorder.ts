@@ -1441,9 +1441,9 @@ export class Recorder extends EventEmitter {
       return false;
     }
 
-    const mime = reqresp.getMimeType();
+    const mime = reqresp.getMimeType() || "";
     // cancel if not 200 or mime is html
-    if (reqresp.status !== 200 || !mime || isHTMLMime(mime)) {
+    if (reqresp.status !== 200 || isHTMLMime(mime)) {
       await fetcher.doCancel();
       return false;
     }
