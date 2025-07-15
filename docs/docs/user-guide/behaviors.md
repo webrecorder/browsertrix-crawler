@@ -35,14 +35,15 @@ To disable all behaviors, use `--behaviors ""`.
 ## Behavior and Page Timeouts
 
 Browsertrix includes a number of timeouts, including before, during and after running behaviors.
+
 The timeouts are as follows:
 
-- `--waitUntil`: how long to wait for page to finish loading, *before* doing anything else.
+- `--pageLoadTimeout`: how long to wait for page to finish loading, *before* doing anything else.
 - `--postLoadDelay`: how long to wait *before* starting any behaviors, but after page has finished loading. A custom behavior can override this (see below).
 - `--behaviorTimeout`: maximum time to spend on running site-specific / Autoscroll behaviors (can be less if behavior finishes early).
 - `--pageExtraDelay`: how long to wait *after* finishing behaviors (or after `behaviorTimeout` has been reached) before moving on to next page.
 
-A site-specific behavior (or Autoscroll) will start after the page is loaded (at most after `--waitUntil` seconds) and exactly after `--postLoadDelay` seconds.
+A site-specific behavior (or Autoscroll) will start after the page is loaded (at most after `--pageLoadTimeout` seconds) and exactly after `--postLoadDelay` seconds.
 
 The behavior will then run until finished or at most until `--behaviorTimeout` is reached (90 seconds by default).
 
