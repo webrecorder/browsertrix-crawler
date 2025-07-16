@@ -144,6 +144,8 @@ export class Recorder extends EventEmitter {
 
   pageFinished = false;
 
+  lastErrorText = "";
+
   gzip = true;
 
   writer: WARCWriter;
@@ -481,6 +483,7 @@ export class Recorder extends EventEmitter {
         break;
 
       default:
+        this.lastErrorText = errorText;
         logger.warn(
           "Request failed",
           { url, errorText, type, status: reqresp.status, ...this.logDetails },
@@ -953,6 +956,7 @@ export class Recorder extends EventEmitter {
     this.pageid = pageid;
     this.pageUrl = url;
     this.finalPageUrl = this.pageUrl;
+    this.lastErrorText = "";
     this.logDetails = { page: url, workerid: this.workerid };
     if (this.pendingRequests && this.pendingRequests.size) {
       logger.debug(
@@ -1735,7 +1739,7 @@ class AsyncFetcher {
 
     const headers = reqresp.getRequestHeadersDict();
 
-    let dispatcher = getProxyDispatcher();
+    let dispatcher = getProxyDispatcher(url);
 
     if (dispatcher) {
       dispatcher = dispatcher.compose((dispatch) => {
