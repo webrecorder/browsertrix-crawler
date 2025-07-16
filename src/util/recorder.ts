@@ -26,10 +26,7 @@ import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
 import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
-<<<<<<< HEAD
-import { ExitCodes, DEFAULT_MAX_RETRIES } from "./constants.js";
-=======
->>>>>>> 488126c8 (check for error status to determine if proxy error)
+import { DEFAULT_MAX_RETRIES } from "./constants.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
