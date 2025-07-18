@@ -233,7 +233,7 @@ class ArgParser {
           describe:
             "If set, will generate DOM snapshots of HTML after page load",
           type: "boolean",
-          default: false,
+          default: true,
         },
 
         driver: {
