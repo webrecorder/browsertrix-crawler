@@ -261,6 +261,10 @@ Options:
                                             ailOnFailedSeed may result in crawl
                                             failing due to non-200 responses
                                                       [boolean] [default: false]
+      --failOnContentCheck                  If set, allows for behaviors to fail
+                                             a crawl with custom reason based on
+                                             content (e.g. logged out)
+                                                      [boolean] [default: false]
       --customBehaviors                     Custom behavior files to inject. Val
                                             id values: URL to file, path to file
                                             , path to directory of behaviors, UR
@@ -272,6 +276,10 @@ Options:
                                             git+https://git.example.com/repo.git
                                             ?branch=dev&path=some/dir"
                                                            [array] [default: []]
+      --saveStorage                         if set, will store the localStorage/
+                                            sessionStorage data for each page as
+                                             part of WARC-JSON-Metadata field
+                                                                       [boolean]
       --debugAccessRedis                    if set, runs internal redis without
                                             protected mode to allow external acc
                                             ess (for debugging)        [boolean]
