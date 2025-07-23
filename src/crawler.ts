@@ -2479,7 +2479,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       case QueueState.DUPE_URL:
         logger.logAsJSON(
-          "Not queued page url, already seen",
+          "Page url not queued, already seen",
           { url, ...logDetails },
           logContext,
           logLevel,
