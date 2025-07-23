@@ -271,7 +271,7 @@ More detailed references will be added in the future.
 
 ## Fail On Content Check
 
-In Browsertrix Crawler 1.7.0 and higher, the `--failOnContentCheck` option will result in a crawl failing if a behavior detects certain content on a page in its `awaitPageLoad()` callback. By default, this is used to fail a crawl if site-specific behaviors determine that the user is not logged in on the following sites:
+In Browsertrix Crawler 1.7.0 and higher, the `--failOnContentCheck` option will result in a crawl failing if a behavior detects the presence or absence of certain content on a page in its `awaitPageLoad()` callback. By default, this is used to fail a crawl if site-specific behaviors determine that the user is not logged in on the following sites:
 
 - Facebook
 - Instagram
