@@ -2459,7 +2459,7 @@ self.__bx_behaviors.selectMainBehavior();
       this.pageLimit,
     );
 
-    const logContext = depth === 0 ? "links" : "scope";
+    const logContext = depth === 0 ? "scope" : "links";
     const logLevel = depth === 0 ? "error" : "debug";
 
     switch (result) {
