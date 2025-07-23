@@ -2469,7 +2469,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       case QueueState.LIMIT_HIT:
         logger.logAsJSON(
-          "Not queued page url, at page limit",
+          "Page url not queued, at page limit",
           { url, ...logDetails },
           logContext,
           logLevel,
