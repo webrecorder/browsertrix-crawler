@@ -2459,25 +2459,35 @@ self.__bx_behaviors.selectMainBehavior();
       this.pageLimit,
     );
 
+    const logContext = depth === 0 ? "links" : "scope";
+    const logLevel = depth === 0 ? "error" : "debug";
+
     switch (result) {
       case QueueState.ADDED:
-        logger.debug("Queued new page url", { url, ...logDetails }, "links");
+        logger.logAsJSON(
+          "Queued new page url",
+          { url, ...logDetails },
+          logContext,
+          logLevel,
+        );
         return true;
 
       case QueueState.LIMIT_HIT:
-        logger.debug(
+        logger.logAsJSON(
           "Not queued page url, at page limit",
           { url, ...logDetails },
-          "links",
+          logContext,
+          logLevel,
         );
         this.limitHit = true;
         return false;
 
       case QueueState.DUPE_URL:
-        logger.debug(
+        logger.logAsJSON(
           "Not queued page url, already seen",
           { url, ...logDetails },
-          "links",
+          logContext,
+          logLevel,
         );
         return false;
     }

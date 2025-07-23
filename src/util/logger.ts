@@ -56,9 +56,12 @@ export const LOG_CONTEXT_TYPES = [
   "wacz",
   "replay",
   "proxy",
+  "scope",
 ] as const;
 
 export type LogContext = (typeof LOG_CONTEXT_TYPES)[number];
+
+export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
 export const DEFAULT_EXCLUDE_LOG_CONTEXTS: LogContext[] = [
   "recorderNetwork",
@@ -118,7 +121,7 @@ class Logger {
     message: string,
     dataUnknown: unknown,
     context: LogContext,
-    logLevel = "info",
+    logLevel: LogLevel,
   ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: Record<string, any> = formatErr(dataUnknown);
@@ -182,7 +185,7 @@ class Logger {
   }
 
   info(message: string, data: unknown = {}, context: LogContext = "general") {
-    this.logAsJSON(message, data, context);
+    this.logAsJSON(message, data, context, "info");
   }
 
   error(message: string, data: unknown = {}, context: LogContext = "general") {
