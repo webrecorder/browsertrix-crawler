@@ -2464,12 +2464,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     switch (result) {
       case QueueState.ADDED:
-        logger.logAsJSON(
-          "Queued new page url",
-          { url, ...logDetails },
-          logContext,
-          logLevel,
-        );
+        logger.debug("Queued new page url", { url, ...logDetails }, logContext);
         return true;
 
       case QueueState.LIMIT_HIT:
