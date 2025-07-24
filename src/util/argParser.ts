@@ -29,6 +29,7 @@ import {
   logger,
 } from "./logger.js";
 import { SaveState } from "./state.js";
+import { loadProxyConfig } from "./proxy.js";
 
 // ============================================================================
 export type CrawlerArgs = ReturnType<typeof parseArgs> & {
@@ -641,6 +642,12 @@ class ArgParser {
           type: "string",
         },
 
+        proxyServerConfig: {
+          describe:
+            "if set, path to yaml/json file that configures multiple path servers per URL regex",
+          type: "string",
+        },
+
         dryRun: {
           describe:
             "If true, no archive data is written to disk, only pages and logs (and optionally saved state).",
@@ -777,6 +784,8 @@ class ArgParser {
     } else {
       argv.emulateDevice = { viewport: null };
     }
+
+    loadProxyConfig(argv);
 
     if (argv.lang) {
       if (!ISO6391.validate(argv.lang)) {
