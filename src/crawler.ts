@@ -2464,12 +2464,12 @@ self.__bx_behaviors.selectMainBehavior();
 
     switch (result) {
       case QueueState.ADDED:
-        logger.debug("Queued new page url", { url, ...logDetails }, logContext);
+        logger.debug("Queued new page URL", { url, ...logDetails }, logContext);
         return true;
 
       case QueueState.LIMIT_HIT:
         logger.logAsJSON(
-          "Page url not queued, at page limit",
+          "Page URL not queued, at page limit",
           { url, ...logDetails },
           logContext,
           logLevel,
@@ -2479,7 +2479,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       case QueueState.DUPE_URL:
         logger.logAsJSON(
-          "Page url not queued, already seen",
+          "Page URL not queued, already seen",
           { url, ...logDetails },
           logContext,
           logLevel,
