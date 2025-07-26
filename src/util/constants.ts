@@ -81,6 +81,7 @@ export enum ExitCodes {
   DiskUtilization = 16,
   Fatal = 17,
   ProxyError = 21,
+  UploadFailed = 22,
 }
 
 export enum InterruptReason {

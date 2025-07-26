@@ -1962,6 +1962,8 @@ self.__bx_behaviors.selectMainBehavior();
       logger.error("Error creating WACZ", e);
       if (!streaming) {
         logger.fatal("Unable to write WACZ successfully");
+      } else if (this.params.restartsOnError) {
+        await this.setStatusAndExit(ExitCodes.UploadFailed, "interrupted");
       }
     }
   }
