@@ -667,7 +667,6 @@ export class Crawler {
     pageUrl: string,
     workerid: WorkerId,
   ) {
-    let behaviorLine;
     let message;
     let details;
 
@@ -711,10 +710,9 @@ export class Crawler {
 
     switch (type) {
       case "info":
-        behaviorLine = JSON.stringify(data);
-        if (behaviorLine !== this.behaviorLastLine) {
+        if (message !== this.behaviorLastLine) {
           logger.info(message, details, context);
-          this.behaviorLastLine = behaviorLine;
+          this.behaviorLastLine = message;
         }
         break;
 
