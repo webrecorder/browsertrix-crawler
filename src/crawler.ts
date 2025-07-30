@@ -178,7 +178,6 @@ export class Crawler {
 
   customBehaviors = "";
   behaviorsChecked = false;
-  behaviorLastLine?: string;
 
   browser: Browser;
   storage: S3StorageSync | null = null;
@@ -667,7 +666,6 @@ export class Crawler {
     pageUrl: string,
     workerid: WorkerId,
   ) {
-    let behaviorLine;
     let message;
     let details;
 
@@ -711,11 +709,7 @@ export class Crawler {
 
     switch (type) {
       case "info":
-        behaviorLine = JSON.stringify(data);
-        if (behaviorLine !== this.behaviorLastLine) {
-          logger.info(message, details, context);
-          this.behaviorLastLine = behaviorLine;
-        }
+        logger.info(message, details, context);
         break;
 
       case "error":
