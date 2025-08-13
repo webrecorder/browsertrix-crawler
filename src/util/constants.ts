@@ -22,6 +22,16 @@ export const DETECT_SITEMAP = "<detect>";
 
 export const EXTRACT_TEXT_TYPES = ["to-pages", "to-warc", "final-to-warc"];
 
+export const DIRECT_FETCH_EXT = [
+  "pdf",
+  "xml",
+  "jpg",
+  "webm",
+  "docx",
+  "mp4",
+  "zip",
+];
+
 export enum BxFunctionBindings {
   BehaviorLogFunc = "__bx_log",
   AddLinkFunc = "__bx_addLink",

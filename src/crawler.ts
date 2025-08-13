@@ -47,6 +47,7 @@ import {
   ExitCodes,
   InterruptReason,
   BxFunctionBindings,
+  DIRECT_FETCH_EXT,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -1035,6 +1036,22 @@ self.__bx_behaviors.selectMainBehavior();
     return "";
   }
 
+  shouldDirectFetchByExt(url: string) {
+    const urlFull = new URL(url);
+    const extParts = urlFull.pathname.split(".");
+    if (extParts.length <= 1) {
+      return false;
+    }
+    const ext = extParts[1];
+
+    // known files that should be direct fetched
+    if (DIRECT_FETCH_EXT.includes(ext)) {
+      return true;
+    }
+
+    return false;
+  }
+
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
@@ -1056,7 +1073,7 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    if (recorder) {
+    if (recorder && this.shouldDirectFetchByExt(url)) {
       try {
         const headers = auth
           ? { Authorization: auth, ...this.headers }
