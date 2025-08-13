@@ -600,6 +600,11 @@ export class Crawler {
         args.push(`--accept-lang=${this.params.lang}`);
       }
     }
+
+    if (Array.isArray(this.params.extraChromeArgs) && this.params.extraChromeArgs.length > 0) {
+      args.push(...this.params.extraChromeArgs);
+    }
+
     return args;
   }
 
