@@ -669,6 +669,13 @@ class ArgParser {
             "path to SSH known hosts file for SOCKS5 over SSH proxy connection",
           type: "string",
         },
+
+        extraChromeArgs: {
+          describe:
+            "Extra arguments to pass directly to the Chrome instance (space-separated or multiple --extraChromeArgs)",
+          type: "array",
+          default: [],
+        },
       });
   }
 
