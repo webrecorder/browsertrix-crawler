@@ -38,6 +38,7 @@ export type ProxyCLIArgs = {
   sshProxyLocalPort?: number;
 
   proxyServer?: string;
+  proxyServerPreferSingleProxy?: boolean;
 
   proxyMap?: ProxyServerConfig;
 };
@@ -122,6 +123,9 @@ export async function initProxy(
       sshProxyPrivateKeyFile,
       sshProxyKnownHostsFile,
     );
+    if (params.proxyServerPreferSingleProxy && defaultProxyEntry.proxyUrl) {
+      return { proxyServer: defaultProxyEntry.proxyUrl };
+    }
   }
 
   if (!params.proxyMap?.matchHosts || !params.proxyMap?.proxies) {

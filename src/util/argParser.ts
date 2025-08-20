@@ -642,6 +642,13 @@ class ArgParser {
           type: "string",
         },
 
+        proxyServerPreferSingleProxy: {
+          describe:
+            "if set, and both proxyServer and proxyServerConfig are provided, the proxyServer value will be preferred",
+          type: "boolean",
+          default: false,
+        },
+
         proxyServerConfig: {
           describe:
             "if set, path to yaml/json file that configures multiple path servers per URL regex",
