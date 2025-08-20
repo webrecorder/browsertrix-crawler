@@ -9,6 +9,8 @@ const SOCKS_PORT = "1080";
 const HTTP_PORT = "3128";
 const WRONG_PORT = "33130";
 
+const PROXY_EXIT_CODE = 21;
+
 const SSH_PROXY_IMAGE = "linuxserver/openssh-server"
 
 const PDF = "https://specs.webrecorder.net/wacz/1.1.1/wacz-2021.pdf";
@@ -27,7 +29,7 @@ beforeAll(() => {
 
   proxyNoAuthId = execSync(`docker run -d --rm --network=proxy-test-net --name proxy-no-auth ${PROXY_IMAGE}`, {encoding: "utf-8"});
 
-  proxySSHId = execSync(`docker run -d --rm -e DOCKER_MODS=linuxserver/mods:openssh-server-ssh-tunnel -e USER_NAME=user -e PUBLIC_KEY_FILE=/keys/proxy-key.pub -v $PWD/tests/fixtures/proxy-key.pub:/keys/proxy-key.pub --network=proxy-test-net --name ssh-proxy ${SSH_PROXY_IMAGE}`);
+  proxySSHId = execSync(`docker run -d --rm -e DOCKER_MODS=linuxserver/mods:openssh-server-ssh-tunnel -e USER_NAME=user -e PUBLIC_KEY_FILE=/keys/proxy-key.pub -v $PWD/tests/fixtures/proxies/proxy-key.pub:/keys/proxy-key.pub --network=proxy-test-net --name ssh-proxy ${SSH_PROXY_IMAGE}`);
 });
 
 afterAll(async () => {
@@ -66,7 +68,7 @@ describe("socks5 + https proxy tests", () => {
           status = e.status;
         }
         // auth supported only for SOCKS5
-        expect(status).toBe(scheme === "socks5" ? 0 : 1);
+        expect(status).toBe(scheme === "socks5" ? 0 : PROXY_EXIT_CODE);
       });
 
       test(`${scheme} proxy, ${type}, wrong auth`, () => {
@@ -77,7 +79,7 @@ describe("socks5 + https proxy tests", () => {
         } catch (e) {
           status = e.status;
         }
-        expect(status).toBe(1);
+        expect(status).toBe(PROXY_EXIT_CODE);
       });
 
       test(`${scheme} proxy, ${type}, wrong protocol`, () => {
@@ -88,7 +90,8 @@ describe("socks5 + https proxy tests", () => {
         } catch (e) {
           status = e.status;
         }
-        expect(status).toBe(1);
+        // wrong protocol (socks5 for http) causes connection to hang, causes a timeout, so just errors with 1
+        expect(status === PROXY_EXIT_CODE || status === 1).toBe(true);
       });
     }
 
@@ -100,7 +103,7 @@ describe("socks5 + https proxy tests", () => {
       } catch (e) {
         status = e.status;
       }
-      expect(status).toBe(1);
+      expect(status).toBe(PROXY_EXIT_CODE);
     });
   }
 });
@@ -118,7 +121,7 @@ test("http proxy set, but not running, separate env vars", () => {
   } catch (e) {
     status = e.status;
   }
-  expect(status).toBe(1);
+  expect(status).toBe(PROXY_EXIT_CODE);
 });
 
 test("http proxy set, but not running, cli arg", () => {
@@ -129,12 +132,12 @@ test("http proxy set, but not running, cli arg", () => {
   } catch (e) {
     status = e.status;
   }
-  expect(status).toBe(1);
+  expect(status).toBe(PROXY_EXIT_CODE);
 });
 
 
 test("ssh socks proxy with custom user", () => {
-  execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxy-key:/keys/proxy-key webrecorder/browsertrix-crawler crawl --proxyServer ssh://user@ssh-proxy:2222 --sshProxyPrivateKeyFile /keys/proxy-key --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
+  execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/proxy-key:/keys/proxy-key webrecorder/browsertrix-crawler crawl --proxyServer ssh://user@ssh-proxy:2222 --sshProxyPrivateKeyFile /keys/proxy-key --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
 });
 
 
@@ -146,7 +149,7 @@ test("ssh socks proxy, wrong user", () => {
   } catch (e) {
     status = e.status;
   }
-  expect(status).toBe(21);
+  expect(status).toBe(PROXY_EXIT_CODE);
 });
 
 
@@ -164,4 +167,30 @@ test("ensure logged proxy string does not include any credentials", () => {
 });
 
 
+test("proxy with config file, wrong auth or no match", () => {
+  let status = 0;
+  try {
+    execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-bad-auth.pac --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
+  } catch (e) {
+    status = e.status;
+  }
+  expect(status).toBe(PROXY_EXIT_CODE);
 
+  // success, no match for PDF
+  execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-bad-auth.pac --url ${PDF} ${extraArgs}`, {encoding: "utf-8"});
+});
+
+
+test("proxy with config file, correct auth or no match", () => {
+  let status = 0;
+  try {
+    execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-good-auth.pac --url ${HTML} ${extraArgs}`, {encoding: "utf-8"});
+  } catch (e) {
+    status = e.status;
+  }
+  expect(status).toBe(0);
+
+  // success, no match for PDF
+  execSync(`docker run --rm --network=proxy-test-net -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-good-auth.pac --url ${PDF} ${extraArgs}`, {encoding: "utf-8"});
+
+});

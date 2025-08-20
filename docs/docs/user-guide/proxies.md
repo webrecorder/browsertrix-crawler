@@ -80,7 +80,55 @@ The above proxy settings also apply to [Browser Profile Creation](browser-profil
 docker run -p 6080:6080 -p 9223:9223 -v $PWD/crawls/profiles:/crawls/profiles -v $PWD/my-proxy-private-key:/tmp/private-key -v $PWD/known_hosts:/tmp/known_hosts webrecorder/browsertrix-crawler create-login-profile --url https://example.com/ --proxyServer ssh://user@path-to-ssh-host.example.com --sshProxyPrivateKeyFile /tmp/private-key --sshProxyKnownHostsFile /tmp/known_hosts
 ```
 
+## Host-Specific Proxies
 
+With the 1.7.0 release, the crawler also supports running with multiple proxies, defined in a separate proxy YAML config file. The file contains a match hosts section, matching hosts by regex to named proxies.
 
+For example, the following YAML file can be passed to `--proxyConfigFile` option:
+
+```yaml
+matchHosts:
+  # load all URLs from example.com through 'example-1-proxy'
+  example.com/.*: example-1-proxy
+
+  # load all URLS from https://my-social.example.com/.*/posts/ through
+  # a different proxy
+  https://my-social.example.com/.*/posts/: social-proxy
+
+  # optional default proxy
+  "": default-proxy
+
+proxies:
+  # SOCKS5 proxy just needs a URL
+  example-1-proxy: socks5://username:password@my-socks-5-proxy.example.com
+
+  # SSH proxy also should have at least a 'privateKeyFile'
+  social-proxy:
+    url: ssh://user@my-social-proxy.example.com
+    privateKeyFile: /proxies/social-proxy-private-key
+    # optional
+    publicHostsFile: /proxies/social-proxy-public-hosts
+
+  default-proxy:
+    url: ssh://user@my-social-proxy.example.com
+    privateKeyFile: /proxies/default-proxy-private-key
+```
+
+If the above config is stored in `./proxies/proxyConfig.yaml` along with the SSH private keys and known public hosts
+files, the crawler can be started with:
+
+```sh
+docker run -v $PWD/crawls:/crawls -v $PWD/proxies:/proxies -it webrecorder/browsertrix-crawler --url https://example.com/ --proxyServerConfig /proxies/proxyConfig.yaml
+```
+
+Note that if SSH proxies are provided, an SSH tunnel must be opened for each one before the crawl starts.
+The crawl will not start if any of the SSH proxy connections fail, even if a host-specific proxy is not actually used.
+SOCKS5 and HTTP proxy connections are attempted only on first use.
+
+The same `--proxyServerConfig` option can also be used in browser profile creation with the `create-login-profile` command in the same way.
+
+### Proxy Precedence
+
+If both `--proxyServerConfig` and `--proxyServer`/`PROXY_SERVER` env var are specified, the `--proxyServerConfig` option takes precedence on matching hosts. To have the single `--proxyServer` option always take precedence instead, pass the `--proxyServerPreferSingleProxy` option.
 
 

@@ -16,7 +16,7 @@ import { initStorage } from "./util/storage.js";
 import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
 import { getInfoString } from "./util/file_reader.js";
 import { DISPLAY, ExitCodes } from "./util/constants.js";
-import { initProxy } from "./util/proxy.js";
+import { initProxy, loadProxyConfig } from "./util/proxy.js";
 //import { sleep } from "./util/timing.js";
 
 const profileHTML = fs.readFileSync(
@@ -123,6 +123,12 @@ function initArgs() {
         type: "string",
       },
 
+      proxyServerConfig: {
+        describe:
+          "if set, path to yaml/json file that configures multiple path servers per URL regex",
+        type: "string",
+      },
+
       sshProxyPrivateKeyFile: {
         describe:
           "path to SSH private key for SOCKS5 over SSH proxy connection",
@@ -161,7 +167,9 @@ async function main() {
 
   process.on("SIGTERM", () => handleTerminate("SIGTERM"));
 
-  const proxyServer = await initProxy(params, false);
+  loadProxyConfig(params);
+
+  const { proxyServer, proxyPacUrl } = await initProxy(params, false);
 
   if (!params.headless) {
     logger.debug("Launching XVFB");
@@ -203,7 +211,8 @@ async function main() {
     headless: params.headless,
     signals: false,
     chromeOptions: {
-      proxy: proxyServer,
+      proxyServer,
+      proxyPacUrl,
       extraArgs: [
         "--window-position=0,0",
         `--window-size=${params.windowSize}`,
