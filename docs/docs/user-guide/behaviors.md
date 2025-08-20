@@ -35,14 +35,15 @@ To disable all behaviors, use `--behaviors ""`.
 ## Behavior and Page Timeouts
 
 Browsertrix includes a number of timeouts, including before, during and after running behaviors.
+
 The timeouts are as follows:
 
-- `--waitUntil`: how long to wait for page to finish loading, *before* doing anything else.
+- `--pageLoadTimeout`: how long to wait for page to finish loading, *before* doing anything else.
 - `--postLoadDelay`: how long to wait *before* starting any behaviors, but after page has finished loading. A custom behavior can override this (see below).
 - `--behaviorTimeout`: maximum time to spend on running site-specific / Autoscroll behaviors (can be less if behavior finishes early).
 - `--pageExtraDelay`: how long to wait *after* finishing behaviors (or after `behaviorTimeout` has been reached) before moving on to next page.
 
-A site-specific behavior (or Autoscroll) will start after the page is loaded (at most after `--waitUntil` seconds) and exactly after `--postLoadDelay` seconds.
+A site-specific behavior (or Autoscroll) will start after the page is loaded (at most after `--pageLoadTimeout` seconds) and exactly after `--postLoadDelay` seconds.
 
 The behavior will then run until finished or at most until `--behaviorTimeout` is reached (90 seconds by default).
 
@@ -267,3 +268,26 @@ Some of these functions which may be of use to behaviors authors are:
 - `getState`: increment a state counter and return all state counters + string message
 
 More detailed references will be added in the future.
+
+## Fail On Content Check
+
+In Browsertrix Crawler 1.7.0 and higher, the `--failOnContentCheck` option will result in a crawl failing if a behavior detects the presence or absence of certain content on a page in its `awaitPageLoad()` callback. By default, this is used to fail a crawl if site-specific behaviors determine that the user is not logged in on the following sites:
+
+- Facebook
+- Instagram
+- TikTok
+- X
+
+It is also used to fail crawls with YouTube videos if one of the videos is found not to play.
+
+It is possible to add content checks to custom behaviors. To do so, include an `awaitPageLoad` method on the behavior and use the `ctx.Lib` function `assertContentValid` to check for content and fail the behavior with a specified reason if it is not found.
+
+For an example, see the following `awaitPageLoad` example from the site-specific behavior for X:
+
+```javascript
+async awaitPageLoad(ctx: any) {
+  const { sleep, assertContentValid } = ctx.Lib;
+  await sleep(5);
+  assertContentValid(() => !document.documentElement.outerHTML.match(/Log In/i), "not_logged_in");
+}
+```

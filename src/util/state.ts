@@ -458,6 +458,10 @@ return inx;
   }
 
   async trimToLimit(limit: number) {
+    if (limit === 0) {
+      return;
+    }
+
     const totalComplete =
       (await this.numPending()) +
       (await this.numDone()) +

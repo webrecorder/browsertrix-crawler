@@ -178,7 +178,6 @@ export class Crawler {
 
   customBehaviors = "";
   behaviorsChecked = false;
-  behaviorLastLine?: string;
 
   browser: Browser;
   storage: S3StorageSync | null = null;
@@ -670,7 +669,6 @@ export class Crawler {
     pageUrl: string,
     workerid: WorkerId,
   ) {
-    let behaviorLine;
     let message;
     let details;
 
@@ -714,11 +712,7 @@ export class Crawler {
 
     switch (type) {
       case "info":
-        behaviorLine = JSON.stringify(data);
-        if (behaviorLine !== this.behaviorLastLine) {
-          logger.info(message, details, context);
-          this.behaviorLastLine = behaviorLine;
-        }
+        logger.info(message, details, context);
         break;
 
       case "error":
@@ -1983,6 +1977,8 @@ self.__bx_behaviors.selectMainBehavior();
       logger.error("Error creating WACZ", e);
       if (!streaming) {
         logger.fatal("Unable to write WACZ successfully");
+      } else if (this.params.restartsOnError) {
+        await this.setStatusAndExit(ExitCodes.UploadFailed, "interrupted");
       }
     }
   }
@@ -2480,25 +2476,30 @@ self.__bx_behaviors.selectMainBehavior();
       this.pageLimit,
     );
 
+    const logContext = depth === 0 ? "scope" : "links";
+    const logLevel = depth === 0 ? "error" : "debug";
+
     switch (result) {
       case QueueState.ADDED:
-        logger.debug("Queued new page url", { url, ...logDetails }, "links");
+        logger.debug("Queued new page URL", { url, ...logDetails }, logContext);
         return true;
 
       case QueueState.LIMIT_HIT:
-        logger.debug(
-          "Not queued page url, at page limit",
+        logger.logAsJSON(
+          "Page URL not queued, at page limit",
           { url, ...logDetails },
-          "links",
+          logContext,
+          logLevel,
         );
         this.limitHit = true;
         return false;
 
       case QueueState.DUPE_URL:
-        logger.debug(
-          "Not queued page url, already seen",
+        logger.logAsJSON(
+          "Page URL not queued, already seen",
           { url, ...logDetails },
-          "links",
+          logContext,
+          logLevel,
         );
         return false;
     }
