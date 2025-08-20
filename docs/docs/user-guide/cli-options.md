@@ -103,16 +103,16 @@ Options:
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
-  atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy"] [default:
-                                                                             []]
+   atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope"]
+                                                                   [default: []]
       --logExcludeContext                   Comma-separated list of contexts to
                                             NOT include in logs
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
-  atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy"] [default:
-                                     ["recorderNetwork","jsError","screencast"]]
+   atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope"]
+                           [default: ["recorderNetwork","jsError","screencast"]]
       --text                                Extract initial (default) or final t
                                             ext to pages.jsonl or WARC resource
                                             record(s)
