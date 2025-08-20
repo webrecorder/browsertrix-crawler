@@ -125,7 +125,7 @@ Note that if SSH proxies are provided, an SSH tunnel must be opened for each one
 The crawl will not start if any of the SSH proxy connections fail, even if a host-specific proxy is not actually used.
 SOCKS5 and HTTP proxy connections are attempted only on first use.
 
-The same `--proxyServerConfig` option can also available be used browser profile creation `create-login-profile` command in the same way.
+The same `--proxyServerConfig` option can also be used in browser profile creation with the `create-login-profile` command in the same way.
 
 ### Proxy Precedence
 
