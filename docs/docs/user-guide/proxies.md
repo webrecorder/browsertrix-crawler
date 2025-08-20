@@ -129,7 +129,6 @@ The same `--proxyServerConfig` option can also be used in browser profile creati
 
 ### Proxy Precedence
 
-If both `--proxyServerConfig` and `--proxyServer`/`PROXY_SERVER` env var are specified, the single `--proxyServer`
-option takes precedence.
+If both `--proxyServerConfig` and `--proxyServer`/`PROXY_SERVER` env var are specified, the `--proxyServerConfig` option takes precedence on matching hosts. To have the single `--proxyServer` option always take precedence instead, pass the `--proxyServerPreferSingleProxy` option.
 
 
