@@ -1823,17 +1823,6 @@ class AsyncFetcher {
       dispatcher,
     });
 
-    // if (this.filter && !this.filter(resp)) {
-    //   // if redirect and cancelled, read whole buffer to avoid possible node error event
-    //   if (resp.status >= 300 && resp.status < 400) {
-    //     await resp.arrayBuffer();
-    //   } else {
-    //     // otherwise, just cancel
-    //     resp.body?.cancel().catch(() => {});
-    //   }
-    //   throw new Error("response-filtered-out");
-    // }
-
     if (
       reqresp.expectedSize < 0 &&
       resp.headers.get("content-length") &&
