@@ -765,7 +765,7 @@ export class Recorder extends EventEmitter {
         mimeType,
       )
     ) {
-      if (await this.isDupe(reqresp)) {
+      if (await this.isDupeFetch(reqresp)) {
         this.removeReqResp(networkId);
         return false;
       }
@@ -1316,52 +1316,6 @@ export class Recorder extends EventEmitter {
     return reqresp;
   }
 
-  async serializeToWARC(reqresp: RequestResponseInfo) {
-    // always include in pageinfo record if going to serialize to WARC
-    // even if serialization does not happen
-    this.addPageRecord(reqresp);
-
-    const { url, method, status, payload, requestId } = reqresp;
-
-    // Specifically log skipping cached resources
-    if (reqresp.isCached()) {
-      logger.debug(
-        "Skipping cached resource, should be already recorded",
-        { url, status },
-        "recorder",
-      );
-      return;
-    } else if (reqresp.shouldSkipSave()) {
-      logger.debug(
-        "Skipping writing request/response",
-        {
-          requestId,
-          url,
-          method,
-          status,
-          payloadLength: (payload && payload.length) || 0,
-        },
-        "recorder",
-      );
-      return;
-    }
-
-    if (
-      url &&
-      method === "GET" &&
-      !isRedirectStatus(status) &&
-      !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, status))
-    ) {
-      logNetwork("Skipping dupe", { url, status, ...this.logDetails });
-      return;
-    }
-
-    const responseRecord = createResponse(reqresp, this.pageid);
-    const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
-
-    this.writer.writeRecordPair(responseRecord, requestRecord);
-  }
-
   async directFetchCapture({
     url,
     headers,
@@ -1435,31 +1389,11 @@ export class Recorder extends EventEmitter {
         requestId,
       });
 
-      const { pageid, gzip } = this;
+      const iter = this.takeStreamIter(reqresp, cdp, stream);
 
-      const responseRecord = createResponse(
-        reqresp,
-        pageid,
-        this.takeStreamIter(reqresp, cdp, stream),
-      );
-      const requestRecord = createRequest(reqresp, responseRecord, pageid);
-
-      const serializer = new WARCSerializer(responseRecord, {
-        gzip,
-        maxMemSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
-      });
-
-      if (!(await this.checkRecords(reqresp, serializer, false))) {
-        serializer.externalBuffer?.purge();
-        await this.crawlState.removeDupe(
-          ASYNC_FETCH_DUPE_KEY,
-          url,
-          reqresp.status,
-        );
+      if (!(await this.serializeToWARC(reqresp, iter))) {
         return false;
       }
-
-      this.commitRecords(reqresp, responseRecord, requestRecord, serializer);
 
       this.removeReqResp(requestId);
     } catch (e) {
@@ -1510,7 +1444,7 @@ export class Recorder extends EventEmitter {
     }
   }
 
-  async isDupe(reqresp: RequestResponseInfo) {
+  async isDupeFetch(reqresp: RequestResponseInfo) {
     const { url, method, status } = reqresp;
     if (
       method === "GET" &&
@@ -1524,7 +1458,7 @@ export class Recorder extends EventEmitter {
     return false;
   }
 
-  async checkRecords(
+  async checkRecordPayload(
     reqresp: RequestResponseInfo,
     serializer: WARCSerializer,
     canRetry: boolean,
@@ -1588,16 +1522,66 @@ export class Recorder extends EventEmitter {
     return true;
   }
 
-  commitRecords(
+  async serializeToWARC(
     reqresp: RequestResponseInfo,
-    responseRecord: WARCRecord,
-    requestRecord: WARCRecord,
-    serializer: WARCSerializer,
-  ) {
+    iter?: AsyncIterable<Uint8Array>,
+  ): Promise<boolean> {
+    // always include in pageinfo record if going to serialize to WARC
+    // even if serialization does not happen, indicates this URL was on the page
+    this.addPageRecord(reqresp);
+
+    const { pageid, gzip } = this;
+    const { url, status, requestId, method, payload } = reqresp;
+
+    // Specifically log skipping cached resources
+    if (reqresp.isCached()) {
+      logger.debug(
+        "Skipping cached resource, should be already recorded",
+        { url, status },
+        "recorder",
+      );
+      return false;
+    } else if (!iter && reqresp.shouldSkipSave()) {
+      logger.debug(
+        "Skipping writing request/response",
+        {
+          requestId,
+          url,
+          method,
+          status,
+          payloadLength: (payload && payload.length) || 0,
+        },
+        "recorder",
+      );
+      return false;
+    }
+
+    if (
+      url &&
+      method === "GET" &&
+      !isRedirectStatus(status) &&
+      !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, status))
+    ) {
+      logNetwork("Skipping dupe", { url, status, ...this.logDetails });
+      return false;
+    }
+
+    const responseRecord = createResponse(reqresp, pageid, iter);
+    const requestRecord = createRequest(reqresp, responseRecord, pageid);
+
+    const serializer = new WARCSerializer(responseRecord, {
+      gzip,
+      maxMemSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
+    });
+
+    if (!(await this.checkRecordPayload(reqresp, serializer, false))) {
+      serializer.externalBuffer?.purge();
+      await this.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
+      return false;
+    }
+
     const externalBuffer: TempFileBuffer =
       serializer.externalBuffer as TempFileBuffer;
-
-    const { url } = reqresp;
 
     if (externalBuffer) {
       const { currSize, buffers, fh } = externalBuffer;
@@ -1646,6 +1630,8 @@ export class Recorder extends EventEmitter {
     this.writer.writeRecordPair(responseRecord, requestRecord, serializer);
 
     this.addPageRecord(reqresp);
+
+    return true;
   }
 }
 
@@ -1739,11 +1725,9 @@ class AsyncFetcher {
   async loadBody() {
     try {
       const { reqresp, useBrowserNetwork, resp, stream, cdp, recorder } = this;
-      const { pageid, gzip } = recorder;
-      const { url, expectedSize, status } = reqresp;
 
       let iter: AsyncIterable<Uint8Array> | undefined;
-      if (expectedSize === 0) {
+      if (reqresp.expectedSize === 0) {
         iter = undefined;
       } else if (stream && useBrowserNetwork && cdp) {
         iter = recorder.takeStreamIter(this.reqresp, cdp, stream);
@@ -1752,27 +1736,8 @@ class AsyncFetcher {
       } else {
         throw new Error("resp body missing");
       }
-      const responseRecord = createResponse(reqresp, pageid, iter);
-      const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
-      const serializer = new WARCSerializer(responseRecord, {
-        gzip,
-        maxMemSize: this.maxFetchSize,
-      });
-
-      if (!(await recorder.checkRecords(reqresp, serializer, false))) {
-        serializer.externalBuffer?.purge();
-        await recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
-        return false;
-      }
-
-      recorder.commitRecords(
-        reqresp,
-        responseRecord,
-        requestRecord,
-        serializer,
-      );
-      return true;
+      return await recorder.serializeToWARC(reqresp, iter);
     } catch (e) {
       logger.warn(
         "Async load body failed",
