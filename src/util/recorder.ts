@@ -1458,7 +1458,7 @@ export class Recorder extends EventEmitter {
     return false;
   }
 
-  async checkRecordPayload(
+  async checkStreamingRecordPayload(
     reqresp: RequestResponseInfo,
     serializer: WARCSerializer,
     canRetry: boolean,
@@ -1574,33 +1574,39 @@ export class Recorder extends EventEmitter {
       maxMemSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
     });
 
-    if (!(await this.checkRecordPayload(reqresp, serializer, false))) {
-      serializer.externalBuffer?.purge();
-      await this.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
-      return false;
-    }
-
-    const externalBuffer: TempFileBuffer =
-      serializer.externalBuffer as TempFileBuffer;
-
-    if (externalBuffer) {
-      const { currSize, buffers, fh } = externalBuffer;
-
-      // if fully buffered in memory, then populate the payload to return to browser
-      if (buffers && buffers.length && !fh) {
-        reqresp.payload = Buffer.concat(buffers, currSize);
-        externalBuffer.buffers = [reqresp.payload];
-      } else if (fh) {
-        logger.debug(
-          "Large payload written to WARC, but not returned to browser (would require rereading into memory)",
-          {
-            url,
-            actualSize: reqresp.readSize,
-            maxSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
-          },
-          "recorder",
-        );
+    if (iter) {
+      if (
+        !(await this.checkStreamingRecordPayload(reqresp, serializer, false))
+      ) {
+        serializer.externalBuffer?.purge();
+        await this.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
+        return false;
       }
+
+      const externalBuffer: TempFileBuffer =
+        serializer.externalBuffer as TempFileBuffer;
+
+      if (externalBuffer) {
+        const { currSize, buffers, fh } = externalBuffer;
+
+        // if fully buffered in memory, then populate the payload to return to browser
+        if (buffers && buffers.length && !fh) {
+          reqresp.payload = Buffer.concat(buffers, currSize);
+          externalBuffer.buffers = [reqresp.payload];
+        } else if (fh) {
+          logger.debug(
+            "Large payload written to WARC, but not returned to browser (would require rereading into memory)",
+            {
+              url,
+              actualSize: reqresp.readSize,
+              maxSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
+            },
+            "recorder",
+          );
+        }
+      }
+    } else {
+      await serializer.digestRecord();
     }
 
     let modified = false;
