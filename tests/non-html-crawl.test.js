@@ -149,7 +149,7 @@ test("XML: check that CDX contains one xml 200, one 301 and one 200, two pageinf
   const lines = filedata.trim().split("\n");
   const cdxj = lines.map(line => JSON.parse(line.split(" ").slice(2).join(" "))).sort((a, b) => a.url < b.url ? -1 : 1);
 
-  expect(cdxj.length).toBe(6);
+  expect(cdxj.length).toBe(5);
 
   expect(cdxj[0].url).toBe("https://webrecorder.net/favicon.ico");
 
@@ -157,18 +157,14 @@ test("XML: check that CDX contains one xml 200, one 301 and one 200, two pageinf
   expect(cdxj[1].status).toBe("200");
   expect(cdxj[1].mime).toBe("application/xml");
 
-  expect(cdxj[2].url).toBe(XML);
-  expect(cdxj[2].status).toBe("200");
-  expect(cdxj[2].mime).toBe("application/xml");
+  expect(cdxj[2].url).toBe(XML_REDIR);
+  expect(cdxj[2].status).toBe("301");
 
-  expect(cdxj[3].url).toBe(XML_REDIR);
-  expect(cdxj[3].status).toBe("301");
+  expect(cdxj[3].url).toBe("urn:pageinfo:" + XML);
+  expect(cdxj[3].mime).toBe("application/json");
 
-  expect(cdxj[4].url).toBe("urn:pageinfo:" + XML);
+  expect(cdxj[4].url).toBe("urn:pageinfo:" + XML_REDIR);
   expect(cdxj[4].mime).toBe("application/json");
-
-  expect(cdxj[5].url).toBe("urn:pageinfo:" + XML_REDIR);
-  expect(cdxj[5].mime).toBe("application/json");
 });
 
 
