@@ -609,7 +609,7 @@ export class Crawler {
     const extra = this.params.extraChromeArgs;
     if (Array.isArray(extra) && extra.length > 0) {
       for (const v of extra) {
-        if (v !== undefined && v !== null && v !== "") {
+        if (v) {
           args.push(String(v));
         }
       }
