@@ -76,7 +76,7 @@ test("PDF: check that the pages.jsonl file entry contains status code and mime t
   expect(pageH.loadState).toBe(2);
 });
 
-test("PDF: check that CDX contains one pdf 200, one 301 and one 200, two pageinfo entries", () => {
+test("PDF: check that CDX contains data from two crawls: one pdf 200, one 301 and one 200, two pageinfo entries", () => {
   const filedata = fs.readFileSync(
     "test-crawls/collections/crawl-pdf/indexes/index.cdxj",
     { encoding: "utf-8" },
@@ -90,6 +90,7 @@ test("PDF: check that CDX contains one pdf 200, one 301 and one 200, two pageinf
   expect(cdxj[0].url).toBe(PDF_HTTP);
   expect(cdxj[0].status).toBe("301");
 
+  // this is duplicated as this is data from two crawls
   expect(cdxj[1].url).toBe(PDF);
   expect(cdxj[1].status).toBe("200");
   expect(cdxj[1].mime).toBe("application/pdf");
