@@ -1097,7 +1097,7 @@ self.__bx_behaviors.selectMainBehavior();
     const { page, cdp, data, workerid, callbacks, recorder } = opts;
     data.callbacks = callbacks;
 
-    const { url, seedId } = data;
+    const { url, seedId, depth } = data;
 
     const auth = this.seeds[seedId].authHeader();
 
@@ -1170,6 +1170,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (recorder) {
       recorder.pageSeed = seed;
+      recorder.pageSeedDepth = depth;
     }
 
     // run custom driver here, if any
@@ -1348,6 +1349,7 @@ self.__bx_behaviors.selectMainBehavior();
     } else {
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
+        this.limitHit = false;
       } else {
         const retry = await this.crawlState.markFailed(url, noRetries);
 
@@ -2219,7 +2221,11 @@ self.__bx_behaviors.selectMainBehavior();
           if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
             // excluded in recorder
             data.pageSkipped = true;
-            logger.warn("Page Load Blocked, skipping", { msg, loadState });
+            logger.warn(
+              "Page Load Blocked, skipping",
+              { msg, loadState },
+              "pageStatus",
+            );
             throw new Error("logged");
           } else {
             return this.pageFailed("Page Load Failed", retry, {

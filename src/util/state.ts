@@ -1073,6 +1073,34 @@ return inx;
     return await this.redis.srem(key, normalizeDedupStatus(status) + "|" + url);
   }
 
+  async getHashDupe(
+    key: string,
+    hash: string,
+    url: string,
+  ): Promise<{ dupe?: boolean; origDate?: string; origUrl?: string }> {
+    const value = await this.redis.hget(key, hash);
+    if (!value) {
+      return {};
+    }
+    const val = value.split("|");
+    // if matches the first entry, return
+    if (val[1] === url) {
+      return { dupe: true };
+    }
+    // otherwise, check if a revisit entry
+    if (await this.redis.sismember(`${key}:${hash}`, url)) {
+      return { dupe: true };
+    }
+    return { origUrl: val[1], origDate: val[0] };
+  }
+
+  async addHashDupe(key: string, hash: string, url: string, date: string) {
+    const val = date + "|" + url;
+    if (!(await this.redis.hsetnx(key, hash, val))) {
+      await this.redis.sadd(`${key}:${hash}`, url);
+    }
+  }
+
   async isInUserSet(value: string) {
     return (await this.redis.sismember(this.key + ":user", value)) === 1;
   }
