@@ -1397,9 +1397,9 @@ export class Recorder extends EventEmitter {
 
       this.removeReqResp(requestId);
     } catch (e) {
-      logger.warn(
-        "Fetch responseBodyAsStream failed",
-        { url, ...formatErr(e), ...this.logDetails },
+      logger.debug(
+        "Fetch responseBodyAsStream failed, will retry async",
+        { url, error: e, ...this.logDetails },
         "recorder",
       );
       return false;
