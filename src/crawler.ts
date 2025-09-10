@@ -1059,58 +1059,43 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
+    let result = false;
+
     if (recorder) {
       try {
         const headers = auth
           ? { Authorization: auth, ...this.headers }
           : this.headers;
 
-        const result = await timedRun(
-          recorder.directFetchCapture({ url, headers, cdp }),
+        result = await timedRun(
+          recorder.directFetchCapture({
+            url,
+            headers,
+            cdp,
+            state: data,
+            crawler: this,
+          }),
           this.params.pageLoadTimeout,
           "Direct fetch of page URL timed out",
           logDetails,
           "fetch",
         );
-
-        // fetched timed out, already logged, don't retry in browser
-        if (!result) {
-          return;
-        }
-
-        const { fetched, mime, ts } = result;
-
-        if (mime) {
-          data.mime = mime;
-          data.isHTMLPage = isHTMLMime(mime);
-        }
-        if (fetched) {
-          data.loadState = LoadState.FULL_PAGE_LOADED;
-          data.status = 200;
-          data.ts = ts || new Date();
-          logger.info(
-            "Direct fetch successful",
-            { url, mime, ...logDetails },
-            "fetch",
-          );
-          return;
-        }
       } catch (e) {
-        if (e instanceof Error && e.message === "response-filtered-out") {
-          // filtered out direct fetch
-          logger.debug(
-            "Direct fetch response not accepted, continuing with browser fetch",
-            logDetails,
-            "fetch",
-          );
-        } else {
-          logger.error(
-            "Direct fetch of page URL failed",
-            { e, ...logDetails },
-            "fetch",
-          );
-          return;
-        }
+        logger.error(
+          "Direct fetch of page URL failed",
+          { e, ...logDetails },
+          "fetch",
+        );
+      }
+
+      if (!result) {
+        logger.debug(
+          "Direct fetch response not accepted, continuing with browser fetch",
+          logDetails,
+          "fetch",
+        );
+      } else {
+        return;
       }
     }
 
@@ -1280,6 +1265,10 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async pageFinished(data: PageState, lastErrorText = "") {
+    // not yet finished
+    if (data.asyncLoading) {
+      return;
+    }
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
     const { loadState, logDetails, depth, url, pageSkipped } = data;
