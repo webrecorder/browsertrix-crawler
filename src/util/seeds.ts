@@ -342,6 +342,7 @@ export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
 
   for (const seed of seeds) {
     const newSeed = typeof seed === "string" ? { url: seed } : seed;
+    newSeed.url = removeQuotes(newSeed.url);
 
     try {
       scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...newSeed }));
@@ -388,4 +389,15 @@ export function parseRx(
   } else {
     return value.map((e) => (e instanceof RegExp ? e : new RegExp(e)));
   }
+}
+
+export function removeQuotes(url: string) {
+  url = url.trim();
+  if (
+    (url.startsWith(`"`) && url.endsWith(`"`)) ||
+    (url.startsWith(`'`) && url.endsWith(`'`))
+  ) {
+    url = url.slice(1, -1);
+  }
+  return url;
 }

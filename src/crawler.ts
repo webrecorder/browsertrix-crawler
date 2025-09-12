@@ -129,6 +129,8 @@ export class Crawler {
   limitHit = false;
   pageLimit: number;
 
+  dupeSeedsFound = false;
+
   saveStateFiles: string[] = [];
   lastSaveTime: number;
 
@@ -2465,30 +2467,34 @@ self.__bx_behaviors.selectMainBehavior();
       this.pageLimit,
     );
 
-    const logContext = depth === 0 ? "scope" : "links";
-    const logLevel = depth === 0 ? "error" : "debug";
-
     switch (result) {
       case QueueState.ADDED:
-        logger.debug("Queued new page URL", { url, ...logDetails }, logContext);
+        logger.debug("Queued new page URL", { url, ...logDetails }, "links");
         return true;
 
       case QueueState.LIMIT_HIT:
-        logger.logAsJSON(
+        logger.debug(
           "Page URL not queued, at page limit",
           { url, ...logDetails },
-          logContext,
-          logLevel,
+          "links",
         );
+        if (!this.limitHit && depth === 0) {
+          logger.error(
+            "Page limit reached when adding URL list, some URLs not crawled.",
+          );
+        }
         this.limitHit = true;
         return false;
 
       case QueueState.DUPE_URL:
-        logger.logAsJSON(
+        if (!this.dupeSeedsFound && depth === 0) {
+          logger.error("Duplicate seed URLs found and skipped");
+          this.dupeSeedsFound = true;
+        }
+        logger.debug(
           "Page URL not queued, already seen",
           { url, ...logDetails },
-          logContext,
-          logLevel,
+          "links",
         );
         return false;
     }

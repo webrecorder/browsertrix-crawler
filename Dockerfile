@@ -39,7 +39,7 @@ ADD config/ /app/
 
 ADD html/ /app/html/
 
-ARG RWP_VERSION=2.3.15
+ARG RWP_VERSION=2.3.17
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/ui.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/sw.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/adblock/adblock.gz /app/html/rwp/adblock.gz

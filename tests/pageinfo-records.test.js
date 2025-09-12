@@ -118,9 +118,9 @@ function validateResourcesIndex(json) {
       { status: 200, mime: "text/css", type: "stylesheet" },
     "https://fonts.googleapis.com/css?family=Source+Code+Pro|Source+Sans+Pro&display=swap":
       { status: 200, mime: "text/css", type: "stylesheet" },
-    "https://fonts.gstatic.com/s/sourcesanspro/v22/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2":
+    "https://fonts.gstatic.com/s/sourcesanspro/v23/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
-    "https://fonts.gstatic.com/s/sourcesanspro/v22/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2":
+    "https://fonts.gstatic.com/s/sourcesanspro/v23/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
     "https://old.webrecorder.net/assets/favicon.ico": {
       status: 200,
@@ -161,9 +161,9 @@ function validateResourcesAbout(json) {
       mime: "image/svg+xml",
       type: "image",
     },
-    "https://fonts.gstatic.com/s/sourcesanspro/v22/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2":
+    "https://fonts.gstatic.com/s/sourcesanspro/v23/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
-    "https://fonts.gstatic.com/s/sourcesanspro/v22/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2":
+    "https://fonts.gstatic.com/s/sourcesanspro/v23/6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2":
       { status: 200, mime: "font/woff2", type: "font" },
   });
 }

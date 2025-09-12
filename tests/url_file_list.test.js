@@ -1,13 +1,30 @@
 import util from "util";
-import { exec as execCallback } from "child_process";
+import { spawn, exec as execCallback } from "child_process";
 import fs from "fs";
 
 const exec = util.promisify(execCallback);
 
+let proc = null;
+
+const DOCKER_HOST_NAME = process.env.DOCKER_HOST_NAME || "host.docker.internal";
+const TEST_HOST = `http://${DOCKER_HOST_NAME}:31502`;
+
+beforeAll(() => {
+  proc = spawn("../../node_modules/.bin/http-server", ["-p", "31502"], {cwd: "tests/fixtures/"});
+});
+
+afterAll(() => {
+  if (proc) {
+    proc.kill();
+  }
+});
+
+
+
 test("check that URLs in seed-list are crawled", async () => {
   try {
     await exec(
-      "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection filelisttest --urlFile /tests/fixtures/urlSeedFile.txt --timeout 90000",
+      "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection filelisttest --urlFile /tests/fixtures/urlSeedFile.txt --timeout 90000 --scopeType page",
     );
   } catch (error) {
     console.log(error);
@@ -43,7 +60,7 @@ test("check that URLs in seed-list are crawled", async () => {
 test("check that URLs in seed-list hosted at URL are crawled", async () => {
   try {
     await exec(
-      'docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection onlinefilelisttest --urlFile "https://raw.githubusercontent.com/webrecorder/browsertrix-crawler/refs/heads/main/tests/fixtures/urlSeedFile.txt" --timeout 90000',
+      `docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection onlinefilelisttest --urlFile "${TEST_HOST}/urlSeedFile.txt" --timeout 90000 --scopeType page`,
     );
   } catch (error) {
     console.log(error);
