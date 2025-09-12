@@ -342,7 +342,7 @@ export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
 
   for (const seed of seeds) {
     const newSeed = typeof seed === "string" ? { url: seed } : seed;
-    newSeed.url = remoteQuotes(newSeed.url);
+    newSeed.url = removeQuotes(newSeed.url);
 
     try {
       scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...newSeed }));
@@ -391,7 +391,8 @@ export function parseRx(
   }
 }
 
-export function remoteQuotes(url: string) {
+export function removeQuotes(url: string) {
+  url = url.trim();
   if (
     (url.startsWith(`"`) && url.endsWith(`"`)) ||
     (url.startsWith(`'`) && url.endsWith(`'`))
