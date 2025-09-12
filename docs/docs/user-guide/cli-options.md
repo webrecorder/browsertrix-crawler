@@ -103,16 +103,16 @@ Options:
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
-  atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy"] [default:
-                                                                             []]
+   atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope"]
+                                                                   [default: []]
       --logExcludeContext                   Comma-separated list of contexts to
                                             NOT include in logs
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
-  atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy"] [default:
-                                     ["recorderNetwork","jsError","screencast"]]
+   atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope"]
+                           [default: ["recorderNetwork","jsError","screencast"]]
       --text                                Extract initial (default) or final t
                                             ext to pages.jsonl or WARC resource
                                             record(s)
@@ -294,6 +294,13 @@ Options:
       --proxyServer                         if set, will use specified proxy ser
                                             ver. Takes precedence over any env v
                                             ar proxy settings           [string]
+      --proxyServerPreferSingleProxy        if set, and both proxyServer and pro
+                                            xyServerConfig are provided, the pro
+                                            xyServer value will be preferred
+                                                      [boolean] [default: false]
+      --proxyServerConfig                   if set, path to yaml/json file that
+                                            configures multiple path servers per
+                                             URL regex                  [string]
       --dryRun                              If true, no archive data is written
                                             to disk, only pages and logs (and op
                                             tionally saved state).     [boolean]
@@ -343,6 +350,8 @@ Options:
                                                            [number] [default: 7]
   --proxyServer             if set, will use specified proxy server. Takes prece
                             dence over any env var proxy settings       [string]
+  --proxyServerConfig       if set, path to yaml/json file that configures multi
+                            ple path servers per URL regex              [string]
   --sshProxyPrivateKeyFile  path to SSH private key for SOCKS5 over SSH proxy co
                             nnection                                    [string]
   --sshProxyKnownHostsFile  path to SSH known hosts file for SOCKS5 over SSH pro

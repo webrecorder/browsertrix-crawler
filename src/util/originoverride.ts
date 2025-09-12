@@ -48,7 +48,7 @@ export class OriginOverride {
 
         const resp = await fetch(newUrl, {
           headers,
-          dispatcher: getProxyDispatcher(),
+          dispatcher: getProxyDispatcher(newUrl),
         });
 
         const body = Buffer.from(await resp.arrayBuffer());

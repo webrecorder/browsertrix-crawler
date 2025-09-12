@@ -1,7 +1,9 @@
 import net from "net";
-import { Agent, Dispatcher, ProxyAgent } from "undici";
-
 import child_process from "child_process";
+import fs from "fs";
+
+import { Agent, Dispatcher, ProxyAgent } from "undici";
+import yaml from "js-yaml";
 
 import { logger } from "./logger.js";
 
@@ -9,11 +11,40 @@ import { socksDispatcher } from "fetch-socks";
 import type { SocksProxyType } from "socks/typings/common/constants.js";
 import { ExitCodes, FETCH_HEADERS_TIMEOUT_SECS } from "./constants.js";
 
+import http, { IncomingMessage, ServerResponse } from "http";
+
 const SSH_PROXY_LOCAL_PORT = 9722;
 
 const SSH_WAIT_TIMEOUT = 30000;
 
-let proxyDispatcher: Dispatcher | undefined = undefined;
+//let proxyDispatcher: Dispatcher | undefined = undefined;
+
+type ProxyEntry = {
+  proxyUrl: string;
+  dispatcher: Dispatcher;
+};
+
+export type ProxyServerConfig = {
+  matchHosts?: Record<string, string>;
+  proxies?: Record<
+    string,
+    string | { url: string; privateKeyFile?: string; publicHostsFile?: string }
+  >;
+};
+
+export type ProxyCLIArgs = {
+  sshProxyPrivateKeyFile?: string;
+  sshProxyKnownHostsFile?: string;
+  sshProxyLocalPort?: number;
+
+  proxyServer?: string;
+  proxyServerPreferSingleProxy?: boolean;
+
+  proxyMap?: ProxyServerConfig;
+};
+
+const proxyMap = new Map<RegExp, ProxyEntry>();
+let defaultProxyEntry: ProxyEntry | null = null;
 
 export function getEnvProxyUrl() {
   if (process.env.PROXY_SERVER) {
@@ -26,6 +57,27 @@ export function getEnvProxyUrl() {
   }
 
   return "";
+}
+
+export function loadProxyConfig(params: {
+  proxyServerConfig?: string;
+  proxyMap?: ProxyServerConfig;
+}) {
+  if (params.proxyServerConfig) {
+    const proxyServerConfig = params.proxyServerConfig;
+    try {
+      const proxies = yaml.load(
+        fs.readFileSync(proxyServerConfig, "utf8"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ) as any;
+      params.proxyMap = proxies;
+      logger.debug("Proxy host match config loaded", { proxyServerConfig });
+    } catch (e) {
+      logger.warn("Proxy host match config file not found, ignoring", {
+        proxyServerConfig,
+      });
+    }
+  }
 }
 
 export function getSafeProxyString(proxyString: string): string {
@@ -54,31 +106,127 @@ export function getSafeProxyString(proxyString: string): string {
 }
 
 export async function initProxy(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  params: Record<string, any>,
+  params: ProxyCLIArgs,
   detached: boolean,
-): Promise<string | undefined> {
-  let proxy = params.proxyServer;
+): Promise<{ proxyServer?: string; proxyPacUrl?: string }> {
+  const { sshProxyPrivateKeyFile, sshProxyKnownHostsFile, sshProxyLocalPort } =
+    params;
+  let localPort = sshProxyLocalPort || SSH_PROXY_LOCAL_PORT;
 
-  if (!proxy) {
-    proxy = getEnvProxyUrl();
+  const singleProxy = params.proxyServer || getEnvProxyUrl();
+
+  if (singleProxy) {
+    defaultProxyEntry = await initSingleProxy(
+      singleProxy,
+      localPort++,
+      detached,
+      sshProxyPrivateKeyFile,
+      sshProxyKnownHostsFile,
+    );
+    if (params.proxyServerPreferSingleProxy && defaultProxyEntry.proxyUrl) {
+      return { proxyServer: defaultProxyEntry.proxyUrl };
+    }
   }
-  if (proxy && proxy.startsWith("ssh://")) {
-    proxy = await runSSHD(params, detached);
+
+  if (!params.proxyMap?.matchHosts || !params.proxyMap?.proxies) {
+    if (defaultProxyEntry) {
+      logger.debug("Using Single Proxy", {}, "proxy");
+    }
+    return { proxyServer: defaultProxyEntry?.proxyUrl };
+  }
+
+  const nameToProxy = new Map<string, ProxyEntry>();
+
+  for (const [name, value] of Object.entries(params.proxyMap.proxies)) {
+    let proxyUrl = "";
+    let privateKeyFile: string | undefined = "";
+    let publicHostsFile: string | undefined = "";
+
+    if (typeof value === "string") {
+      proxyUrl = value;
+    } else {
+      proxyUrl = value.url;
+      privateKeyFile = value.privateKeyFile;
+      publicHostsFile = value.publicHostsFile;
+    }
+
+    privateKeyFile = privateKeyFile || sshProxyPrivateKeyFile;
+    publicHostsFile = publicHostsFile || sshProxyKnownHostsFile;
+
+    logger.debug("Initing proxy", {
+      url: getSafeProxyString(proxyUrl),
+      localPort,
+      privateKeyFile,
+      publicHostsFile,
+    });
+
+    const entry = await initSingleProxy(
+      proxyUrl,
+      localPort++,
+      detached,
+      privateKeyFile,
+      publicHostsFile,
+    );
+
+    nameToProxy.set(name, entry);
+  }
+
+  for (const [rx, name] of Object.entries(params.proxyMap.matchHosts)) {
+    const entry = nameToProxy.get(name);
+
+    if (!entry) {
+      logger.fatal("Proxy specified but not found in proxies list: " + name);
+      return {};
+    }
+
+    if (rx) {
+      proxyMap.set(new RegExp(rx), entry);
+    } else {
+      defaultProxyEntry = entry;
+    }
+  }
+
+  const p = new ProxyPacServer();
+
+  logger.debug("Using Proxy PAC script", {}, "proxy");
+
+  return { proxyPacUrl: `http://localhost:${p.port}/proxy.pac` };
+}
+
+export async function initSingleProxy(
+  proxyUrl: string,
+  localPort: number,
+  detached: boolean,
+  sshProxyPrivateKeyFile?: string,
+  sshProxyKnownHostsFile?: string,
+): Promise<{ proxyUrl: string; dispatcher: Dispatcher }> {
+  if (proxyUrl && proxyUrl.startsWith("ssh://")) {
+    proxyUrl = await runSSHD(
+      proxyUrl,
+      localPort,
+      detached,
+      sshProxyPrivateKeyFile,
+      sshProxyKnownHostsFile,
+    );
   }
 
   const agentOpts: Agent.Options = {
     headersTimeout: FETCH_HEADERS_TIMEOUT_SECS * 1000,
   };
 
-  // set global fetch() dispatcher (with proxy, if any)
-  const dispatcher = createDispatcher(proxy, agentOpts);
-  proxyDispatcher = dispatcher;
-  return proxy;
+  const dispatcher = createDispatcher(proxyUrl, agentOpts);
+  return { proxyUrl, dispatcher };
 }
 
-export function getProxyDispatcher() {
-  return proxyDispatcher;
+export function getProxyDispatcher(url: string) {
+  // find url match by regex first
+  for (const [rx, { dispatcher }] of proxyMap.entries()) {
+    if (rx && url.match(rx)) {
+      return dispatcher;
+    }
+  }
+  // if default proxy set, return default dispatcher, otherwise no dispatcher
+  return defaultProxyEntry ? defaultProxyEntry.dispatcher : undefined;
 }
 
 export function createDispatcher(
@@ -113,9 +261,13 @@ export function createDispatcher(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function runSSHD(params: Record<string, any>, detached: boolean) {
-  const { proxyServer } = params;
+export async function runSSHD(
+  proxyServer: string,
+  localPort: number,
+  detached: boolean,
+  privateKey?: string,
+  publicKnownHost?: string,
+) {
   if (!proxyServer || !proxyServer.startsWith("ssh://")) {
     return "";
   }
@@ -126,17 +278,14 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
   const host = proxyServerUrl.hostname.replace("[", "").replace("]", "");
   const port = proxyServerUrl.port || 22;
   const user = proxyServerUrl.username || "root";
-  const localPort = params.sshProxyLocalPort || SSH_PROXY_LOCAL_PORT;
   const proxyString = `socks5://localhost:${localPort}`;
 
   const args: string[] = [
     user + "@" + host,
     "-p",
-    port,
+    port + "",
     "-D",
-    localPort,
-    "-i",
-    params.sshProxyPrivateKeyFile,
+    localPort + "",
     "-o",
     "IdentitiesOnly=yes",
     "-o",
@@ -146,10 +295,15 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
     "-o",
   ];
 
-  if (params.sshProxyKnownHostsFile) {
-    args.push(`UserKnownHostsFile=${params.sshProxyKnownHostsFile}`);
+  if (publicKnownHost) {
+    args.push(`UserKnownHostsFile=${publicKnownHost}`);
   } else {
     args.push("StrictHostKeyChecking=no");
+  }
+
+  if (privateKey) {
+    args.push("-i");
+    args.push(privateKey);
   }
 
   args.push("-M", "0", "-N", "-T");
@@ -221,7 +375,7 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
       "proxy",
       ExitCodes.ProxyError,
     );
-    return;
+    return "";
   }
 
   logger.info(
@@ -241,10 +395,61 @@ export async function runSSHD(params: Record<string, any>, detached: boolean) {
       },
       "proxy",
     );
-    runSSHD(params, detached).catch((e) =>
-      logger.error("proxy retry error", e, "proxy"),
-    );
+    runSSHD(
+      proxyServer,
+      localPort,
+      detached,
+      privateKey,
+      publicKnownHost,
+    ).catch((e) => logger.error("proxy retry error", e, "proxy"));
   });
 
   return proxyString;
+}
+
+class ProxyPacServer {
+  port = 20278;
+
+  proxyPacText = "";
+
+  constructor() {
+    const httpServer = http.createServer((req, res) =>
+      this.handleRequest(req, res),
+    );
+    httpServer.listen(this.port);
+    this.generateProxyPac();
+  }
+
+  async handleRequest(request: IncomingMessage, response: ServerResponse) {
+    response.writeHead(200, {
+      "Content-Type": "application/x-ns-proxy-autoconfig",
+    });
+    response.end(this.proxyPacText);
+  }
+
+  generateProxyPac() {
+    const urlToProxy = (proxyUrl: string) => {
+      const url = new URL(proxyUrl);
+      const hostport = url.href.slice(url.protocol.length + 2);
+      const type = url.protocol.slice(0, -1).toUpperCase();
+      return `"${type} ${hostport}"`;
+    };
+
+    this.proxyPacText = `
+
+function FindProxyForURL(url, host) {
+
+`;
+    proxyMap.forEach(({ proxyUrl }, k) => {
+      this.proxyPacText += `  if (url.match(/${
+        k.source
+      }/)) { return ${urlToProxy(proxyUrl)}; }\n`;
+    });
+
+    this.proxyPacText += `\n  return ${
+      defaultProxyEntry ? urlToProxy(defaultProxyEntry.proxyUrl) : `"DIRECT"`
+    };
+}
+`;
+  }
 }

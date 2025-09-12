@@ -188,6 +188,7 @@ export class Crawler {
   maxHeapTotal = 0;
 
   proxyServer?: string;
+  proxyPacUrl?: string;
 
   driver:
     | ((opts: {
@@ -510,7 +511,9 @@ export class Crawler {
     setWARCInfo(this.infoString, this.params.warcInfo);
     logger.info(this.infoString);
 
-    this.proxyServer = await initProxy(this.params, RUN_DETACHED);
+    const res = await initProxy(this.params, RUN_DETACHED);
+    this.proxyServer = res.proxyServer;
+    this.proxyPacUrl = res.proxyPacUrl;
 
     this.seeds = await parseSeeds(this.params);
     this.numOriginalSeeds = this.seeds.length;
@@ -1058,58 +1061,43 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
+    let result = false;
+
     if (recorder) {
       try {
         const headers = auth
           ? { Authorization: auth, ...this.headers }
           : this.headers;
 
-        const result = await timedRun(
-          recorder.directFetchCapture({ url, headers, cdp }),
+        result = await timedRun(
+          recorder.directFetchCapture({
+            url,
+            headers,
+            cdp,
+            state: data,
+            crawler: this,
+          }),
           this.params.pageLoadTimeout,
           "Direct fetch of page URL timed out",
           logDetails,
           "fetch",
         );
-
-        // fetched timed out, already logged, don't retry in browser
-        if (!result) {
-          return;
-        }
-
-        const { fetched, mime, ts } = result;
-
-        if (mime) {
-          data.mime = mime;
-          data.isHTMLPage = isHTMLMime(mime);
-        }
-        if (fetched) {
-          data.loadState = LoadState.FULL_PAGE_LOADED;
-          data.status = 200;
-          data.ts = ts || new Date();
-          logger.info(
-            "Direct fetch successful",
-            { url, mime, ...logDetails },
-            "fetch",
-          );
-          return;
-        }
       } catch (e) {
-        if (e instanceof Error && e.message === "response-filtered-out") {
-          // filtered out direct fetch
-          logger.debug(
-            "Direct fetch response not accepted, continuing with browser fetch",
-            logDetails,
-            "fetch",
-          );
-        } else {
-          logger.error(
-            "Direct fetch of page URL failed",
-            { e, ...logDetails },
-            "fetch",
-          );
-          return;
-        }
+        logger.error(
+          "Direct fetch of page URL failed",
+          { e, ...logDetails },
+          "fetch",
+        );
+      }
+
+      if (!result) {
+        logger.debug(
+          "Direct fetch response not accepted, continuing with browser fetch",
+          logDetails,
+          "fetch",
+        );
+      } else {
+        return;
       }
     }
 
@@ -1278,7 +1266,11 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async pageFinished(data: PageState) {
+  async pageFinished(data: PageState, lastErrorText = "") {
+    // not yet finished
+    if (data.asyncLoading) {
+      return;
+    }
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
     const { loadState, logDetails, depth, url, pageSkipped } = data;
@@ -1313,11 +1305,28 @@ self.__bx_behaviors.selectMainBehavior();
           await this.serializeConfig();
 
           if (depth === 0 && this.params.failOnFailedSeed) {
+            let errorCode = ExitCodes.GenericError;
+
+            switch (lastErrorText) {
+              case "net::ERR_SOCKS_CONNECTION_FAILED":
+              case "net::SOCKS_CONNECTION_HOST_UNREACHABLE":
+              case "net::ERR_PROXY_CONNECTION_FAILED":
+              case "net::ERR_TUNNEL_CONNECTION_FAILED":
+                errorCode = ExitCodes.ProxyError;
+                break;
+
+              case "net::ERR_TIMED_OUT":
+              case "net::ERR_INVALID_AUTH_CREDENTIALS":
+                if (this.proxyServer || this.proxyPacUrl) {
+                  errorCode = ExitCodes.ProxyError;
+                }
+                break;
+            }
             logger.fatal(
               "Seed Page Load Failed, failing crawl",
               {},
               "general",
-              ExitCodes.GenericError,
+              errorCode,
             );
           }
         }
@@ -1705,7 +1714,8 @@ self.__bx_behaviors.selectMainBehavior();
       emulateDevice: this.emulateDevice,
       swOpt: this.params.serviceWorker,
       chromeOptions: {
-        proxy: this.proxyServer,
+        proxyServer: this.proxyServer,
+        proxyPacUrl: this.proxyPacUrl,
         userAgent: this.emulateDevice.userAgent,
         extraArgs: this.extraChromeArgs(),
       },
