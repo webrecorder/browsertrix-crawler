@@ -1,2 +1,3 @@
-https://webrecorder.net/about/
+https://old.webrecorder.net/about/
 https://specs.webrecorder.net/wacz/1.1.1/
+"https://old.webrecorder.net/faq"
