@@ -1,5 +1,6 @@
 import { Redis } from "ioredis";
 import { logger } from "./logger.js";
+import { sleep } from "./timing.js";
 
 const error = console.error;
 
@@ -32,6 +33,19 @@ export async function initRedis(url: string) {
   const redis = new Redis(url, { lazyConnect: true });
   await redis.connect();
   return redis;
+}
+
+export async function initRedisWaitForSuccess(redisUrl: string, retrySecs = 1) {
+  while (true) {
+    try {
+      return await initRedis(redisUrl);
+      break;
+    } catch (e) {
+      //logger.fatal("Unable to connect to state store Redis: " + redisUrl);
+      logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
+      await sleep(retrySecs);
+    }
+  }
 }
 
 export function setExitOnRedisError() {
