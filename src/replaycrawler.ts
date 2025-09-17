@@ -10,9 +10,6 @@ import { PageInfoRecord, PageInfoValue, Recorder } from "./util/recorder.js";
 import fsp from "fs/promises";
 import path from "path";
 
-import { ZipRangeReader, createLoader } from "@webrecorder/wabac";
-
-import { AsyncIterReader } from "warcio";
 import { parseArgs } from "./util/argParser.js";
 
 import { PNG } from "pngjs";
@@ -24,6 +21,7 @@ import { openAsBlob } from "fs";
 import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
 import { getFileOrUrlJson } from "./util/file_reader.js";
+import { WACZLoader } from "./util/wacz.js";
 
 // RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
@@ -777,40 +775,5 @@ export class ReplayCrawler extends Crawler {
 
   createRecorder(): Recorder | null {
     return null;
-  }
-}
-
-class WACZLoader {
-  url: string;
-  zipreader: ZipRangeReader | null;
-
-  constructor(url: string) {
-    this.url = url;
-    this.zipreader = null;
-  }
-
-  async init() {
-    if (!this.url.startsWith("http://") && !this.url.startsWith("https://")) {
-      const blob = await openAsBlob(this.url);
-      this.url = URL.createObjectURL(blob);
-    }
-
-    const loader = await createLoader({ url: this.url });
-
-    this.zipreader = new ZipRangeReader(loader);
-  }
-
-  async loadFile(fileInZip: string) {
-    const { reader } = await this.zipreader!.loadFile(fileInZip);
-
-    if (!reader) {
-      return null;
-    }
-
-    if (!reader.iterLines) {
-      return new AsyncIterReader(reader);
-    }
-
-    return reader;
   }
 }
