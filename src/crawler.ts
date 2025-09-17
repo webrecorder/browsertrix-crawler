@@ -31,7 +31,7 @@ import {
 } from "./util/storage.js";
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
-import { initRedis } from "./util/redis.js";
+import { initRedisWaitForSuccess } from "./util/redis.js";
 import { logger, formatErr, LogDetails, LogContext } from "./util/logger.js";
 import { WorkerState, closeWorkers, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
@@ -343,6 +343,7 @@ export class Crawler {
 
   async initCrawlState() {
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
+    const dedupRedisUrl = this.params.dedupStoreUrl || redisUrl;
 
     if (!redisUrl.startsWith("redis://")) {
       logger.fatal(
@@ -350,24 +351,19 @@ export class Crawler {
       );
     }
 
-    let redis;
-
-    while (true) {
-      try {
-        redis = await initRedis(redisUrl);
-        break;
-      } catch (e) {
-        //logger.fatal("Unable to connect to state store Redis: " + redisUrl);
-        logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
-        await sleep(1);
-      }
-    }
+    const redis = await initRedisWaitForSuccess(redisUrl);
 
     logger.debug(
       `Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`,
       {},
       "state",
     );
+
+    let dedupRedis = redis;
+
+    if (redisUrl !== dedupRedisUrl) {
+      dedupRedis = await initRedisWaitForSuccess(dedupRedisUrl);
+    }
 
     logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
 
@@ -377,6 +373,7 @@ export class Crawler {
       this.maxPageTime,
       os.hostname(),
       this.params.maxPageRetries,
+      dedupRedis,
     );
 
     if (this.params.logErrorsToRedis) {
