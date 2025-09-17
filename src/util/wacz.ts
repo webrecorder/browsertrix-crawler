@@ -1,5 +1,5 @@
 import path, { basename } from "node:path";
-import fs from "node:fs";
+import fs, { openAsBlob } from "node:fs";
 import fsp from "node:fs/promises";
 import { Writable, Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -17,6 +17,8 @@ import { logger, formatErr } from "./logger.js";
 import { streamFinish } from "./warcwriter.js";
 import { getDirSize } from "./storage.js";
 import { request } from "undici";
+import { createLoader, ZipRangeReader } from "@webrecorder/wabac";
+import { AsyncIterReader } from "warcio";
 
 const DATAPACKAGE_JSON = "datapackage.json";
 const DATAPACKAGE_DIGEST_JSON = "datapackage-digest.json";
@@ -426,5 +428,41 @@ export async function mergeCDXJ(
     await streamFinish(outputIdx);
 
     await removeIndexFile(INDEX_CDXJ);
+  }
+}
+
+// ============================================================================
+export class WACZLoader {
+  url: string;
+  zipreader: ZipRangeReader | null;
+
+  constructor(url: string) {
+    this.url = url;
+    this.zipreader = null;
+  }
+
+  async init() {
+    if (!this.url.startsWith("http://") && !this.url.startsWith("https://")) {
+      const blob = await openAsBlob(this.url);
+      this.url = URL.createObjectURL(blob);
+    }
+
+    const loader = await createLoader({ url: this.url });
+
+    this.zipreader = new ZipRangeReader(loader);
+  }
+
+  async loadFile(fileInZip: string) {
+    const { reader } = await this.zipreader!.loadFile(fileInZip);
+
+    if (!reader) {
+      return null;
+    }
+
+    if (!reader.iterLines) {
+      return new AsyncIterReader(reader);
+    }
+
+    return reader;
   }
 }
