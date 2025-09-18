@@ -465,4 +465,17 @@ export class WACZLoader {
 
     return reader;
   }
+
+  async *iterFiles(prefix: string) {
+    if (!this.zipreader) {
+      await this.init();
+    }
+    const entries = await this.zipreader!.load();
+
+    for (const [key, value] of Object.entries(entries)) {
+      if (key.startsWith(prefix)) {
+        yield value;
+      }
+    }
+  }
 }
