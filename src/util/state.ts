@@ -1096,13 +1096,16 @@ return inx;
     return await this.redis.zcard(this.qkey);
   }
 
-  async addIfNoDupe(key: string, url: string, other_id: string) {
+  async addIfNoDupe(key: string, url: string, status: number) {
     url = normalizeUrl(url, normalizeUrlOpts);
-    return (await this.redis.sadd(key, other_id + "|" + url)) === 1;
+    return (
+      (await this.redis.sadd(key, normalizeDedupStatus(status) + "|" + url)) ===
+      1
+    );
   }
 
-  async removeDupe(key: string, url: string, other_id: string) {
-    return await this.redis.srem(key, other_id + "|" + url);
+  async removeDupe(key: string, url: string, status: number) {
+    return await this.redis.srem(key, normalizeDedupStatus(status) + "|" + url);
   }
 
   async isInUserSet(value: string) {
