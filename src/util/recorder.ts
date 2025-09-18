@@ -15,12 +15,19 @@ import {
   removeRangeAsQuery,
   rewriteDASH,
   rewriteHLS,
+  tsToDate,
 } from "@webrecorder/wabac";
 
 import { WARCRecord, multiValueHeader } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
-import { LoadState, PageState, RedisCrawlState, WorkerId } from "./state.js";
+import {
+  LoadState,
+  normalizeDedupStatus,
+  PageState,
+  RedisCrawlState,
+  WorkerId,
+} from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
@@ -38,7 +45,7 @@ const TAKE_STREAM_BUFF_SIZE = 1024 * 64;
 
 const ASYNC_FETCH_DUPE_KEY = "s:fetchdupe";
 
-const WRITE_DUPE_KEY = "dupe";
+const WRITE_DUPE_KEY = "s:writedupe";
 
 const MIME_EVENT_STREAM = "text/event-stream";
 
@@ -142,6 +149,7 @@ export class Recorder extends EventEmitter {
 
   pageSeed?: ScopedSeed;
   pageSeedDepth = 0;
+  minPageDedupDepth = -1;
 
   frameIdToExecId: Map<string, number> | null;
 
@@ -164,6 +172,8 @@ export class Recorder extends EventEmitter {
     this.crawlState = crawler.crawlState;
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
+
+    this.minPageDedupDepth = crawler.params.minPageDedupDepth;
 
     this.writer = writer;
 
@@ -821,11 +831,16 @@ export class Recorder extends EventEmitter {
 
     const rewritten = await this.rewriteResponse(reqresp, mimeType);
 
-    if (url === this.pageUrl && reqresp.payload && this.pageSeedDepth >= 1) {
+    if (
+      url === this.pageUrl &&
+      reqresp.payload &&
+      this.minPageDedupDepth >= 0 &&
+      this.pageSeedDepth >= this.minPageDedupDepth
+    ) {
       const hash =
         "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
-      const res = await this.crawlState.getHashDupe(WRITE_DUPE_KEY, hash, url);
-      if (res && res.dupe) {
+      const { origUrl } = await this.crawlState.getHashDupe(hash);
+      if (origUrl) {
         const errorReason = "BlockedByResponse";
         await cdp.send("Fetch.failRequest", {
           requestId,
@@ -1497,7 +1512,11 @@ export class Recorder extends EventEmitter {
     if (
       method === "GET" &&
       url &&
-      !(await this.crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url, status))
+      !(await this.crawlState.addIfNoDupe(
+        ASYNC_FETCH_DUPE_KEY,
+        url,
+        normalizeDedupStatus(status),
+      ))
     ) {
       reqresp.asyncLoading = false;
       return true;
@@ -1608,7 +1627,7 @@ export class Recorder extends EventEmitter {
     //   !isRedirectStatus(status) &&
     //   !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, status))
     // ) {
-    //   logNetwork("Skipping dupe", { url, status, ...this.logDetails });
+    //   logNetwork("Skipping exact URL dupe in this crawl", { url, status, ...this.logDetails });
     //   return false;
     // }
 
@@ -1625,7 +1644,11 @@ export class Recorder extends EventEmitter {
         !(await this.checkStreamingRecordPayload(reqresp, serializer, false))
       ) {
         serializer.externalBuffer?.purge();
-        await this.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
+        await this.crawlState.removeDupe(
+          ASYNC_FETCH_DUPE_KEY,
+          url,
+          normalizeDedupStatus(status),
+        );
         //await this.crawlState.removeDupe(WRITE_DUPE_KEY, url, status);
         return false;
       }
@@ -1659,29 +1682,29 @@ export class Recorder extends EventEmitter {
     }
 
     const hash = responseRecord.warcPayloadDigest || "";
+
+    if (!(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, hash))) {
+      serializer.externalBuffer?.purge();
+      return false;
+    }
+
     const date = responseRecord.warcDate || "";
 
     const isEmpty = reqresp.readSize === 0;
 
     if (!isEmpty && url && method === "GET" && !isRedirectStatus(status)) {
-      const { dupe, origUrl, origDate } = await this.crawlState.getHashDupe(
-        WRITE_DUPE_KEY,
-        hash,
-        url,
-      );
+      const { origUrl, origDate } = await this.crawlState.getHashDupe(hash);
 
-      if (dupe) {
-        // duplicate url at origTs
-        // skip, no need for revisit
-        logNetwork("Skipping dupe", { url, status, ...this.logDetails });
-        return false;
-      } else if (origUrl && origDate) {
+      if (hash && origUrl && origDate) {
+        const date = tsToDate(origDate).toISOString();
+        // always write revisit here
+        // duplicate URLs in same crawl filtered out separately
         serializer.externalBuffer?.purge();
         ({ responseRecord, serializer } = await createRevisitForResponse(
           responseRecord,
           serializer,
           origUrl,
-          origDate,
+          date,
         ));
       } else {
         // no dupe, continue
@@ -1717,7 +1740,7 @@ export class Recorder extends EventEmitter {
     this.addPageRecord(reqresp);
 
     if (!isEmpty) {
-      await this.crawlState.addHashDupe(WRITE_DUPE_KEY, hash, url, date);
+      await this.crawlState.addHashDupe(hash, url, date);
     }
 
     return true;
@@ -2095,6 +2118,7 @@ async function createRevisitForResponse(
 
   const warcHeaders: Record<string, string> = {
     "WARC-Page-ID": responseRecord.warcHeaders.headers.get("WARC-Page-ID")!,
+    "WARC-Payload-Digest": origPayloadDigest!,
   };
 
   const revisitRecord = WARCRecord.create({
@@ -2114,13 +2138,6 @@ async function createRevisitForResponse(
   });
 
   await serializer.digestRecord();
-
-  if (origPayloadDigest) {
-    revisitRecord.warcHeaders.headers.set(
-      "WARC-Payload-Digest",
-      origPayloadDigest,
-    );
-  }
 
   return { serializer, responseRecord: revisitRecord };
 }
