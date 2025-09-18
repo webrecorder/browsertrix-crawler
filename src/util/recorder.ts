@@ -21,13 +21,7 @@ import {
 import { WARCRecord, multiValueHeader } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";
 import { WARCWriter } from "./warcwriter.js";
-import {
-  LoadState,
-  normalizeDedupStatus,
-  PageState,
-  RedisCrawlState,
-  WorkerId,
-} from "./state.js";
+import { LoadState, PageState, RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
@@ -1536,11 +1530,7 @@ export class Recorder extends EventEmitter {
     if (
       method === "GET" &&
       url &&
-      !(await this.crawlState.addIfNoDupe(
-        ASYNC_FETCH_DUPE_KEY,
-        url,
-        normalizeDedupStatus(status),
-      ))
+      !(await this.crawlState.addIfNoDupe(ASYNC_FETCH_DUPE_KEY, url, status))
     ) {
       reqresp.asyncLoading = false;
       return true;
@@ -1645,15 +1635,19 @@ export class Recorder extends EventEmitter {
       return false;
     }
 
-    // if (
-    //   url &&
-    //   method === "GET" &&
-    //   !isRedirectStatus(status) &&
-    //   !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, status))
-    // ) {
-    //   logNetwork("Skipping exact URL dupe in this crawl", { url, status, ...this.logDetails });
-    //   return false;
-    // }
+    if (
+      url &&
+      method === "GET" &&
+      !isRedirectStatus(status) &&
+      !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, status))
+    ) {
+      logNetwork("Skipping exact URL dupe in this crawl", {
+        url,
+        status,
+        ...this.logDetails,
+      });
+      return false;
+    }
 
     let responseRecord = createResponse(reqresp, pageid, iter);
     const requestRecord = createRequest(reqresp, responseRecord, pageid);
@@ -1668,12 +1662,8 @@ export class Recorder extends EventEmitter {
         !(await this.checkStreamingRecordPayload(reqresp, serializer, false))
       ) {
         serializer.externalBuffer?.purge();
-        await this.crawlState.removeDupe(
-          ASYNC_FETCH_DUPE_KEY,
-          url,
-          normalizeDedupStatus(status),
-        );
-        //await this.crawlState.removeDupe(WRITE_DUPE_KEY, url, status);
+        await this.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
+        await this.crawlState.removeDupe(WRITE_DUPE_KEY, url, status);
         return false;
       }
 
@@ -1707,10 +1697,10 @@ export class Recorder extends EventEmitter {
 
     const hash = responseRecord.warcPayloadDigest || "";
 
-    if (!(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, hash))) {
-      serializer.externalBuffer?.purge();
-      return false;
-    }
+    // if (!(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, hash))) {
+    //   serializer.externalBuffer?.purge();
+    //   return false;
+    // }
 
     const date = responseRecord.warcDate || "";
 
