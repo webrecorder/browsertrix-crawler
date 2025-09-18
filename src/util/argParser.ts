@@ -445,7 +445,7 @@ class ArgParser {
           default: "redis://localhost:6379/0",
         },
 
-        dedupStoreUrl: {
+        redisDedupUrl: {
           describe:
             "If set, url for remote redis server to store state. Otherwise, using local redis instance",
           type: "string",

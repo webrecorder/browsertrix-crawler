@@ -2147,7 +2147,7 @@ async function createRevisitForResponse(
 
   const origWarcHeaders = responseRecord.warcHeaders.headers;
 
-  for (const header in REVISIT_COPY_HEADERS) {
+  for (const header of REVISIT_COPY_HEADERS) {
     if (origWarcHeaders.has(header)) {
       warcHeaders[header] = origWarcHeaders.get(header)!;
     }

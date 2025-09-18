@@ -343,7 +343,7 @@ export class Crawler {
 
   async initCrawlState() {
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
-    const dedupRedisUrl = this.params.dedupStoreUrl || redisUrl;
+    const dedupRedisUrl = this.params.redisDedupUrl || redisUrl;
 
     if (!redisUrl.startsWith("redis://")) {
       logger.fatal(
