@@ -39,7 +39,7 @@
     "tsc": "^2.0.4",
     "undici": "^6.18.2",
     "uuid": "8.3.2",
-    "warcio": "git+https://github.com/webrecorder/warcio.js#fix-digestrecord-no-headers",
+    "warcio": "^2.4.7",
     "ws": "^7.4.4",
     "yargs": "^17.7.2"
   },
@@ -71,6 +71,7 @@
   },
   "resolutions": {
     "wrap-ansi": "7.0.0",
+    "warcio": "^2.4.7",
     "@novnc/novnc": "1.4.0"
   }
 }
