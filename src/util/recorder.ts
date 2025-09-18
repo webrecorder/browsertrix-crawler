@@ -2095,12 +2095,12 @@ function createResponse(
     warcHeaders["WARC-Resource-Type"] = reqresp.resourceType;
   }
 
-  if (!contentIter) {
-    contentIter = [reqresp.payload] as Iterable<Uint8Array>;
-  }
-
   if (Object.keys(reqresp.extraOpts).length) {
     warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
+  }
+
+  if (!contentIter) {
+    contentIter = [reqresp.payload] as Iterable<Uint8Array>;
   }
 
   return WARCRecord.create(
@@ -2118,6 +2118,14 @@ function createResponse(
 }
 
 // =================================================================
+const REVISIT_COPY_HEADERS = [
+  "WARC-Page-ID",
+  "WARC-Protocol",
+  "WARC-Resource-Type",
+  "WARC-JSON-Metadata",
+];
+
+// =================================================================
 // revisit
 async function createRevisitForResponse(
   responseRecord: WARCRecord,
@@ -2125,12 +2133,17 @@ async function createRevisitForResponse(
   refersToUrl: string,
   refersToDate: string,
 ) {
-  const origPayloadDigest = responseRecord.warcPayloadDigest;
+  const payloadDigestForRevisit = responseRecord.warcPayloadDigest || "";
 
-  const warcHeaders: Record<string, string> = {
-    "WARC-Page-ID": responseRecord.warcHeaders.headers.get("WARC-Page-ID")!,
-    "WARC-Payload-Digest": origPayloadDigest!,
-  };
+  const warcHeaders: Record<string, string> = {};
+
+  const origWarcHeaders = responseRecord.warcHeaders.headers;
+
+  for (const header in REVISIT_COPY_HEADERS) {
+    if (origWarcHeaders.has(header)) {
+      warcHeaders[header] = origWarcHeaders.get(header)!;
+    }
+  }
 
   const revisitRecord = WARCRecord.create({
     url: responseRecord.warcTargetURI!,
@@ -2148,7 +2161,7 @@ async function createRevisitForResponse(
     maxMemSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
   });
 
-  await serializer.digestRecord();
+  await serializer.digestRecord({ payloadDigestForRevisit });
 
   return { serializer, responseRecord: revisitRecord };
 }
