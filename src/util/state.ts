@@ -7,6 +7,7 @@ import {
   MAX_DEPTH,
   DEFAULT_MAX_RETRIES,
   ROBOTS_CACHE_LIMIT,
+  HASH_DUPE_KEY
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -45,11 +46,11 @@ const normalizeUrlOpts: NormamlizeUrlOptions = {
 
 // ============================================================================
 // treat 0 or 206 as 200 for purposes of dedup
-function normalizeDedupStatus(status: number): number {
+export function normalizeDedupStatus(status: number): string {
   if (status === 0 || status === 206) {
-    return 200;
+    return "200";
   }
-  return status;
+  return status + "";
 }
 
 // ============================================================================
@@ -214,10 +215,41 @@ export type SaveState = {
 };
 
 // ============================================================================
-export class RedisCrawlState {
+export class RedisDedupIndex {
+  dedupRedis: Redis;
+
+  constructor(dedupRedis: Redis) {
+    this.dedupRedis = dedupRedis;
+  }
+
+  async getHashDupe(
+    hash: string,
+    key = HASH_DUPE_KEY,
+    //url: string,
+  ): Promise<{ origDate?: string; origUrl?: string }> {
+    const value = await this.dedupRedis.hget(key, hash);
+    if (!value) {
+      return {};
+    }
+    const val = value.split("|");
+    return { origUrl: val[1], origDate: val[0] };
+  }
+
+  async addHashDupe(
+    hash: string,
+    url: string,
+    date: string,
+    key = HASH_DUPE_KEY,
+  ) {
+    const val = date.replace(/[^\d]/g, "") + "|" + url;
+    await this.dedupRedis.hsetnx(key, hash, val);
+  }
+}
+
+// ============================================================================
+export class RedisCrawlState extends RedisDedupIndex {
   redis: Redis;
   maxRetries: number;
-  dedupRedis: Redis;
 
   uid: string;
   key: string;
@@ -251,8 +283,8 @@ export class RedisCrawlState {
     maxRetries?: number,
     dedupRedis?: Redis,
   ) {
+    super(dedupRedis || redis);
     this.redis = redis;
-    this.dedupRedis = dedupRedis || redis;
 
     this.uid = uid;
     this.key = key;
@@ -1064,44 +1096,13 @@ return inx;
     return await this.redis.zcard(this.qkey);
   }
 
-  async addIfNoDupe(key: string, url: string, status: number) {
+  async addIfNoDupe(key: string, url: string, other_id: string) {
     url = normalizeUrl(url, normalizeUrlOpts);
-    return (
-      (await this.redis.sadd(key, normalizeDedupStatus(status) + "|" + url)) ===
-      1
-    );
+    return (await this.redis.sadd(key, other_id + "|" + url)) === 1;
   }
 
-  async removeDupe(key: string, url: string, status: number) {
-    return await this.redis.srem(key, normalizeDedupStatus(status) + "|" + url);
-  }
-
-  async getHashDupe(
-    key: string,
-    hash: string,
-    url: string,
-  ): Promise<{ dupe?: boolean; origDate?: string; origUrl?: string }> {
-    const value = await this.dedupRedis.hget(key, hash);
-    if (!value) {
-      return {};
-    }
-    const val = value.split("|");
-    // if matches the first entry, return
-    if (val[1] === url) {
-      return { dupe: true };
-    }
-    // otherwise, check if a revisit entry
-    if (await this.dedupRedis.sismember(`${key}:${hash}`, url)) {
-      return { dupe: true };
-    }
-    return { origUrl: val[1], origDate: val[0] };
-  }
-
-  async addHashDupe(key: string, hash: string, url: string, date: string) {
-    const val = date + "|" + url;
-    if (!(await this.dedupRedis.hsetnx(key, hash, val))) {
-      await this.dedupRedis.sadd(`${key}:${hash}`, url);
-    }
+  async removeDupe(key: string, url: string, other_id: string) {
+    return await this.redis.srem(key, other_id + "|" + url);
   }
 
   async isInUserSet(value: string) {
