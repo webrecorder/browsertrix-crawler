@@ -17,7 +17,7 @@ export class CrawlIndexer {
     return yargs(process.argv)
       .usage("indexer [options]")
       .options({
-        dedupStoreUrl: {
+        redisDedupUrl: {
           describe: "URL for remote redis instance to index into",
           type: "string",
           required: true,
@@ -43,7 +43,7 @@ export class CrawlIndexer {
 
     const params = this.initArgs();
 
-    const redis = await initRedisWaitForSuccess(params.dedupStoreUrl);
+    const redis = await initRedisWaitForSuccess(params.redisDedupUrl);
     const dedupIndex = new RedisDedupIndex(redis);
 
     const allFiles = [];
