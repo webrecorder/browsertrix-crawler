@@ -5526,10 +5526,10 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.4.0, warcio@^2.4.5:
-  version "2.4.5"
-  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.5.tgz#ba39c38e433491ab9016282813b9cf6539c3d808"
-  integrity sha512-b6R/aIsR4fXzrpY/Zud7LqHFi2Bt8Ov5VLOnruHQ10rk129e9d0KOCZlyRmPD6ENTcV7yze5rXvJ5WSNS8R1zw==
+warcio@^2.4.0, warcio@^2.4.5, warcio@^2.4.6:
+  version "2.4.6"
+  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.6.tgz#4c7b2cdf3c56d6927e8e2940e2da0f34a0160d9a"
+  integrity sha512-ofjimN/YWOohBC+7GRrpf4Dz2o5tKi08hlGBU7iViKvEo3rAps6YYIePB/gcFvDzRRBTKUw0f9+jJE4FQ5h0tw==
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"
