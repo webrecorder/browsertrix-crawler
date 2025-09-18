@@ -1548,7 +1548,7 @@ export class Recorder extends EventEmitter {
     const { logDetails } = this;
     try {
       reqresp.readSize = await serializer.digestRecord({
-        includeHeadersSize: false,
+        returnPayloadOnlySize: true,
       });
       // set truncated field and recompute header buff
       if (reqresp.truncated) {
@@ -1691,7 +1691,7 @@ export class Recorder extends EventEmitter {
       }
     } else {
       reqresp.readSize = await serializer.digestRecord({
-        includeHeadersSize: false,
+        returnPayloadOnlySize: true,
       });
     }
 
