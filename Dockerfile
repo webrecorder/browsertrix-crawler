@@ -28,7 +28,7 @@ RUN mkdir -p /tmp/ads && cd /tmp/ads && \
     cat ad-hosts.txt | grep '^0.0.0.0 '| awk '{ print $2; }' | grep -v '0.0.0.0' | jq --raw-input --slurp 'split("\n")' > /app/ad-hosts.json && \
     rm /tmp/ads/ad-hosts.txt
 
-RUN yarn install --network-timeout 1000000 --network-concurrency 1
+RUN yarn install --network-timeout 1000000
 
 ADD tsconfig.json /app/
 ADD src /app/src
@@ -39,7 +39,7 @@ ADD config/ /app/
 
 ADD html/ /app/html/
 
-ARG RWP_VERSION=2.3.17
+ARG RWP_VERSION=2.3.19
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/ui.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/sw.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/adblock/adblock.gz /app/html/rwp/adblock.gz
