@@ -10,7 +10,7 @@ export class TestBehavior {
   }
 
   static isMatch() {
-    return window.location.origin === "https://example.com";
+    return window.location.origin === "https://example-com.webrecorder.net";
   }
 
   async *run(ctx) {

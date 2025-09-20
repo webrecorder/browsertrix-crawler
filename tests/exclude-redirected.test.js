@@ -6,7 +6,7 @@ import { execSync } from "child_process";
 
 test("ensure exclusion is applied on redirected URL, which contains 'help', so it is not crawled", () => {
   execSync(
-      "docker run -p 9037:9037 -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com/ --exclude help --collection redir-exclude-test --extraHops 1");
+      "docker run -p 9037:9037 -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example-com.webrecorder.net/ --exclude help --collection redir-exclude-test --extraHops 1");
 
   // no entries besides header
   expect(

@@ -28,7 +28,7 @@
         },
         {
             "type": "change",
-            "value": "https://example.com/",
+            "value": "https://example-com.webrecorder.net/",
             "selectors": [
                 [
                     "aria/[role=\"main\"]",

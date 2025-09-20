@@ -38,7 +38,7 @@ afterAll(() => {
 
 
 test("run crawl with retries for no response", async () => {
-  execSync(`docker run -d -v $PWD/test-crawls:/crawls -e CRAWL_ID=test -p 36387:6379 --rm webrecorder/browsertrix-crawler crawl --url http://invalid-host-x:31501 --url https://example.com/ --limit 2 --pageExtraDelay 10 --debugAccessRedis --collection retry-fail --retries 5`);
+  execSync(`docker run -d -v $PWD/test-crawls:/crawls -e CRAWL_ID=test -p 36387:6379 --rm webrecorder/browsertrix-crawler crawl --url http://invalid-host-x:31501 --url https://example-com.webrecorder.net/ --limit 2 --pageExtraDelay 10 --debugAccessRedis --collection retry-fail --retries 5`);
 
   const redis = new Redis("redis://127.0.0.1:36387/0", { lazyConnect: true, retryStrategy: () => null });
 
@@ -90,7 +90,7 @@ test("run crawl with retries for 503, enough retries to succeed", async () => {
   requests = 0;
   success = false;
 
-  const child = exec(`docker run -v $PWD/test-crawls:/crawls --rm webrecorder/browsertrix-crawler crawl --url http://${DOCKER_HOST_NAME}:31501 --url https://example.com/ --limit 2 --collection retry-fail-2 --retries 2 --failOnInvalidStatus --failOnFailedSeed --logging stats,debug`);
+  const child = exec(`docker run -v $PWD/test-crawls:/crawls --rm webrecorder/browsertrix-crawler crawl --url http://${DOCKER_HOST_NAME}:31501 --url https://example-com.webrecorder.net/ --limit 2 --collection retry-fail-2 --retries 2 --failOnInvalidStatus --failOnFailedSeed --logging stats,debug`);
 
   let status = 0;
 
@@ -117,7 +117,7 @@ test("run crawl with retries for 503, not enough retries, fail", async () => {
   requests = 0;
   success = false;
 
-  const child = exec(`docker run -v $PWD/test-crawls:/crawls --rm webrecorder/browsertrix-crawler crawl --url http://${DOCKER_HOST_NAME}:31501 --url https://example.com/ --limit 2 --collection retry-fail-3 --retries 1 --failOnInvalidStatus --failOnFailedSeed --logging stats,debug`);
+  const child = exec(`docker run -v $PWD/test-crawls:/crawls --rm webrecorder/browsertrix-crawler crawl --url http://${DOCKER_HOST_NAME}:31501 --url https://example-com.webrecorder.net/ --limit 2 --collection retry-fail-3 --retries 1 --failOnInvalidStatus --failOnFailedSeed --logging stats,debug`);
 
   let status = 0;
 
@@ -143,7 +143,7 @@ test("run crawl with retries for 503, no retries, fail", async () => {
   requests = 0;
   success = false;
 
-  const child = exec(`docker run -v $PWD/test-crawls:/crawls --rm webrecorder/browsertrix-crawler crawl --url http://${DOCKER_HOST_NAME}:31501 --url https://example.com/ --limit 2 --collection retry-fail-4 --retries 0 --failOnInvalidStatus --failOnFailedSeed --logging stats,debug`);
+  const child = exec(`docker run -v $PWD/test-crawls:/crawls --rm webrecorder/browsertrix-crawler crawl --url http://${DOCKER_HOST_NAME}:31501 --url https://example-com.webrecorder.net/ --limit 2 --collection retry-fail-4 --retries 0 --failOnInvalidStatus --failOnFailedSeed --logging stats,debug`);
 
   let status = 0;
 

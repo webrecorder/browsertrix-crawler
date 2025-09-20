@@ -71,7 +71,7 @@ test("test valid autoclick selector passes validation", async () => {
 
   try {
     child_process.execSync(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com/ --clickSelector button --scopeType page",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example-com.webrecorder.net/ --clickSelector button --scopeType page",
     );
   } catch (e) {
     failed = true;
@@ -87,7 +87,7 @@ test("test invalid autoclick selector fails validation, crawl fails", async () =
 
   try {
     child_process.execSync(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example.com/ --clickSelector \",\" --scopeType page",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example-com.webrecorder.net/ --clickSelector \",\" --scopeType page",
     );
   } catch (e) {
     status = e.status;
