@@ -1,7 +1,7 @@
 import {exec, execSync} from "child_process";
 import fs from "fs";
 import path from "path";
-import { Redis } from "ioredis";
+import Redis from "ioredis";
 import { WARCParser } from "warcio";
 
 function sleep(ms) {
@@ -10,7 +10,7 @@ function sleep(ms) {
 
 
 let redisId;
-//let crawler1, crawler2;
+let numResponses = 0;
 
 beforeAll(() => {
   execSync("docker network create dedup");
@@ -28,10 +28,10 @@ afterAll(async () => {
   execSync("docker network rm dedup");
 });
 
-function runCrawl(name) {
+function runCrawl(name, db="0") {
   fs.rmSync(`./test-crawls/collections/${name}`, { recursive: true, force: true });
 
-  const crawler = exec(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedup webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit 4 --exclude community --collection ${name} --redisDedupUrl redis://dedup-redis:6379`);
+  const crawler = exec(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedup webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit 4 --exclude community --collection ${name} --redisDedupUrl redis://dedup-redis:6379/${db} --generateWACZ`);
 
   return new Promise((resolve) => {
     crawler.on("exit", (code) => {
@@ -92,6 +92,42 @@ test("check revisit records written on duplicate crawl", async () => {
 
   // revisits should match number of responses for non urn:
   expect(response).toBe(revisit);
+
+  numResponses = response;
+});
+
+
+test("import index and crawl dupe", async () => {
+  
+  execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedup webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedup-test-orig/dedup-test-orig.wacz --redisDedupUrl redis://dedup-redis:6379/1`);
+
+  const redis = new Redis("redis://127.0.0.1:37379/1", { lazyConnect: true, retryStrategy: () => null });
+
+  await redis.connect({maxRetriesPerRequest: 50});
+
+  expect(await redis.hlen("dupe")).toBe(numResponses);
+});
+
+
+test("imported crawl dupe matches previous dupe count", async () => {
+  expect(await runCrawl("dedup-test-dupe-2", 1)).toBe(0);
+
+  const dupeOrig = loadFirstWARC("dedup-test-dupe-2");
+
+  let revisit = 0;
+
+  for await (const record of dupeOrig) {
+    if (record.warcTargetURI && record.warcTargetURI.startsWith("urn:")) {
+      continue;
+    }
+
+    if (record.warcType === "revisit") {
+      revisit++;
+    }
+  }
+
+  // matches same number of revisits as original
+  expect(revisit).toBe(numResponses);
 });
 
 

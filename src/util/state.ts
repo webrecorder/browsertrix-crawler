@@ -227,6 +227,7 @@ export class RedisDedupIndex {
     key = HASH_DUPE_KEY,
     //url: string,
   ): Promise<{ origDate?: string; origUrl?: string }> {
+    hash = hash.split(":").at(-1)!;
     const value = await this.dedupRedis.hget(key, hash);
     if (!value) {
       return {};
@@ -242,6 +243,7 @@ export class RedisDedupIndex {
     key = HASH_DUPE_KEY,
   ) {
     const val = date.replace(/[^\d]/g, "") + "|" + url;
+    hash = hash.split(":").at(-1)!;
     await this.dedupRedis.hsetnx(key, hash, val);
   }
 }
