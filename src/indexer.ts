@@ -46,19 +46,18 @@ export class CrawlIndexer {
     const redis = await initRedisWaitForSuccess(params.redisDedupUrl);
     const dedupIndex = new RedisDedupIndex(redis);
 
-    const allFiles = [];
-
-    for await (const waczfile of this.iterWACZ(params.sourceUrl)) {
-      allFiles.push(waczfile);
+    for await (const [name, waczfile] of this.iterWACZ(params.sourceUrl)) {
+      await dedupIndex.addHashSource(name, waczfile);
     }
 
     let count = 0;
-    const total = allFiles.length;
+    let res;
 
-    for (const waczfile of allFiles) {
+    while ((res = await dedupIndex.nextQueuedHashSource())) {
+      const { id, url, total } = res;
       count += 1;
-      const loader = new WACZLoader(waczfile);
-      logger.debug(`Processing WACZ ${count} of ${total}`, { waczfile });
+      const loader = new WACZLoader(url);
+      logger.debug(`Processing WACZ ${count} of ${total}`, { waczfile: url });
       for await (const file of loader.iterFiles("indexes/")) {
         const filename = file.filename;
         if (filename.endsWith(".cdx.gz")) {
@@ -69,6 +68,7 @@ export class CrawlIndexer {
           await this.ingestCDXJ(dedupIndex, loader, filename);
         }
       }
+      await dedupIndex.addDoneSource(id);
     }
 
     logger.info("Done!");
@@ -141,7 +141,7 @@ export class CrawlIndexer {
     logger.debug("Processed", { count });
   }
 
-  async *iterWACZ(url: string): AsyncIterable<string> {
+  async *iterWACZ(url: string, name?: string): AsyncIterable<[string, string]> {
     let path: string = url;
 
     try {
@@ -151,7 +151,7 @@ export class CrawlIndexer {
     }
 
     if (path.endsWith(".wacz")) {
-      yield url;
+      yield [name || url, url];
     } else if (path.endsWith(".json")) {
       if (!url.startsWith("http://") && !url.startsWith("https://")) {
         const blob = await openAsBlob(url);
@@ -163,7 +163,7 @@ export class CrawlIndexer {
 
       for (const entry of json.resources) {
         if (entry.path) {
-          yield* this.iterWACZ(entry.path);
+          yield* this.iterWACZ(entry.path, entry.name);
         }
       }
     } else {
