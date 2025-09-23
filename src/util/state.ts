@@ -204,6 +204,12 @@ export type SaveState = {
 export class RedisDedupIndex {
   dedupRedis: Redis;
 
+  sourceDone = "src:d";
+  sourceQ = "src:q";
+  pendingQ = "pending:q";
+  sourceP = "src:p";
+  pendingPrefix = "pending:q:";
+
   constructor(dedupRedis: Redis) {
     this.dedupRedis = dedupRedis;
   }
@@ -231,6 +237,58 @@ export class RedisDedupIndex {
     const val = date.replace(/[^\d]/g, "") + "|" + url;
     hash = hash.split(":").at(-1)!;
     await this.dedupRedis.hsetnx(key, hash, val);
+  }
+
+  async addHashSource(id: string, url: string) {
+    // already handled this source
+    if (await this.dedupRedis.sismember(this.sourceDone, id)) {
+      return;
+    }
+    await this.dedupRedis.lpush(this.sourceQ, JSON.stringify({ id, url }));
+  }
+
+  async addDoneSource(id: string) {
+    await this.dedupRedis.sadd(this.sourceDone, id);
+  }
+
+  async nextQueuedHashSource() {
+    let res: string | null = await this.dedupRedis.lmove(
+      this.sourceQ,
+      this.pendingQ,
+      "RIGHT",
+      "LEFT",
+    );
+    // use circular pending Q to support retries
+    if (!res) {
+      const len = await this.dedupRedis.llen(this.pendingQ);
+      for (let i = 0; i < len; i++) {
+        res = await this.dedupRedis.lmove(
+          this.pendingQ,
+          this.pendingQ,
+          "RIGHT",
+          "LEFT",
+        );
+        if (res) {
+          const { id } = JSON.parse(res);
+          if (await this.dedupRedis.get(this.pendingPrefix + id)) {
+            res = null;
+            continue;
+          } else {
+            break;
+          }
+        }
+      }
+    }
+
+    if (!res) {
+      return null;
+    }
+
+    await this.dedupRedis.lrem(this.pendingQ, 1, res);
+    const { id, url } = JSON.parse(res);
+    const total = await this.dedupRedis.llen(this.sourceQ);
+    await this.dedupRedis.setex(this.pendingPrefix + id, "1", 300);
+    return { id, url, total };
   }
 }
 
