@@ -3,6 +3,7 @@ import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp from "fs/promises";
+import robotsParser, { Robot } from "robots-parser";
 
 import {
   RedisCrawlState,
@@ -1063,6 +1064,19 @@ self.__bx_behaviors.selectMainBehavior();
 
     let result = false;
 
+    if (this.params.robots) {
+      const robots = await this.fetchAndParseRobots(url, logDetails)
+      if (robots && robots.isDisallowed(url, "Browsertrix/1.0")) {
+        logger.info(
+          "Skipping page due to robots.txt rules",
+          logDetails,
+        );
+        // TODO: Mark page as seen/failed in way that it doesn't
+        // just retry a few times
+        return;
+      }
+    }
+
     if (recorder) {
       try {
         const headers = auth
@@ -1247,6 +1261,37 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
     }
+  }
+
+  async fetchAndParseRobots(url: string, logDetails: LogDetails): Promise<Robot | undefined> {
+    // Fetch robots.txt for url's host and return parser
+    // TODO: Cache robots contents per-host in Redis
+    // TODO (next phase): Use LRU cache/only cache so many robots responses
+    // in Redis at one time and re-fetch if no longer in cache (necessary for
+    // very large URL lists to avoid memory being exhausted)
+    const urlParser = new URL(url);
+
+    const origin = urlParser.origin;
+    const robotsUrl = `${origin}/robots.txt`;
+    // const hostname = urlParser.hostname;
+
+    // TODO: Implement retries, look at/reuse sitemapper fetch
+    try {
+      logger.debug("Fetching robots.txt", { ...logDetails, robotsUrl });
+      const resp = await fetch(robotsUrl);
+      if (resp.status === 200) {
+        const content = await resp.text();
+        const robots = robotsParser(robotsUrl, content);
+        return robots;
+      }
+      if (resp.status === 404) {
+        logger.debug("No robots.txt found", { ...logDetails, robotsUrl });
+        return;
+      }
+    } catch (e) {
+      // ignore
+    }
+    logger.warn("Failed to fetch robots.txt", { ...logDetails, robotsUrl });
   }
 
   async awaitPageExtraDelay(opts: WorkerState) {
