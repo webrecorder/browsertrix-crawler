@@ -1706,7 +1706,7 @@ export class Recorder extends EventEmitter {
 
     const isEmpty = reqresp.readSize === 0;
 
-    if (!isEmpty && url && method === "GET" && !isRedirectStatus(status)) {
+    if (!isEmpty && url) {
       const { origUrl, origDate } = await this.crawlState.getHashDupe(hash);
 
       if (hash && origUrl && origDate) {
