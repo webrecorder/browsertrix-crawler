@@ -683,6 +683,13 @@ class ArgParser {
             "path to SSH known hosts file for SOCKS5 over SSH proxy connection",
           type: "string",
         },
+
+        robots: {
+          describe:
+            "If set, fetch and respect page disallows specified in per-host robots.txt",
+          type: "boolean",
+          default: false,
+        },
       });
   }
 
