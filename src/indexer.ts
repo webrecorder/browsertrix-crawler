@@ -72,6 +72,7 @@ export class CrawlIndexer {
     }
 
     logger.info("Done!");
+    await dedupIndex.markDoneImport();
     process.exit(ExitCodes.Success);
   }
 
