@@ -290,6 +290,10 @@ export class RedisDedupIndex {
     await this.dedupRedis.setex(this.pendingPrefix + id, "1", 300);
     return { id, url, total };
   }
+
+  async markDoneImport() {
+    await this.dedupRedis.set("last_update_ts", new Date().toISOString());
+  }
 }
 
 // ============================================================================
