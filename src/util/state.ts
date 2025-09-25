@@ -200,7 +200,9 @@ export class RedisCrawlState {
   fkey: string;
   ekey: string;
   bkey: string;
+  rkey: string;
   pageskey: string;
+
   esKey: string;
   esMap: string;
 
@@ -233,6 +235,8 @@ export class RedisCrawlState {
     this.ekey = this.key + ":e";
     // crawler behavior script messages
     this.bkey = this.key + ":b";
+    // cached robots.txt bodies (per-origin)
+    this.rkey = this.key + ":r";
     // pages
     this.pageskey = this.key + ":pages";
 
@@ -1023,6 +1027,16 @@ return inx;
 
   async logBehavior(behaviorLog: string) {
     return await this.redis.lpush(this.bkey, behaviorLog);
+  }
+
+  async setCachedRobots(robotsUrl: string, body: string) {
+    const urlKey = `${this.rkey}:${robotsUrl}`;
+    return await this.redis.set(urlKey, body);
+  }
+
+  async getCachedRobots(robotsUrl: string) {
+    const urlKey = `${this.rkey}:${robotsUrl}`;
+    return await this.redis.get(urlKey);
   }
 
   async writeToPagesQueue(
