@@ -1305,11 +1305,9 @@ self.__bx_behaviors.selectMainBehavior();
     url: string,
     logDetails: LogDetails,
   ): Promise<Robot | null> {
-    // Fetch robots.txt for url's host and return parser, caching robots
-    // bodies in Redis by their URL
-    // TODO: Consider using an LRU cache/only cache so many robots responses
-    // in Redis at one time and re-fetch if no longer in cache to avoid
-    // exhausting memory on very large crawls across many hosts
+    // Fetch robots.txt for url's host and return parser.
+    // Results are cached by robots.txt URL in Redis using an LRU cache
+    // implementation that retains the 100 most recently used values.
     const urlParser = new URL(url);
     const robotsUrl = `${urlParser.origin}/robots.txt`;
 
