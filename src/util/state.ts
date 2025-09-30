@@ -1052,6 +1052,11 @@ return inx;
       const keysToDelete = await this.redis.zrange(this.lkey, 0, diff - 1);
 
       for (const keyToDelete of keysToDelete) {
+        logger.debug(
+          "Deleting cached robots.txt, over cache limit",
+          { url: keyToDelete },
+          "robots",
+        );
         await this.redis.del(`${this.rkey}:${keyToDelete}`);
         await this.redis.zrem(this.lkey, keyToDelete);
       }
