@@ -129,8 +129,6 @@ export class Crawler {
   limitHit = false;
   pageLimit: number;
 
-  dupeSeedsFound = false;
-
   saveStateFiles: string[] = [];
   lastSaveTime: number;
 
@@ -2487,10 +2485,6 @@ self.__bx_behaviors.selectMainBehavior();
         return false;
 
       case QueueState.DUPE_URL:
-        if (!this.dupeSeedsFound && depth === 0) {
-          logger.error("Duplicate seed URLs found and skipped");
-          this.dupeSeedsFound = true;
-        }
         logger.debug(
           "Page URL not queued, already seen",
           { url, ...logDetails },
