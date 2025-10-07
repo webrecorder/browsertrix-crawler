@@ -368,7 +368,7 @@ class Flow {
       case StepType.DoubleClick:
         await locator(step)
           .setTimeout(timeout * 1000)
-          //.on('action', () => startWaitingForEvents())
+          .setEnsureElementIsInTheViewport(true)
           .click({
             count: 2,
             button: step.button && mouseButtonMap.get(step.button),
@@ -392,7 +392,7 @@ class Flow {
 
         await locator(step)
           .setTimeout(timeout * 1000)
-          //.on('action', () => startWaitingForEvents())
+          .setEnsureElementIsInTheViewport(true)
           .click({
             delay: step.duration,
             button: step.button && mouseButtonMap.get(step.button),
@@ -410,7 +410,7 @@ class Flow {
       case StepType.Hover:
         await locator(step)
           .setTimeout(timeout * 1000)
-          //.on('action', () => startWaitingForEvents())
+          .setEnsureElementIsInTheViewport(true)
           .hover();
         break;
 
@@ -426,15 +426,14 @@ class Flow {
 
       case StepType.Change:
         await locator(step)
-          //.on('action', () => startWaitingForEvents())
           .setTimeout(timeout * 1000)
+          .setEnsureElementIsInTheViewport(true)
           .fill(step.value);
         break;
 
       case StepType.Scroll: {
         if ("selectors" in step) {
           await locator(step)
-            //.on('action', () => startWaitingForEvents())
             .setTimeout(timeout * 1000)
             .scroll({
               scrollLeft: step.x || 0,
