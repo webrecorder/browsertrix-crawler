@@ -43,8 +43,8 @@ test("test custom selector crawls JS files as pages", async () => {
   ]);
 
   const expectedExtraPages = new Set([
-    "https://www.iana.org/_js/jquery.js",
-    "https://www.iana.org/_js/iana.js",
+    "https://www.iana.org/static/_js/jquery.js",
+    "https://www.iana.org/static/_js/iana.js",
   ]);
 
   expect(pages).toEqual(expectedPages);
