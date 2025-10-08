@@ -854,7 +854,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // Handle JS dialogs:
     // - Ensure off-page navigation is canceled while behavior is running
-    // - accept close all other dialogs if not blocking unload
+    // - dismiss close all other dialogs if not blocking unload
     page.on("dialog", async (dialog) => {
       let accepted = true;
       if (dialog.type() === "beforeunload") {
@@ -865,8 +865,8 @@ self.__bx_behaviors.selectMainBehavior();
           await dialog.accept();
         }
       } else {
-        // other JS dialog, just accept
-        await dialog.accept();
+        // other JS dialog, just dismiss
+        await dialog.dismiss();
       }
       logger.debug("JS Dialog", {
         accepted,
