@@ -339,7 +339,11 @@ async function createProfile(
   cdp: CDPSession,
   targetFilename = "",
 ) {
-  await cdp.send("Network.clearBrowserCache");
+  try {
+    await cdp.send("Network.clearBrowserCache");
+  } catch (e) {
+    logger.warn("Error clearing cache", e, "browser");
+  }
 
   await browser.close();
 
