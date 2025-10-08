@@ -571,7 +571,7 @@ class InteractiveBrowser {
           cookie.url = url;
         }
       }
-      await this.browser.setCookies(this.page, cookies);
+      await this.browser.setCookies(cookies);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.error("Save Cookie Error: ", e);
