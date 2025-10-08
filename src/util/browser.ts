@@ -616,14 +616,14 @@ export class Browser {
     await page.setViewport(params);
   }
 
-  async getCookies(page: Page) {
-    return await page.cookies();
+  async getCookies() {
+    return (await this.browser?.cookies()) || [];
   }
 
   // TODO: Fix this the next time the file is edited.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async setCookies(page: Page, cookies: any) {
-    return await page.setCookie(...cookies);
+    return await this.browser?.setCookie(...cookies);
   }
 }
 

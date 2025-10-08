@@ -546,7 +546,8 @@ class InteractiveBrowser {
         return;
       }
 
-      const cookies = await this.browser.getCookies(this.page);
+      const cookies = await this.browser.getCookies();
+
       for (const cookieOrig of cookies) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cookie = cookieOrig as any;
