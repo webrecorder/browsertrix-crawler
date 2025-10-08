@@ -852,31 +852,34 @@ self.__bx_behaviors.selectMainBehavior();
       await this.browser.addInitScript(page, initScript);
     }
 
-    // only add if running with autoclick behavior
-    if (this.params.behaviors.includes("autoclick")) {
-      // Ensure off-page navigation is canceled while behavior is running
-      page.on("dialog", async (dialog) => {
-        let accepted = true;
-        if (dialog.type() === "beforeunload") {
-          if (opts.pageBlockUnload) {
-            accepted = false;
-            await dialog.dismiss();
-          } else {
-            await dialog.accept();
-          }
+    // Handle JS dialogs:
+    // - Ensure off-page navigation is canceled while behavior is running
+    // - dismiss close all other dialogs if not blocking unload
+    page.on("dialog", async (dialog) => {
+      let accepted = true;
+      if (dialog.type() === "beforeunload") {
+        if (opts.pageBlockUnload) {
+          accepted = false;
+          await dialog.dismiss();
         } else {
           await dialog.accept();
         }
-        logger.debug("JS Dialog", {
-          accepted,
-          blockingUnload: opts.pageBlockUnload,
-          message: dialog.message(),
-          type: dialog.type(),
-          page: page.url(),
-          workerid,
-        });
+      } else {
+        // other JS dialog, just dismiss
+        await dialog.dismiss();
+      }
+      logger.debug("JS Dialog", {
+        accepted,
+        blockingUnload: opts.pageBlockUnload,
+        message: dialog.message(),
+        type: dialog.type(),
+        page: page.url(),
+        workerid,
       });
+    });
 
+    // only add if running with autoclick behavior
+    if (this.params.behaviors.includes("autoclick")) {
       // Close any windows opened during navigation from autoclick
       await cdp.send("Target.setDiscoverTargets", { discover: true });
 
