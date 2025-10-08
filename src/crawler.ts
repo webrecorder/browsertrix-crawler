@@ -852,7 +852,9 @@ self.__bx_behaviors.selectMainBehavior();
       await this.browser.addInitScript(page, initScript);
     }
 
-    // Ensure off-page navigation is canceled while behavior is running
+    // Handle JS dialogs:
+    // - Ensure off-page navigation is canceled while behavior is running
+    // - accept close all other dialogs if not blocking unload
     page.on("dialog", async (dialog) => {
       let accepted = true;
       if (dialog.type() === "beforeunload") {
