@@ -339,7 +339,11 @@ async function createProfile(
   cdp: CDPSession,
   targetFilename = "",
 ) {
-  await cdp.send("Network.clearBrowserCache");
+  try {
+    await cdp.send("Network.clearBrowserCache");
+  } catch (e) {
+    logger.warn("Error clearing cache", e, "browser");
+  }
 
   await browser.close();
 
@@ -546,7 +550,8 @@ class InteractiveBrowser {
         return;
       }
 
-      const cookies = await this.browser.getCookies(this.page);
+      const cookies = await this.browser.getCookies();
+
       for (const cookieOrig of cookies) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cookie = cookieOrig as any;
@@ -566,7 +571,7 @@ class InteractiveBrowser {
           cookie.url = url;
         }
       }
-      await this.browser.setCookies(this.page, cookies);
+      await this.browser.setCookies(cookies);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       logger.error("Save Cookie Error: ", e);

@@ -22,6 +22,7 @@ import puppeteer, {
   Page,
   LaunchOptions,
   Viewport,
+  CookieData,
 } from "puppeteer-core";
 import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 import { Recorder } from "./recorder.js";
@@ -616,14 +617,12 @@ export class Browser {
     await page.setViewport(params);
   }
 
-  async getCookies(page: Page) {
-    return await page.cookies();
+  async getCookies() {
+    return (await this.browser?.cookies()) || [];
   }
 
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async setCookies(page: Page, cookies: any) {
-    return await page.setCookie(...cookies);
+  async setCookies(cookies: CookieData[]) {
+    return await this.browser?.setCookie(...cookies);
   }
 }
 
