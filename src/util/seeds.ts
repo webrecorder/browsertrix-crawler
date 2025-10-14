@@ -4,7 +4,6 @@ import { MAX_DEPTH } from "./constants.js";
 import { collectOnlineSeedFile } from "./file_reader.js";
 import { logger } from "./logger.js";
 import { type CrawlerArgs } from "./argParser.js";
-import { RedisCrawlState } from "./seeds.js";
 
 type ScopeType =
   | "prefix"
@@ -307,7 +306,8 @@ export class ScopedSeed {
 
 export async function parseSeeds(
   params: CrawlerArgs,
-  crawlState: RedisCrawlState,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  crawlState: any,
 ): Promise<ScopedSeed[]> {
   let seeds = params.seeds as string[];
   const scopedSeeds: ScopedSeed[] = [];
