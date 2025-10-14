@@ -2652,7 +2652,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (await this.crawlState.isSitemapDone()) {
-      logger.info("Sitemap already processed, skipping", "sitemap");
+      logger.info("Sitemap already processed, skipping", {}, "sitemap");
       return;
     }
 
