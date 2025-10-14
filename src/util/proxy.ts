@@ -153,13 +153,6 @@ export async function initProxy(
     privateKeyFile = privateKeyFile || sshProxyPrivateKeyFile;
     publicHostsFile = publicHostsFile || sshProxyKnownHostsFile;
 
-    logger.debug("Initing proxy", {
-      url: getSafeProxyString(proxyUrl),
-      localPort,
-      privateKeyFile,
-      publicHostsFile,
-    });
-
     const entry = await initSingleProxy(
       proxyUrl,
       localPort++,
@@ -200,6 +193,13 @@ export async function initSingleProxy(
   sshProxyPrivateKeyFile?: string,
   sshProxyKnownHostsFile?: string,
 ): Promise<{ proxyUrl: string; dispatcher: Dispatcher }> {
+  logger.debug("Initing proxy", {
+    url: getSafeProxyString(proxyUrl),
+    localPort,
+    sshProxyPrivateKeyFile,
+    sshProxyKnownHostsFile,
+  });
+
   if (proxyUrl && proxyUrl.startsWith("ssh://")) {
     proxyUrl = await runSSHD(
       proxyUrl,

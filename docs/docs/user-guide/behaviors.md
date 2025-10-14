@@ -266,6 +266,7 @@ Some of these functions which may be of use to behaviors authors are:
 - `scrollToOffset`: scroll to particular offset
 - `scrollIntoView`: smoothly scroll particular element into view
 - `getState`: increment a state counter and return all state counters + string message
+* `addLink`: add a given URL to the crawl queue
 
 More detailed references will be added in the future.
 
