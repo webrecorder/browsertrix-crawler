@@ -182,6 +182,7 @@ export type SaveState = {
   errors: string[];
   extraSeeds: string[];
   sitemapDone: boolean;
+  seedFileDone: boolean;
 };
 
 // ============================================================================
@@ -205,6 +206,7 @@ export class RedisCrawlState {
   esMap: string;
 
   sitemapDoneKey: string;
+  seedFileDoneKey: string;
 
   waczFilename: string | null = null;
 
@@ -240,6 +242,7 @@ export class RedisCrawlState {
     this.esMap = this.key + ":esMap";
 
     this.sitemapDoneKey = this.key + ":sitemapDone";
+    this.seedFileDoneKey = this.key + ":seedFileDone";
 
     this._initLuaCommands(this.redis);
   }
@@ -735,6 +738,7 @@ return inx;
     const errors = await this.getErrorList();
     const extraSeeds = await this._iterListKeys(this.esKey, seen);
     const sitemapDone = await this.isSitemapDone();
+    const seedFileDone = await this.isSeedFileDone();
 
     const finished = [...seen.values()];
 
@@ -744,6 +748,7 @@ return inx;
       queued,
       pending,
       sitemapDone,
+      seedFileDone,
       failed,
       errors,
     };
@@ -887,6 +892,10 @@ return inx;
 
       if (state.sitemapDone) {
         await this.markSitemapDone();
+      }
+
+      if (state.seedFileDone) {
+        await this.markSeedFileDone();
       }
     }
 
@@ -1105,5 +1114,13 @@ return inx;
   async markProfileUploaded(result: UploadResult & { modified?: string }) {
     result.modified = this._timestamp();
     await this.redis.set(`${this.key}:profileUploaded`, JSON.stringify(result));
+  }
+
+  async isSeedFileDone() {
+    return (await this.redis.get(this.seedFileDoneKey)) == "1";
+  }
+
+  async markSeedFileDone() {
+    await this.redis.set(this.seedFileDoneKey, "1");
   }
 }
