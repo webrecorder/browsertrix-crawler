@@ -304,11 +304,17 @@ export class ScopedSeed {
   }
 }
 
-export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
+export async function parseSeeds(
+  params: CrawlerArgs,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  crawlState: any,
+): Promise<ScopedSeed[]> {
   let seeds = params.seeds as string[];
   const scopedSeeds: ScopedSeed[] = [];
 
-  if (params.seedFile) {
+  if (params.seedFile && (await crawlState.isSeedFileDone())) {
+    logger.info("Seed file already processed, skipping", {}, "seedFile");
+  } else if (params.seedFile) {
     let seedFilePath = params.seedFile as string;
     if (
       seedFilePath.startsWith("http://") ||
@@ -366,6 +372,10 @@ export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
 
   if (!params.qaSource && !scopedSeeds.length) {
     logger.fatal("No valid seeds specified, aborting crawl");
+  }
+
+  if (params.seedFile) {
+    await crawlState.markSeedFileDone();
   }
 
   return scopedSeeds;

@@ -513,7 +513,7 @@ export class Crawler {
     this.proxyServer = res.proxyServer;
     this.proxyPacUrl = res.proxyPacUrl;
 
-    this.seeds = await parseSeeds(this.params);
+    this.seeds = await parseSeeds(this.params, this.crawlState);
     this.numOriginalSeeds = this.seeds.length;
 
     logger.info("Seeds", this.seeds);
