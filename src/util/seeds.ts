@@ -312,12 +312,9 @@ export async function parseSeeds(
   let seeds = params.seeds as string[];
   const scopedSeeds: ScopedSeed[] = [];
 
-  if (params.seedFile) {
-    if (await crawlState.isSeedFileDone()) {
-      logger.info("Seed file already processed, skipping", {}, "seedFile");
-      return;
-    }
-
+  if (params.seedFile && (await crawlState.isSeedFileDone())) {
+    logger.info("Seed file already processed, skipping", {}, "seedFile");
+  } else if (params.seedFile) {
     let seedFilePath = params.seedFile as string;
     if (
       seedFilePath.startsWith("http://") ||
