@@ -4,6 +4,7 @@ import { MAX_DEPTH } from "./constants.js";
 import { collectOnlineSeedFile } from "./file_reader.js";
 import { logger } from "./logger.js";
 import { type CrawlerArgs } from "./argParser.js";
+import { RedisCrawlState } from "./seeds.js";
 
 type ScopeType =
   | "prefix"
@@ -304,11 +305,19 @@ export class ScopedSeed {
   }
 }
 
-export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
+export async function parseSeeds(
+  params: CrawlerArgs,
+  crawlState: RedisCrawlState,
+): Promise<ScopedSeed[]> {
   let seeds = params.seeds as string[];
   const scopedSeeds: ScopedSeed[] = [];
 
   if (params.seedFile) {
+    if (await crawlState.isSeedFileDone()) {
+      logger.info("Seed file already processed, skipping", {}, "seedFile");
+      return;
+    }
+
     let seedFilePath = params.seedFile as string;
     if (
       seedFilePath.startsWith("http://") ||
@@ -366,6 +375,10 @@ export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
 
   if (!params.qaSource && !scopedSeeds.length) {
     logger.fatal("No valid seeds specified, aborting crawl");
+  }
+
+  if (params.seedFile) {
+    await crawlState.markSeedFileDone();
   }
 
   return scopedSeeds;
