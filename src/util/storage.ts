@@ -15,8 +15,12 @@ import { logger } from "./logger.js";
 import getFolderSize from "get-folder-size";
 
 import { WACZ } from "./wacz.js";
+import { sleep, timedRun } from "./timing.js";
+import { DEFAULT_MAX_RETRIES, ExitCodes } from "./constants.js";
 
 const DEFAULT_REGION = "us-east-1";
+
+const DOWNLOAD_PROFILE_MAX_TIME = 60;
 
 // ===========================================================================
 export class S3StorageSync {
@@ -134,11 +138,38 @@ export class S3StorageSync {
   }
 
   async downloadFile(srcFilename: string, destFilename: string) {
-    await this.client.fGetObject(
-      this.bucketName,
-      this.objectPrefix + srcFilename,
-      destFilename,
-    );
+    let count = 0;
+    logger.debug("Downloading profile", { srcFilename }, "storage");
+    while (true) {
+      try {
+        await timedRun(
+          this.client.fGetObject(
+            this.bucketName,
+            this.objectPrefix + srcFilename,
+            destFilename,
+          ),
+          DOWNLOAD_PROFILE_MAX_TIME,
+          "Timeout out downloading profile",
+          {},
+          "storage",
+          true,
+        );
+        break;
+      } catch (e) {
+        if (count <= DEFAULT_MAX_RETRIES) {
+          count += 1;
+          await sleep(5);
+          logger.warn("Retry downloading profile", {}, "storage");
+        } else {
+          logger.fatal(
+            "Could not download profile, exiting",
+            {},
+            "storage",
+            ExitCodes.Failed,
+          );
+        }
+      }
+    }
   }
 
   async uploadCollWACZ(
