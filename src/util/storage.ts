@@ -149,7 +149,7 @@ export class S3StorageSync {
             destFilename,
           ),
           DOWNLOAD_PROFILE_MAX_TIME,
-          "Timeout out downloading profile",
+          "Timed out downloading profile",
           {},
           "storage",
           true,
