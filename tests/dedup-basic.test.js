@@ -31,7 +31,7 @@ afterAll(async () => {
 function runCrawl(name, db="0") {
   fs.rmSync(`./test-crawls/collections/${name}`, { recursive: true, force: true });
 
-  const crawler = exec(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedup webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit 4 --exclude community --collection ${name} --redisDedupUrl redis://dedup-redis:6379/${db} --generateWACZ`);
+  const crawler = exec(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedup -e CRAWL_ID=${name} webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit 4 --exclude community --collection ${name} --redisDedupUrl redis://dedup-redis:6379/${db} --generateWACZ`);
 
   return new Promise((resolve) => {
     crawler.on("exit", (code) => {
@@ -53,6 +53,20 @@ function loadFirstWARC(name) {
 
   return parser; 
 }
+
+function loadDataPackageRelated(name) {
+  execSync(
+    `unzip test-crawls/collections/${name}/${name}.wacz -d test-crawls/collections/${name}/wacz`,
+  );
+
+  const data = fs.readFileSync(
+    `test-crawls/collections/${name}/wacz/datapackage.json`,
+    "utf8",
+  );
+  const dataPackageJSON = JSON.parse(data);
+  return dataPackageJSON.relation;
+}
+
 
 test("check revisit records written on duplicate crawl", async () => {
 
@@ -99,7 +113,7 @@ test("check revisit records written on duplicate crawl", async () => {
 
 test("import index and crawl dupe", async () => {
   
-  execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedup webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedup-test-orig/dedup-test-orig.wacz --redisDedupUrl redis://dedup-redis:6379/1`);
+  execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedup webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedup-test-orig/dedup-test-orig.wacz --sourceId dedup-test-orig --redisDedupUrl redis://dedup-redis:6379/1`);
 
   const redis = new Redis("redis://127.0.0.1:37379/1", { lazyConnect: true, retryStrategy: () => null });
 
@@ -128,6 +142,18 @@ test("imported crawl dupe matches previous dupe count", async () => {
 
   // matches same number of revisits as original
   expect(revisit).toBe(numResponses);
+});
+
+test("test requires in wacz 1", () => {
+
+  const expected = {"requires": ["dedup-test-orig"]};
+
+  const res1 = loadDataPackageRelated("dedup-test-dupe");
+  const res2 = loadDataPackageRelated("dedup-test-dupe-2");
+
+  expect(res1).toEqual(expected);
+  expect(res1).toEqual(res2);
+
 });
 
 
