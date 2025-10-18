@@ -23,6 +23,7 @@ export const DETECT_SITEMAP = "<detect>";
 export const EXTRACT_TEXT_TYPES = ["to-pages", "to-warc", "final-to-warc"];
 
 export const HASH_DUPE_KEY = "dupe";
+export const HASH_DUPE_SOURCE_LIST_KEY = "sources";
 
 export enum BxFunctionBindings {
   BehaviorLogFunc = "__bx_log",
