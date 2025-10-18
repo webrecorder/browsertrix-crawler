@@ -45,6 +45,7 @@ export type WACZInitOpts = {
   signingToken?: string;
   title?: string;
   description?: string;
+  requires?: string[];
 };
 
 export type WACZResourceEntry = {
@@ -61,6 +62,7 @@ export type WACZDataPackage = {
   software: string;
   title?: string;
   description?: string;
+  relation?: { requires: string[] };
 };
 
 type WACZDigest = {
@@ -130,6 +132,11 @@ export class WACZ {
     if (config.description) {
       this.datapackage.description = config.description;
     }
+
+    if (config.requires && config.requires.length) {
+      this.datapackage.relation = { requires: config.requires };
+    }
+    console.log("REQUIRES", config.requires);
 
     this.signingUrl = config.signingUrl || null;
     this.signingToken = config.signingToken || null;
