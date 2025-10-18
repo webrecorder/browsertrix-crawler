@@ -2000,6 +2000,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.closeLog();
 
+    const requires = await this.crawlState.getDupeDependentSources();
+
     const waczOpts: WACZInitOpts = {
       input: warcFileList.map((x) => path.join(this.archivesDir, x)),
       output: waczPath,
@@ -2008,6 +2010,7 @@ self.__bx_behaviors.selectMainBehavior();
       warcCdxDir: this.warcCdxDir,
       indexesDir: this.indexesDir,
       softwareString: this.infoString,
+      requires,
     };
 
     if (process.env.WACZ_SIGN_URL) {
