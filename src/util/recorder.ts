@@ -846,13 +846,16 @@ export class Recorder extends EventEmitter {
     ) {
       const hash =
         "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
-      const { origUrl } = await this.crawlState.getHashDupe(hash);
+      const { origUrl, origId } = await this.crawlState.getHashDupe(hash);
       if (origUrl) {
         const errorReason = "BlockedByResponse";
         await cdp.send("Fetch.failRequest", {
           requestId,
           errorReason,
         });
+        if (origId) {
+          await this.crawlState.addDupeCrawlRef(origId);
+        }
         return true;
       }
     }
@@ -1705,9 +1708,10 @@ export class Recorder extends EventEmitter {
     const isEmpty = reqresp.readSize === 0;
 
     if (!isEmpty && url) {
-      const { origUrl, origDate } = await this.crawlState.getHashDupe(hash);
+      const { origUrl, origDate, origId } =
+        await this.crawlState.getHashDupe(hash);
 
-      if (hash && origUrl && origDate) {
+      if (hash && origUrl && origDate && origId) {
         const date = tsToDate(origDate).toISOString();
         // always write revisit here
         // duplicate URLs in same crawl filtered out separately
@@ -1718,6 +1722,7 @@ export class Recorder extends EventEmitter {
           origUrl,
           date,
         ));
+        await this.crawlState.addDupeCrawlRef(origId);
       } else {
         // no dupe, continue
       }

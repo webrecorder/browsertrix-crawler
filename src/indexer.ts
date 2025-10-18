@@ -28,6 +28,12 @@ export class CrawlIndexer {
           type: "string",
           required: true,
         },
+
+        sourceId: {
+          describe: "If single WACZ, use this id as source id",
+          type: "string",
+          required: false,
+        },
       })
       .parseSync();
   }
@@ -44,7 +50,7 @@ export class CrawlIndexer {
     const params = this.initArgs();
 
     const redis = await initRedisWaitForSuccess(params.redisDedupUrl);
-    const dedupIndex = new RedisDedupIndex(redis);
+    const dedupIndex = new RedisDedupIndex(redis, "");
 
     for await (const [name, waczfile] of this.iterWACZ(params.sourceUrl)) {
       await dedupIndex.addHashSource(name, waczfile);
@@ -58,6 +64,11 @@ export class CrawlIndexer {
       count += 1;
       const loader = new WACZLoader(url);
       logger.debug(`Processing WACZ ${count} of ${total}`, { waczfile: url });
+
+      const sourceId = params.sourceId && total === 1 ? params.sourceId : url;
+
+      dedupIndex.dedupKeyIndex = await dedupIndex.addToSourcesList(sourceId);
+
       for await (const file of loader.iterFiles("indexes/")) {
         const filename = file.filename;
         if (filename.endsWith(".cdx.gz")) {
