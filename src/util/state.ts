@@ -7,7 +7,8 @@ import {
   MAX_DEPTH,
   DEFAULT_MAX_RETRIES,
   ROBOTS_CACHE_LIMIT,
-  HASH_DUPE_KEY
+  HASH_DUPE_KEY,
+  HASH_DUPE_SOURCE_LIST_KEY,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -203,6 +204,8 @@ export type SaveState = {
 // ============================================================================
 export class RedisDedupIndex {
   dedupRedis: Redis;
+  key: string;
+  dedupKeyIndex = -1;
 
   sourceDone = "src:d";
   sourceQ = "src:q";
@@ -210,22 +213,42 @@ export class RedisDedupIndex {
   sourceP = "src:p";
   pendingPrefix = "pending:q:";
 
-  constructor(dedupRedis: Redis) {
+  constructor(dedupRedis: Redis, key: string) {
     this.dedupRedis = dedupRedis;
+    this.key = key;
+  }
+
+  private async getKeyIndex() {
+    if (!this.key) {
+      return;
+    }
+    const res = await this.dedupRedis.lpos(HASH_DUPE_SOURCE_LIST_KEY, this.key);
+    if (res) {
+      this.dedupKeyIndex = res;
+    } else {
+      this.dedupKeyIndex = await this.addToSourcesList(this.key);
+    }
+    return this.dedupKeyIndex;
+  }
+
+  async addToSourcesList(crawlId: string) {
+    return (
+      (await this.dedupRedis.rpush(HASH_DUPE_SOURCE_LIST_KEY, crawlId)) - 1
+    );
   }
 
   async getHashDupe(
     hash: string,
     key = HASH_DUPE_KEY,
     //url: string,
-  ): Promise<{ origDate?: string; origUrl?: string }> {
+  ): Promise<{ origDate?: string; origUrl?: string; origId?: string }> {
     hash = hash.split(":").at(-1)!;
     const value = await this.dedupRedis.hget(key, hash);
     if (!value) {
       return {};
     }
-    const val = value.split("|");
-    return { origUrl: val[1], origDate: val[0] };
+    const val = value.split(" ");
+    return { origUrl: val[2], origDate: val[1], origId: val[0] };
   }
 
   async addHashDupe(
@@ -234,8 +257,12 @@ export class RedisDedupIndex {
     date: string,
     key = HASH_DUPE_KEY,
   ) {
-    const val = date.replace(/[^\d]/g, "") + "|" + url;
+    date = date.replace(/[^\d]/g, "");
     hash = hash.split(":").at(-1)!;
+    if (this.dedupKeyIndex < 0) {
+      await this.getKeyIndex();
+    }
+    const val = `${this.dedupKeyIndex} ${date} ${url}`;
     await this.dedupRedis.hsetnx(key, hash, val);
   }
 
@@ -286,7 +313,7 @@ export class RedisDedupIndex {
 
     await this.dedupRedis.lrem(this.pendingQ, 1, res);
     const { id, url } = JSON.parse(res);
-    const total = await this.dedupRedis.llen(this.sourceQ);
+    const total = (await this.dedupRedis.llen(this.sourceQ)) + 1;
     await this.dedupRedis.setex(this.pendingPrefix + id, "1", 300);
     return { id, url, total };
   }
@@ -302,7 +329,6 @@ export class RedisCrawlState extends RedisDedupIndex {
   maxRetries: number;
 
   uid: string;
-  key: string;
   maxPageTime: number;
 
   qkey: string;
@@ -333,11 +359,10 @@ export class RedisCrawlState extends RedisDedupIndex {
     maxRetries?: number,
     dedupRedis?: Redis,
   ) {
-    super(dedupRedis || redis);
+    super(dedupRedis || redis, key);
     this.redis = redis;
 
     this.uid = uid;
-    this.key = key;
     this.maxPageTime = maxPageTime;
     this.maxRetries = maxRetries ?? DEFAULT_MAX_RETRIES;
 
@@ -1286,5 +1311,24 @@ return inx;
   async markProfileUploaded(result: UploadResult & { modified?: string }) {
     result.modified = this._timestamp();
     await this.redis.set(`${this.key}:profileUploaded`, JSON.stringify(result));
+  }
+
+  async addDupeCrawlRef(id: string) {
+    await this.redis.sadd(`${this.key}:dindex`, id);
+  }
+
+  async getDupeDependentSources(): Promise<string[]> {
+    const dependIndexes = await this.redis.smembers(`${this.key}:dindex`);
+    const crawlIds = [];
+    for (const inx of dependIndexes) {
+      const crawlId = await this.dedupRedis.lindex(
+        HASH_DUPE_SOURCE_LIST_KEY,
+        Number(inx),
+      );
+      if (crawlId && crawlId !== this.key) {
+        crawlIds.push(crawlId);
+      }
+    }
+    return crawlIds;
   }
 }
