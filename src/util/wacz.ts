@@ -109,6 +109,7 @@ export class WACZ {
 
   private size = 0;
   private hash: string = "";
+  private localFilename = "";
 
   constructor(config: WACZInitOpts, collDir: string) {
     this.warcs = config.input;
@@ -136,7 +137,6 @@ export class WACZ {
     if (config.requires && config.requires.length) {
       this.datapackage.relation = { requires: config.requires };
     }
-    console.log("REQUIRES", config.requires);
 
     this.signingUrl = config.signingUrl || null;
     this.signingToken = config.signingToken || null;
@@ -201,7 +201,12 @@ export class WACZ {
     return this.size;
   }
 
+  getLocalFilename() {
+    return this.localFilename;
+  }
+
   async generateToFile(filename: string) {
+    this.localFilename = path.basename(filename);
     await pipeline(this.generate(), fs.createWriteStream(filename));
   }
 
