@@ -1935,12 +1935,14 @@ self.__bx_behaviors.selectMainBehavior();
         if (this.deduping) {
           await this.crawlState.setStatus("post-crawl");
           await this.crawlState.updateDedupSource(wacz);
+
+          await this.crawlState.clearDupeFileRef();
         }
 
         await this.crawlState.clearWACZFilename();
       }
 
-      if (wacz && this.uploadAndDeleteLocal) {
+      if (wacz && this.storage && this.uploadAndDeleteLocal) {
         await this.crawlState.setArchiveSize(0);
 
         logger.info(
@@ -2069,9 +2071,8 @@ self.__bx_behaviors.selectMainBehavior();
         const targetFilename = await this.crawlState.getWACZFilename();
 
         await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
-
-        return wacz;
       }
+      return wacz;
     } catch (e) {
       logger.error("Error creating WACZ", e);
       if (!streaming) {
