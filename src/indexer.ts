@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-
 import yargs from "yargs";
 import { logger } from "./util/logger.js";
 import { getInfoString } from "./util/file_reader.js";
@@ -9,6 +8,15 @@ import { ExitCodes } from "./util/constants.js";
 import { initRedisWaitForSuccess } from "./util/redis.js";
 import { AsyncIterReader } from "warcio";
 import { RedisDedupIndex } from "./util/state.js";
+import { basename } from "node:path";
+
+export type DedupIndexEntry = {
+  name: string;
+  url: string;
+  crawlId?: string;
+  size?: number;
+  hash?: string;
+};
 
 export class CrawlIndexer {
   constructor() {}
@@ -29,7 +37,7 @@ export class CrawlIndexer {
           required: true,
         },
 
-        sourceId: {
+        sourceCrawlId: {
           describe: "If single WACZ, use this id as source id",
           type: "string",
           required: false,
@@ -52,38 +60,50 @@ export class CrawlIndexer {
     const redis = await initRedisWaitForSuccess(params.redisDedupUrl);
     const dedupIndex = new RedisDedupIndex(redis, "");
 
-    for await (const [name, waczfile] of this.iterWACZ(params.sourceUrl)) {
-      await dedupIndex.addHashSource(name, waczfile);
+    for await (const entry of this.iterWACZ(params.sourceUrl)) {
+      await dedupIndex.queueImportSource(entry.name, JSON.stringify(entry));
     }
 
     let count = 0;
     let res;
 
-    while ((res = await dedupIndex.nextQueuedHashSource())) {
-      const { id, url, total } = res;
+    while ((res = await dedupIndex.nextQueuedImportSource())) {
+      const { name, entry, total } = res;
+      const { url, crawlId, size, hash } = JSON.parse(entry) as DedupIndexEntry;
       count += 1;
       const loader = new WACZLoader(url);
       logger.debug(`Processing WACZ ${count} of ${total}`, { waczfile: url });
 
-      const sourceId = params.sourceId && total === 1 ? params.sourceId : url;
+      const crawlIdReal = crawlId || params.sourceCrawlId || url;
 
-      dedupIndex.dedupKeyIndex = await dedupIndex.addToSourcesList(sourceId);
+      await dedupIndex.addImportedSourceForDedup(crawlIdReal, {
+        filename: name,
+        size,
+        hash,
+      });
 
       for await (const file of loader.iterFiles("indexes/")) {
         const filename = file.filename;
         if (filename.endsWith(".cdx.gz")) {
           logger.debug("Processing CDX GZ Index", { filename });
-          await this.ingestCDXJ(dedupIndex, loader, filename, "gzip");
+          await this.ingestCDXJ(
+            dedupIndex,
+            loader,
+            filename,
+            crawlIdReal,
+            "gzip",
+          );
         } else if (filename.endsWith(".cdx") || filename.endsWith(".cdxj")) {
           logger.debug("Processing CDX Index", { filename });
-          await this.ingestCDXJ(dedupIndex, loader, filename);
+          await this.ingestCDXJ(dedupIndex, loader, filename, crawlIdReal);
         }
       }
-      await dedupIndex.addDoneSource(id);
+
+      await dedupIndex.markImportSourceDone(name, crawlIdReal);
     }
 
     logger.info("Done!");
-    await dedupIndex.markDoneImport();
+    await dedupIndex.markImportFinishedTS();
     process.exit(ExitCodes.Success);
   }
 
@@ -91,6 +111,7 @@ export class CrawlIndexer {
     dedupIndex: RedisDedupIndex,
     loader: WACZLoader,
     filename: string,
+    crawlId: string,
     compression?: string,
   ) {
     let reader = await loader.loadFile(filename);
@@ -137,7 +158,8 @@ export class CrawlIndexer {
       }
 
       if (url && date && hash) {
-        await dedupIndex.addHashDupe(hash, url, date);
+        await dedupIndex.addHashDupe(hash, url, date, crawlId);
+        await dedupIndex.addImportedForCrawl(hash, crawlId);
       } else {
         logger.warn("Skipping invalid CDXJ, data missing", {
           url,
@@ -153,7 +175,7 @@ export class CrawlIndexer {
     logger.debug("Processed", { count });
   }
 
-  async *iterWACZ(url: string, name?: string): AsyncIterable<[string, string]> {
+  async *iterWACZ(url: string, name?: string): AsyncIterable<DedupIndexEntry> {
     let path: string = url;
 
     try {
@@ -163,7 +185,7 @@ export class CrawlIndexer {
     }
 
     if (path.endsWith(".wacz")) {
-      yield [name || url, url];
+      yield { name: basename(name || url), url };
     } else if (path.endsWith(".json")) {
       if (!url.startsWith("http://") && !url.startsWith("https://")) {
         const blob = await openAsBlob(url);
@@ -174,7 +196,11 @@ export class CrawlIndexer {
       const json = await resp.json();
 
       for (const entry of json.resources) {
-        if (entry.path) {
+        const url = entry.path;
+        if (url && url.endsWith(".wacz")) {
+          const { size, hash, crawlId, name } = entry;
+          yield { crawlId, name, url, size, hash };
+        } else {
           yield* this.iterWACZ(entry.path, entry.name);
         }
       }

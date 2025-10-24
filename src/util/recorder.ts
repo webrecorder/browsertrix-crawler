@@ -846,16 +846,15 @@ export class Recorder extends EventEmitter {
     ) {
       const hash =
         "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
-      const { origUrl, origId } = await this.crawlState.getHashDupe(hash);
-      if (origUrl) {
+      const res = await this.crawlState.getHashDupe(hash);
+      if (res) {
+        const { index, crawlId } = res;
         const errorReason = "BlockedByResponse";
         await cdp.send("Fetch.failRequest", {
           requestId,
           errorReason,
         });
-        if (origId) {
-          await this.crawlState.addDupeCrawlRef(origId);
-        }
+        await this.crawlState.addDupeCrawlRef(crawlId, index);
         return true;
       }
     }
@@ -1707,11 +1706,13 @@ export class Recorder extends EventEmitter {
 
     const isEmpty = reqresp.readSize === 0;
 
-    if (!isEmpty && url) {
-      const { origUrl, origDate, origId } =
-        await this.crawlState.getHashDupe(hash);
+    let isDupe = false;
 
-      if (hash && origUrl && origDate && origId) {
+    if (!isEmpty && url) {
+      const res = await this.crawlState.getHashDupe(hash);
+
+      if (res) {
+        const { origUrl, origDate, crawlId, index } = res;
         const date = tsToDate(origDate).toISOString();
         // always write revisit here
         // duplicate URLs in same crawl filtered out separately
@@ -1722,7 +1723,8 @@ export class Recorder extends EventEmitter {
           origUrl,
           date,
         ));
-        await this.crawlState.addDupeCrawlRef(origId);
+        await this.crawlState.addDupeCrawlRef(crawlId, index);
+        isDupe = true;
       } else {
         // no dupe, continue
       }
@@ -1756,7 +1758,7 @@ export class Recorder extends EventEmitter {
 
     this.addPageRecord(reqresp);
 
-    if (!isEmpty) {
+    if (!isEmpty && !isDupe) {
       await this.crawlState.addHashDupe(hash, url, date);
     }
 
