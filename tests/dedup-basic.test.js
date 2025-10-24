@@ -113,13 +113,13 @@ test("check revisit records written on duplicate crawl", async () => {
 
 test("import index and crawl dupe", async () => {
   
-  execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedup webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedup-test-orig/dedup-test-orig.wacz --sourceId dedup-test-orig --redisDedupUrl redis://dedup-redis:6379/1`);
+  execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedup webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedup-test-orig/dedup-test-orig.wacz --sourceCrawlId dedup-test-orig --redisDedupUrl redis://dedup-redis:6379/1`);
 
   const redis = new Redis("redis://127.0.0.1:37379/1", { lazyConnect: true, retryStrategy: () => null });
 
   await redis.connect({maxRetriesPerRequest: 50});
 
-  expect(await redis.hlen("dupe")).toBe(numResponses);
+  expect(await redis.hlen("alldupes")).toBe(numResponses);
 });
 
 
@@ -144,16 +144,26 @@ test("imported crawl dupe matches previous dupe count", async () => {
   expect(revisit).toBe(numResponses);
 });
 
-test("test requires in wacz 1", () => {
-
-  const expected = {"requires": ["dedup-test-orig"]};
-
+test("test requires in datapackage.json of wacz deduped against previous crawl", () => {
   const res1 = loadDataPackageRelated("dedup-test-dupe");
+
+  expect(res1.requires.length).toBe(1);
+  const entry = res1.requires[0];
+  expect(entry.crawlId).toBe("dedup-test-orig");
+  expect(entry.filename).toBe("dedup-test-orig.wacz");
+  expect(entry.size).toBeDefined();
+  expect(entry.hash).toBeDefined();
+});
+
+test("test requires in datapackage.json of wacz deduped against import from wacz", () => {
   const res2 = loadDataPackageRelated("dedup-test-dupe-2");
-
-  expect(res1).toEqual(expected);
-  expect(res1).toEqual(res2);
-
+  expect(res2.requires.length).toBe(1);
+  const entry2 = res2.requires[0];
+  expect(entry2.crawlId).toBe("dedup-test-orig");
+  expect(entry2.filename).toBe("dedup-test-orig.wacz");
+  // undefined as importing from single WACZ and not computing
+  expect(entry2.size).toBeUndefined();
+  expect(entry2.hash).toBeUndefined();
 });
 
 
