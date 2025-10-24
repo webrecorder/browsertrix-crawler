@@ -2041,9 +2041,13 @@ self.__bx_behaviors.selectMainBehavior();
 
         await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
 
+        await this.crawlState.updateDedupSource(wacz);
+
         await this.crawlState.clearWACZFilename();
 
         return true;
+      } else {
+        await this.crawlState.updateDedupSource(wacz);
       }
 
       return false;
