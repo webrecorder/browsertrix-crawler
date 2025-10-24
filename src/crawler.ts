@@ -1653,9 +1653,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.generateWACZ) {
       this.storage = initStorage();
 
-      if (this.storage) {
-        await this.crawlState.setWACZFilename();
-      }
+      await this.crawlState.setWACZFilename();
     }
 
     if (POST_CRAWL_STATES.includes(initState)) {
@@ -1961,9 +1959,13 @@ self.__bx_behaviors.selectMainBehavior();
 
         await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
 
+        await this.crawlState.updateDedupSource(wacz);
+
         await this.crawlState.clearWACZFilename();
 
         return true;
+      } else {
+        await this.crawlState.updateDedupSource(wacz);
       }
 
       return false;
