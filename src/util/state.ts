@@ -261,12 +261,13 @@ export class RedisDedupIndex {
   async commitDedupDone() {
     for await (const hashes of this.dedupRedis.hscanStream(
       `h:${this.crawlId}`,
-      {
-        noValues: true,
-      },
     )) {
+      let value = false;
       for (const hash of hashes) {
-        await this.dedupRedis.hset(DUPE_ALL_HASH_KEY, hash, this.crawlId);
+        if (!value) {
+          await this.dedupRedis.hset(DUPE_ALL_HASH_KEY, hash, this.crawlId);
+        }
+        value = !value;
       }
     }
 
@@ -1292,6 +1293,8 @@ return inx;
   async markSitemapDone() {
     await this.redis.set(this.sitemapDoneKey, "1");
   }
+
+  // DEPENDENT CRAWLS FOR DEDUPE
 
   async addDupeCrawlRef(crawlId: string, index: string) {
     await this.redis.sadd(`${this.crawlId}:dindex`, crawlId + " " + index);
