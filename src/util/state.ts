@@ -1394,11 +1394,16 @@ return inx;
 
   // DEPENDENT CRAWLS FOR DEDUPE
   async addDupeCrawlRef(crawlId: string, index: string) {
-    await this.redis.sadd(`${this.crawlId}:dindex`, crawlId + " " + index);
+    await this.redis.sadd(`${this.uid}:dindex`, crawlId + " " + index);
+    await this.redis.sadd(`${this.crawlId}:depCrawls`, crawlId);
+  }
+
+  async clearDupeFileRef() {
+    await this.redis.del(`${this.uid}:dindex`);
   }
 
   async getDupeDependentSources() {
-    const dependIndexes = await this.redis.smembers(`${this.crawlId}:dindex`);
+    const dependIndexes = await this.redis.smembers(`${this.uid}:dindex`);
     const crawlIds = [];
     for (const value of dependIndexes) {
       const [crawlId, index] = value.split(" ");
