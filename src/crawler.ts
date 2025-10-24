@@ -202,6 +202,7 @@ export class Crawler {
     | null = null;
 
   recording: boolean;
+  deduping = false;
 
   constructor() {
     const args = this.parseArgs();
@@ -342,6 +343,8 @@ export class Crawler {
   async initCrawlState() {
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
     const dedupRedisUrl = this.params.redisDedupUrl || redisUrl;
+
+    this.deduping = dedupRedisUrl !== redisUrl;
 
     if (!redisUrl.startsWith("redis://")) {
       logger.fatal(
@@ -1890,10 +1893,20 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.generateWACZ && generateFiles) {
-      const uploaded = await this.generateWACZ();
+      const wacz = await this.generateWACZ();
 
-      if (uploaded && this.uploadAndDeleteLocal) {
+      if (wacz) {
+        if (this.deduping) {
+          await this.crawlState.setStatus("post-crawl");
+          await this.crawlState.updateDedupSource(wacz);
+        }
+
+        await this.crawlState.clearWACZFilename();
+      }
+
+      if (wacz && this.uploadAndDeleteLocal) {
         await this.crawlState.setArchiveSize(0);
+
         logger.info(
           `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
         );
@@ -1942,7 +1955,7 @@ self.__bx_behaviors.selectMainBehavior();
     await streamFinish(logFH);
   }
 
-  async generateWACZ() {
+  async generateWACZ(): Promise<WACZ | null> {
     logger.info("Generating WACZ");
     await this.crawlState.setStatus("generate-wacz");
 
@@ -1956,11 +1969,11 @@ self.__bx_behaviors.selectMainBehavior();
     if (!warcFileList.length) {
       // if finished, just return
       if (isFinished || (await this.crawlState.isCrawlCanceled())) {
-        return;
+        return null;
       }
       // possibly restarted after committing, so assume done here!
       if ((await this.crawlState.numDone()) > 0) {
-        return;
+        return null;
       }
       // fail crawl otherwise
       logger.fatal("No WARC Files, assuming crawl failed");
@@ -2021,16 +2034,8 @@ self.__bx_behaviors.selectMainBehavior();
 
         await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
 
-        await this.crawlState.updateDedupSource(wacz);
-
-        await this.crawlState.clearWACZFilename();
-
-        return true;
-      } else {
-        await this.crawlState.updateDedupSource(wacz);
+        return wacz;
       }
-
-      return false;
     } catch (e) {
       logger.error("Error creating WACZ", e);
       if (!streaming) {
@@ -2039,6 +2044,8 @@ self.__bx_behaviors.selectMainBehavior();
         await this.setStatusAndExit(ExitCodes.UploadFailed, "interrupted");
       }
     }
+
+    return null;
   }
 
   logMemory() {
