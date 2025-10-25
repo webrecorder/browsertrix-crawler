@@ -288,12 +288,12 @@ export class RedisDedupeIndex {
     for await (const hashes of this.dedupeRedis.hscanStream(
       `h:${this.crawlId}`,
     )) {
-      let value = false;
+      let isValue = false;
       for (const hash of hashes) {
-        if (!value) {
+        if (!isValue) {
           await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, this.crawlId);
         }
-        value = !value;
+        isValue = !isValue;
       }
     }
 
@@ -396,13 +396,57 @@ export class RedisDedupeIndex {
 
     await this.dedupeRedis.lrem(this.pendingQ, 1, res);
     const { name } = JSON.parse(res);
-    const total = (await this.dedupeRedis.llen(this.sourceQ)) + 1;
+    const remaining = (await this.dedupeRedis.llen(this.sourceQ)) + 1;
     await this.dedupeRedis.setex(this.pendingPrefix + name, "1", 300);
-    return { name, entry: res, total };
+    return { name, entry: res, remaining };
   }
 
   async markImportFinishedTS() {
     await this.dedupeRedis.set("last_update_ts", new Date().toISOString());
+  }
+
+  // REMOVE ON IMPORT
+
+  async markNotRemoved(crawlId: string) {
+    await this.dedupeRedis.sadd("noremove", crawlId);
+  }
+
+  async getRemoveSet() {
+    const removeSet = await this.dedupeRedis.sdiff(DUPE_ALL_CRAWLS, "noremove");
+    await this.dedupeRedis.del("noremove");
+    return new Set<string>(removeSet);
+  }
+
+  async removeCrawlIds(toRemove: Set<string>) {
+    for await (const hashes of this.dedupeRedis.hscanStream(
+      DUPE_ALL_HASH_KEY,
+    )) {
+      let isValue = false;
+      let key = "";
+      for (const hash of hashes) {
+        if (!isValue) {
+          key = hash;
+        }
+        if (key && isValue && toRemove.has(hash)) {
+          await this.dedupeRedis.hdel(DUPE_ALL_HASH_KEY, key);
+        }
+        isValue = !isValue;
+      }
+    }
+
+    for (const crawlId of toRemove) {
+      const allWACZ = await this.dedupeRedis.lrange(`c:${crawlId}:wacz`, 0, -1);
+      for (const waczdata of allWACZ) {
+        try {
+          const { filename } = JSON.parse(waczdata);
+          await this.dedupeRedis.srem(this.sourceDone, filename);
+        } catch (e) {
+          // ignore
+        }
+      }
+      await this.dedupeRedis.del(`h:${crawlId}`, `c:${crawlId}:wacz`);
+      await this.dedupeRedis.srem(DUPE_ALL_CRAWLS, crawlId);
+    }
   }
 }
 
@@ -1399,7 +1443,10 @@ return inx;
 
   async markProfileUploaded(result: UploadResult & { modified?: string }) {
     result.modified = this._timestamp();
-    await this.redis.set(`${this.crawlId}:profileUploaded`, JSON.stringify(result));
+    await this.redis.set(
+      `${this.crawlId}:profileUploaded`,
+      JSON.stringify(result),
+    );
   }
 
   // DEPENDENT CRAWLS FOR DEDUPE
