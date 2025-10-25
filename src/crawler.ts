@@ -344,9 +344,9 @@ export class Crawler {
 
   async initCrawlState() {
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
-    const dedupRedisUrl = this.params.redisDedupUrl || redisUrl;
+    const dedupeRedisUrl = this.params.redisDedupeUrl || redisUrl;
 
-    this.deduping = dedupRedisUrl !== redisUrl;
+    this.deduping = dedupeRedisUrl !== redisUrl;
 
     if (!redisUrl.startsWith("redis://")) {
       logger.fatal(
@@ -362,10 +362,10 @@ export class Crawler {
       "state",
     );
 
-    let dedupRedis = redis;
+    let dedupeRedis = redis;
 
-    if (redisUrl !== dedupRedisUrl) {
-      dedupRedis = await initRedisWaitForSuccess(dedupRedisUrl);
+    if (redisUrl !== dedupeRedisUrl) {
+      dedupeRedis = await initRedisWaitForSuccess(dedupeRedisUrl);
     }
 
     logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
@@ -376,7 +376,7 @@ export class Crawler {
       this.maxPageTime,
       os.hostname(),
       this.params.maxPageRetries,
-      dedupRedis,
+      dedupeRedis,
     );
 
     if (this.params.logErrorsToRedis) {
@@ -1934,7 +1934,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (wacz) {
         if (this.deduping) {
           await this.crawlState.setStatus("post-crawl");
-          await this.crawlState.updateDedupSource(wacz);
+          await this.crawlState.updateDedupeSource(wacz);
 
           await this.crawlState.clearDupeFileRef();
         }
