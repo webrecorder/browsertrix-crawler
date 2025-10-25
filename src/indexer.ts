@@ -9,6 +9,7 @@ import { initRedisWaitForSuccess } from "./util/redis.js";
 import { AsyncIterReader } from "warcio";
 import { RedisDedupeIndex } from "./util/state.js";
 import { basename } from "node:path";
+import { sleep } from "./util/timing.js";
 
 export type DedupeIndexEntry = {
   name: string;
@@ -42,6 +43,13 @@ export class CrawlIndexer {
           type: "string",
           required: false,
         },
+
+        removing: {
+          describe: "If set, also remove unsued crawls/hashes from index",
+          type: "boolean",
+          required: false,
+          default: false,
+        },
       })
       .parseSync();
   }
@@ -62,16 +70,24 @@ export class CrawlIndexer {
 
     for await (const entry of this.iterWACZ({
       url: params.sourceUrl,
-      name: params.sourceCrawlId || params.sourceUrl,
+      name: basename(params.sourceUrl),
+      crawlId: params.sourceCrawlId,
     })) {
       await dedupeIndex.queueImportSource(entry.name, JSON.stringify(entry));
+      if (params.removing && entry.crawlId) {
+        await dedupeIndex.markNotRemoved(entry.crawlId);
+      }
     }
 
     let count = 0;
+    let total = 0;
     let res;
 
     while ((res = await dedupeIndex.nextQueuedImportSource())) {
-      const { name, entry, total } = res;
+      const { name, entry, remaining } = res;
+      if (!total) {
+        total = remaining;
+      }
       const { url, crawlId, size, hash } = JSON.parse(
         entry,
       ) as DedupeIndexEntry;
@@ -107,7 +123,15 @@ export class CrawlIndexer {
       await dedupeIndex.markImportSourceDone(name, crawlIdReal);
     }
 
+    if (params.removing) {
+      const removeset = await dedupeIndex.getRemoveSet();
+      if (removeset.size > 0) {
+        await dedupeIndex.removeCrawlIds(removeset);
+      }
+    }
+
     logger.info("Done!");
+    await sleep(30);
     await dedupeIndex.markImportFinishedTS();
     process.exit(ExitCodes.Success);
   }
@@ -180,7 +204,6 @@ export class CrawlIndexer {
   }
 
   async *iterWACZ(entry: DedupeIndexEntry): AsyncIterable<DedupeIndexEntry> {
-    const { name } = entry;
     let { url } = entry;
     let path = url;
 
@@ -191,8 +214,7 @@ export class CrawlIndexer {
     }
 
     if (path.endsWith(".wacz")) {
-      console.log({ ...entry, name: basename(name || url) });
-      yield { ...entry, name: basename(name || url) };
+      yield entry;
     } else if (path.endsWith(".json")) {
       if (!url.startsWith("http://") && !url.startsWith("https://")) {
         const blob = await openAsBlob(url);
