@@ -310,11 +310,20 @@ export class RedisDedupeIndex {
     return { origUrl: val[2], origDate: val[1], index: val[0], crawlId };
   }
 
-  async addHashDupe(hash: string, url: string, date: string, crawlId?: string) {
+  async addHashDupe(
+    hash: string,
+    url: string,
+    date: string,
+    crawlId?: string,
+    commit = false,
+  ) {
     date = date.replace(/[^\d]/g, "");
     hash = hash.split(":").at(-1)!;
     const val = `${this.dedupeKeyIndex} ${date} ${url}`;
-    await this.dedupeRedis.hsetnx(`h:${crawlId || this.crawlId}`, hash, val);
+    crawlId = crawlId || this.crawlId;
+    if ((await this.dedupeRedis.hsetnx(`h:${crawlId}`, hash, val)) && commit) {
+      await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId);
+    }
   }
 
   // IMPORT
@@ -325,10 +334,6 @@ export class RedisDedupeIndex {
       return;
     }
     await this.dedupeRedis.lpush(this.sourceQ, data);
-  }
-
-  async addImportedForCrawl(hash: string, crawlId: string) {
-    await this.dedupeRedis.hset(DUPE_ALL_HASH_KEY, hash, crawlId);
   }
 
   async addImportedSourceForDedupe(key: string, entry: DedupeSourceEntry) {

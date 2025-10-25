@@ -60,7 +60,10 @@ export class CrawlIndexer {
     const redis = await initRedisWaitForSuccess(params.redisDedupeUrl);
     const dedupeIndex = new RedisDedupeIndex(redis, "");
 
-    for await (const entry of this.iterWACZ(params.sourceUrl)) {
+    for await (const entry of this.iterWACZ({
+      url: params.sourceUrl,
+      name: params.sourceCrawlId || params.sourceUrl,
+    })) {
       await dedupeIndex.queueImportSource(entry.name, JSON.stringify(entry));
     }
 
@@ -160,8 +163,7 @@ export class CrawlIndexer {
       }
 
       if (url && date && hash) {
-        await dedupeIndex.addHashDupe(hash, url, date, crawlId);
-        await dedupeIndex.addImportedForCrawl(hash, crawlId);
+        await dedupeIndex.addHashDupe(hash, url, date, crawlId, true);
       } else {
         logger.warn("Skipping invalid CDXJ, data missing", {
           url,
@@ -177,8 +179,10 @@ export class CrawlIndexer {
     logger.debug("Processed", { count });
   }
 
-  async *iterWACZ(url: string, name?: string): AsyncIterable<DedupeIndexEntry> {
-    let path: string = url;
+  async *iterWACZ(entry: DedupeIndexEntry): AsyncIterable<DedupeIndexEntry> {
+    const { name } = entry;
+    let { url } = entry;
+    let path = url;
 
     try {
       path = new URL(url).pathname;
@@ -187,7 +191,8 @@ export class CrawlIndexer {
     }
 
     if (path.endsWith(".wacz")) {
-      yield { name: basename(name || url), url };
+      console.log({ ...entry, name: basename(name || url) });
+      yield { ...entry, name: basename(name || url) };
     } else if (path.endsWith(".json")) {
       if (!url.startsWith("http://") && !url.startsWith("https://")) {
         const blob = await openAsBlob(url);
@@ -198,13 +203,8 @@ export class CrawlIndexer {
       const json = await resp.json();
 
       for (const entry of json.resources) {
-        const url = entry.path;
-        if (url && url.endsWith(".wacz")) {
-          const { size, hash, crawlId, name } = entry;
-          yield { crawlId, name, url, size, hash };
-        } else {
-          yield* this.iterWACZ(entry.path, entry.name);
-        }
+        entry.url = entry.path;
+        yield* this.iterWACZ(entry);
       }
     } else {
       logger.warn("Unknown source", { url }, "replay");
