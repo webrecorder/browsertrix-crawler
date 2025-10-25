@@ -147,7 +147,7 @@ export class Recorder extends EventEmitter {
 
   pageSeed?: ScopedSeed;
   pageSeedDepth = 0;
-  minPageDedupDepth = -1;
+  minPageDedupeDepth = -1;
 
   frameIdToExecId: Map<string, number> | null;
 
@@ -171,7 +171,7 @@ export class Recorder extends EventEmitter {
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
 
-    this.minPageDedupDepth = crawler.params.minPageDedupDepth;
+    this.minPageDedupeDepth = crawler.params.minPageDedupeDepth;
 
     this.writer = writer;
 
@@ -843,8 +843,8 @@ export class Recorder extends EventEmitter {
     if (
       url === this.pageUrl &&
       reqresp.payload &&
-      this.minPageDedupDepth >= 0 &&
-      this.pageSeedDepth >= this.minPageDedupDepth
+      this.minPageDedupeDepth >= 0 &&
+      this.pageSeedDepth >= this.minPageDedupeDepth
     ) {
       const hash =
         "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");

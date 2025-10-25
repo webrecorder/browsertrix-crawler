@@ -48,7 +48,7 @@ const normalizeUrlOpts: NormamlizeUrlOptions = {
 
 // ============================================================================
 // treat 0 or 206 as 200 for purposes of dedup
-export function normalizeDedupStatus(status: number): string {
+export function normalizeDedupeStatus(status: number): string {
   if (status === 0 || status === 206) {
     return "200";
   }
@@ -225,18 +225,18 @@ export type DedupeEntry = {
 };
 
 // ============================================================================
-export type DedupSourceEntry = {
+export type DedupeSourceEntry = {
   filename: string;
   size?: number;
   hash?: string;
 };
 
 // ============================================================================
-export class RedisDedupIndex {
-  dedupRedis: Redis;
+export class RedisDedupeIndex {
+  dedupeRedis: Redis;
   crawlId: string;
-  dedupKeyIndex = -1;
-  dedupCurrFilename = "";
+  dedupeKeyIndex = -1;
+  dedupeCurrFilename = "";
 
   sourceDone = "src:d";
   sourceQ = "src:q";
@@ -244,61 +244,61 @@ export class RedisDedupIndex {
   sourceP = "src:p";
   pendingPrefix = "pending:q:";
 
-  constructor(dedupRedis: Redis, crawlId: string) {
-    this.dedupRedis = dedupRedis;
+  constructor(dedupeRedis: Redis, crawlId: string) {
+    this.dedupeRedis = dedupeRedis;
     this.crawlId = crawlId;
   }
 
-  // DEDUP SOURCE
+  // DEDUPE SOURCE
 
-  async addSourceForDedup(filename: string) {
-    //const count = await this.dedupRedis.incr(`c:${key}:count`) - 1;
+  async addSourceForDedupe(filename: string) {
+    //const count = await this.dedupeRedis.incr(`c:${key}:count`) - 1;
     const count =
-      (await this.dedupRedis.rpush(
+      (await this.dedupeRedis.rpush(
         `c:${this.crawlId}:wacz`,
         JSON.stringify({ filename }),
       )) - 1;
-    this.dedupCurrFilename = filename;
-    this.dedupKeyIndex = count;
+    this.dedupeCurrFilename = filename;
+    this.dedupeKeyIndex = count;
   }
 
-  async updateDedupSource(wacz: WACZ) {
-    if (this.dedupKeyIndex < 0) {
+  async updateDedupeSource(wacz: WACZ) {
+    if (this.dedupeKeyIndex < 0) {
       return;
     }
 
-    const value: DedupSourceEntry = {
-      filename: wacz.getLocalFilename() || this.dedupCurrFilename,
+    const value: DedupeSourceEntry = {
+      filename: wacz.getLocalFilename() || this.dedupeCurrFilename,
       hash: wacz.getHash(),
       size: wacz.getSize(),
     };
 
-    await this.dedupRedis.lset(
+    await this.dedupeRedis.lset(
       `c:${this.crawlId}:wacz`,
-      this.dedupKeyIndex,
+      this.dedupeKeyIndex,
       JSON.stringify(value),
     );
 
-    await this.commitDedupDone();
+    await this.commitDedupeDone();
   }
 
-  // COMMIT DEDUP TO SHARED INDEX
+  // COMMIT DEDUPE TO SHARED INDEX
 
-  async commitDedupDone() {
-    for await (const hashes of this.dedupRedis.hscanStream(
+  async commitDedupeDone() {
+    for await (const hashes of this.dedupeRedis.hscanStream(
       `h:${this.crawlId}`,
     )) {
       let value = false;
       for (const hash of hashes) {
         if (!value) {
-          await this.dedupRedis.hset(DUPE_ALL_HASH_KEY, hash, this.crawlId);
+          await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, this.crawlId);
         }
         value = !value;
       }
     }
 
     // add to crawls list
-    await this.dedupRedis.sadd(DUPE_ALL_CRAWLS, this.crawlId);
+    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, this.crawlId);
   }
 
   // GET OR ADD INDIVIDUAL HASHES
@@ -311,12 +311,12 @@ export class RedisDedupIndex {
     hash = hash.split(":").at(-1)!;
 
     // first, check the shared key
-    let crawlId = await this.dedupRedis.hget(key, hash);
+    let crawlId = await this.dedupeRedis.hget(key, hash);
     if (!crawlId) {
       // otherwise, try current crawl
       crawlId = this.crawlId;
     }
-    const value = await this.dedupRedis.hget(`h:${crawlId}`, hash);
+    const value = await this.dedupeRedis.hget(`h:${crawlId}`, hash);
     if (!value) {
       return null;
     }
@@ -327,37 +327,37 @@ export class RedisDedupIndex {
   async addHashDupe(hash: string, url: string, date: string, crawlId?: string) {
     date = date.replace(/[^\d]/g, "");
     hash = hash.split(":").at(-1)!;
-    const val = `${this.dedupKeyIndex} ${date} ${url}`;
-    await this.dedupRedis.hsetnx(`h:${crawlId || this.crawlId}`, hash, val);
+    const val = `${this.dedupeKeyIndex} ${date} ${url}`;
+    await this.dedupeRedis.hsetnx(`h:${crawlId || this.crawlId}`, hash, val);
   }
 
   // IMPORT
 
   async queueImportSource(id: string, data: string) {
     // already handled this source
-    if (await this.dedupRedis.sismember(this.sourceDone, id)) {
+    if (await this.dedupeRedis.sismember(this.sourceDone, id)) {
       return;
     }
-    await this.dedupRedis.lpush(this.sourceQ, data);
+    await this.dedupeRedis.lpush(this.sourceQ, data);
   }
 
   async addImportedForCrawl(hash: string, crawlId: string) {
-    await this.dedupRedis.hset(DUPE_ALL_HASH_KEY, hash, crawlId);
+    await this.dedupeRedis.hset(DUPE_ALL_HASH_KEY, hash, crawlId);
   }
 
-  async addImportedSourceForDedup(key: string, entry: DedupSourceEntry) {
+  async addImportedSourceForDedupe(key: string, entry: DedupeSourceEntry) {
     return (
-      (await this.dedupRedis.rpush(`c:${key}:wacz`, JSON.stringify(entry))) - 1
+      (await this.dedupeRedis.rpush(`c:${key}:wacz`, JSON.stringify(entry))) - 1
     );
   }
 
   async markImportSourceDone(id: string, crawlId: string) {
-    await this.dedupRedis.sadd(this.sourceDone, id);
-    await this.dedupRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
+    await this.dedupeRedis.sadd(this.sourceDone, id);
+    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
   }
 
   async nextQueuedImportSource() {
-    let res: string | null = await this.dedupRedis.lmove(
+    let res: string | null = await this.dedupeRedis.lmove(
       this.sourceQ,
       this.pendingQ,
       "RIGHT",
@@ -365,9 +365,9 @@ export class RedisDedupIndex {
     );
     // use circular pending Q to support retries
     if (!res) {
-      const len = await this.dedupRedis.llen(this.pendingQ);
+      const len = await this.dedupeRedis.llen(this.pendingQ);
       for (let i = 0; i < len; i++) {
-        res = await this.dedupRedis.lmove(
+        res = await this.dedupeRedis.lmove(
           this.pendingQ,
           this.pendingQ,
           "RIGHT",
@@ -375,7 +375,7 @@ export class RedisDedupIndex {
         );
         if (res) {
           const { id } = JSON.parse(res);
-          if (await this.dedupRedis.get(this.pendingPrefix + id)) {
+          if (await this.dedupeRedis.get(this.pendingPrefix + id)) {
             res = null;
             continue;
           } else {
@@ -389,20 +389,20 @@ export class RedisDedupIndex {
       return null;
     }
 
-    await this.dedupRedis.lrem(this.pendingQ, 1, res);
+    await this.dedupeRedis.lrem(this.pendingQ, 1, res);
     const { name } = JSON.parse(res);
-    const total = (await this.dedupRedis.llen(this.sourceQ)) + 1;
-    await this.dedupRedis.setex(this.pendingPrefix + name, "1", 300);
+    const total = (await this.dedupeRedis.llen(this.sourceQ)) + 1;
+    await this.dedupeRedis.setex(this.pendingPrefix + name, "1", 300);
     return { name, entry: res, total };
   }
 
   async markImportFinishedTS() {
-    await this.dedupRedis.set("last_update_ts", new Date().toISOString());
+    await this.dedupeRedis.set("last_update_ts", new Date().toISOString());
   }
 }
 
 // ============================================================================
-export class RedisCrawlState extends RedisDedupIndex {
+export class RedisCrawlState extends RedisDedupeIndex {
   redis: Redis;
   maxRetries: number;
 
@@ -435,9 +435,9 @@ export class RedisCrawlState extends RedisDedupIndex {
     maxPageTime: number,
     uid: string,
     maxRetries?: number,
-    dedupRedis?: Redis,
+    dedupeRedis?: Redis,
   ) {
-    super(dedupRedis || redis, key);
+    super(dedupeRedis || redis, key);
     this.redis = redis;
 
     this.uid = uid;
@@ -759,7 +759,7 @@ return inx;
         "state",
       );
     }
-    await this.addSourceForDedup(this.waczFilename!);
+    await this.addSourceForDedupe(this.waczFilename!);
     return this.waczFilename!;
   }
 
@@ -1253,13 +1253,18 @@ return inx;
   async addIfNoDupe(key: string, url: string, status: number) {
     url = normalizeUrl(url, normalizeUrlOpts);
     return (
-      (await this.redis.sadd(key, normalizeDedupStatus(status) + "|" + url)) ===
-      1
+      (await this.redis.sadd(
+        key,
+        normalizeDedupeStatus(status) + "|" + url,
+      )) === 1
     );
   }
 
   async removeDupe(key: string, url: string, status: number) {
-    return await this.redis.srem(key, normalizeDedupStatus(status) + "|" + url);
+    return await this.redis.srem(
+      key,
+      normalizeDedupeStatus(status) + "|" + url,
+    );
   }
 
   async isInUserSet(value: string) {
@@ -1394,20 +1399,20 @@ return inx;
 
   // DEPENDENT CRAWLS FOR DEDUPE
   async addDupeCrawlRef(crawlId: string, index: string) {
-    await this.redis.sadd(`${this.uid}:dindex`, crawlId + " " + index);
-    await this.redis.sadd(`${this.crawlId}:depCrawls`, crawlId);
+    await this.redis.sadd(`${this.uid}:duperef`, crawlId + " " + index);
+    await this.redis.sadd(`${this.crawlId}:reqCrawls`, crawlId);
   }
 
   async clearDupeFileRef() {
-    await this.redis.del(`${this.uid}:dindex`);
+    await this.redis.del(`${this.uid}:duperef`);
   }
 
   async getDupeDependentSources() {
-    const dependIndexes = await this.redis.smembers(`${this.uid}:dindex`);
+    const dependRefs = await this.redis.smembers(`${this.uid}:duperef`);
     const crawlIds = [];
-    for (const value of dependIndexes) {
+    for (const value of dependRefs) {
       const [crawlId, index] = value.split(" ");
-      const source = await this.dedupRedis.lindex(
+      const source = await this.dedupeRedis.lindex(
         `c:${crawlId}:wacz`,
         Number(index),
       );

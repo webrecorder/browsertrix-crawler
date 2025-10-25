@@ -7,10 +7,10 @@ import { WACZLoader } from "./util/wacz.js";
 import { ExitCodes } from "./util/constants.js";
 import { initRedisWaitForSuccess } from "./util/redis.js";
 import { AsyncIterReader } from "warcio";
-import { RedisDedupIndex } from "./util/state.js";
+import { RedisDedupeIndex } from "./util/state.js";
 import { basename } from "node:path";
 
-export type DedupIndexEntry = {
+export type DedupeIndexEntry = {
   name: string;
   url: string;
   crawlId?: string;
@@ -25,7 +25,7 @@ export class CrawlIndexer {
     return yargs(process.argv)
       .usage("indexer [options]")
       .options({
-        redisDedupUrl: {
+        redisDedupeUrl: {
           describe: "URL for remote redis instance to index into",
           type: "string",
           required: true,
@@ -57,26 +57,28 @@ export class CrawlIndexer {
 
     const params = this.initArgs();
 
-    const redis = await initRedisWaitForSuccess(params.redisDedupUrl);
-    const dedupIndex = new RedisDedupIndex(redis, "");
+    const redis = await initRedisWaitForSuccess(params.redisDedupeUrl);
+    const dedupeIndex = new RedisDedupeIndex(redis, "");
 
     for await (const entry of this.iterWACZ(params.sourceUrl)) {
-      await dedupIndex.queueImportSource(entry.name, JSON.stringify(entry));
+      await dedupeIndex.queueImportSource(entry.name, JSON.stringify(entry));
     }
 
     let count = 0;
     let res;
 
-    while ((res = await dedupIndex.nextQueuedImportSource())) {
+    while ((res = await dedupeIndex.nextQueuedImportSource())) {
       const { name, entry, total } = res;
-      const { url, crawlId, size, hash } = JSON.parse(entry) as DedupIndexEntry;
+      const { url, crawlId, size, hash } = JSON.parse(
+        entry,
+      ) as DedupeIndexEntry;
       count += 1;
       const loader = new WACZLoader(url);
       logger.debug(`Processing WACZ ${count} of ${total}`, { waczfile: url });
 
       const crawlIdReal = crawlId || params.sourceCrawlId || url;
 
-      await dedupIndex.addImportedSourceForDedup(crawlIdReal, {
+      await dedupeIndex.addImportedSourceForDedupe(crawlIdReal, {
         filename: name,
         size,
         hash,
@@ -87,7 +89,7 @@ export class CrawlIndexer {
         if (filename.endsWith(".cdx.gz")) {
           logger.debug("Processing CDX GZ Index", { filename });
           await this.ingestCDXJ(
-            dedupIndex,
+            dedupeIndex,
             loader,
             filename,
             crawlIdReal,
@@ -95,20 +97,20 @@ export class CrawlIndexer {
           );
         } else if (filename.endsWith(".cdx") || filename.endsWith(".cdxj")) {
           logger.debug("Processing CDX Index", { filename });
-          await this.ingestCDXJ(dedupIndex, loader, filename, crawlIdReal);
+          await this.ingestCDXJ(dedupeIndex, loader, filename, crawlIdReal);
         }
       }
 
-      await dedupIndex.markImportSourceDone(name, crawlIdReal);
+      await dedupeIndex.markImportSourceDone(name, crawlIdReal);
     }
 
     logger.info("Done!");
-    await dedupIndex.markImportFinishedTS();
+    await dedupeIndex.markImportFinishedTS();
     process.exit(ExitCodes.Success);
   }
 
   async ingestCDXJ(
-    dedupIndex: RedisDedupIndex,
+    dedupeIndex: RedisDedupeIndex,
     loader: WACZLoader,
     filename: string,
     crawlId: string,
@@ -152,14 +154,14 @@ export class CrawlIndexer {
         continue;
       }
 
-      // only adding originals to dedup against, don't want to dedup against existing revisits
+      // only adding originals to dedupe against, don't want to dedupe against existing revisits
       if (cdx.mime === "warc/revisit") {
         continue;
       }
 
       if (url && date && hash) {
-        await dedupIndex.addHashDupe(hash, url, date, crawlId);
-        await dedupIndex.addImportedForCrawl(hash, crawlId);
+        await dedupeIndex.addHashDupe(hash, url, date, crawlId);
+        await dedupeIndex.addImportedForCrawl(hash, crawlId);
       } else {
         logger.warn("Skipping invalid CDXJ, data missing", {
           url,
@@ -175,7 +177,7 @@ export class CrawlIndexer {
     logger.debug("Processed", { count });
   }
 
-  async *iterWACZ(url: string, name?: string): AsyncIterable<DedupIndexEntry> {
+  async *iterWACZ(url: string, name?: string): AsyncIterable<DedupeIndexEntry> {
     let path: string = url;
 
     try {
