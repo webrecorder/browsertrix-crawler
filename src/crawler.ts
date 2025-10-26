@@ -1651,12 +1651,12 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    if (this.params.generateWACZ) {
+    if (this.params.generateWACZ || this.params.saveProfile) {
       this.storage = initStorage();
+    }
 
-      if (this.storage) {
-        await this.crawlState.setWACZFilename();
-      }
+    if (this.params.generateWACZ && this.storage) {
+      await this.crawlState.setWACZFilename();
     }
 
     if (POST_CRAWL_STATES.includes(initState)) {
@@ -1736,8 +1736,16 @@ self.__bx_behaviors.selectMainBehavior();
 
     // --------------
     // Run Crawl Here!
-    await runWorkers(this, this.params.workers, this.maxPageTime);
+    await runWorkers(
+      this,
+      this.params.workers,
+      this.maxPageTime,
+      false,
+      !!this.params.saveProfile,
+    );
     // --------------
+
+    await this.browser.close();
 
     await this.serializeConfig(true);
 
@@ -1855,6 +1863,15 @@ self.__bx_behaviors.selectMainBehavior();
           logger.warn(`Unable to clear ${this.collDir} before exit`, e);
         }
       }
+    }
+
+    if (this.finalExit && generateFiles && this.params.saveProfile) {
+      console.log("SAVE PROFILE", this.params.saveProfile);
+      await this.browser.saveProfile(
+        this.params.saveProfile,
+        this.storage,
+        this.params.saveProfile,
+      );
     }
 
     if (this.params.waitOnDone && (!this.interruptReason || this.finalExit)) {
