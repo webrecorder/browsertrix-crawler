@@ -1866,7 +1866,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.finalExit && generateFiles && this.params.saveProfile) {
-      console.log("SAVE PROFILE", this.params.saveProfile);
       await this.browser.saveProfile(
         this.params.saveProfile,
         this.storage,

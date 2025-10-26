@@ -72,6 +72,7 @@ export class Browser {
   swOpt?: ServiceWorkerOpt = "disabled";
 
   crashed = false;
+  launched = false;
 
   screenWidth: number;
   screenHeight: number;
@@ -246,6 +247,15 @@ export class Browser {
     if (this.browser) {
       logger.warn(
         "Browser must be closed before saving profile",
+        {},
+        "browser",
+      );
+      return;
+    }
+
+    if (!this.launched) {
+      logger.warn(
+        "Browser never launched, skipping profile update",
         {},
         "browser",
       );
@@ -530,6 +540,7 @@ export class Browser {
     const target = this.browser.target();
 
     this.firstCDP = await target.createCDPSession();
+    this.launched = true;
 
     if (recording) {
       await this.browserContextFetch();
