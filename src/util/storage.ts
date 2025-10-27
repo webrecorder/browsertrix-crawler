@@ -23,6 +23,14 @@ const DEFAULT_REGION = "us-east-1";
 const DOWNLOAD_PROFILE_MAX_TIME = 60;
 
 // ===========================================================================
+export type UploadResult = {
+  path: string;
+  hash: string;
+  size: number;
+  bytes: number;
+};
+
+// ===========================================================================
 export class S3StorageSync {
   fullPrefix: string;
   client: Minio.Client;
@@ -87,7 +95,10 @@ export class S3StorageSync {
     this.webhookUrl = webhookUrl;
   }
 
-  async uploadStreamingWACZ(wacz: WACZ, targetFilename: string) {
+  async uploadStreamingWACZ(
+    wacz: WACZ,
+    targetFilename: string,
+  ): Promise<UploadResult> {
     const fileUploadInfo = {
       bucket: this.bucketName,
       crawlId: this.crawlId,
@@ -113,7 +124,10 @@ export class S3StorageSync {
     return { path, size, hash, bytes: size };
   }
 
-  async uploadFile(srcFilename: string, targetFilename: string) {
+  async uploadFile(
+    srcFilename: string,
+    targetFilename: string,
+  ): Promise<UploadResult> {
     const fileUploadInfo = {
       bucket: this.bucketName,
       crawlId: this.crawlId,

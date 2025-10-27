@@ -856,12 +856,11 @@ class ArgParser {
       logger.info("Saving localStorage and sessionStorage");
     }
 
-    //remove default
-    if (!argv.saveProfile) {
-      argv.saveProfile = true;
-    }
     if (argv.saveProfile === true) {
       argv.saveProfile = argv.profile;
+    }
+    if (argv.saveProfile) {
+      logger.info("Updating profile on successful crawl");
     }
 
     return true;

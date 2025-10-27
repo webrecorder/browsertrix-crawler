@@ -8,7 +8,7 @@ import path from "path";
 
 import { formatErr, LogContext, logger } from "./logger.js";
 import { getSafeProxyString } from "./proxy.js";
-import { initStorage, S3StorageSync } from "./storage.js";
+import { initStorage, S3StorageSync, UploadResult } from "./storage.js";
 
 import {
   DISPLAY,
@@ -243,14 +243,14 @@ export class Browser {
     localFilename?: string,
     storage: S3StorageSync | null = null,
     remoteFilename?: string,
-  ) {
+  ): Promise<UploadResult | null> {
     if (this.browser) {
       logger.warn(
         "Browser must be closed before saving profile",
         {},
         "browser",
       );
-      return;
+      return null;
     }
 
     if (!this.launched) {
@@ -259,7 +259,7 @@ export class Browser {
         {},
         "browser",
       );
-      return;
+      return null;
     }
 
     logger.info("Saving Browser Profile");
@@ -295,7 +295,7 @@ export class Browser {
       cwd: this.profileDir,
     });
 
-    let resource = {};
+    let resource: UploadResult | null = null;
 
     // Only storage relative remote path supported
     if (remoteFilename && storage) {

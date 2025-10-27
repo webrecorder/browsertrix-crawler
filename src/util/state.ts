@@ -6,7 +6,7 @@ import { logger } from "./logger.js";
 import { MAX_DEPTH, DEFAULT_MAX_RETRIES } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
-import { interpolateFilename } from "./storage.js";
+import { interpolateFilename, UploadResult } from "./storage.js";
 
 // ============================================================================
 export enum LoadState {
@@ -1100,5 +1100,10 @@ return inx;
 
   async markSitemapDone() {
     await this.redis.set(this.sitemapDoneKey, "1");
+  }
+
+  async markProfileUploaded(result: UploadResult & { modified?: string }) {
+    result.modified = this._timestamp();
+    await this.redis.set(`${this.key}:profileUploaded`, JSON.stringify(result));
   }
 }

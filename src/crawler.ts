@@ -1866,11 +1866,14 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.finalExit && generateFiles && this.params.saveProfile) {
-      await this.browser.saveProfile(
+      const resource = await this.browser.saveProfile(
         this.params.saveProfile,
         this.storage,
         this.params.saveProfile,
       );
+      if (resource && resource.path) {
+        await this.crawlState.markProfileUploaded(resource);
+      }
     }
 
     if (this.params.waitOnDone && (!this.interruptReason || this.finalExit)) {
