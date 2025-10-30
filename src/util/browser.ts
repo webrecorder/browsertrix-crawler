@@ -230,6 +230,7 @@ export class Browser {
         child_process.execSync("tar xvfz " + profileFilename, {
           cwd: this.profileDir,
         });
+        this.removeSingletons();
         return true;
       } catch (e) {
         logger.error(`Profile filename ${profileFilename} not a valid tar.gz`);
@@ -237,6 +238,16 @@ export class Browser {
     }
 
     return false;
+  }
+
+  removeSingletons() {
+    try {
+      child_process.execSync("rm ./Singleton*", {
+        cwd: this.profileDir,
+      });
+    } catch (e) {
+      // ignore
+    }
   }
 
   async saveProfile(
