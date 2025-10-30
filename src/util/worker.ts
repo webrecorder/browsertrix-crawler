@@ -7,6 +7,7 @@ import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
 import { PageState, WorkerId } from "./state.js";
 import { Crawler } from "../crawler.js";
+import { PAGE_OP_TIMEOUT_SECS } from "./constants.js";
 
 const MAX_REUSE = 5;
 
@@ -410,6 +411,7 @@ export async function runWorkers(
   numWorkers: number,
   maxPageTime: number,
   alwaysReuse = false,
+  clearCacheAtEnd = false,
 ) {
   logger.info(`Creating ${numWorkers} workers`, {}, "worker");
 
@@ -435,9 +437,26 @@ export async function runWorkers(
 
   await Promise.allSettled(workers.map((worker) => worker.run()));
 
-  await closeWorkers();
+  if (clearCacheAtEnd && workers.length) {
+    for (const worker of workers) {
+      if (worker.cdp) {
+        try {
+          await timedRun(
+            worker.cdp.send("Network.clearBrowserCache"),
+            PAGE_OP_TIMEOUT_SECS,
+            "Error clearing cache",
+            {},
+            "worker",
+          );
+          break;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+  }
 
-  await crawler.browser.close();
+  await closeWorkers();
 }
 
 // ===========================================================================

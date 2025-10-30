@@ -47,6 +47,8 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
 
   crawlId: string;
 
+  saveProfile?: string;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   origConfig: Record<string, any>;
   state?: SaveState;
@@ -395,9 +397,15 @@ class ArgParser {
         },
 
         profile: {
+          alias: "loadProfile",
           describe:
             "Path or HTTP(S) URL to tar.gz file which contains the browser profile directory",
           type: "string",
+        },
+
+        saveProfile: {
+          describe:
+            "If set, save profile if crawl succeeded successfully. If no value provided, save back to save location as specified in --profile",
         },
 
         screenshot: {
@@ -846,6 +854,13 @@ class ArgParser {
 
     if (argv.saveStorage) {
       logger.info("Saving localStorage and sessionStorage");
+    }
+
+    if (argv.saveProfile === true) {
+      argv.saveProfile = argv.profile;
+    }
+    if (argv.saveProfile) {
+      logger.info("Updating profile on successful crawl");
     }
 
     return true;

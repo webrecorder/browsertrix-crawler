@@ -161,9 +161,13 @@ Options:
                                             econds) after behaviors before movin
                                             g on to next page
                                                            [number] [default: 0]
-      --profile                             Path or HTTP(S) URL to tar.gz file w
+      --profile, --loadProfile              Path or HTTP(S) URL to tar.gz file w
                                             hich contains the browser profile di
                                             rectory                     [string]
+      --saveProfile                         If set, save profile if crawl succee
+                                            ded successfully. If no value provid
+                                            ed, save back to save location as sp
+                                            ecified in --profile
       --screenshot                          Screenshot options for crawler, can
                                             include: view, thumbnail, fullPage,
                                             fullPageFinal

@@ -8,7 +8,7 @@ import path from "path";
 
 import { formatErr, LogContext, logger } from "./logger.js";
 import { getSafeProxyString } from "./proxy.js";
-import { initStorage } from "./storage.js";
+import { initStorage, S3StorageSync, UploadResult } from "./storage.js";
 
 import {
   DISPLAY,
@@ -72,6 +72,7 @@ export class Browser {
   swOpt?: ServiceWorkerOpt = "disabled";
 
   crashed = false;
+  launched = false;
 
   screenWidth: number;
   screenHeight: number;
@@ -238,10 +239,88 @@ export class Browser {
     return false;
   }
 
-  saveProfile(profileFilename: string) {
+  async saveProfile(
+    localFilename?: string,
+    storage: S3StorageSync | null = null,
+    remoteFilename?: string,
+  ): Promise<UploadResult | null> {
+    if (this.browser) {
+      logger.warn(
+        "Browser must be closed before saving profile",
+        {},
+        "browser",
+      );
+      return null;
+    }
+
+    if (!this.launched) {
+      logger.warn(
+        "Browser never launched, skipping profile update",
+        {},
+        "browser",
+      );
+      return null;
+    }
+
+    logger.info("Saving Browser Profile");
+
+    // First, determine valid local path
+    // can't save to http/https, so use default local path
+    if (
+      localFilename &&
+      (localFilename.startsWith("http:") ||
+        localFilename.startsWith("https") ||
+        localFilename.startsWith("@"))
+    ) {
+      localFilename = "";
+    }
+
+    if (localFilename && !localFilename.startsWith("/")) {
+      localFilename = path.resolve("/crawls/profiles/", localFilename);
+      logger.info(
+        `Absolute path for filename not provided, saving to ${localFilename}`,
+        "browser",
+      );
+    }
+
+    const profileFilename = localFilename || "/crawls/profiles/profile.tar.gz";
+
+    const outputDir = path.dirname(profileFilename);
+    if (outputDir && !fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    logger.info("Local profile saved", { profileFilename }, "browser");
     child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {
       cwd: this.profileDir,
     });
+
+    let resource: UploadResult | null = null;
+
+    // Only storage relative remote path supported
+    if (remoteFilename && storage) {
+      // remote storage relative prefix, always storage relative here
+      if (remoteFilename.startsWith("@")) {
+        remoteFilename = remoteFilename.slice(1);
+      }
+      if (
+        remoteFilename.startsWith("http:") ||
+        remoteFilename.startsWith("https:") ||
+        remoteFilename.startsWith("/")
+      ) {
+        logger.warn(
+          "Not saving remote profile, invalid target",
+          { remoteFilename },
+          "browser",
+        );
+      } else {
+        logger.info("Uploading to remote storage...", {}, "browser");
+        resource = await storage.uploadFile(profileFilename, remoteFilename);
+      }
+    }
+
+    logger.info("Profile creation done", {}, "browser");
+    return resource;
   }
 
   chromeArgs({
@@ -461,6 +540,7 @@ export class Browser {
     const target = this.browser.target();
 
     this.firstCDP = await target.createCDPSession();
+    this.launched = true;
 
     if (recording) {
       await this.browserContextFetch();

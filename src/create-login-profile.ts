@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import fs from "fs";
-import path from "path";
 import http, { IncomingMessage, ServerResponse } from "http";
 
 import readline from "readline";
@@ -325,19 +324,16 @@ async function automatedProfile(
     await page.screenshot({ path: params.debugScreenshot });
   }
 
-  await createProfile(params, browser, page, cdp);
+  await createProfile(browser, cdp, params.filename);
 
   process.exit(ExitCodes.Success);
 }
 
 async function createProfile(
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  params: any,
   browser: Browser,
-  page: Page,
   cdp: CDPSession,
-  targetFilename = "",
+  localFilename: string,
+  remoteFilename = "",
 ) {
   try {
     await cdp.send("Network.clearBrowserCache");
@@ -347,34 +343,9 @@ async function createProfile(
 
   await browser.close();
 
-  logger.info("Creating profile");
-
-  if (params.filename && !params.filename.startsWith("/")) {
-    params.filename = path.resolve("/crawls/profiles/", params.filename);
-    logger.info(
-      `Absolute path for filename not provided, saving to ${params.filename}`,
-    );
-  }
-
-  const profileFilename = params.filename || "/crawls/profiles/profile.tar.gz";
-
-  const outputDir = path.dirname(profileFilename);
-  if (outputDir && !fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-
-  browser.saveProfile(profileFilename);
-
-  let resource = {};
-
   const storage = initStorage();
-  if (storage) {
-    logger.info("Uploading to remote storage...");
-    resource = await storage.uploadFile(profileFilename, targetFilename);
-  }
 
-  logger.info("Profile creation done");
-  return resource;
+  return await browser.saveProfile(localFilename, storage, remoteFilename);
 }
 
 function promptInput(msg: string, hidden = false) {
@@ -677,16 +648,15 @@ class InteractiveBrowser {
 
         try {
           const postData = await this.readBodyJson(req);
-          const targetFilename = postData.filename || "";
+          const remoteFilename = postData.filename || "";
 
           await this.saveAllCookies();
 
           const resource = await createProfile(
-            this.params,
             this.browser,
-            this.page,
             this.cdp,
-            targetFilename,
+            this.params.filename,
+            remoteFilename,
           );
           origins = Array.from(this.originSet.values());
 
@@ -710,7 +680,7 @@ class InteractiveBrowser {
         try {
           await this.saveAllCookies();
 
-          await createProfile(this.params, this.browser, this.page, this.cdp);
+          await createProfile(this.browser, this.cdp, this.params.filename);
 
           res.writeHead(200, { "Content-Type": "text/html" });
           res.end(
