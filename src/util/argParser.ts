@@ -856,6 +856,10 @@ class ArgParser {
       logger.info("Saving localStorage and sessionStorage");
     }
 
+    // temp
+    if (!argv.saveProfile) {
+      argv.saveProfile = true;
+    }
     if (argv.saveProfile === true) {
       argv.saveProfile = argv.profile;
     }
