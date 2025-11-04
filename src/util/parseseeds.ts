@@ -8,12 +8,33 @@ import { type RedisCrawlState } from "./state.js";
 
 export async function parseSeeds(
   params: CrawlerArgs,
-  crawlState: RedisCrawlState,
+  crawlState?: RedisCrawlState,
 ): Promise<ScopedSeed[]> {
   let seeds = params.seeds as string[];
   const scopedSeeds: ScopedSeed[] = [];
 
-  const seedFileDone = await crawlState.isSeedFileDone();
+  // Re-add seedFileDone from serialized state to Redis if present
+  if (params.state && params.state.seedFileDone && crawlState) {
+    await crawlState.markSeedFileDone();
+  }
+
+  let seedFileDone = false;
+  if (crawlState) {
+    seedFileDone = await crawlState.isSeedFileDone();
+  }
+
+  // Re-add any seeds from seed files from serialized state to Redis
+  if (
+    params.state &&
+    params.state.seedFileSeeds &&
+    seedFileDone &&
+    crawlState
+  ) {
+    for (const seed of params.state.seedFileSeeds) {
+      const scopedSeed: ScopedSeed = JSON.parse(seed);
+      await crawlState.addSeedFileSeed(scopedSeed);
+    }
+  }
 
   if (params.seedFile && !seedFileDone) {
     let seedFilePath = params.seedFile as string;
@@ -54,7 +75,7 @@ export async function parseSeeds(
     try {
       const scopedSeed = new ScopedSeed({ ...scopeOpts, ...newSeed });
       scopedSeeds.push(scopedSeed);
-      if (params.seedFile) {
+      if (params.seedFile && !seedFileDone && crawlState) {
         await crawlState.addSeedFileSeed(scopedSeed);
         logger.debug(
           "Pushed seed file seed to Redis",
@@ -80,7 +101,8 @@ export async function parseSeeds(
     }
   }
 
-  if (params.seedFile && seedFileDone) {
+  // If seed file was already successfully parsed, re-add seeds from Redis
+  if (params.seedFile && seedFileDone && crawlState) {
     const seedFileScopedSeeds = await crawlState.getSeedFileSeeds();
     for (const seed of seedFileScopedSeeds) {
       logger.debug(
@@ -105,7 +127,7 @@ export async function parseSeeds(
     logger.fatal("No valid seeds specified, aborting crawl");
   }
 
-  if (params.seedFile) {
+  if (params.seedFile && crawlState) {
     await crawlState.markSeedFileDone();
   }
 
