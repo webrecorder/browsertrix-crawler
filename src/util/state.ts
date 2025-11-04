@@ -855,13 +855,6 @@ return inx;
       await this.redis.set(this.dkey, state.finished.length);
     }
 
-    if (state.seedFileSeeds) {
-      for (const seed of state.seedFileSeeds) {
-        const scopedSeed: ScopedSeed = JSON.parse(seed);
-        await this.addSeedFileSeed(scopedSeed);
-      }
-    }
-
     if (state.extraSeeds) {
       const origLen = seeds.length;
 
