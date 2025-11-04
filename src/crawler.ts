@@ -62,7 +62,8 @@ import {
 } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
-import { ScopedSeed, parseSeeds } from "./util/seeds.js";
+import { ScopedSeed } from "./util/seeds.js";
+import { parseSeeds } from "./util/parseseeds.js";
 import {
   WARCWriter,
   createWARCInfo,

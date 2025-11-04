@@ -1,11 +1,7 @@
-import fs from "fs";
-
 import { MAX_DEPTH } from "./constants.js";
-import { collectOnlineSeedFile } from "./file_reader.js";
 import { logger } from "./logger.js";
-import { type CrawlerArgs } from "./argParser.js";
 
-type ScopeType =
+export type ScopeType =
   | "prefix"
   | "host"
   | "domain"
@@ -302,83 +298,6 @@ export class ScopedSeed {
 
     return false;
   }
-}
-
-export async function parseSeeds(
-  params: CrawlerArgs,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  crawlState: any,
-): Promise<ScopedSeed[]> {
-  let seeds = params.seeds as string[];
-  const scopedSeeds: ScopedSeed[] = [];
-
-  if (params.seedFile && (await crawlState.isSeedFileDone())) {
-    logger.info("Seed file already processed, skipping", {}, "seedFile");
-  } else if (params.seedFile) {
-    let seedFilePath = params.seedFile as string;
-    if (
-      seedFilePath.startsWith("http://") ||
-      seedFilePath.startsWith("https://")
-    ) {
-      seedFilePath = await collectOnlineSeedFile(seedFilePath);
-    }
-
-    const urlSeedFile = fs.readFileSync(seedFilePath, "utf8");
-    const urlSeedFileList = urlSeedFile.split("\n");
-
-    if (typeof seeds === "string") {
-      seeds = [seeds];
-    }
-
-    for (const seed of urlSeedFileList) {
-      if (seed) {
-        seeds.push(seed);
-      }
-    }
-  }
-
-  const scopeOpts = {
-    scopeType: params.scopeType as ScopeType | undefined,
-    sitemap: params.sitemap,
-    include: params.include,
-    exclude: params.exclude,
-    depth: params.depth,
-    extraHops: params.extraHops,
-  };
-
-  for (const seed of seeds) {
-    const newSeed = typeof seed === "string" ? { url: seed } : seed;
-    newSeed.url = removeQuotes(newSeed.url);
-
-    try {
-      scopedSeeds.push(new ScopedSeed({ ...scopeOpts, ...newSeed }));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      logger.error("Failed to create seed", {
-        error: e.toString(),
-        ...scopeOpts,
-        ...newSeed,
-      });
-      if (params.failOnFailedSeed) {
-        logger.fatal(
-          "Invalid seed specified, aborting crawl",
-          { url: newSeed.url },
-          "general",
-          1,
-        );
-      }
-    }
-  }
-
-  if (!params.qaSource && !scopedSeeds.length) {
-    logger.fatal("No valid seeds specified, aborting crawl");
-  }
-
-  if (params.seedFile) {
-    await crawlState.markSeedFileDone();
-  }
-
-  return scopedSeeds;
 }
 
 export function rxEscape(string: string) {
