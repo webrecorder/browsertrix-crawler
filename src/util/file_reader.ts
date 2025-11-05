@@ -40,8 +40,9 @@ async function writeUrlContentsToFile(
   url: string,
   pathPrefix: string,
   pathDefaultExt: string,
+  useProxy: boolean = false,
 ) {
-  const res = await fetch(url, { dispatcher: getProxyDispatcher(url) });
+  const res = await fetch(url, { dispatcher: useProxy ? getProxyDispatcher(url) : undefined });
   const fileContents = await res.text();
 
   const filename =
