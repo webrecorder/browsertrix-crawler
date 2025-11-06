@@ -30,9 +30,8 @@ export async function parseSeeds(
     seedFileDone &&
     crawlState
   ) {
-    for (const seed of params.state.seedFileSeeds) {
-      const scopedSeed: ScopedSeed = JSON.parse(seed);
-      await crawlState.addSeedFileSeed(scopedSeed);
+    for (const seedUrl of params.state.seedFileSeeds) {
+      await crawlState.addSeedFileSeed(seedUrl);
     }
   }
 
@@ -76,7 +75,7 @@ export async function parseSeeds(
       const scopedSeed = new ScopedSeed({ ...scopeOpts, ...newSeed });
       scopedSeeds.push(scopedSeed);
       if (params.seedFile && !seedFileDone && crawlState) {
-        await crawlState.addSeedFileSeed(scopedSeed);
+        await crawlState.addSeedFileSeed(scopedSeed.url);
         logger.debug(
           "Pushed seed file seed to Redis",
           { url: scopedSeed.url },
@@ -103,21 +102,21 @@ export async function parseSeeds(
 
   // If seed file was already successfully parsed, re-add seeds from Redis
   if (params.seedFile && seedFileDone && crawlState) {
-    const seedFileScopedSeeds = await crawlState.getSeedFileSeeds();
-    for (const seed of seedFileScopedSeeds) {
+    const seedFileSeedUrls = await crawlState.getSeedFileSeeds();
+    for (const seedUrl of seedFileSeedUrls) {
       logger.debug(
         "Pulled seed file seed from Redis",
-        { url: seed.url },
+        { url: seedUrl },
         "seedFile",
       );
       try {
-        const scopedSeed = new ScopedSeed({ ...scopeOpts, url: seed.url });
+        const scopedSeed = new ScopedSeed({ ...scopeOpts, url: seedUrl });
         scopedSeeds.push(scopedSeed);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
         logger.error("Failed to create seed from Redis", {
           error: e.toString(),
-          ...seed,
+          url: seedUrl,
         });
       }
     }

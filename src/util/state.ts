@@ -743,7 +743,7 @@ return inx;
     const pending = await this.getPendingList();
     const failed = await this._iterListKeys(this.fkey, seen);
     const errors = await this.getErrorList();
-    const seedFileSeeds = await this._iterListKeys(this.seedFileSeedsKey, seen);
+    const seedFileSeeds = await this.getSeedFileSeeds();
     const extraSeeds = await this._iterListKeys(this.esKey, seen);
     const sitemapDone = await this.isSitemapDone();
     const seedFileDone = await this.isSeedFileDone();
@@ -1050,11 +1050,11 @@ return inx;
     return await this.redis.lpush(this.pageskey, JSON.stringify(data));
   }
 
-  async addSeedFileSeed(seed: ScopedSeed) {
-    const ret = await this.redis.sadd(this.seedFileSeedsMap, seed.url);
+  async addSeedFileSeed(url: string) {
+    const ret = await this.redis.sadd(this.seedFileSeedsMap, url);
     if (ret > 0) {
       // Push to end of list to keep seeds in order for ids
-      await this.redis.rpush(this.seedFileSeedsKey, JSON.stringify(seed));
+      await this.redis.rpush(this.seedFileSeedsKey, url);
     }
   }
 
@@ -1112,13 +1112,7 @@ return inx;
   }
 
   async getSeedFileSeeds() {
-    const seeds: ScopedSeed[] = [];
-
-    const res = await this.redis.lrange(this.seedFileSeedsKey, 0, -1);
-    for (const key of res) {
-      seeds.push(JSON.parse(key));
-    }
-    return seeds;
+    return await this.redis.lrange(this.seedFileSeedsKey, 0, -1);
   }
 
   async getExtraSeeds() {
