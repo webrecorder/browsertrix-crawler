@@ -198,12 +198,32 @@ test("check that URLs in seed-list are added to Redis then interrupt crawl", asy
 
 
 test("check seed file seeds are pulled from Redis on crawl restart and that crawl finishes successfully", async () => {
-  const res = execSync(
-    `docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures -e CRAWL_ID=seed-file-restart-test --network=seedfilecrawl --rm webrecorder/browsertrix-crawler crawl --debugAccessRedis --redisStoreUrl redis://redis:6379 --seedFile "${TEST_HOST}/urlSeedFile.txt" --limit 10 --behaviors "" --exclude community --scopeType page --extraHops 1`,
-    { encoding: "utf-8" },
-  );
+  let containerId = null;
 
-  const log = res.toString();
+  try {
+    containerId = execSync(
+      `docker run -d -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures -e CRAWL_ID=seed-file-restart-test --network=seedfilecrawl --rm webrecorder/browsertrix-crawler crawl --debugAccessRedis --redisStoreUrl redis://redis:6379 --seedFile "${TEST_HOST}/urlSeedFile.txt" --limit 10 --behaviors "" --exclude community --scopeType page --extraHops 1`,
+      { encoding: "utf-8" },
+    );
+  } catch (error) {
+    console.log(error);
+  }
+
+  await waitContainerDone(containerId);
+
+  // check most recent log file
+  const logDir = "test-crawls/collections/seed-file-restart-test/logs/";
+  const logFiles = [];
+  fs.readdirSync(logDir).forEach((file) => {
+    if (file.endsWith(".log")) {
+      logFiles.push(path.join(logDir, file));
+    }
+  });
+
+  expect(logFiles.length).toBeGreaterThan(0);
+
+  logFile = logFiles[logFiles.length - 1];
+  const log = fs.readFileSync(logFile, { encoding: "utf-8" }).trim();
 
   expect(
     log.indexOf(
@@ -223,6 +243,7 @@ test("check seed file seeds are pulled from Redis on crawl restart and that craw
     ) > 0,
   ).toBe(true);
 
+  // check we have right number of pages
   const pages = fs
     .readFileSync(pagesFile, { encoding: "utf-8" })
     .trim()
