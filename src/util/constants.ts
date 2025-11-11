@@ -32,6 +32,8 @@ export enum BxFunctionBindings {
   NextFlowStep = "__bx_nextFlowStep",
 
   ContentCheckFailed = "__bx_contentCheckFailed",
+
+  Click = "__bx_click",
 }
 
 export const MAX_DEPTH = 1000000;

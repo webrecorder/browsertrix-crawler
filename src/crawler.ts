@@ -3,6 +3,7 @@ import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp from "fs/promises";
+import { createCursor } from "ghost-cursor";
 
 import {
   RedisCrawlState,
@@ -834,6 +835,13 @@ export class Crawler {
       BxFunctionBindings.AddLinkFunc,
       (url: string) => callbacks.addLink && callbacks.addLink(url),
     );
+
+    await page.exposeFunction(BxFunctionBindings.Click, async (sel: string) => {
+      //@ts-expect-error: ignore
+      const cursor = createCursor(page);
+      await cursor.click(sel);
+      logger.info("Custom Click Made", {}, "behaviorScript");
+    });
 
     // used for both behaviors and link extraction now
     await this.browser.addInitScript(page, btrixBehaviors);
