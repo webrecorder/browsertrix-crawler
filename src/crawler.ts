@@ -592,7 +592,7 @@ export class Crawler {
   }
 
   extraChromeArgs() {
-    const args = [];
+    const args: string[] = [];
     if (this.params.lang) {
       if (this.params.profile) {
         logger.warn(
@@ -603,6 +603,16 @@ export class Crawler {
         args.push(`--accept-lang=${this.params.lang}`);
       }
     }
+
+    const extra = this.params.extraChromeArgs;
+    if (Array.isArray(extra) && extra.length > 0) {
+      for (const v of extra) {
+        if (v) {
+          args.push(String(v));
+        }
+      }
+    }
+
     return args;
   }
 
