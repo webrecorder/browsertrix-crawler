@@ -763,6 +763,10 @@ class ArgParser {
 
     // background behaviors to apply
     const behaviorOpts: { [key: string]: string | boolean } = {};
+
+    //TODO remove - test only
+    argv.behaviors = ["siteSpecific"];
+
     if (argv.behaviors.length > 0) {
       if (argv.clickSelector) {
         try {
