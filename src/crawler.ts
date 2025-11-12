@@ -2296,12 +2296,11 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.netIdle(page, logDetails);
 
-    // allow failing crawl via script only within awaitPageLoad() for now
     data.contentCheckAllowed = true;
 
     await this.awaitPageLoad(page.mainFrame(), logDetails);
 
-    data.contentCheckAllowed = false;
+    //data.contentCheckAllowed = false;
 
     // skip extraction if at max depth
     if (seed.isAtMaxDepth(depth, extraHops)) {

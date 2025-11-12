@@ -14,8 +14,10 @@ export function timedRun(
   logDetails = {},
   context: LogContext = "general",
   isWarn = false,
+  throwOnTimeout = false,
 ) {
   // return Promise return value or log error if timeout is reached first
+  // or throw if throwOnTimeout is true!
   const timeout = seconds * 1000;
 
   let tm: NodeJS.Timeout;
@@ -36,6 +38,9 @@ export function timedRun(
           { seconds: seconds, ...logDetails },
           context,
         );
+        if (throwOnTimeout) {
+          throw err;
+        }
       } else {
         //logger.error("Unknown exception", {...errJSON(err), ...logDetails}, context);
         throw err;
