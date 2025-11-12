@@ -182,6 +182,8 @@ export type SaveState = {
   errors: string[];
   extraSeeds: string[];
   sitemapDone: boolean;
+  seedFileDone: boolean;
+  seedFileSeeds: string[];
 };
 
 // ============================================================================
@@ -205,6 +207,10 @@ export class RedisCrawlState {
   esMap: string;
 
   sitemapDoneKey: string;
+
+  seedFileDoneKey: string;
+  seedFileSeedsKey: string;
+  seedFileSeedsMap: string;
 
   waczFilename: string | null = null;
 
@@ -240,6 +246,10 @@ export class RedisCrawlState {
     this.esMap = this.key + ":esMap";
 
     this.sitemapDoneKey = this.key + ":sitemapDone";
+
+    this.seedFileDoneKey = this.key + ":sfDone";
+    this.seedFileSeedsKey = this.key + "sfSeeds";
+    this.seedFileSeedsMap = this.key + ":sfMap";
 
     this._initLuaCommands(this.redis);
   }
@@ -733,8 +743,10 @@ return inx;
     const pending = await this.getPendingList();
     const failed = await this._iterListKeys(this.fkey, seen);
     const errors = await this.getErrorList();
+    const seedFileSeeds = await this._iterListKeys(this.seedFileSeedsKey, seen);
     const extraSeeds = await this._iterListKeys(this.esKey, seen);
     const sitemapDone = await this.isSitemapDone();
+    const seedFileDone = await this.isSeedFileDone();
 
     const finished = [...seen.values()];
 
@@ -744,6 +756,8 @@ return inx;
       queued,
       pending,
       sitemapDone,
+      seedFileDone,
+      seedFileSeeds,
       failed,
       errors,
     };
@@ -887,6 +901,10 @@ return inx;
 
       if (state.sitemapDone) {
         await this.markSitemapDone();
+      }
+
+      if (state.seedFileDone) {
+        await this.markSeedFileDone();
       }
     }
 
@@ -1032,6 +1050,14 @@ return inx;
     return await this.redis.lpush(this.pageskey, JSON.stringify(data));
   }
 
+  async addSeedFileSeed(seed: ScopedSeed) {
+    const ret = await this.redis.sadd(this.seedFileSeedsMap, seed.url);
+    if (ret > 0) {
+      // Push to end of list to keep seeds in order for ids
+      await this.redis.rpush(this.seedFileSeedsKey, JSON.stringify(seed));
+    }
+  }
+
   // add extra seeds from redirect
   async addExtraSeed(
     seeds: ScopedSeed[],
@@ -1085,6 +1111,16 @@ return inx;
     return seeds[newSeedId];
   }
 
+  async getSeedFileSeeds() {
+    const seeds: ScopedSeed[] = [];
+
+    const res = await this.redis.lrange(this.seedFileSeedsKey, 0, -1);
+    for (const key of res) {
+      seeds.push(JSON.parse(key));
+    }
+    return seeds;
+  }
+
   async getExtraSeeds() {
     const seeds: ExtraRedirectSeed[] = [];
     const res = await this.redis.lrange(this.esKey, 0, -1);
@@ -1105,5 +1141,13 @@ return inx;
   async markProfileUploaded(result: UploadResult & { modified?: string }) {
     result.modified = this._timestamp();
     await this.redis.set(`${this.key}:profileUploaded`, JSON.stringify(result));
+  }
+
+  async isSeedFileDone() {
+    return (await this.redis.get(this.seedFileDoneKey)) == "1";
+  }
+
+  async markSeedFileDone() {
+    await this.redis.set(this.seedFileDoneKey, "1");
   }
 }

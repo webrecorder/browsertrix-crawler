@@ -62,7 +62,8 @@ import {
 } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
-import { ScopedSeed, parseSeeds } from "./util/seeds.js";
+import { ScopedSeed } from "./util/seeds.js";
+import { parseSeeds } from "./util/parseseeds.js";
 import {
   WARCWriter,
   createWARCInfo,
@@ -513,7 +514,7 @@ export class Crawler {
     this.proxyServer = res.proxyServer;
     this.proxyPacUrl = res.proxyPacUrl;
 
-    this.seeds = await parseSeeds(this.params);
+    this.seeds = await parseSeeds(this.params, this.crawlState);
     this.numOriginalSeeds = this.seeds.length;
 
     logger.info("Seeds", this.seeds);
@@ -2651,7 +2652,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (await this.crawlState.isSitemapDone()) {
-      logger.info("Sitemap already processed, skipping", "sitemap");
+      logger.info("Sitemap already processed, skipping", {}, "sitemap");
       return;
     }
 
