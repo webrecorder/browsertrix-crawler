@@ -524,7 +524,7 @@ class ArgParser {
         netIdleMaxRequests: {
           describe:
             "max active requests allowed for network to be considered idle",
-          default: 0,
+          default: 1,
         },
 
         lang: {
