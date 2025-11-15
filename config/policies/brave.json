@@ -3,5 +3,12 @@
     "BraveWalletDisabled": true,
     "BraveVPNDisabled": 1,
     "BraveAIChatEnabled": false,
+    "BraveNewsDisabled": 1,
+    "BraveTalkDisabled": 1,
+    "BraveSpeedreaderEnabled": 0,
+    "BraveWaybackMachineEnabled": 0,
+    "BraveP3AEnabled": 0,
+    "BraveWebDiscoveryEnabled": 0,
+    "BravePlaylistEnabled": 0,
     "TorDisabled": true
 }
