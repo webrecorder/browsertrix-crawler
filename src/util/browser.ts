@@ -729,7 +729,7 @@ export const defaultArgs = [
   "--disable-breakpad",
   "--disable-client-side-phishing-detection",
   "--disable-component-extensions-with-background-pages",
-  "--disable-component-update", // Avoids unneeded network activity after startup.
+  //"--disable-component-update", // now required for chrome/brave
   "--no-default-browser-check",
   "--disable-default-apps",
   "--disable-dev-shm-usage",
