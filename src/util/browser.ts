@@ -23,8 +23,11 @@ import puppeteer, {
   LaunchOptions,
   Viewport,
   CookieData,
+  WaitForNetworkIdleOptions,
+  CDPSession,
+  Target,
+  Browser as PptrBrowser,
 } from "puppeteer-core";
-import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
 import { Recorder } from "./recorder.js";
 import { timedRun } from "./timing.js";
 import assert from "node:assert";
@@ -244,6 +247,7 @@ export class Browser {
     try {
       child_process.execSync("rm ./Singleton*", {
         cwd: this.profileDir,
+        stdio: "ignore",
       });
     } catch (e) {
       // ignore
@@ -700,7 +704,7 @@ export class Browser {
     page.on("request", callback);
   }
 
-  async waitForNetworkIdle(page: Page, params: { timeout?: number }) {
+  async waitForNetworkIdle(page: Page, params: WaitForNetworkIdleOptions) {
     return await page.waitForNetworkIdle(params);
   }
 

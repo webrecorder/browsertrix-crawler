@@ -2329,6 +2329,7 @@ self.__bx_behaviors.selectMainBehavior();
     try {
       await this.browser.waitForNetworkIdle(page, {
         timeout: this.params.netIdleWait * 1000,
+        concurrency: this.params.netIdleMaxRequests,
       });
     } catch (e) {
       logger.debug("waitForNetworkIdle timed out, ignoring", details);

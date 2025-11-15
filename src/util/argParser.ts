@@ -521,6 +521,12 @@ class ArgParser {
           default: -1,
         },
 
+        netIdleMaxRequests: {
+          describe:
+            "max active requests allowed for network to be considered idle",
+          default: 0,
+        },
+
         lang: {
           describe:
             "if set, sets the language used by the browser, should be ISO 639 language[-country] code",
