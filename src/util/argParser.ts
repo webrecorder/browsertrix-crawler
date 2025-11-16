@@ -518,7 +518,7 @@ class ArgParser {
           describe:
             "if set, wait for network idle after page load and after behaviors are done (in seconds). if -1 (default), determine based on scope",
           type: "number",
-          default: -1,
+          default: 2,
         },
 
         netIdleMaxRequests: {
@@ -842,15 +842,6 @@ class ArgParser {
     }
 
     argv.selectLinks = selectLinks;
-
-    if (argv.netIdleWait === -1) {
-      if (argv.scopeType === "page" || argv.scopeType === "page-spa") {
-        argv.netIdleWait = 15;
-      } else {
-        argv.netIdleWait = 2;
-      }
-      //logger.debug(`Set netIdleWait to ${argv.netIdleWait} seconds`);
-    }
 
     if (isQA && !argv.qaSource) {
       logger.fatal("--qaSource required for QA mode");
