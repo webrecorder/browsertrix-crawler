@@ -221,11 +221,13 @@ Options:
                                             interrupted, don't run post-crawl pr
                                             ocesses on interrupt
                                                       [boolean] [default: false]
-      --netIdleWait                         if set, wait for network idle after
-                                            page load and after behaviors are do
-                                            ne (in seconds). if -1 (default), de
-                                            termine based on scope
-                                                          [number] [default: -1]
+      --netIdleWait                         number of seconds to wait for networ
+                                            k idle after page load and after beh
+                                            aviors are done (default: 2)
+                                                           [number] [default: 2]
+      --netIdleMaxRequests                  max active requests allowed for netw
+                                            ork to be considered idle
+                                                                    [default: 1]
       --lang                                if set, sets the language used by th
                                             e browser, should be ISO 639 languag
                                             e[-country] code            [string]
@@ -318,6 +320,10 @@ Options:
       --sshProxyKnownHostsFile              path to SSH known hosts file for SOC
                                             KS5 over SSH proxy connection
                                                                         [string]
+      --extraChromeArgs                     Extra arguments to pass directly to
+                                            the Chrome instance (space-separated
+                                             or multiple --extraChromeArgs)
+                                                           [array] [default: []]
       --config                              Path to YAML config file
 ```
 
