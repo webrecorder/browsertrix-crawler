@@ -516,7 +516,7 @@ class ArgParser {
 
         netIdleWait: {
           describe:
-            "if set, wait for network idle after page load and after behaviors are done (in seconds). if -1 (default), determine based on scope",
+            "number of seconds to wait for network idle after page load and after behaviors are done (default: 2)",
           type: "number",
           default: 2,
         },
