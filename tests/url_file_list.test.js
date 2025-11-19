@@ -216,6 +216,10 @@ test("check saved state for seed file seeds", () => {
   for (const [index, seed] of seedFileSeeds.entries()) {
     expect(seed).toEqual(expectedSeedFileSeeds[index]);
   }
+
+  for (const [index, seed] of finished.entries()) {
+    expect(seed).toEqual(expectedSeedFileSeeds[index]);
+  }
 });
 
 
