@@ -167,6 +167,7 @@ export class S3StorageSync {
           {},
           "storage",
           true,
+          true,
         );
         break;
       } catch (e) {

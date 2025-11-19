@@ -1,6 +1,6 @@
 {
   "name": "browsertrix-crawler",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "main": "browsertrix-crawler",
   "type": "module",
   "repository": "https://github.com/webrecorder/browsertrix-crawler",
@@ -19,7 +19,7 @@
     "@novnc/novnc": "1.4.0",
     "@puppeteer/replay": "^3.1.3",
     "@webrecorder/wabac": "^2.24.5",
-    "browsertrix-behaviors": "^0.9.5",
+    "browsertrix-behaviors": "^0.9.6",
     "client-zip": "^2.4.5",
     "css-selector-parser": "^3.0.5",
     "fetch-socks": "^1.3.0",

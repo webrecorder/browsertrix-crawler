@@ -236,7 +236,11 @@ export class Browser {
         this.removeSingletons();
         return true;
       } catch (e) {
-        logger.error(`Profile filename ${profileFilename} not a valid tar.gz`);
+        logger.fatal(
+          `Profile filename ${profileFilename} not a valid tar.gz, can not load profile, exiting`,
+          {},
+          "browser",
+        );
       }
     }
 

@@ -1209,6 +1209,9 @@ self.__bx_behaviors.selectMainBehavior();
       if (data.skipBehaviors) {
         logger.warn("Skipping behaviors for slow page", logDetails, "behavior");
       } else {
+        // allow failing crawl via script from within behaviors also
+        data.contentCheckAllowed = true;
+
         const res = await timedRun(
           this.runBehaviors(
             page,
@@ -1223,6 +1226,8 @@ self.__bx_behaviors.selectMainBehavior();
           "behavior",
           true,
         );
+
+        data.contentCheckAllowed = false;
 
         await this.netIdle(page, logDetails);
 
@@ -2296,7 +2301,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.netIdle(page, logDetails);
 
-    // allow failing crawl via script only within awaitPageLoad() for now
+    // allow failing crawl via script only within awaitPageLoad()
     data.contentCheckAllowed = true;
 
     await this.awaitPageLoad(page.mainFrame(), logDetails);
