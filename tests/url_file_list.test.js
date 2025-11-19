@@ -292,6 +292,8 @@ test("ensure that seed file seeds were pulled from Redis on restart", async () =
   const logFile = logFiles[logFiles.length - 1];
   const log = fs.readFileSync(logFile, { encoding: "utf-8" }).trim();
 
+  expect(log.indexOf("Seed file downloaded") > 0).toBe(false);
+
   expect(
     log.indexOf(
       '"logLevel":"debug","context":"seedFile","message":"Pulled seed file seed from Redis","details":{"url":"https://old.webrecorder.net/about/"}',
