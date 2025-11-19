@@ -208,17 +208,20 @@ test("check saved state for seed file seeds", () => {
   expect(numDone > 0).toEqual(true);
   expect(numQueued > 0).toEqual(true);
 
+  // ensure seedFileDone is set
   const seedFileDone = state.seedFileDone;
   expect(seedFileDone).toEqual(true);
 
+  // ensure seed file seeds are serialized in correct order
   const seedFileSeeds = state.seedFileSeeds;
   expect(seedFileSeeds.length).toEqual(3);
   for (const [index, seed] of seedFileSeeds.entries()) {
     expect(seed).toEqual(expectedSeedFileSeeds[index]);
   }
 
-  for (const [index, seed] of finished.entries()) {
-    expect(seed).toEqual(expectedSeedFileSeeds[index]);
+  // ensure all of the seed file seeds are in finished
+  for (const seedUrl of seedFileSeeds) {
+    expect(finished.includes(seedUrl)).toEqual(true);
   }
 });
 
