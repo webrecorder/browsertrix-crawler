@@ -182,8 +182,8 @@ export type SaveState = {
   errors: string[];
   extraSeeds: string[];
   sitemapDone: boolean;
-  seedFileDone: boolean;
-  seedFileSeeds: string[];
+  seedFileDone?: boolean;
+  seedFileSeeds?: string[];
 };
 
 // ============================================================================
