@@ -20,7 +20,7 @@ import { DEFAULT_MAX_RETRIES, ExitCodes } from "./constants.js";
 
 const DEFAULT_REGION = "us-east-1";
 
-const DOWNLOAD_PROFILE_MAX_TIME = 60;
+const DOWNLOAD_PROFILE_MAX_TIME = 300;
 
 // ===========================================================================
 export type UploadResult = {
