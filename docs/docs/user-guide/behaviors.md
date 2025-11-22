@@ -143,7 +143,7 @@ class MyBehavior
   // optional: if true, will also check isMatch() and possibly run
   // this behavior in each iframe.
   // if false, or not defined, this behavior will be skipped for iframes.
-  static runInIframes = false;
+  static runInIframe = false;
 
   // optional: if defined, provides a way to define a custom way to determine
   // when a page has finished loading beyond the standard 'load' event.
