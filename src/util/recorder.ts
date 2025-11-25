@@ -145,6 +145,8 @@ export class Recorder extends EventEmitter {
 
   shouldSaveStorage = false;
 
+  stopping = false;
+
   constructor({
     workerid,
     writer,
@@ -857,8 +859,10 @@ export class Recorder extends EventEmitter {
   }
 
   addAsyncFetch(opts: AsyncFetchOptions) {
-    const fetcher = new AsyncFetcher(opts);
-    void this.fetcherQ.add(() => fetcher.load());
+    if (!this.stopping) {
+      const fetcher = new AsyncFetcher(opts);
+      void this.fetcherQ.add(() => fetcher.load());
+    }
   }
 
   addExternalFetch(url: string, cdp: CDPSession) {
@@ -1046,6 +1050,8 @@ export class Recorder extends EventEmitter {
   }
 
   async onDone(timeout: number) {
+    this.stopping = true;
+
     await this.crawlState.setStatus("pending-wait");
 
     const finishFetch = async () => {
@@ -1062,6 +1068,8 @@ export class Recorder extends EventEmitter {
         "recorder",
       );
     }
+
+    this.fetcherQ.clear();
 
     logger.debug("Finishing WARC writing", this.logDetails, "recorder");
 
@@ -1356,8 +1364,10 @@ export class Recorder extends EventEmitter {
       await fetcher.doCancel();
       return false;
     }
-    state.asyncLoading = true;
-    void this.fetcherQ.add(() => fetcher.loadDirectPage(state, crawler));
+    if (!this.stopping) {
+      state.asyncLoading = true;
+      void this.fetcherQ.add(() => fetcher.loadDirectPage(state, crawler));
+    }
     return true;
   }
 
