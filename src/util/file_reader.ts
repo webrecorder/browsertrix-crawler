@@ -36,28 +36,81 @@ async function getTempFile(
   return path.join(tmpDir, filename);
 }
 
+export async function replaceDir(
+  sourceDir: string,
+  destDir: string,
+  exists: boolean,
+) {
+  // Move new dir to new location
+  try {
+    if (exists) {
+      await fsp.rm(sourceDir, { force: true, recursive: true });
+    }
+    await fsp.rename(sourceDir, destDir);
+  } catch (e) {
+    logger.fatal("Error moving/renaming directories, should not happen", {
+      ...formatErr(e),
+    });
+  }
+}
+
 async function writeUrlContentsToFile(
+  targetDir: string,
   url: string,
   pathPrefix: string,
   pathDefaultExt: string,
-  useProxy: boolean = false,
-) {
-  const res = await fetch(url, {
-    dispatcher: useProxy ? getProxyDispatcher(url) : undefined,
-  });
-  const fileContents = await res.text();
-
+  fetchNew = false,
+  useProxy = false,
+): Promise<string> {
   const filename =
     path.basename(new URL(url).pathname) || "index." + pathDefaultExt;
-  const filepath = await getTempFile(filename, pathPrefix);
 
-  await fsp.writeFile(filepath, fileContents);
-  return filepath;
+  const targetFile = path.join(targetDir, filename);
+  let exists = false;
+
+  try {
+    await fsp.access(targetFile, fsp.constants.R_OK | fsp.constants.W_OK);
+    exists = true;
+  } catch (e) {
+    // ignore
+  }
+
+  if (exists && !fetchNew) {
+    return targetFile;
+  }
+
+  try {
+    const res = await fetch(url, {
+      dispatcher: useProxy ? getProxyDispatcher(url) : undefined,
+    });
+    const fileContents = await res.text();
+
+    const filepath = await getTempFile(filename, pathPrefix);
+
+    await fsp.writeFile(filepath, fileContents);
+
+    await fsp.rename(filepath, targetFile);
+  } catch (e) {
+    if (!exists) {
+      throw e;
+    }
+  }
+  return targetFile;
 }
 
-export async function collectOnlineSeedFile(url: string): Promise<string> {
+export async function collectOnlineSeedFile(
+  targetDir: string,
+  url: string,
+): Promise<string> {
   try {
-    const filepath = await writeUrlContentsToFile(url, "seeds-", ".txt");
+    const filepath = await writeUrlContentsToFile(
+      targetDir,
+      url,
+      "seeds-",
+      ".txt",
+      false,
+      false,
+    );
     logger.info("Seed file downloaded", { url, path: filepath });
     return filepath;
   } catch (e) {
@@ -70,16 +123,17 @@ export async function collectOnlineSeedFile(url: string): Promise<string> {
 }
 
 export async function collectCustomBehaviors(
+  targetDir: string,
   sources: string[],
 ): Promise<FileSources> {
   const collectedSources: FileSources = [];
 
   for (const fileSource of sources) {
     if (fileSource.startsWith("git+")) {
-      const newSources = await collectGitBehaviors(fileSource);
+      const newSources = await collectGitBehaviors(targetDir, fileSource);
       collectedSources.push(...newSources);
     } else if (fileSource.startsWith("http")) {
-      const newSources = await collectOnlineBehavior(fileSource);
+      const newSources = await collectOnlineBehavior(targetDir, fileSource);
       collectedSources.push(...newSources);
     } else {
       const newSources = await collectLocalPathBehaviors(fileSource);
@@ -90,15 +144,29 @@ export async function collectCustomBehaviors(
   return collectedSources;
 }
 
-async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
+async function collectGitBehaviors(
+  targetDir: string,
+  gitUrl: string,
+): Promise<FileSources> {
   const url = gitUrl.split("git+").pop() || "";
   const params = new URL(url).searchParams;
   const branch = params.get("branch") || "";
   const relPath = params.get("path") || "";
   const urlStripped = url.split("?")[0];
 
+  const behaviorsDir = path.join(targetDir, "behaviors");
+
+  let exists = false;
+
+  try {
+    await fsp.access(behaviorsDir);
+    exists = true;
+  } catch (e) {
+    // ignore
+  }
+
   const tmpDir = path.join(
-    os.tmpdir(),
+    targetDir,
     `behaviors-repo-${crypto.randomBytes(4).toString("hex")}`,
   );
 
@@ -113,6 +181,7 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
     pathToCollect = path.join(tmpDir, relPath);
   }
 
+  // Download behaviors to temp dir
   try {
     await exec(cloneCommand);
     logger.info(
@@ -120,23 +189,40 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
       { url: urlStripped },
       "behavior",
     );
-    return await collectLocalPathBehaviors(pathToCollect);
   } catch (e) {
-    logger.fatal(
-      "Error downloading custom behaviors from Git repo",
-      { url: urlStripped, ...formatErr(e) },
-      "behavior",
-    );
+    if (!exists) {
+      logger.fatal(
+        "Error downloading custom behaviors from Git repo",
+        { url: urlStripped, ...formatErr(e) },
+        "behavior",
+      );
+    } else {
+      logger.info(
+        "Error re-downloading custom behaviors from Git repo, using existing behaviors",
+        { url: urlStripped, ...formatErr(e) },
+        "behavior",
+      );
+      return await collectLocalPathBehaviors(behaviorsDir);
+    }
   }
-  return [];
+
+  await replaceDir(pathToCollect, behaviorsDir, exists);
+
+  return await collectLocalPathBehaviors(behaviorsDir);
 }
 
-async function collectOnlineBehavior(url: string): Promise<FileSources> {
+async function collectOnlineBehavior(
+  targetDir: string,
+  url: string,
+): Promise<FileSources> {
   try {
     const behaviorFilepath = await writeUrlContentsToFile(
+      targetDir,
       url,
       "behaviors-",
       ".js",
+      true,
+      false,
     );
     logger.info(
       "Custom behavior file downloaded",

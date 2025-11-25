@@ -16,7 +16,7 @@ import getFolderSize from "get-folder-size";
 
 import { WACZ } from "./wacz.js";
 import { sleep, timedRun } from "./timing.js";
-import { DEFAULT_MAX_RETRIES, ExitCodes } from "./constants.js";
+import { DEFAULT_MAX_RETRIES } from "./constants.js";
 
 const DEFAULT_REGION = "us-east-1";
 
@@ -176,12 +176,7 @@ export class S3StorageSync {
           await sleep(5);
           logger.warn("Retry downloading profile", {}, "storage");
         } else {
-          logger.fatal(
-            "Could not download profile, exiting",
-            {},
-            "storage",
-            ExitCodes.Failed,
-          );
+          throw new Error("profile count not be downloaded");
         }
       }
     }

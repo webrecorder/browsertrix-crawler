@@ -304,7 +304,10 @@ export class ScopedSeed {
   }
 }
 
-export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
+export async function parseSeeds(
+  targetDir: string,
+  params: CrawlerArgs,
+): Promise<ScopedSeed[]> {
   let seeds = params.seeds as string[];
   const scopedSeeds: ScopedSeed[] = [];
 
@@ -314,7 +317,7 @@ export async function parseSeeds(params: CrawlerArgs): Promise<ScopedSeed[]> {
       seedFilePath.startsWith("http://") ||
       seedFilePath.startsWith("https://")
     ) {
-      seedFilePath = await collectOnlineSeedFile(seedFilePath);
+      seedFilePath = await collectOnlineSeedFile(targetDir, seedFilePath);
     }
 
     const urlSeedFile = fs.readFileSync(seedFilePath, "utf8");

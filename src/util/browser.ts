@@ -1,7 +1,9 @@
 import * as child_process from "child_process";
 import fs from "fs";
+import fsp from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
+import crypto from "crypto";
 
 import os from "os";
 import path from "path";
@@ -31,6 +33,7 @@ import puppeteer, {
 import { Recorder } from "./recorder.js";
 import { timedRun } from "./timing.js";
 import assert from "node:assert";
+import { replaceDir } from "./file_reader.js";
 
 type BtrixChromeOpts = {
   proxyServer?: string;
@@ -61,6 +64,7 @@ const BROWSER_HEIGHT_OFFSET = 81;
 
 // ==================================================================
 export class Browser {
+  downloadsDir: string;
   profileDir: string;
   customProfile = false;
   // TODO: Fix this the next time the file is edited.
@@ -81,12 +85,9 @@ export class Browser {
   screenHeight: number;
   screenWHRatio: number;
 
-  constructor() {
-    this.profileDir = path.join(os.tmpdir(), "btrixProfile");
-    if (fs.existsSync(this.profileDir)) {
-      fs.rmSync(this.profileDir, { recursive: true, force: true });
-    }
-    fs.mkdirSync(this.profileDir);
+  constructor(downloadsDir: string) {
+    this.downloadsDir = downloadsDir;
+    this.profileDir = path.join(downloadsDir, "btrixProfile");
 
     // must be provided, part of Dockerfile
     assert(process.env.GEOMETRY);
@@ -112,9 +113,7 @@ export class Browser {
       return;
     }
 
-    if (profileUrl) {
-      this.customProfile = await this.loadProfile(profileUrl);
-    }
+    await this.installProfile(profileUrl);
 
     this.swOpt = swOpt;
 
@@ -190,7 +189,47 @@ export class Browser {
     }
   }
 
-  async loadProfile(profileFilename: string): Promise<boolean> {
+  async installProfile(profileUrl: string) {
+    if (!profileUrl) {
+      await fsp.mkdir(this.profileDir, { recursive: true });
+      return;
+    }
+
+    let exists = false;
+    try {
+      await fsp.mkdir(this.profileDir);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
+      if (e.code === "EEXIST") {
+        // if throws, direct
+        exists = true;
+      }
+    }
+
+    const suffix = crypto.randomBytes(4).toString("hex");
+
+    const tmpProfileDir = path.join(os.tmpdir(), `profile-${suffix}`);
+
+    try {
+      await this.loadProfile(profileUrl, tmpProfileDir);
+    } catch (e) {
+      if (exists) {
+        logger.warn(
+          "Error updating profile, using existing profile",
+          formatErr(e),
+          "browser",
+        );
+        this.customProfile = true;
+        return;
+      } else {
+        logger.fatal("Profile setup failed", formatErr(e), "browser");
+      }
+    }
+
+    await replaceDir(tmpProfileDir, this.profileDir, exists);
+  }
+
+  async loadProfile(profileFilename: string, profileDir: string) {
     const targetFilename = path.join(os.tmpdir(), "profile.tar.gz");
 
     if (
@@ -217,10 +256,9 @@ export class Browser {
       const storage = initStorage();
 
       if (!storage) {
-        logger.fatal(
+        throw new Error(
           "Profile specified relative to s3 storage, but no S3 storage defined",
         );
-        return false;
       }
 
       await storage.downloadFile(profileFilename.slice(1), targetFilename);
@@ -231,20 +269,15 @@ export class Browser {
     if (profileFilename) {
       try {
         child_process.execSync("tar xvfz " + profileFilename, {
-          cwd: this.profileDir,
+          cwd: profileDir,
         });
         this.removeSingletons();
-        return true;
       } catch (e) {
-        logger.fatal(
-          `Profile filename ${profileFilename} not a valid tar.gz, can not load profile, exiting`,
-          {},
-          "browser",
+        throw new Error(
+          `Profile filename ${profileFilename} not a valid tar.gz`,
         );
       }
     }
-
-    return false;
   }
 
   removeSingletons() {

@@ -155,6 +155,8 @@ export class Crawler {
   warcCdxDir: string;
   indexesDir: string;
 
+  downloadsDir: string;
+
   screenshotWriter: WARCWriter | null;
   textWriter: WARCWriter | null;
 
@@ -288,6 +290,9 @@ export class Crawler {
     this.warcCdxDir = path.join(this.collDir, "warc-cdx");
     this.indexesDir = path.join(this.collDir, "indexes");
 
+    // download dirs
+    this.downloadsDir = path.join(this.collDir, "downloads");
+
     this.screenshotWriter = null;
     this.textWriter = null;
 
@@ -306,7 +311,7 @@ export class Crawler {
 
     this.customBehaviors = "";
 
-    this.browser = new Browser();
+    this.browser = new Browser(this.downloadsDir);
   }
 
   protected parseArgs() {
@@ -502,6 +507,8 @@ export class Crawler {
       await fsp.mkdir(this.warcCdxDir, { recursive: true });
     }
 
+    await fsp.mkdir(this.downloadsDir, { recursive: true });
+
     this.logFH = fs.createWriteStream(this.logFilename, { flags: "a" });
     logger.setExternalLogStream(this.logFH);
 
@@ -513,7 +520,7 @@ export class Crawler {
     this.proxyServer = res.proxyServer;
     this.proxyPacUrl = res.proxyPacUrl;
 
-    this.seeds = await parseSeeds(this.params);
+    this.seeds = await parseSeeds(this.downloadsDir, this.params);
     this.numOriginalSeeds = this.seeds.length;
 
     logger.info("Seeds", this.seeds);
@@ -1010,7 +1017,10 @@ self.__bx_behaviors.selectMainBehavior();
   async loadCustomBehaviors(sources: string[]) {
     let str = "";
 
-    for (const { contents } of await collectCustomBehaviors(sources)) {
+    for (const { contents } of await collectCustomBehaviors(
+      this.downloadsDir,
+      sources,
+    )) {
       str += `self.__bx_behaviors.load(${contents});\n`;
     }
 
@@ -1024,7 +1034,10 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    for (const { path, contents } of await collectCustomBehaviors(sources)) {
+    for (const { path, contents } of await collectCustomBehaviors(
+      this.downloadsDir,
+      sources,
+    )) {
       await this.browser.checkScript(cdp, path, contents);
     }
   }
