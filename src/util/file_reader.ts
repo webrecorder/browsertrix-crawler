@@ -1,6 +1,5 @@
 import fsp from "fs/promises";
 import path from "path";
-import os from "os";
 import crypto from "crypto";
 import { fetch } from "undici";
 import util from "util";
@@ -25,11 +24,12 @@ export type FileSource = {
 export type FileSources = FileSource[];
 
 async function getTempFile(
+  targetDir: string,
   filename: string,
   dirPrefix: string,
 ): Promise<string> {
   const tmpDir = path.join(
-    os.tmpdir(),
+    targetDir,
     `${dirPrefix}-${crypto.randomBytes(4).toString("hex")}`,
   );
   await fsp.mkdir(tmpDir, { recursive: true });
@@ -46,6 +46,7 @@ export async function replaceDir(
     if (exists) {
       await fsp.rm(destDir, { force: true, recursive: true });
     }
+    //await exec(`mv ${sourceDir} ${destDir}`);
     await fsp.rename(sourceDir, destDir);
   } catch (e) {
     logger.fatal("Error moving/renaming directories, should not happen", {
@@ -85,7 +86,7 @@ async function writeUrlContentsToFile(
     });
     const fileContents = await res.text();
 
-    const filepath = await getTempFile(filename, pathPrefix);
+    const filepath = await getTempFile(targetDir, filename, pathPrefix);
 
     await fsp.writeFile(filepath, fileContents);
 

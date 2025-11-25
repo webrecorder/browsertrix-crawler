@@ -208,7 +208,7 @@ export class Browser {
 
     const suffix = crypto.randomBytes(4).toString("hex");
 
-    const tmpProfileDir = path.join(os.tmpdir(), `profile-${suffix}`);
+    const tmpProfileDir = path.join(this.downloadsDir, `profile-${suffix}`);
 
     try {
       await this.loadProfile(profileUrl, tmpProfileDir);
@@ -278,6 +278,8 @@ export class Browser {
         );
       }
     }
+
+    await fsp.unlink(targetFilename);
   }
 
   removeSingletons() {
