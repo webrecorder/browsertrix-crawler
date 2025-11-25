@@ -14,7 +14,7 @@ async function getSeeds(config) {
   };
 
   const params = parseArgs(["node", "crawler", "--config", "stdinconfig"]);
-  return await parseSeeds(params);
+  return await parseSeeds("", params);
 }
 
 test("default scope", async () => {

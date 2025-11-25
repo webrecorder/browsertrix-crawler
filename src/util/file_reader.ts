@@ -44,7 +44,7 @@ export async function replaceDir(
   // Move new dir to new location
   try {
     if (exists) {
-      await fsp.rm(sourceDir, { force: true, recursive: true });
+      await fsp.rm(destDir, { force: true, recursive: true });
     }
     await fsp.rename(sourceDir, destDir);
   } catch (e) {
