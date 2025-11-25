@@ -13,8 +13,7 @@ import { gzip } from "node:zlib";
 import { ReadableStream } from "node:stream/web";
 
 import { makeZip, InputWithoutMeta } from "client-zip";
-import { logger, formatErr } from "./logger.js";
-import { streamFinish } from "./warcwriter.js";
+import { logger, formatErr, streamFinish } from "./logger.js";
 import { getDirSize } from "./storage.js";
 
 const DATAPACKAGE_JSON = "datapackage.json";

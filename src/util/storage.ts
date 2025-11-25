@@ -176,10 +176,9 @@ export class S3StorageSync {
           await sleep(5);
           logger.warn("Retry downloading profile", {}, "storage");
         } else {
-          logger.fatal(
+          await logger.interrupt(
             "Could not download profile, exiting",
             {},
-            "storage",
             ExitCodes.Failed,
           );
         }

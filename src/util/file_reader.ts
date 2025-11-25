@@ -9,6 +9,7 @@ import { exec as execCallback } from "child_process";
 import { formatErr, logger } from "./logger.js";
 import { getProxyDispatcher } from "./proxy.js";
 import { parseRecorderFlowJson } from "./flowbehavior.js";
+import { ExitCodes } from "./constants.js";
 
 const exec = util.promisify(execCallback);
 
@@ -61,10 +62,14 @@ export async function collectOnlineSeedFile(url: string): Promise<string> {
     logger.info("Seed file downloaded", { url, path: filepath });
     return filepath;
   } catch (e) {
-    logger.fatal("Error downloading seed file from URL", {
-      url,
-      ...formatErr(e),
-    });
+    await logger.interrupt(
+      "Error downloading seed file from URL",
+      {
+        url,
+        ...formatErr(e),
+      },
+      ExitCodes.InvalidInput,
+    );
     throw e;
   }
 }
@@ -122,10 +127,10 @@ async function collectGitBehaviors(gitUrl: string): Promise<FileSources> {
     );
     return await collectLocalPathBehaviors(pathToCollect);
   } catch (e) {
-    logger.fatal(
+    await logger.interrupt(
       "Error downloading custom behaviors from Git repo",
       { url: urlStripped, ...formatErr(e) },
-      "behavior",
+      ExitCodes.InvalidInput,
     );
   }
   return [];
@@ -145,10 +150,10 @@ async function collectOnlineBehavior(url: string): Promise<FileSources> {
     );
     return await collectLocalPathBehaviors(behaviorFilepath, 0, url);
   } catch (e) {
-    logger.fatal(
+    await logger.interrupt(
       "Error downloading custom behavior from URL",
       { url, ...formatErr(e) },
-      "behavior",
+      ExitCodes.InvalidInput,
     );
   }
   return [];

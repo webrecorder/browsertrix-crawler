@@ -1106,4 +1106,10 @@ return inx;
     result.modified = this._timestamp();
     await this.redis.set(`${this.key}:profileUploaded`, JSON.stringify(result));
   }
+
+  async markFailedIfEmpty() {
+    if ((await this.numDone()) === 0) {
+      await this.setStatus("failed");
+    }
+  }
 }

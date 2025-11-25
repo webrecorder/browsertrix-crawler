@@ -12,6 +12,7 @@ import { initStorage, S3StorageSync, UploadResult } from "./storage.js";
 
 import {
   DISPLAY,
+  ExitCodes,
   PAGE_OP_TIMEOUT_SECS,
   type ServiceWorkerOpt,
 } from "./constants.js";
@@ -236,10 +237,10 @@ export class Browser {
         this.removeSingletons();
         return true;
       } catch (e) {
-        logger.fatal(
-          `Profile filename ${profileFilename} not a valid tar.gz, can not load profile, exiting`,
-          {},
-          "browser",
+        await logger.interrupt(
+          `Profile not a valid tar.gz, can not load profile, exiting`,
+          { profileFilename },
+          ExitCodes.InvalidInput,
         );
       }
     }

@@ -63,12 +63,7 @@ import {
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed, parseSeeds } from "./util/seeds.js";
-import {
-  WARCWriter,
-  createWARCInfo,
-  setWARCInfo,
-  streamFinish,
-} from "./util/warcwriter.js";
+import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
@@ -474,10 +469,9 @@ export class Crawler {
 
   async bootstrap() {
     if (await isDiskFull(this.params.cwd)) {
-      logger.fatal(
+      await logger.interrupt(
         "Out of disk space, exiting",
         {},
-        "general",
         ExitCodes.OutOfSpace,
       );
     }
@@ -502,8 +496,7 @@ export class Crawler {
       await fsp.mkdir(this.warcCdxDir, { recursive: true });
     }
 
-    this.logFH = fs.createWriteStream(this.logFilename, { flags: "a" });
-    logger.setExternalLogStream(this.logFH);
+    logger.openLog(this.logFilename);
 
     this.infoString = await getInfoString();
     setWARCInfo(this.infoString, this.params.warcInfo);
@@ -1572,14 +1565,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async setStatusAndExit(exitCode: ExitCodes, status: string) {
-    logger.info(`Exiting, Crawl status: ${status}`);
-
-    await this.closeLog();
-
-    if (this.crawlState && status) {
-      await this.crawlState.setStatus(status);
-    }
-    process.exit(exitCode);
+    await logger.interrupt("", {}, exitCode, status);
   }
 
   async serializeAndExit() {
@@ -1906,17 +1892,6 @@ self.__bx_behaviors.selectMainBehavior();
     this.browser.crashed = true;
   }
 
-  async closeLog(): Promise<void> {
-    // close file-based log
-    logger.setExternalLogStream(null);
-    if (!this.logFH) {
-      return;
-    }
-    const logFH = this.logFH;
-    this.logFH = null;
-    await streamFinish(logFH);
-  }
-
   async generateWACZ() {
     logger.info("Generating WACZ");
     await this.crawlState.setStatus("generate-wacz");
@@ -1953,7 +1928,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     logger.debug("End of log file in WACZ, storing logs to WACZ file");
 
-    await this.closeLog();
+    await logger.closeLog();
 
     const waczOpts: WACZInitOpts = {
       input: warcFileList.map((x) => path.join(this.archivesDir, x)),
@@ -2002,9 +1977,17 @@ self.__bx_behaviors.selectMainBehavior();
     } catch (e) {
       logger.error("Error creating WACZ", e);
       if (!streaming) {
-        logger.fatal("Unable to write WACZ successfully");
+        await logger.interrupt(
+          "Unable to write WACZ successfully",
+          formatErr(e),
+          ExitCodes.GenericError,
+        );
       } else if (this.params.restartsOnError) {
-        await this.setStatusAndExit(ExitCodes.UploadFailed, "interrupted");
+        await logger.interrupt(
+          "Unable to upload WACZ successfully",
+          formatErr(e),
+          ExitCodes.UploadFailed,
+        );
       }
     }
   }

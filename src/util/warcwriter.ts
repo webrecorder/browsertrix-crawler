@@ -4,7 +4,13 @@ import path from "path";
 
 import { CDXIndexer, WARCRecord, DEFAULT_CDX_FIELDS } from "warcio";
 import { WARCSerializer } from "warcio/node";
-import { logger, formatErr, LogDetails, LogContext } from "./logger.js";
+import {
+  logger,
+  formatErr,
+  LogDetails,
+  LogContext,
+  streamFinish,
+} from "./logger.js";
 import type { IndexerOffsetLength } from "warcio";
 import { timestampNow } from "./timing.js";
 import PQueue from "p-queue";
@@ -372,13 +378,4 @@ export async function createWARCInfo(filename: string) {
     gzip: true,
   });
   return buffer;
-}
-
-// =================================================================
-export function streamFinish(fh: Writable) {
-  const p = new Promise<void>((resolve) => {
-    fh.once("finish", () => resolve());
-  });
-  fh.end();
-  return p;
 }

@@ -2,6 +2,7 @@
 // to fix serialization of regexes for logging purposes
 
 import { Writable } from "node:stream";
+import fs from "node:fs";
 import { RedisCrawlState } from "./state.js";
 import { ExitCodes } from "./constants.js";
 
@@ -80,13 +81,24 @@ class Logger {
   excludeContexts: LogContext[] = [];
   crawlState?: RedisCrawlState | null = null;
   fatalExitCode: ExitCodes = ExitCodes.Fatal;
+  logFH: Writable | null = null;
 
   setDefaultFatalExitCode(exitCode: number) {
     this.fatalExitCode = exitCode;
   }
 
-  setExternalLogStream(logFH: Writable | null) {
-    this.logStream = logFH;
+  openLog(filename: string) {
+    this.logFH = fs.createWriteStream(filename, { flags: "a" });
+  }
+
+  async closeLog(): Promise<void> {
+    // close file-based log
+    if (!this.logFH) {
+      return;
+    }
+    const logFH = this.logFH;
+    this.logFH = null;
+    await streamFinish(logFH);
   }
 
   setDebugLogging(debugLog: boolean) {
@@ -220,6 +232,35 @@ class Logger {
       process.exit(exitCode);
     }
   }
+
+  async interrupt(
+    message: string,
+    data = {},
+    exitCode: ExitCodes,
+    status = "interrupted",
+  ) {
+    if (message) {
+      this.error(`${message}: exiting, crawl status: ${status}`, data);
+    } else {
+      this.info(`exiting, crawl status: ${status}`);
+    }
+
+    await this.closeLog();
+
+    if (this.crawlState && status) {
+      await this.crawlState.setStatus(status);
+    }
+    process.exit(exitCode);
+  }
+}
+
+// =================================================================
+export function streamFinish(fh: Writable) {
+  const p = new Promise<void>((resolve) => {
+    fh.once("finish", () => resolve());
+  });
+  fh.end();
+  return p;
 }
 
 export const logger = new Logger();
