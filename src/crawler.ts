@@ -1554,7 +1554,10 @@ self.__bx_behaviors.selectMainBehavior();
     if (interrupt) {
       this.uploadAndDeleteLocal = true;
       this.gracefulFinishOnInterrupt(interrupt);
+      return true;
     }
+
+    return false;
   }
 
   gracefulFinishOnInterrupt(interruptReason: InterruptReason) {
@@ -1691,7 +1694,11 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    await this.checkLimits();
+    if (await this.checkLimits()) {
+      // if interrupted
+      await this.postCrawl();
+      return;
+    }
 
     await this.crawlState.setStatus("running");
 
@@ -1869,6 +1876,7 @@ self.__bx_behaviors.selectMainBehavior();
       const uploaded = await this.generateWACZ();
 
       if (uploaded && this.uploadAndDeleteLocal) {
+        await this.crawlState.setArchiveSize(0);
         logger.info(
           `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
         );
