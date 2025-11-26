@@ -26,14 +26,11 @@ export type FileSources = FileSource[];
 async function getTempFile(
   targetDir: string,
   filename: string,
-  dirPrefix: string,
 ): Promise<string> {
-  const tmpDir = path.join(
+  return path.join(
     targetDir,
-    `${dirPrefix}-${crypto.randomBytes(4).toString("hex")}`,
+    `${crypto.randomBytes(4).toString("hex")}-${filename}`,
   );
-  await fsp.mkdir(tmpDir, { recursive: true });
-  return path.join(tmpDir, filename);
 }
 
 export async function replaceDir(
@@ -84,9 +81,12 @@ async function writeUrlContentsToFile(
     const res = await fetch(url, {
       dispatcher: useProxy ? getProxyDispatcher(url) : undefined,
     });
+    if (!res.ok) {
+      throw new Error(`Invalid response, status: ${res.status}`);
+    }
     const fileContents = await res.text();
 
-    const filepath = await getTempFile(targetDir, filename, pathPrefix);
+    const filepath = await getTempFile(targetDir, filename);
 
     await fsp.writeFile(filepath, fileContents);
 

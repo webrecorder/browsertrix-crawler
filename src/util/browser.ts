@@ -85,9 +85,9 @@ export class Browser {
   screenHeight: number;
   screenWHRatio: number;
 
-  constructor(downloadsDir: string) {
-    this.downloadsDir = downloadsDir;
-    this.profileDir = path.join(downloadsDir, "btrixProfile");
+  constructor(rootDir: string) {
+    this.downloadsDir = path.join(rootDir, "downloads");
+    this.profileDir = path.join(rootDir, "profile");
 
     // must be provided, part of Dockerfile
     assert(process.env.GEOMETRY);

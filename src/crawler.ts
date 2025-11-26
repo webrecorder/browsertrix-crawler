@@ -311,7 +311,7 @@ export class Crawler {
 
     this.customBehaviors = "";
 
-    this.browser = new Browser(this.downloadsDir);
+    this.browser = new Browser(this.collDir);
   }
 
   protected parseArgs() {

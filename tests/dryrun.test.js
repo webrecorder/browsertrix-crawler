@@ -7,10 +7,11 @@ test("ensure dryRun crawl only writes pages and logs", async () => {
   );
 
   const files = fs.readdirSync("test-crawls/collections/dry-run-wr-net").sort();
-  expect(files.length).toBe(3);
+  expect(files.length).toBe(4);
   expect(files[0]).toBe("logs");
   expect(files[1]).toBe("pages");
   expect(files[1]).toBe("downloads");
+  expect(files[1]).toBe("profile");
 });
 
 
