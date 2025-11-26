@@ -35,7 +35,7 @@ function verifyAllSeedsCrawled(collName, hasDownload) {
     "utf8",
   );
 
-  const seedFile = hasDownload ? `test-crawls/collections/${collName}/downloads/seedFileCopy.txt` : "tests/fixtures/urlSeedFile.txt";
+  const seedFile = hasDownload ? `test-crawls/collections/${collName}/downloads/seeds-seedFileCopy.txt` : "tests/fixtures/urlSeedFile.txt";
   let seed_file = fs
     .readFileSync(seedFile, "utf8")
     .split("\n")
