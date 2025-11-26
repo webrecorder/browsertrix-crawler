@@ -63,7 +63,7 @@ async function writeUrlContentsToFile(
   const filename =
     path.basename(new URL(url).pathname) || "index." + pathDefaultExt;
 
-  const targetFile = path.join(targetDir, filename);
+  const targetFile = path.join(targetDir, pathPrefix + filename);
   let exists = false;
 
   try {
@@ -155,7 +155,9 @@ async function collectGitBehaviors(
   const relPath = params.get("path") || "";
   const urlStripped = url.split("?")[0];
 
-  const behaviorsDir = path.join(targetDir, "behaviors");
+  const urlHash = crypto.createHash("sha-256").update(url).digest("hex");
+
+  const behaviorsDir = path.join(targetDir, `behaviors-repo-${urlHash}`);
 
   let exists = false;
 
@@ -168,7 +170,7 @@ async function collectGitBehaviors(
 
   const tmpDir = path.join(
     targetDir,
-    `behaviors-repo-${crypto.randomBytes(4).toString("hex")}`,
+    `behaviors-repo-${urlHash}-${crypto.randomBytes(4).toString("hex")}`,
   );
 
   let cloneCommand = "git clone ";
@@ -208,6 +210,11 @@ async function collectGitBehaviors(
   }
 
   await replaceDir(pathToCollect, behaviorsDir, exists);
+
+  // remove the rest of the repo that we're not using
+  if (relPath) {
+    await fsp.rm(tmpDir, { recursive: true, force: true });
+  }
 
   return await collectLocalPathBehaviors(behaviorsDir);
 }
