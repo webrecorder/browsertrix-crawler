@@ -5,7 +5,6 @@ import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import crypto from "crypto";
 
-import os from "os";
 import path from "path";
 
 import { formatErr, LogContext, logger } from "./logger.js";
@@ -190,29 +189,34 @@ export class Browser {
   }
 
   async installProfile(profileUrl: string) {
+    await fsp.mkdir(this.profileDir, { recursive: true });
+
     if (!profileUrl) {
-      await fsp.mkdir(this.profileDir, { recursive: true });
       return;
     }
 
-    let exists = false;
-    try {
-      await fsp.mkdir(this.profileDir);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      if (e.code === "EEXIST") {
-        // if throws, direct
-        exists = true;
-      }
-    }
+    const profileTarGz = path.join(this.downloadsDir, "profile.tar.gz");
+
+    const exists = fs.existsSync(profileTarGz);
 
     const suffix = crypto.randomBytes(4).toString("hex");
 
+    const tmpProfileDest = path.join(
+      this.downloadsDir,
+      `profile-${suffix}.tar.gz`,
+    );
     const tmpProfileDir = path.join(this.downloadsDir, `profile-${suffix}`);
+
     await fsp.mkdir(tmpProfileDir, { recursive: true });
 
     try {
-      await this.loadProfile(profileUrl, tmpProfileDir);
+      await this.loadProfile(profileUrl, tmpProfileDest, tmpProfileDir);
+
+      // replace old profile dir with new profile dir
+      await replaceDir(tmpProfileDir, this.profileDir, exists);
+
+      // replace old tarball with new tarball
+      await fsp.rename(tmpProfileDest, profileTarGz);
     } catch (e) {
       if (exists) {
         logger.warn(
@@ -223,37 +227,37 @@ export class Browser {
         this.customProfile = true;
         return;
       } else {
+        // remove the temp profile dir, likely empty
+        await fsp.rm(tmpProfileDir, { recursive: true });
         logger.fatal("Profile setup failed", formatErr(e), "browser");
       }
     }
-
-    await replaceDir(tmpProfileDir, this.profileDir, exists);
   }
 
-  async loadProfile(profileFilename: string, profileDir: string) {
-    const targetFilename = path.join(os.tmpdir(), "profile.tar.gz");
-
+  async loadProfile(
+    profileRemoteSrc: string,
+    profileLocalSrc: string,
+    profileDir: string,
+  ) {
     if (
-      profileFilename &&
-      (profileFilename.startsWith("http:") ||
-        profileFilename.startsWith("https:"))
+      profileRemoteSrc &&
+      (profileRemoteSrc.startsWith("http:") ||
+        profileRemoteSrc.startsWith("https:"))
     ) {
       logger.info(
-        `Downloading ${profileFilename} to ${targetFilename}`,
+        `Downloading ${profileRemoteSrc} to ${profileLocalSrc}`,
         {},
         "browser",
       );
 
-      const resp = await fetch(profileFilename);
+      const resp = await fetch(profileRemoteSrc);
       await pipeline(
         // TODO: Fix this the next time the file is edited.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Readable.fromWeb(resp.body as any),
-        fs.createWriteStream(targetFilename),
+        fs.createWriteStream(profileLocalSrc),
       );
-
-      profileFilename = targetFilename;
-    } else if (profileFilename && profileFilename.startsWith("@")) {
+    } else if (profileRemoteSrc && profileRemoteSrc.startsWith("@")) {
       const storage = initStorage();
 
       if (!storage) {
@@ -262,25 +266,20 @@ export class Browser {
         );
       }
 
-      await storage.downloadFile(profileFilename.slice(1), targetFilename);
-
-      profileFilename = targetFilename;
+      await storage.downloadFile(profileRemoteSrc.slice(1), profileLocalSrc);
+    } else {
+      await fsp.copyFile(profileRemoteSrc, profileLocalSrc);
     }
 
-    if (profileFilename) {
-      try {
-        child_process.execSync("tar xvfz " + profileFilename, {
-          cwd: profileDir,
-        });
-        this.removeSingletons();
-      } catch (e) {
-        throw new Error(
-          `Profile filename ${profileFilename} not a valid tar.gz`,
-        );
-      }
+    try {
+      child_process.execSync("tar xvfz " + profileLocalSrc, {
+        cwd: profileDir,
+        stdio: "ignore",
+      });
+      this.removeSingletons();
+    } catch (e) {
+      throw new Error(`Profile ${profileLocalSrc} not a valid tar.gz`);
     }
-
-    await fsp.unlink(targetFilename);
   }
 
   removeSingletons() {
