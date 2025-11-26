@@ -209,6 +209,7 @@ export class Browser {
     const suffix = crypto.randomBytes(4).toString("hex");
 
     const tmpProfileDir = path.join(this.downloadsDir, `profile-${suffix}`);
+    await fsp.mkdir(tmpProfileDir, { recursive: true });
 
     try {
       await this.loadProfile(profileUrl, tmpProfileDir);
