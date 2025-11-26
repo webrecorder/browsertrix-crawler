@@ -3,8 +3,6 @@ import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp from "fs/promises";
-import { fetch as undiciFetch } from "undici";
-import robotsParser, { Robot } from "robots-parser";
 
 import {
   RedisCrawlState,
@@ -38,7 +36,6 @@ import { logger, formatErr, LogDetails, LogContext } from "./util/logger.js";
 import { WorkerState, closeWorkers, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectCustomBehaviors, getInfoString } from "./util/file_reader.js";
-import { getProxyDispatcher } from "./util/proxy.js";
 
 import { Browser } from "./util/browser.js";
 
@@ -75,6 +72,7 @@ import {
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
+import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -549,6 +547,10 @@ export class Crawler {
     }
 
     this.headers = { "User-Agent": this.configureUA() };
+
+    if (this.params.robots) {
+      setRobotsConfig(this.headers, this.crawlState);
+    }
 
     process.on("exit", () => {
       for (const proc of subprocesses) {
@@ -1266,96 +1268,6 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
     }
-  }
-
-  async _fetchRobots(url: string) {
-    while (true) {
-      const resp = await undiciFetch(url, {
-        headers: this.headers,
-        dispatcher: getProxyDispatcher(url),
-      });
-
-      if (resp.ok) {
-        return resp;
-      }
-
-      const retry = resp.headers.get("retry-after");
-
-      if (retry) {
-        logger.debug(
-          "Robots.txt fetch: Retry after",
-          { url, retrySeconds: retry },
-          "robots",
-        );
-        await sleep(parseInt(retry));
-        continue;
-      }
-
-      logger.debug(
-        "Robots.txt not fetched",
-        { url, status: resp.status },
-        "robots",
-      );
-      return null;
-    }
-    return null;
-  }
-
-  async fetchAndParseRobots(
-    url: string,
-    logDetails: LogDetails,
-  ): Promise<Robot | null> {
-    // Fetch robots.txt for url's host and return parser.
-    // Results are cached by robots.txt URL in Redis using an LRU cache
-    // implementation that retains the 100 most recently used values.
-    const urlParser = new URL(url);
-    const robotsUrl = `${urlParser.origin}/robots.txt`;
-
-    const cachedRobots = await this.crawlState.getCachedRobots(robotsUrl);
-    if (cachedRobots) {
-      logger.debug(
-        "Using cached robots.txt body",
-        {
-          url: robotsUrl,
-          ...logDetails,
-        },
-        "robots",
-      );
-      return robotsParser(robotsUrl, cachedRobots);
-    }
-
-    try {
-      logger.debug(
-        "Fetching robots.txt",
-        { url: robotsUrl, ...logDetails },
-        "robots",
-      );
-      const resp = await this._fetchRobots(robotsUrl);
-      if (!resp) {
-        return null;
-      }
-      const content = await resp.text();
-
-      logger.debug(
-        "Caching robots.txt body",
-        { url: robotsUrl, ...logDetails },
-        "robots",
-      );
-      await this.crawlState.setCachedRobots(robotsUrl, content);
-
-      return robotsParser(robotsUrl, content);
-    } catch (e) {
-      // ignore
-    }
-    logger.warn(
-      "Failed to fetch robots.txt",
-      {
-        url: robotsUrl,
-        ...logDetails,
-      },
-      "robots",
-    );
-    return null;
   }
 
   async awaitPageExtraDelay(opts: WorkerState) {
@@ -2599,16 +2511,16 @@ self.__bx_behaviors.selectMainBehavior();
       return false;
     }
 
-    if (this.params.robots) {
-      const robots = await this.fetchAndParseRobots(url, logDetails);
-      if (robots && robots.isDisallowed(url, "Browsertrix/1.0")) {
-        logger.debug(
-          "Page URL not queued, disallowed by robots.txt",
-          { url, ...logDetails },
-          "links",
-        );
-        return false;
-      }
+    if (
+      this.params.robots &&
+      (await isDisallowedByRobots(url, logDetails, this.params.robotsAgent))
+    ) {
+      logger.debug(
+        "Page URL not queued, disallowed by robots.txt",
+        { url, ...logDetails },
+        "links",
+      );
+      return false;
     }
 
     const result = await this.crawlState.addToQueue(

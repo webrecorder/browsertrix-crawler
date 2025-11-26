@@ -711,6 +711,12 @@ class ArgParser {
           type: "boolean",
           default: false,
         },
+
+        robotsAgent: {
+          describe: "Agent to check in addition to '*' for robots rules",
+          type: "string",
+          default: "Browsertrix/1.x",
+        },
       });
   }
 
