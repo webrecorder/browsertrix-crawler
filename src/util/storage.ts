@@ -176,7 +176,7 @@ export class S3StorageSync {
           await sleep(5);
           logger.warn("Retry downloading profile", {}, "storage");
         } else {
-          throw new Error("profile count not be downloaded");
+          throw new Error("Profile could not be downloaded");
         }
       }
     }

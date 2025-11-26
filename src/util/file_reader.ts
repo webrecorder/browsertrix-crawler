@@ -184,7 +184,7 @@ async function collectGitBehaviors(
     pathToCollect = path.join(tmpDir, relPath);
   }
 
-  // Download behaviors to temp dir
+  // Download behaviors to temp dir (in downloads directory)
   try {
     await exec(cloneCommand);
     logger.info(
