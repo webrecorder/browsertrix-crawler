@@ -16,7 +16,7 @@ test("test robots.txt is fetched and cached", async () => {
 
   expect(
     log.indexOf(
-      '"logLevel":"debug","context":"robots","message":"Robots.txt not fetched","details":{"url":"https://specs.webrecorder.net/robots.txt","status":404}}',
+      '"logLevel":"debug","context":"robots","message":"Robots.txt invalid, storing empty value","details":{"url":"https://specs.webrecorder.net/robots.txt","status":404}}',
     ) > 0,
   ).toBe(true);
 

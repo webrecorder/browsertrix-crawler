@@ -102,13 +102,19 @@ async function fetchRobots(url: string): Promise<string | null> {
       }
 
       logger.debug(
-        "Robots.txt not fetched, will retry later",
+        "Robots.txt temporarily not fetched, will retry later",
         { url, status: resp.status },
         "robots",
       );
 
       return null;
     }
+
+    logger.debug(
+      "Robots.txt invalid, storing empty value",
+      { url, status: resp.status },
+      "robots",
+    );
 
     // for other status errors, just return empty
     return "";
