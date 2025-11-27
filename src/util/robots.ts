@@ -9,6 +9,11 @@ import { timedRun } from "./timing.js";
 let headers: Record<string, string> = {};
 let crawlState: RedisCrawlState | null = null;
 
+const pendingFetches: Map<string, Promise<string>> = new Map<
+  string,
+  Promise<string>
+>();
+
 // max seconds to wait to fetch robots
 const ROBOTS_FETCH_TIMEOUT = 10;
 
@@ -47,18 +52,20 @@ async function fetchAndParseRobots(
   }
 
   try {
-    logger.debug(
-      "Fetching robots.txt",
-      { url: robotsUrl, ...logDetails },
-      "robots",
-    );
-    const content = await timedRun(
-      fetchRobots(robotsUrl),
-      ROBOTS_FETCH_TIMEOUT,
-      "Fetching Robots timed out",
-      logDetails,
-      "robots",
-    );
+    let promise = pendingFetches.get(robotsUrl);
+
+    if (!promise) {
+      promise = timedRun(
+        fetchRobots(robotsUrl, logDetails),
+        ROBOTS_FETCH_TIMEOUT,
+        "Fetching Robots timed out",
+        logDetails,
+        "robots",
+      );
+      pendingFetches.set(robotsUrl, promise);
+    }
+
+    const content = await promise;
 
     if (content === null) {
       return null;
@@ -75,6 +82,8 @@ async function fetchAndParseRobots(
     return content ? robotsParser(robotsUrl, content) : null;
   } catch (e) {
     // ignore
+  } finally {
+    pendingFetches.delete(robotsUrl);
   }
   logger.warn(
     "Failed to fetch robots.txt",
@@ -87,14 +96,21 @@ async function fetchAndParseRobots(
   return null;
 }
 
-async function fetchRobots(url: string): Promise<string | null> {
+async function fetchRobots(
+  url: string,
+  logDetails: LogDetails,
+): Promise<string | null> {
+  logger.debug("Fetching robots.txt", { url, ...logDetails }, "robots");
+
   const resp = await fetch(url, {
     headers,
     dispatcher: getProxyDispatcher(url),
   });
 
   if (resp.ok) {
-    return await resp.text();
+    const buff = await resp.arrayBuffer();
+    // only decode and store at most 100K
+    return new TextDecoder().decode(buff.slice(0, 100000));
   }
 
   logger.debug(
