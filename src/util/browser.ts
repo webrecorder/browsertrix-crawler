@@ -224,14 +224,13 @@ export class Browser {
           formatErr(e),
           "browser",
         );
-        this.customProfile = true;
-        return;
       } else {
         // remove the temp profile dir, likely empty
         await fsp.rm(tmpProfileDir, { recursive: true });
         logger.fatal("Profile setup failed", formatErr(e), "browser");
       }
     }
+    this.customProfile = true;
   }
 
   async loadProfile(
