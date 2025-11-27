@@ -1606,10 +1606,10 @@ browserslist@^4.24.0:
     node-releases "^2.0.18"
     update-browserslist-db "^1.1.1"
 
-browsertrix-behaviors@^0.9.6:
-  version "0.9.6"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.9.6.tgz#9ebf583c4512172e8a5a1d35aa4f884b25eaa339"
-  integrity sha512-Ar4OBkJDRLkA4gpVv8BmcryzUdVc8tGeIkTY90eGkkeNM1wMennr2/XoEYWpX4zQlwkG7tLxQD0vQujtRNdvqA==
+browsertrix-behaviors@^0.9.7:
+  version "0.9.7"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.9.7.tgz#4bc19c1bba4eba9227f076903f1964f5aa3ebb2e"
+  integrity sha512-agTjyk2wz/wLEWbkLE8PIVn6r4Xjkx+7nEm7kiwy4Y64ePFI6wlnNQJwgeBgeRmrnh46bE6XQ8ahHl3jv4qxNQ==
   dependencies:
     query-selector-shadow-dom "^1.0.1"
 
@@ -4567,17 +4567,17 @@ puppeteer-core@24.4.0, puppeteer-core@^24.4.0:
     typed-query-selector "^2.12.0"
     ws "^8.18.1"
 
-puppeteer-core@^24.30.0:
-  version "24.30.0"
-  resolved "https://registry.yarnpkg.com/puppeteer-core/-/puppeteer-core-24.30.0.tgz#7d0d15ce6aee4f1aa8a8f046bf0198f025ee6c81"
-  integrity sha512-2S3Smy0t0W4wJnNvDe7W0bE7wDmZjfZ3ljfMgJd6hn2Hq/f0jgN+x9PULZo2U3fu5UUIJ+JP8cNUGllu8P91Pg==
+puppeteer-core@^24.31.0:
+  version "24.31.0"
+  resolved "https://registry.yarnpkg.com/puppeteer-core/-/puppeteer-core-24.31.0.tgz#a00daa971fb6a9f722264afda7290dd0bfd566f0"
+  integrity sha512-pnAohhSZipWQoFpXuGV7xCZfaGhqcBR9C4pVrU0QSrcMi7tQMH9J9lDBqBvyMAHQqe8HCARuREqFuVKRQOgTvg==
   dependencies:
     "@puppeteer/browsers" "2.10.13"
     chromium-bidi "11.0.0"
     debug "^4.4.3"
     devtools-protocol "0.0.1521046"
     typed-query-selector "^2.12.0"
-    webdriver-bidi-protocol "0.3.8"
+    webdriver-bidi-protocol "0.3.9"
     ws "^8.18.3"
 
 puppeteer@^24.4.0:
@@ -5585,10 +5585,10 @@ web-encoding@^1.1.5:
   optionalDependencies:
     "@zxing/text-encoding" "0.9.0"
 
-webdriver-bidi-protocol@0.3.8:
-  version "0.3.8"
-  resolved "https://registry.yarnpkg.com/webdriver-bidi-protocol/-/webdriver-bidi-protocol-0.3.8.tgz#9c822b2647fd16d22b1b6fd730d4a3b863c93b93"
-  integrity sha512-21Yi2GhGntMc671vNBCjiAeEVknXjVRoyu+k+9xOMShu+ZQfpGQwnBqbNz/Sv4GXZ6JmutlPAi2nIJcrymAWuQ==
+webdriver-bidi-protocol@0.3.9:
+  version "0.3.9"
+  resolved "https://registry.yarnpkg.com/webdriver-bidi-protocol/-/webdriver-bidi-protocol-0.3.9.tgz#89abf021f2a557a2dd81772f9ce7172b01f8a0f0"
+  integrity sha512-uIYvlRQ0PwtZR1EzHlTMol1G0lAlmOe6wPykF9a77AK3bkpvZHzIVxRE2ThOx5vjy2zISe0zhwf5rzuUfbo1PQ==
 
 whatwg-encoding@^2.0.0:
   version "2.0.0"
