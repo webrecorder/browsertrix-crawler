@@ -18,7 +18,7 @@
   "dependencies": {
     "@novnc/novnc": "1.4.0",
     "@puppeteer/replay": "^3.1.3",
-    "@webrecorder/wabac": "^2.24.5",
+    "@webrecorder/wabac": "^2.25.0",
     "browsertrix-behaviors": "^0.9.7",
     "client-zip": "^2.4.5",
     "css-selector-parser": "^3.0.5",

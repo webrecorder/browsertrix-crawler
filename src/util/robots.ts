@@ -9,13 +9,20 @@ import { timedRun } from "./timing.js";
 let headers: Record<string, string> = {};
 let crawlState: RedisCrawlState | null = null;
 
-const pendingFetches: Map<string, Promise<string>> = new Map<
+type FetchResp = {
+  url?: string;
+  content: string;
+};
+
+const pendingFetches: Map<string, Promise<FetchResp>> = new Map<
   string,
-  Promise<string>
+  Promise<FetchResp>
 >();
 
 // max seconds to wait to fetch robots
 const ROBOTS_FETCH_TIMEOUT = 10;
+
+const decoder = new TextDecoder();
 
 export function setRobotsConfig(
   _headers: Record<string, string>,
@@ -65,11 +72,13 @@ async function fetchAndParseRobots(
       pendingFetches.set(robotsUrl, promise);
     }
 
-    const content = await promise;
+    const resp = await promise;
 
-    if (content === null) {
+    if (resp === null) {
       return null;
     }
+
+    const { url, content } = resp;
 
     logger.debug(
       "Caching robots.txt body",
@@ -77,6 +86,11 @@ async function fetchAndParseRobots(
       "robots",
     );
     await crawlState!.setCachedRobots(robotsUrl, content);
+
+    // if redirected to a different domain /robots.txt, also set for that domain
+    if (url && url.match(/^https?:\/\/[^/]+\/robots.txt$/)) {
+      await crawlState!.setCachedRobots(url, content);
+    }
 
     // empty string cached, but no need to create parser
     return content ? robotsParser(robotsUrl, content) : null;
@@ -99,7 +113,7 @@ async function fetchAndParseRobots(
 async function fetchRobots(
   url: string,
   logDetails: LogDetails,
-): Promise<string | null> {
+): Promise<FetchResp | null> {
   logger.debug("Fetching robots.txt", { url, ...logDetails }, "robots");
 
   const resp = await fetch(url, {
@@ -110,7 +124,7 @@ async function fetchRobots(
   if (resp.ok) {
     const buff = await resp.arrayBuffer();
     // only decode and store at most 100K
-    return new TextDecoder().decode(buff.slice(0, 100000));
+    return { url: resp.url, content: decoder.decode(buff.slice(0, 100000)) };
   }
 
   logger.debug(
@@ -120,5 +134,5 @@ async function fetchRobots(
   );
 
   // for other status errors, just return empty
-  return "";
+  return { content: "" };
 }
