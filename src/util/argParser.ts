@@ -704,6 +704,19 @@ class ArgParser {
           type: "array",
           default: [],
         },
+
+        robots: {
+          describe:
+            "If set, fetch and respect page disallows specified in per-host robots.txt",
+          type: "boolean",
+          default: false,
+        },
+
+        robotsAgent: {
+          describe: "Agent to check in addition to '*' for robots rules",
+          type: "string",
+          default: "Browsertrix/1.x",
+        },
       });
   }
 

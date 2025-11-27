@@ -3,7 +3,11 @@ import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "./logger.js";
 
-import { MAX_DEPTH, DEFAULT_MAX_RETRIES } from "./constants.js";
+import {
+  MAX_DEPTH,
+  DEFAULT_MAX_RETRIES,
+  ROBOTS_CACHE_LIMIT,
+} from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 import { interpolateFilename, UploadResult } from "./storage.js";
@@ -200,7 +204,10 @@ export class RedisCrawlState {
   fkey: string;
   ekey: string;
   bkey: string;
+  rkey: string;
+  lkey: string;
   pageskey: string;
+
   esKey: string;
   esMap: string;
 
@@ -233,6 +240,10 @@ export class RedisCrawlState {
     this.ekey = this.key + ":e";
     // crawler behavior script messages
     this.bkey = this.key + ":b";
+    // cached robots.txt bodies (per-origin)
+    this.rkey = this.key + ":r";
+    // LRU cache of robots.txt keys
+    this.lkey = this.key + ":l";
     // pages
     this.pageskey = this.key + ":pages";
 
@@ -1023,6 +1034,38 @@ return inx;
 
   async logBehavior(behaviorLog: string) {
     return await this.redis.lpush(this.bkey, behaviorLog);
+  }
+
+  async _updateRobotsAccessTime(robotsUrl: string) {
+    const accessTime = Date.now();
+    await this.redis.zadd(this.lkey, accessTime, robotsUrl);
+  }
+
+  async setCachedRobots(robotsUrl: string, body: string) {
+    await this._updateRobotsAccessTime(robotsUrl);
+    await this.redis.set(`${this.rkey}:${robotsUrl}`, body);
+
+    // prune least-recently used items in zset and robots cache if over limit
+    const cacheCount = await this.redis.zcard(this.lkey);
+    if (cacheCount > ROBOTS_CACHE_LIMIT) {
+      const diff = cacheCount - ROBOTS_CACHE_LIMIT;
+      const keysToDelete = await this.redis.zrange(this.lkey, 0, diff - 1);
+
+      for (const keyToDelete of keysToDelete) {
+        logger.debug(
+          "Deleting cached robots.txt, over cache limit",
+          { url: keyToDelete },
+          "robots",
+        );
+        await this.redis.del(`${this.rkey}:${keyToDelete}`);
+        await this.redis.zrem(this.lkey, keyToDelete);
+      }
+    }
+  }
+
+  async getCachedRobots(robotsUrl: string) {
+    await this._updateRobotsAccessTime(robotsUrl);
+    return await this.redis.get(`${this.rkey}:${robotsUrl}`);
   }
 
   async writeToPagesQueue(

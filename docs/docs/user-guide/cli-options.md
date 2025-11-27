@@ -103,16 +103,16 @@ Options:
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
-   atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope"]
-                                                                   [default: []]
+   atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope",
+                                                         "robots"] [default: []]
       --logExcludeContext                   Comma-separated list of contexts to
                                             NOT include in logs
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
   , "state", "redis", "storage", "text", "exclusion", "screenshots", "screencast
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
-   atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope"]
-                           [default: ["recorderNetwork","jsError","screencast"]]
+   atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope",
+                 "robots"] [default: ["recorderNetwork","jsError","screencast"]]
       --text                                Extract initial (default) or final t
                                             ext to pages.jsonl or WARC resource
                                             record(s)
@@ -324,6 +324,12 @@ Options:
                                             the Chrome instance (space-separated
                                              or multiple --extraChromeArgs)
                                                            [array] [default: []]
+      --robots                              If set, fetch and respect page disal
+                                            lows specified in per-host robots.tx
+                                            t         [boolean] [default: false]
+      --robotsAgent                         Agent to check in addition to '*' fo
+                                            r robots rules
+                                           [string] [default: "Browsertrix/1.x"]
       --config                              Path to YAML config file
 ```
 

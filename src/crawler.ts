@@ -72,6 +72,7 @@ import {
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
+import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -546,6 +547,10 @@ export class Crawler {
     }
 
     this.headers = { "User-Agent": this.configureUA() };
+
+    if (this.params.robots) {
+      setRobotsConfig(this.headers, this.crawlState);
+    }
 
     process.on("exit", () => {
       for (const proc of subprocesses) {
@@ -2503,6 +2508,18 @@ self.__bx_behaviors.selectMainBehavior();
     pageid?: string,
   ) {
     if (this.limitHit) {
+      return false;
+    }
+
+    if (
+      this.params.robots &&
+      (await isDisallowedByRobots(url, logDetails, this.params.robotsAgent))
+    ) {
+      logger.debug(
+        "Page URL not queued, disallowed by robots.txt",
+        { url, ...logDetails },
+        "links",
+      );
       return false;
     }
 
