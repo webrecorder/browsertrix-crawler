@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from "fs";
+import os from "os";
 import http, { IncomingMessage, ServerResponse } from "http";
 
 import readline from "readline";
@@ -203,7 +204,7 @@ async function main() {
     ]);
   }
 
-  const browser = new Browser();
+  const browser = new Browser(os.tmpdir());
 
   await browser.launch({
     profileUrl: params.profile,
