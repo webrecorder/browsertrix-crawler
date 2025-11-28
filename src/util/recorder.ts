@@ -841,7 +841,7 @@ export class Recorder extends EventEmitter {
           requestId,
           errorReason,
         });
-        await this.crawlState.addDupeCrawlRef(crawlId, index);
+        await this.crawlState.addDupeCrawlDependency(crawlId, index);
         return true;
       }
     }
@@ -1701,7 +1701,7 @@ export class Recorder extends EventEmitter {
           origUrl,
           date,
         ));
-        await this.crawlState.addDupeCrawlRef(crawlId, index);
+        await this.crawlState.addDupeCrawlDependency(crawlId, index);
         isDupe = true;
       } else {
         // no dupe, continue
