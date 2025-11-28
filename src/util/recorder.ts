@@ -1776,8 +1776,6 @@ class AsyncFetcher {
         "fetch",
       );
       return false;
-    } finally {
-      this.resp = undefined;
     }
   }
 
@@ -1785,6 +1783,7 @@ class AsyncFetcher {
     const { abort } = this;
     if (abort) {
       abort.abort();
+      this.abort = undefined;
     }
   }
 
