@@ -1390,7 +1390,10 @@ return inx;
 
   async markProfileUploaded(result: UploadResult & { modified?: string }) {
     result.modified = this._timestamp();
-    await this.redis.set(`${this.key}:profileUploaded`, JSON.stringify(result));
+    await this.redis.set(
+      `${this.crawlId}:profileUploaded`,
+      JSON.stringify(result),
+    );
   }
 
   // DEPENDENT CRAWLS FOR DEDUPE
