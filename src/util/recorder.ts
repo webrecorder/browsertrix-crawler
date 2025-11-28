@@ -866,17 +866,29 @@ export class Recorder extends EventEmitter {
   }
 
   addExternalFetch(url: string, cdp: CDPSession) {
-    logger.debug(
-      "Handling fetch from behavior",
-      { url, ...this.logDetails },
-      "recorder",
-    );
     const reqresp = new RequestResponseInfo("0");
     reqresp.url = url;
     reqresp.method = "GET";
     reqresp.frameId = this.mainFrameId || undefined;
-    this.addAsyncFetch({ reqresp, recorder: this, cdp });
-    // return true if successful
+
+    const details = { url, ...this.logDetails };
+
+    const fetchIfNotDupe = async () => {
+      if (await this.isDupeFetch(reqresp)) {
+        logger.debug("Skipping dupe fetch from behavior", details, "recorder");
+        return false;
+      }
+
+      logger.debug("Handling fetch from behavior", details, "recorder");
+
+      this.addAsyncFetch({ reqresp, recorder: this, cdp });
+    };
+
+    void fetchIfNotDupe().catch(() =>
+      logger.warn("Error fetching URL from behavior", details, "recorder"),
+    );
+
+    // return true to indicate no need for in-browser fetch
     return true;
   }
 
