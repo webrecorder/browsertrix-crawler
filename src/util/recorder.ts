@@ -1451,6 +1451,16 @@ export class Recorder extends EventEmitter {
         "recorder",
       );
       reqresp.truncated = "disconnect";
+    } finally {
+      try {
+        await cdp.send("IO.close", { handle: stream });
+      } catch (e) {
+        logger.warn(
+          "takeStream close failed",
+          { url: reqresp.url, ...this.logDetails },
+          "recorder",
+        );
+      }
     }
   }
 
@@ -1662,6 +1672,7 @@ class AsyncFetcher {
 
   stream?: string;
   resp?: Response;
+  abort?: AbortController;
 
   maxFetchSize: number;
 
@@ -1753,7 +1764,11 @@ class AsyncFetcher {
         throw new Error("resp body missing");
       }
 
-      return await recorder.serializeToWARC(reqresp, iter);
+      if (!(await recorder.serializeToWARC(reqresp, iter))) {
+        await this.doCancel();
+        return false;
+      }
+      return true;
     } catch (e) {
       logger.warn(
         "Async load body failed",
@@ -1761,18 +1776,15 @@ class AsyncFetcher {
         "fetch",
       );
       return false;
+    } finally {
+      this.resp = undefined;
     }
   }
 
   async doCancel() {
-    const { resp, useBrowserNetwork } = this;
-    if (!useBrowserNetwork && resp) {
-      if (resp.status >= 300 && resp.status < 400) {
-        await resp.arrayBuffer();
-      } else {
-        // otherwise, just cancel
-        resp.body?.cancel().catch(() => {});
-      }
+    const { abort } = this;
+    if (abort) {
+      abort.abort();
     }
   }
 
@@ -1796,12 +1808,15 @@ class AsyncFetcher {
       });
     }
 
+    this.abort = new AbortController();
+
     const resp = await fetch(url!, {
       method,
       headers,
       body: reqresp.postData || undefined,
       redirect: this.manualRedirect ? "manual" : "follow",
       dispatcher,
+      signal: this.abort.signal,
     });
 
     if (
