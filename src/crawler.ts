@@ -1729,7 +1729,7 @@ self.__bx_behaviors.selectMainBehavior();
       this.storage = initStorage();
     }
 
-    if (this.params.generateWACZ && this.storage) {
+    if (this.params.generateWACZ && (this.storage || this.deduping)) {
       await this.crawlState.setWACZFilename();
     }
 
