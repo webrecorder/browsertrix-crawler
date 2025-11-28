@@ -862,17 +862,29 @@ export class Recorder extends EventEmitter {
   }
 
   addExternalFetch(url: string, cdp: CDPSession) {
-    logger.debug(
-      "Handling fetch from behavior",
-      { url, ...this.logDetails },
-      "recorder",
-    );
     const reqresp = new RequestResponseInfo("0");
     reqresp.url = url;
     reqresp.method = "GET";
     reqresp.frameId = this.mainFrameId || undefined;
-    this.addAsyncFetch({ reqresp, recorder: this, cdp });
-    // return true if successful
+
+    const details = { url, ...this.logDetails };
+
+    const fetchIfNotDupe = async () => {
+      if (await this.isDupeFetch(reqresp)) {
+        logger.debug("Skipping dupe fetch from behavior", details, "recorder");
+        return false;
+      }
+
+      logger.debug("Handling fetch from behavior", details, "recorder");
+
+      this.addAsyncFetch({ reqresp, recorder: this, cdp });
+    };
+
+    void fetchIfNotDupe().catch(() =>
+      logger.warn("Error fetching URL from behavior", details, "recorder"),
+    );
+
+    // return true to indicate no need for in-browser fetch
     return true;
   }
 
@@ -1441,6 +1453,16 @@ export class Recorder extends EventEmitter {
         "recorder",
       );
       reqresp.truncated = "disconnect";
+    } finally {
+      try {
+        await cdp.send("IO.close", { handle: stream });
+      } catch (e) {
+        logger.warn(
+          "takeStream close failed",
+          { url: reqresp.url, ...this.logDetails },
+          "recorder",
+        );
+      }
     }
   }
 
@@ -1652,6 +1674,7 @@ class AsyncFetcher {
 
   stream?: string;
   resp?: Response;
+  abort?: AbortController;
 
   maxFetchSize: number;
 
@@ -1743,7 +1766,11 @@ class AsyncFetcher {
         throw new Error("resp body missing");
       }
 
-      return await recorder.serializeToWARC(reqresp, iter);
+      if (!(await recorder.serializeToWARC(reqresp, iter))) {
+        await this.doCancel();
+        return false;
+      }
+      return true;
     } catch (e) {
       logger.warn(
         "Async load body failed",
@@ -1755,14 +1782,10 @@ class AsyncFetcher {
   }
 
   async doCancel() {
-    const { resp, useBrowserNetwork } = this;
-    if (!useBrowserNetwork && resp) {
-      if (resp.status >= 300 && resp.status < 400) {
-        await resp.arrayBuffer();
-      } else {
-        // otherwise, just cancel
-        resp.body?.cancel().catch(() => {});
-      }
+    const { abort } = this;
+    if (abort) {
+      abort.abort();
+      this.abort = undefined;
     }
   }
 
@@ -1786,12 +1809,15 @@ class AsyncFetcher {
       });
     }
 
+    this.abort = new AbortController();
+
     const resp = await fetch(url!, {
       method,
       headers,
       body: reqresp.postData || undefined,
       redirect: this.manualRedirect ? "manual" : "follow",
       dispatcher,
+      signal: this.abort.signal,
     });
 
     if (
