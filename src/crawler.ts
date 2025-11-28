@@ -1730,7 +1730,10 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.generateWACZ && (this.storage || this.deduping)) {
-      await this.crawlState.setWACZFilename();
+      const filename = await this.crawlState.setWACZFilename();
+      if (this.deduping) {
+        await this.crawlState.addSourceWACZForDedupe(filename);
+      }
     }
 
     if (POST_CRAWL_STATES.includes(initState)) {
@@ -1932,28 +1935,32 @@ self.__bx_behaviors.selectMainBehavior();
       const wacz = await this.generateWACZ();
 
       if (wacz) {
-        if (this.deduping) {
-          await this.crawlState.setStatus("post-crawl");
-          await this.crawlState.updateDedupeSource(wacz);
-
-          await this.crawlState.clearDupeFileRef();
-        }
-
         await this.crawlState.clearWACZFilename();
-      }
 
-      if (wacz && this.storage && this.uploadAndDeleteLocal) {
-        await this.crawlState.setArchiveSize(0);
+        if (this.deduping) {
+          await this.crawlState.updateDedupeSourceWACZ(wacz);
+        }
 
-        logger.info(
-          `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
-        );
-        try {
-          fs.rmSync(this.collDir, { recursive: true, force: true });
-        } catch (e) {
-          logger.warn(`Unable to clear ${this.collDir} before exit`, e);
+        if (this.storage && this.uploadAndDeleteLocal) {
+          await this.crawlState.setArchiveSize(0);
+
+          logger.info(
+            `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
+          );
+          try {
+            fs.rmSync(this.collDir, { recursive: true, force: true });
+          } catch (e) {
+            logger.warn(`Unable to clear ${this.collDir} before exit`, e);
+          }
         }
       }
+    }
+
+    if (this.deduping) {
+      //await this.crawlState.clearDupeCrawlRef();
+
+      // commit crawl data to main index
+      await this.crawlState.commitDedupeDone();
     }
 
     if (this.finalExit && generateFiles && this.params.saveProfile) {
@@ -2031,7 +2038,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.closeLog();
 
-    const requires = await this.crawlState.getDupeDependentSources();
+    const requires = await this.crawlState.getDupeDependentCrawls();
 
     const waczOpts: WACZInitOpts = {
       input: warcFileList.map((x) => path.join(this.archivesDir, x)),
