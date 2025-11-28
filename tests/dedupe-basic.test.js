@@ -28,10 +28,10 @@ afterAll(async () => {
   execSync("docker network rm dedupe");
 });
 
-function runCrawl(name, db="0") {
+function runCrawl(name, {db = 0, limit = 4, wacz = true} = {}) {
   fs.rmSync(`./test-crawls/collections/${name}`, { recursive: true, force: true });
 
-  const crawler = exec(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedupe -e CRAWL_ID=${name} webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit 4 --exclude community --collection ${name} --redisDedupeUrl redis://dedupe-redis:6379/${db} --generateWACZ`);
+  const crawler = exec(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedupe -e CRAWL_ID=${name} webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit ${limit} --exclude community --collection ${name} --redisDedupeUrl redis://dedupe-redis:6379/${db} ${wacz ? "--generateWACZ" : ""}`);
 
   return new Promise((resolve) => {
     crawler.on("exit", (code) => {
@@ -54,6 +54,16 @@ function loadFirstWARC(name) {
   return parser; 
 }
 
+function deleteFirstWARC(name) {
+  const archiveWarcLists = fs.readdirSync(
+    `test-crawls/collections/${name}/archive`,
+  );
+
+  const warcName = path.join(`test-crawls/collections/${name}/archive`, archiveWarcLists[0]);
+
+  fs.unlinkSync(warcName);
+}
+
 function loadDataPackageRelated(name) {
   execSync(
     `unzip test-crawls/collections/${name}/${name}.wacz -d test-crawls/collections/${name}/wacz`,
@@ -67,11 +77,60 @@ function loadDataPackageRelated(name) {
   return dataPackageJSON.relation;
 }
 
+test("check revisit records written on duplicate crawl, same collection, no wacz", async () => {
 
-test("check revisit records written on duplicate crawl", async () => {
+  const collName = "dedupe-test-same-coll";
 
-  expect(await runCrawl("dedupe-test-orig")).toBe(0);
-  expect(await runCrawl("dedupe-test-dupe")).toBe(0);
+  expect(await runCrawl(collName, {limit: 1, wacz: false})).toBe(0);
+
+  let statusCode = -1;
+
+  let response = 0;
+  let revisit = 0;
+
+  const parserOrig = loadFirstWARC(collName);
+
+  for await (const record of parserOrig) {
+    if (record.warcTargetURI && record.warcTargetURI.startsWith("urn:")) {
+      continue;
+    }
+
+    if (record.warcType === "response") {
+      response++;
+    }
+  }
+
+  deleteFirstWARC(collName);
+
+  expect(await runCrawl(collName, {limit: 1, wacz: false})).toBe(0);
+
+  const dupeOrig = loadFirstWARC(collName);
+
+  for await (const record of dupeOrig) {
+    if (record.warcTargetURI && record.warcTargetURI.startsWith("urn:")) {
+      continue;
+    }
+
+    if (record.warcType === "revisit") {
+      revisit++;
+    }
+  }
+
+  expect(response).toBeGreaterThan(0);
+
+  // revisits should match number of responses for non urn:
+  expect(response).toBe(revisit);
+
+  numResponses = response;
+});
+
+
+
+
+test("check revisit records written on duplicate crawl, different collections, with wacz", async () => {
+
+  expect(await runCrawl("dedupe-test-orig", {db: 1})).toBe(0);
+  expect(await runCrawl("dedupe-test-dupe", {db: 1})).toBe(0);
 
   let statusCode = -1;
 
@@ -111,11 +170,11 @@ test("check revisit records written on duplicate crawl", async () => {
 });
 
 
-test("import index and crawl dupe", async () => {
+test("import dupe index from wacz", async () => {
   
-  execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedupe webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedupe-test-orig/dedupe-test-orig.wacz --sourceCrawlId dedupe-test-orig --redisDedupeUrl redis://dedupe-redis:6379/1`);
+  execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedupe webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedupe-test-orig/dedupe-test-orig.wacz --sourceCrawlId dedupe-test-orig --redisDedupeUrl redis://dedupe-redis:6379/2`);
 
-  const redis = new Redis("redis://127.0.0.1:37379/1", { lazyConnect: true, retryStrategy: () => null });
+  const redis = new Redis("redis://127.0.0.1:37379/2", { lazyConnect: true, retryStrategy: () => null });
 
   await redis.connect({maxRetriesPerRequest: 50});
 
@@ -123,8 +182,8 @@ test("import index and crawl dupe", async () => {
 });
 
 
-test("imported crawl dupe matches previous dupe count", async () => {
-  expect(await runCrawl("dedupe-test-dupe-2", 1)).toBe(0);
+test("verify crawl with imported dupe index has same dupes as dedupe against original", async () => {
+  expect(await runCrawl("dedupe-test-dupe-2", {db: 2})).toBe(0);
 
   const dupeOrig = loadFirstWARC("dedupe-test-dupe-2");
 

@@ -235,7 +235,7 @@ export type DedupeSourceEntry = {
 export class RedisDedupeIndex {
   dedupeRedis: Redis;
   crawlId: string;
-  dedupeKeyIndex = -1;
+  dedupeKeyIndex = 0;
   dedupeCurrFilename = "";
 
   sourceDone = "src:d";
@@ -249,37 +249,32 @@ export class RedisDedupeIndex {
     this.crawlId = crawlId;
   }
 
-  // DEDUPE SOURCE
+  // DEDUPE SOURCE WACZ (to track dependencies)
 
-  async addSourceForDedupe(filename: string) {
-    //const count = await this.dedupeRedis.incr(`c:${key}:count`) - 1;
+  async addSourceWACZForDedupe(filename: string) {
+    const crawlId = this.crawlId;
     const count =
       (await this.dedupeRedis.rpush(
-        `c:${this.crawlId}:wacz`,
+        `c:${crawlId}:wacz`,
         JSON.stringify({ filename }),
       )) - 1;
     this.dedupeCurrFilename = filename;
     this.dedupeKeyIndex = count;
   }
 
-  async updateDedupeSource(wacz: WACZ) {
-    if (this.dedupeKeyIndex < 0) {
-      return;
-    }
-
+  async updateDedupeSourceWACZ(wacz: WACZ) {
     const value: DedupeSourceEntry = {
       filename: wacz.getLocalFilename() || this.dedupeCurrFilename,
       hash: wacz.getHash(),
       size: wacz.getSize(),
     };
 
+    const crawlId = this.crawlId;
     await this.dedupeRedis.lset(
-      `c:${this.crawlId}:wacz`,
+      `c:${crawlId}:wacz`,
       this.dedupeKeyIndex,
       JSON.stringify(value),
     );
-
-    await this.commitDedupeDone();
   }
 
   // COMMIT DEDUPE TO SHARED INDEX
@@ -350,9 +345,12 @@ export class RedisDedupeIndex {
     await this.dedupeRedis.lpush(this.sourceQ, data);
   }
 
-  async addImportedSourceForDedupe(key: string, entry: DedupeSourceEntry) {
+  async addImportedSourceForDedupe(crawlId: string, entry: DedupeSourceEntry) {
     return (
-      (await this.dedupeRedis.rpush(`c:${key}:wacz`, JSON.stringify(entry))) - 1
+      (await this.dedupeRedis.rpush(
+        `c:${crawlId}:wacz`,
+        JSON.stringify(entry),
+      )) - 1
     );
   }
 
@@ -808,7 +806,6 @@ return inx;
         "state",
       );
     }
-    await this.addSourceForDedupe(this.waczFilename!);
     return this.waczFilename!;
   }
 
@@ -1449,29 +1446,32 @@ return inx;
     );
   }
 
-  // DEPENDENT CRAWLS FOR DEDUPE
-  async addDupeCrawlRef(crawlId: string, index: string) {
+  // DEPENDENT CRAWLS FOR DEDUPE (requires WACZ)
+  async addDupeCrawlDependency(crawlId: string, index: string) {
     await this.redis.sadd(`${this.uid}:duperef`, crawlId + " " + index);
     await this.redis.sadd(`${this.crawlId}:reqCrawls`, crawlId);
   }
 
-  async clearDupeFileRef() {
-    await this.redis.del(`${this.uid}:duperef`);
-  }
+  // async clearDupeCrawlDependency() {
+  //   await this.redis.del(`${this.uid}:duperef`);
+  // }
 
-  async getDupeDependentSources() {
+  // Requires crawling with WACZ to match dependencies
+  async getDupeDependentCrawls() {
     const dependRefs = await this.redis.smembers(`${this.uid}:duperef`);
     const crawlIds = [];
     for (const value of dependRefs) {
       const [crawlId, index] = value.split(" ");
-      const source = await this.dedupeRedis.lindex(
-        `c:${crawlId}:wacz`,
-        Number(index),
-      );
-      if (crawlId && crawlId !== this.crawlId && source) {
-        const entry = JSON.parse(source);
-        entry.crawlId = crawlId;
-        crawlIds.push(entry);
+      if (crawlId && crawlId !== this.crawlId) {
+        const source = await this.dedupeRedis.lindex(
+          `c:${crawlId}:wacz`,
+          Number(index),
+        );
+        if (source) {
+          const entry = JSON.parse(source);
+          entry.crawlId = crawlId;
+          crawlIds.push(entry);
+        }
       }
     }
     return crawlIds;
