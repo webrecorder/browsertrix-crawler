@@ -47,6 +47,7 @@ import {
   ExitCodes,
   InterruptReason,
   BxFunctionBindings,
+  MAX_JS_DIALOG_PER_PAGE,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -890,9 +891,9 @@ self.__bx_behaviors.selectMainBehavior();
         } else {
           // other JS dialog, just dismiss
           accepted = false;
-          if (dialogCount >= 10) {
-            // dialog likely in a loop, just ignore
-            logger.warn(
+          if (dialogCount >= MAX_JS_DIALOG_PER_PAGE) {
+            // dialog likely in a loop, need to crash page to avoid being stuck
+            logger.error(
               "JS Dialog appears to be in a loop, crashing page to continue",
             );
             await cdp.send("Page.crash");
