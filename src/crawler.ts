@@ -874,30 +874,49 @@ self.__bx_behaviors.selectMainBehavior();
       await this.browser.addInitScript(page, initScript);
     }
 
+    let dialogCount = 0;
+
     // Handle JS dialogs:
     // - Ensure off-page navigation is canceled while behavior is running
     // - dismiss close all other dialogs if not blocking unload
     page.on("dialog", async (dialog) => {
       let accepted = true;
-      if (dialog.type() === "beforeunload") {
-        if (opts.pageBlockUnload) {
-          accepted = false;
-          await dialog.dismiss();
+      let msg = {};
+      try {
+        if (dialog.type() === "beforeunload") {
+          if (opts.pageBlockUnload) {
+            accepted = false;
+          }
         } else {
-          await dialog.accept();
+          // other JS dialog, just dismiss
+          accepted = false;
+          if (dialogCount >= 10) {
+            // dialog likely in a loop, just ignore
+            logger.warn(
+              "JS Dialog appears to be in a loop, crashing page to continue",
+            );
+            await cdp.send("Page.crash");
+            return;
+          }
+          dialogCount++;
         }
-      } else {
-        // other JS dialog, just dismiss
-        await dialog.dismiss();
+        msg = {
+          accepted,
+          blockingUnload: opts.pageBlockUnload,
+          message: dialog.message(),
+          type: dialog.type(),
+          page: page.url(),
+          workerid,
+        };
+        if (accepted) {
+          await dialog.accept();
+        } else {
+          await dialog.dismiss();
+        }
+        logger.debug("JS Dialog", msg);
+      } catch (e) {
+        logger.warn("JS Dialog Error", { ...msg, ...formatErr(e) });
       }
-      logger.debug("JS Dialog", {
-        accepted,
-        blockingUnload: opts.pageBlockUnload,
-        message: dialog.message(),
-        type: dialog.type(),
-        page: page.url(),
-        workerid,
-      });
     });
 
     // only add if running with autoclick behavior
