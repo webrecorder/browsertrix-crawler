@@ -43,6 +43,9 @@ export const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
 
 export const ROBOTS_CACHE_LIMIT = 100;
 
+// max JS dialogs (alert/prompt) to allow per page
+export const MAX_JS_DIALOG_PER_PAGE = 10;
+
 export type ExtractSelector = {
   selector: string;
   extract: string;
