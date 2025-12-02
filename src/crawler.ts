@@ -2714,8 +2714,17 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
+    if (
+      (this.params.scopeType === "page" ||
+        this.params.scopeType === "page-spa") &&
+      !this.params.extraHops
+    ) {
+      logger.info("Single page crawl, skipping sitemap", {}, "sitemap");
+      return;
+    }
+
     if (await this.crawlState.isSitemapDone()) {
-      logger.info("Sitemap already processed, skipping", "sitemap");
+      logger.info("Sitemap already processed, skipping", {}, "sitemap");
       return;
     }
 
@@ -2739,23 +2748,12 @@ self.__bx_behaviors.selectMainBehavior();
       limit: this.pageLimit,
     });
 
-    try {
-      await sitemapper.parse(sitemap, url);
-    } catch (e) {
-      logger.warn(
-        "Sitemap for seed failed",
-        { url, sitemap, ...formatErr(e) },
-        "sitemap",
-      );
-      return;
-    }
-
     let power = 1;
     let resolved = false;
 
     let finished = false;
 
-    await new Promise<void>((resolve) => {
+    const p = new Promise<void>((resolve) => {
       sitemapper.on("end", () => {
         resolve();
         if (!finished) {
@@ -2778,9 +2776,10 @@ self.__bx_behaviors.selectMainBehavior();
             power++;
           }
           const sitemapsQueued = sitemapper.getSitemapsQueued();
+          const pending = sitemapper.getNumPending();
           logger.debug(
             "Sitemap URLs processed so far",
-            { count, sitemapsQueued },
+            { count, sitemapsQueued, pending },
             "sitemap",
           );
         }
@@ -2798,6 +2797,19 @@ self.__bx_behaviors.selectMainBehavior();
         }
       });
     });
+
+    try {
+      await sitemapper.parse(sitemap, url);
+    } catch (e) {
+      logger.warn(
+        "Sitemap for seed failed",
+        { url, sitemap, ...formatErr(e) },
+        "sitemap",
+      );
+      return;
+    }
+
+    await p;
   }
 
   async combineWARC() {
