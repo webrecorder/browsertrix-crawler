@@ -324,7 +324,7 @@ Options:
                                             the Chrome instance (space-separated
                                              or multiple --extraChromeArgs)
                                                            [array] [default: []]
-      --robots                              If set, fetch and respect page disal
+      --useRobots, --robots                 If set, fetch and respect page disal
                                             lows specified in per-host robots.tx
                                             t         [boolean] [default: false]
       --robotsAgent                         Agent to check in addition to '*' fo
