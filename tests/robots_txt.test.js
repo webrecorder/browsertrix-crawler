@@ -2,7 +2,7 @@ import child_process from "child_process";
 
 test("test robots.txt is fetched and cached", async () => {
   const res = child_process.execSync(
-    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://webrecorder.net/ --scopeType page --robots --logging debug",
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://webrecorder.net/ --scopeType page --useRobots --logging debug",
   );
 
   const log = res.toString();
