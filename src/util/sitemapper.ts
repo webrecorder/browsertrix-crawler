@@ -35,7 +35,7 @@ export class SitemapReader extends EventEmitter {
   queue: PQueue;
 
   seenSitemapSet: Set<string>;
-  pending: Set<string>;
+  pending = 0;
 
   count = 0;
   limit: number;
@@ -52,8 +52,6 @@ export class SitemapReader extends EventEmitter {
     this.seenSitemapSet = new Set<string>();
 
     this.limit = opts.limit || 0;
-
-    this.pending = new Set<string>();
   }
 
   getCT(headers: Headers) {
@@ -191,8 +189,10 @@ export class SitemapReader extends EventEmitter {
         { fullUrl, seedUrl },
         "sitemap",
       );
-      this._parseSitemapFromResponse(fullUrl, resp);
+      await this.parseSitemapFromResponse(fullUrl, resp);
     }
+
+    await this.checkIfDone();
   }
 
   async parseFromRobots(url: string) {
@@ -218,23 +218,61 @@ export class SitemapReader extends EventEmitter {
 
   async parseSitemap(url: string) {
     this.seenSitemapSet.add(url);
-    this.pending.add(url);
 
     const resp = await this._fetchWithRetry(url, "Sitemap parse failed");
     if (!resp) {
       return;
     }
 
-    this._parseSitemapFromResponse(url, resp);
+    await this.parseSitemapFromResponse(url, resp);
+
+    await this.checkIfDone();
   }
 
-  private _parseSitemapFromResponse(url: string, resp: Response) {
+  private async parseSitemapFromResponse(url: string, resp: Response) {
+    let resolve: () => void;
+    let reject: () => void;
+
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+
+    this.pending++;
+
+    try {
+      this.doParseSitemapFromResponse(url, resp, resolve!, reject!);
+
+      await promise;
+    } finally {
+      this.pending--;
+    }
+  }
+
+  async checkIfDone() {
+    if (!this.pending) {
+      // this needs to happen async since if its in the current task,
+      // queue won't be idle until this completes
+      setTimeout(async () => {
+        await this.queue.onIdle();
+        this.emit("end");
+      }, 100);
+    }
+  }
+
+  private doParseSitemapFromResponse(
+    url: string,
+    resp: Response,
+    resolve: () => void,
+    reject: () => void,
+  ) {
     let stream;
 
     const { body } = resp;
     if (!body) {
-      void this.closeSitemap(url);
-      throw new Error("missing response body");
+      logger.warn("Sitemap missing response body", {}, "sitemap");
+      reject();
+      return;
     }
     // decompress .gz sitemaps
     // if content-encoding is gzip, then likely already being decompressed by fetch api
@@ -255,23 +293,18 @@ export class SitemapReader extends EventEmitter {
 
     readableNodeStream.on("error", (e: Error) => {
       logger.warn("Error parsing sitemap", formatErr(e), "sitemap");
-      void this.closeSitemap(url);
+      reject();
     });
 
-    this.initSaxParser(url, readableNodeStream);
+    this.initSaxParser(url, readableNodeStream, resolve, reject);
   }
 
-  private async closeSitemap(url: string) {
-    this.pending.delete(url);
-    if (!this.pending.size) {
-      await this.queue.onIdle();
-      this.emit("end");
-    }
-  }
-
-  initSaxParser(url: string, sourceStream: Readable) {
-    this.pending.add(url);
-
+  private initSaxParser(
+    url: string,
+    sourceStream: Readable,
+    resolve: () => void,
+    reject: () => void,
+  ) {
     const parserStream = sax.createStream(false, {
       trim: true,
       normalize: true,
@@ -315,7 +348,7 @@ export class SitemapReader extends EventEmitter {
       }
     };
 
-    parserStream.on("end", () => this.closeSitemap(url));
+    parserStream.on("end", () => resolve());
 
     parserStream.on("opentag", (node: sax.Tag) => {
       switch (node.name) {
@@ -398,19 +431,23 @@ export class SitemapReader extends EventEmitter {
     parserStream.on("cdata", (text: string) => processText(text));
 
     parserStream.on("error", (err: Error) => {
+      const msg = { url, err, errCount };
       if (this.atLimit()) {
-        this.pending.delete(url);
-        return;
-      }
-      logger.warn(
-        "Sitemap error parsing XML",
-        { url, err, errCount },
-        "sitemap",
-      );
-      if (errCount++ < 3) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (parserStream._parser as any).error = null;
-        parserStream._parser.resume();
+        logger.warn(
+          "Sitemap parsing aborting, page limit reached",
+          msg,
+          "sitemap",
+        );
+        resolve();
+      } else {
+        logger.warn("Sitemap error parsing XML", msg, "sitemap");
+        if (errCount++ < 3) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (parserStream._parser as any).error = null;
+          parserStream._parser.resume();
+        } else {
+          reject();
+        }
       }
     });
 
@@ -487,5 +524,9 @@ export class SitemapReader extends EventEmitter {
 
   getSitemapsQueued() {
     return this.queue.size;
+  }
+
+  getNumPending() {
+    return this.pending;
   }
 }
