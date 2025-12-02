@@ -705,7 +705,8 @@ class ArgParser {
           default: [],
         },
 
-        robots: {
+        useRobots: {
+          alias: "robots",
           describe:
             "If set, fetch and respect page disallows specified in per-host robots.txt",
           type: "boolean",
