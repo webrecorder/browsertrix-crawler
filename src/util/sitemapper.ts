@@ -62,7 +62,7 @@ export class SitemapReader extends EventEmitter {
     return ct.split(";")[0];
   }
 
-  async _fetchWithRetry(url: string, message: string) {
+  async _fetchWithRetry(url: string, expectedCT = XML_CONTENT_TYPES) {
     while (true) {
       const resp = await fetch(url, {
         headers: this.headers,
@@ -70,6 +70,15 @@ export class SitemapReader extends EventEmitter {
       });
 
       if (resp.ok) {
+        const ct = resp.headers.get("content-type");
+        if (expectedCT && ct && !expectedCT.includes(ct.split(";")[0])) {
+          logger.debug(
+            "Loading sitemap: invalid content-type",
+            { ct },
+            "sitemap",
+          );
+          return null;
+        }
         return resp;
       }
 
@@ -85,148 +94,82 @@ export class SitemapReader extends EventEmitter {
         continue;
       }
 
-      logger.debug(message, { status: resp.status }, "sitemap");
-      return null;
-    }
-  }
-
-  async tryFetch(url: string, expectedCT?: string[] | null) {
-    try {
       logger.debug(
-        "Detecting Sitemap: fetching",
-        { url, expectedCT },
+        "Loading Sitemap: invalid status code",
+        { status: resp.status },
         "sitemap",
       );
-
-      const resp = await this._fetchWithRetry(
-        url,
-        "Detecting Sitemap: invalid status code",
-      );
-
-      if (!resp) {
-        return null;
-      }
-
-      const ct = resp.headers.get("content-type");
-      if (expectedCT && ct && !expectedCT.includes(ct.split(";")[0])) {
-        logger.debug(
-          "Detecting Sitemap: invalid content-type",
-          { ct },
-          "sitemap",
-        );
-        return null;
-      }
-
-      return resp;
-    } catch (e) {
-      logger.debug("Detecting Sitemap: unknown error", e, "sitemap");
       return null;
     }
   }
 
   async parse(sitemap: string, seedUrl: string) {
-    let resp: Response | null = null;
-    let fullUrl: string | null = null;
-    let isRobots = false;
-    let isSitemap = false;
-
-    // if set to auto-detect, eg. --sitemap / --useSitemap with no URL
-    // 1. first check robots.txt
-    // 2. if not found, check /sitemap.xml
     if (sitemap === DETECT_SITEMAP) {
+      // if set to auto-detect, eg. --sitemap / --useSitemap with no URL
+      // 1. first check robots.txt
+      // 2. if not found, check /sitemap.xml
       logger.debug("Detecting sitemap for seed", { seedUrl }, "sitemap");
-      fullUrl = new URL("/robots.txt", seedUrl).href;
-      resp = await this.tryFetch(fullUrl, TEXT_CONTENT_TYPE);
-      if (resp) {
-        isRobots = true;
-      } else {
-        fullUrl = new URL("/sitemap.xml", seedUrl).href;
-        resp = await this.tryFetch(fullUrl, XML_CONTENT_TYPES);
-        if (resp) {
-          isSitemap = true;
-        }
+      const robotsUrl = new URL("/robots.txt", seedUrl).href;
+      const done = await this.parseRobotsForSitemap(robotsUrl);
+
+      if (!done) {
+        const sitemapUrl = new URL("/sitemap.xml", seedUrl).href;
+        await this.parseSitemap(sitemapUrl);
       }
     } else {
       // if specific URL provided, check if its a .xml file or a robots.txt file
-      fullUrl = new URL(sitemap, seedUrl).href;
-      let expected = null;
+      const fullUrl = new URL(sitemap, seedUrl).href;
       if (fullUrl.endsWith(".xml") || fullUrl.endsWith(".xml.gz")) {
-        expected = XML_CONTENT_TYPES;
-        isSitemap = true;
+        await this.parseSitemap(fullUrl);
       } else if (fullUrl.endsWith(".txt")) {
-        expected = TEXT_CONTENT_TYPE;
-        isRobots = true;
+        await this.parseRobotsForSitemap(fullUrl);
+      } else {
+        logger.debug(
+          "Sitemap not found",
+          { sitemap, seedUrl, fullUrl },
+          "sitemap",
+        );
+        throw new Error("not found");
       }
-      resp = await this.tryFetch(fullUrl, expected);
     }
-
-    // fail if no successful response fetched
-    if (!resp) {
-      logger.debug(
-        "Sitemap not found",
-        { sitemap, seedUrl, fullUrl },
-        "sitemap",
-      );
-      throw new Error("not found");
-    }
-
-    // fail if neither an xml nor robots.txt
-    if (!isRobots && !isSitemap) {
-      logger.info("Sitemap not detected for seed", { seedUrl }, "sitemap");
-      throw new Error("not xml or robots.txt");
-    }
-
-    if (isRobots) {
-      logger.debug(
-        "Sitemap: parsing from robots.txt",
-        { fullUrl, seedUrl },
-        "sitemap",
-      );
-      await this._parseRobotsFromResponse(resp);
-    } else if (isSitemap) {
-      logger.debug(
-        "Sitemap: parsing from top-level sitemap XML",
-        { fullUrl, seedUrl },
-        "sitemap",
-      );
-      await this.parseSitemapFromResponse(fullUrl, resp);
-    }
-
-    await this.checkIfDone();
   }
 
-  async parseFromRobots(url: string) {
-    const resp = await this._fetchWithRetry(
-      url,
-      "Sitemap robots.txt parse failed",
-    );
-    if (!resp) {
-      return;
+  private async parseRobotsForSitemap(url: string) {
+    let sitemapFound = false;
+    try {
+      const resp = await this._fetchWithRetry(url, TEXT_CONTENT_TYPE);
+      if (!resp) {
+        return sitemapFound;
+      }
+
+      const text = await resp.text();
+
+      text.replace(/^Sitemap:\s?([^\s]+)$/gim, (m, url) => {
+        this.addNewSitemap(url, null);
+        sitemapFound = true;
+        return url;
+      });
+    } catch (e) {
+      //
     }
-
-    await this._parseRobotsFromResponse(resp);
-  }
-
-  private async _parseRobotsFromResponse(resp: Response) {
-    const text = await resp.text();
-
-    text.replace(/^Sitemap:\s?([^\s]+)$/gim, (m, url) => {
-      this.addNewSitemap(url, null);
-      return url;
-    });
+    return sitemapFound;
   }
 
   async parseSitemap(url: string) {
-    this.seenSitemapSet.add(url);
+    try {
+      this.seenSitemapSet.add(url);
 
-    const resp = await this._fetchWithRetry(url, "Sitemap parse failed");
-    if (!resp) {
-      return;
+      const resp = await this._fetchWithRetry(url);
+      if (!resp) {
+        return;
+      }
+
+      await this.parseSitemapFromResponse(url, resp);
+
+      await this.checkIfDone();
+    } catch (e) {
+      logger.warn("Sitemap parse failed", { url, ...formatErr(e) }, "sitemap");
     }
-
-    await this.parseSitemapFromResponse(url, resp);
-
-    await this.checkIfDone();
   }
 
   private async parseSitemapFromResponse(url: string, resp: Response) {
@@ -490,17 +433,7 @@ export class SitemapReader extends EventEmitter {
       return;
     }
 
-    void this.queue.add(async () => {
-      try {
-        await this.parseSitemap(url);
-      } catch (e) {
-        logger.warn(
-          "Sitemap parse failed",
-          { url, ...formatErr(e) },
-          "sitemap",
-        );
-      }
-    });
+    void this.queue.add(() => this.parseSitemap(url));
   }
 
   emitEntry(url: string | null, lastmod: Date | null) {
