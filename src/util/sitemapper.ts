@@ -134,20 +134,31 @@ export class SitemapReader extends EventEmitter {
     }
   }
 
-  private async parseRobotsForSitemap(url: string) {
+  private async parseRobotsForSitemap(robotsUrl: string) {
     let sitemapFound = false;
     try {
-      const resp = await this._fetchWithRetry(url, TEXT_CONTENT_TYPE);
+      logger.debug(
+        "Sitemap: Parsing robots to detect sitemap",
+        { url: robotsUrl },
+        "sitemap",
+      );
+      const resp = await this._fetchWithRetry(robotsUrl, TEXT_CONTENT_TYPE);
       if (!resp) {
         return sitemapFound;
       }
 
       const text = await resp.text();
 
-      text.replace(/^Sitemap:\s?([^\s]+)$/gim, (m, url) => {
-        this.addNewSitemap(url, null);
-        sitemapFound = true;
-        return url;
+      text.replace(/^Sitemap:\s?([^\s]+)$/gim, (m, urlStr) => {
+        try {
+          const url = new URL(urlStr, robotsUrl).href;
+          logger.debug("Sitemap: Added from robots", { url }, "sitemap");
+          this.addNewSitemap(url, null);
+          sitemapFound = true;
+        } catch (e) {
+          // ignore invalid
+        }
+        return urlStr;
       });
     } catch (e) {
       //
@@ -158,6 +169,8 @@ export class SitemapReader extends EventEmitter {
   async parseSitemap(url: string) {
     try {
       this.seenSitemapSet.add(url);
+
+      logger.debug("Parsing sitemap XML", url, "sitemap");
 
       const resp = await this._fetchWithRetry(url);
       if (!resp) {
