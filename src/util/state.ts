@@ -11,7 +11,7 @@ import {
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 import { interpolateFilename, UploadResult } from "./storage.js";
-import normalizeUrl from "normalize-url";
+import normalizeUrl, { Options } from "normalize-url";
 
 // ============================================================================
 export enum LoadState {
@@ -28,6 +28,20 @@ export enum QueueState {
   LIMIT_HIT = 1,
   DUPE_URL = 2,
 }
+
+// ============================================================================
+const normalizeOpts: Options = {
+  defaultProtocol: "https",
+  stripAuthentication: false,
+  stripTextFragment: false,
+  stripWWW: false,
+  stripHash: false,
+  removeTrailingSlash: false,
+  removeSingleSlash: false,
+  removeExplicitPort: true,
+  sortQueryParameters: true,
+  removePath: false,
+};
 
 // ============================================================================
 // treat 0 or 206 as 200 for purposes of dedup
@@ -687,7 +701,7 @@ return inx;
     }: QueueEntry,
     limit = 0,
   ) {
-    url = normalizeUrl(url);
+    url = normalizeUrl(url, normalizeOpts);
     const added = this._timestamp();
     const data: QueueEntry = { added, url, seedId, depth, extraHops };
 
@@ -1013,7 +1027,7 @@ return inx;
   }
 
   async addIfNoDupe(key: string, url: string, status: number) {
-    url = normalizeUrl(url);
+    url = normalizeUrl(url, normalizeOpts);
     return (
       (await this.redis.sadd(key, normalizeDedupStatus(status) + "|" + url)) ===
       1
