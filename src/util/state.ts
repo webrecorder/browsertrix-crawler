@@ -89,6 +89,8 @@ export class PageState {
 
   skipBehaviors = false;
   pageSkipped = false;
+  noRetries = false;
+
   asyncLoading = false;
   filteredFrames: Frame[] = [];
   loadState: LoadState = LoadState.FAILED;

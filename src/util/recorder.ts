@@ -464,6 +464,16 @@ export class Recorder extends EventEmitter {
         }
         break;
 
+      case "net::ERR_HTTP_RESPONSE_CODE_FAILURE":
+        logger.warn("Recording empty non-200 status response", {
+          url,
+          status: reqresp.status,
+          errorText,
+          type,
+          ...this.logDetails,
+        });
+        return this.serializeToWARC(reqresp);
+
       default:
         this.lastErrorText = errorText;
         logger.warn(
