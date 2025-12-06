@@ -38,7 +38,7 @@ const normalizeOpts: Options = {
   stripHash: false,
   removeTrailingSlash: false,
   removeSingleSlash: false,
-  removeExplicitPort: true,
+  removeExplicitPort: false,
   sortQueryParameters: true,
   removePath: false,
 };
