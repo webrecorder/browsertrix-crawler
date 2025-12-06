@@ -30,7 +30,7 @@ export enum QueueState {
 }
 
 // ============================================================================
-const normalizeOpts: Options = {
+const normalizeUrlOpts: Options = {
   defaultProtocol: "https",
   stripAuthentication: false,
   stripTextFragment: false,
@@ -699,7 +699,7 @@ return inx;
     }: QueueEntry,
     limit = 0,
   ) {
-    url = normalizeUrl(url, normalizeOpts);
+    url = normalizeUrl(url, normalizeUrlOpts);
     const added = this._timestamp();
     const data: QueueEntry = { added, url, seedId, depth, extraHops };
 
@@ -1025,7 +1025,7 @@ return inx;
   }
 
   async addIfNoDupe(key: string, url: string, status: number) {
-    url = normalizeUrl(url, normalizeOpts);
+    url = normalizeUrl(url, normalizeUrlOpts);
     return (
       (await this.redis.sadd(key, normalizeDedupStatus(status) + "|" + url)) ===
       1
