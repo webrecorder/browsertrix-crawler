@@ -1327,7 +1327,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url, pageSkipped } = data;
+    const { loadState, logDetails, depth, url, pageSkipped, noRetries } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       await this.writePage(data);
@@ -1347,7 +1347,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
       } else {
-        const retry = await this.crawlState.markFailed(url);
+        const retry = await this.crawlState.markFailed(url, noRetries);
 
         if (this.healthChecker) {
           this.healthChecker.incError();
@@ -2215,8 +2215,8 @@ self.__bx_behaviors.selectMainBehavior();
         if (msg !== "logged") {
           const loadState = data.loadState;
 
-          // excluded in recorder
           if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
+            // excluded in recorder
             data.pageSkipped = true;
             logger.warn("Page Load Blocked, skipping", { msg, loadState });
           } else {
@@ -2274,6 +2274,17 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (failed) {
+      const failText = resp.request().failure()?.errorText;
+      if (isChromeError && failText === "net::ERR_HTTP_RESPONSE_CODE_FAILURE") {
+        data.noRetries = true;
+        logger.warn(
+          "Page is an empty non-200 response, not retrying",
+          { url, status, ...logDetails },
+          "pageStatus",
+        );
+        throw new Error("logged");
+      }
+
       return this.pageFailed(
         isChromeError ? "Page Crashed on Load" : "Page Invalid Status",
         retry,
