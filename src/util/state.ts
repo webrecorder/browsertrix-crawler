@@ -120,6 +120,7 @@ declare module "ioredis" {
       qkey: string,
       skey: string,
       esKey: string,
+      exrKey: string,
       url: string,
       score: number,
       data: string,
@@ -188,6 +189,7 @@ export type SaveState = {
   errors: string[];
   extraSeeds: string[];
   sitemapDone: boolean;
+  excluded?: string[];
 };
 
 // ============================================================================
@@ -212,6 +214,8 @@ export class RedisCrawlState {
 
   esKey: string;
   esMap: string;
+
+  exKey: string;
 
   sitemapDoneKey: string;
 
@@ -252,6 +256,10 @@ export class RedisCrawlState {
     this.esKey = this.key + ":extraSeeds";
     this.esMap = this.key + ":esMap";
 
+    // stores URLs that have been seen but excluded
+    // (eg. redirect-to-excluded or trimmed)
+    this.exKey = this.key + ":excluded";
+
     this.sitemapDoneKey = this.key + ":sitemapDone";
 
     this._initLuaCommands(this.redis);
@@ -259,9 +267,9 @@ export class RedisCrawlState {
 
   _initLuaCommands(redis: Redis) {
     redis.defineCommand("addqueue", {
-      numberOfKeys: 4,
+      numberOfKeys: 5,
       lua: `
-local size = redis.call('scard', KEYS[3]) - redis.call('llen', KEYS[4]);
+local size = redis.call('scard', KEYS[3]) - redis.call('llen', KEYS[4]) - redis.call('scard', KEYS[5]);
 local limit = tonumber(ARGV[4]);
 if limit > 0 and size >= limit then
   return 1;
@@ -288,7 +296,7 @@ return 0;
       if json then
         local data = cjson.decode(json);
         redis.call('hdel', KEYS[2], data.url);
-        redis.call('srem', KEYS[3], data.url);
+        redis.call('sadd', KEYS[3], data.url);
       end
       return 1;
       `,
@@ -449,7 +457,7 @@ return inx;
   async markExcluded(url: string) {
     await this.redis.hdel(this.pkey, url);
 
-    await this.redis.srem(this.skey, url);
+    await this.redis.sadd(this.exKey, url);
   }
 
   recheckScope(data: QueueEntry, seeds: ScopedSeed[]) {
@@ -486,7 +494,7 @@ return inx;
     const remain = Math.max(0, limit - totalComplete);
     // trim queue until size <= remain
     while (
-      (await this.redis.trimqueue(this.qkey, this.pkey, this.skey, remain)) ===
+      (await this.redis.trimqueue(this.qkey, this.pkey, this.exKey, remain)) ===
       1
     ) {
       /* ignore */
@@ -706,6 +714,7 @@ return inx;
       this.qkey,
       this.skey,
       this.esKey,
+      this.exKey,
       url,
       this._getScore(data),
       JSON.stringify(data),
@@ -748,8 +757,10 @@ return inx;
     const errors = await this.getErrorList();
     const extraSeeds = await this._iterListKeys(this.esKey, seen);
     const sitemapDone = await this.isSitemapDone();
+    const excludedSet = await this._iterSet(this.exKey);
 
     const finished = [...seen.values()];
+    const excluded = [...excludedSet.values()];
 
     return {
       extraSeeds,
@@ -759,6 +770,7 @@ return inx;
       sitemapDone,
       failed,
       errors,
+      excluded,
     };
   }
 
@@ -845,6 +857,7 @@ return inx;
     await this.redis.del(this.fkey);
     await this.redis.del(this.skey);
     await this.redis.del(this.ekey);
+    await this.redis.del(this.exKey);
 
     let seen: string[] = [];
 
@@ -940,6 +953,11 @@ return inx;
     }
 
     await this.redis.sadd(this.skey, seen);
+
+    if (state.excluded?.length) {
+      await this.redis.sadd(this.exKey, state.excluded);
+    }
+
     return seen.length;
   }
 
