@@ -2219,6 +2219,7 @@ self.__bx_behaviors.selectMainBehavior();
             // excluded in recorder
             data.pageSkipped = true;
             logger.warn("Page Load Blocked, skipping", { msg, loadState });
+            throw new Error("logged");
           } else {
             return this.pageFailed("Page Load Failed", retry, {
               msg,
