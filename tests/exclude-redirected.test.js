@@ -40,11 +40,7 @@ test("ensure exclusion applied on redirect URL, and URL is not requeued again", 
     { encoding: "utf-8" },
   );
 
-  // expect one occurence
+  // expect no urn:pageinfo records for excluded page
   const first = data.indexOf(`"urn:pageinfo:https://www.iana.org/domains/example"`);
-  expect(first > 0).toBe(true);
-
-  // expect no other occurences
-  expect(data.indexOf(`"urn:pageinfo:https://www.iana.org/domains/example"`, first + 1)).toBe(-1);
-
+  expect(first < 0).toBe(true);
 });
