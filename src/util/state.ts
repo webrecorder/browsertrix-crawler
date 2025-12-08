@@ -11,7 +11,7 @@ import {
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 import { interpolateFilename, UploadResult } from "./storage.js";
-import normalizeUrl, { Options } from "normalize-url";
+import normalizeUrl, { Options as NormamlizeUrlOptions } from "normalize-url";
 
 // ============================================================================
 export enum LoadState {
@@ -30,7 +30,7 @@ export enum QueueState {
 }
 
 // ============================================================================
-const normalizeUrlOpts: Options = {
+const normalizeUrlOpts: NormamlizeUrlOptions = {
   defaultProtocol: "https",
   stripAuthentication: false,
   stripTextFragment: false,
