@@ -120,7 +120,7 @@ declare module "ioredis" {
       qkey: string,
       skey: string,
       esKey: string,
-      exrKey: string,
+      exKey: string,
       url: string,
       score: number,
       data: string,
