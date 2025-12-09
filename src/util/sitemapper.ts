@@ -73,7 +73,7 @@ export class SitemapReader extends EventEmitter {
         const ct = resp.headers.get("content-type");
         if (expectedCT && ct && !expectedCT.includes(ct.split(";")[0])) {
           logger.debug(
-            "Not loading sitemap: invalid content-type"
+            "Not loading sitemap: invalid content-type",
             { ct },
             "sitemap",
           );
@@ -104,34 +104,45 @@ export class SitemapReader extends EventEmitter {
   }
 
   async parse(sitemap: string, seedUrl: string) {
+    let found = false;
+
     if (sitemap === DETECT_SITEMAP) {
       // if set to auto-detect, eg. --sitemap / --useSitemap with no URL
       // 1. first check robots.txt
       // 2. if not found, check /sitemap.xml
       logger.debug("Detecting sitemap for seed", { seedUrl }, "sitemap");
       const robotsUrl = new URL("/robots.txt", seedUrl).href;
-      const done = await this.parseRobotsForSitemap(robotsUrl);
+      found = await this.parseRobotsForSitemap(robotsUrl);
 
-      if (!done) {
-        const sitemapUrl = new URL("/sitemap.xml", seedUrl).href;
-        await this.parseSitemap(sitemapUrl);
+      const sitemapUrl = new URL("/sitemap.xml", seedUrl).href;
+
+      if (!found) {
+        found = await this.parseSitemap(sitemapUrl);
+      }
+      if (!found) {
+        logger.debug(
+          "Sitemap not detected in robots.txt or sitemap.xml",
+          { robotsUrl, sitemapUrl, seedUrl },
+          "sitemap",
+        );
       }
     } else {
       // if specific URL provided, check if its a .xml file or a robots.txt file
       const fullUrl = new URL(sitemap, seedUrl).href;
       if (fullUrl.endsWith(".xml") || fullUrl.endsWith(".xml.gz")) {
-        await this.parseSitemap(fullUrl);
+        found = await this.parseSitemap(fullUrl);
       } else if (fullUrl.endsWith(".txt")) {
-        await this.parseRobotsForSitemap(fullUrl);
+        found = await this.parseRobotsForSitemap(fullUrl);
       } else {
         logger.debug(
-          "Sitemap not found",
+          "URL provided must be a sitemap XML or robots TXT file",
           { sitemap, seedUrl, fullUrl },
           "sitemap",
         );
-        throw new Error("not found");
       }
     }
+
+    return found;
   }
 
   private async parseRobotsForSitemap(robotsUrl: string) {
@@ -174,14 +185,16 @@ export class SitemapReader extends EventEmitter {
 
       const resp = await this._fetchWithRetry(url);
       if (!resp) {
-        return;
+        return false;
       }
 
       await this.parseSitemapFromResponse(url, resp);
 
       await this.checkIfDone();
+      return true;
     } catch (e) {
       logger.warn("Sitemap parse failed", { url, ...formatErr(e) }, "sitemap");
+      return false;
     }
   }
 
@@ -386,14 +399,19 @@ export class SitemapReader extends EventEmitter {
     parserStream.on("text", (text: string) => processText(text));
     parserStream.on("cdata", (text: string) => processText(text));
 
+    let limitLogged = false;
+
     parserStream.on("error", (err: Error) => {
       const msg = { url, err, errCount };
       if (this.atLimit()) {
-        logger.warn(
-          "Sitemap parsing aborting, page limit reached",
-          msg,
-          "sitemap",
-        );
+        if (!limitLogged) {
+          logger.warn(
+            "Sitemap parsing aborting, page limit reached",
+            msg,
+            "sitemap",
+          );
+          limitLogged = true;
+        }
         resolve();
       } else {
         logger.warn("Sitemap error parsing XML", msg, "sitemap");
