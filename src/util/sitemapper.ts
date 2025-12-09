@@ -73,7 +73,7 @@ export class SitemapReader extends EventEmitter {
         const ct = resp.headers.get("content-type");
         if (expectedCT && ct && !expectedCT.includes(ct.split(";")[0])) {
           logger.debug(
-            "Loading sitemap: invalid content-type",
+            "Not loading sitemap: invalid content-type"
             { ct },
             "sitemap",
           );
@@ -95,7 +95,7 @@ export class SitemapReader extends EventEmitter {
       }
 
       logger.debug(
-        "Loading Sitemap: invalid status code",
+        "Not loading sitemap: invalid status code",
         { status: resp.status },
         "sitemap",
       );
