@@ -118,6 +118,7 @@ export class Recorder extends EventEmitter {
   pageInfo!: PageInfoRecord;
   mainFrameId: string | null = null;
   skipRangeUrls!: Map<string, number>;
+  skipPageInfo = false;
 
   swTargetId?: string | null;
   swFrameIds = new Set<string>();
@@ -743,6 +744,7 @@ export class Recorder extends EventEmitter {
       );
 
       if (errorReason) {
+        this.skipPageInfo = true;
         await cdp.send("Fetch.failRequest", {
           requestId,
           errorReason,
@@ -946,6 +948,7 @@ export class Recorder extends EventEmitter {
     this.pendingRequests = new Map();
     this.skipIds = new Set();
     this.skipRangeUrls = new Map<string, number>();
+    this.skipPageInfo = false;
     this.pageFinished = false;
     this.pageInfo = {
       pageid,
@@ -974,6 +977,14 @@ export class Recorder extends EventEmitter {
   }
 
   writePageInfoRecord() {
+    if (this.skipPageInfo) {
+      logger.debug(
+        "Skipping writing pageinfo for blocked page",
+        { url: "urn:pageinfo:" + this.pageUrl },
+        "recorder",
+      );
+      return;
+    }
     const text = JSON.stringify(this.pageInfo, null, 2);
 
     const url = this.pageUrl;

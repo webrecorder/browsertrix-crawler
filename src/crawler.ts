@@ -2076,12 +2076,11 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    const realSize = await this.crawlState.queueSize();
     const pendingPages = await this.crawlState.getPendingList();
     const pending = pendingPages.length;
     const crawled = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
-    const total = realSize + pendingPages.length + crawled + failed;
+    const total = await this.crawlState.numFound();
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled,
@@ -2219,6 +2218,7 @@ self.__bx_behaviors.selectMainBehavior();
             // excluded in recorder
             data.pageSkipped = true;
             logger.warn("Page Load Blocked, skipping", { msg, loadState });
+            throw new Error("logged");
           } else {
             return this.pageFailed("Page Load Failed", retry, {
               msg,
