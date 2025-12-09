@@ -115,6 +115,12 @@ export class PageState {
 // ============================================================================
 declare module "ioredis" {
   interface RedisCommander<Context> {
+    numfound(
+      skey: string,
+      esKey: string,
+      exKey: string,
+    ): Result<number, Context>;
+
     addqueue(
       pkey: string,
       qkey: string,
@@ -266,6 +272,13 @@ export class RedisCrawlState {
   }
 
   _initLuaCommands(redis: Redis) {
+    redis.defineCommand("numfound", {
+      numberOfKeys: 3,
+      lua: `
+return redis.call('scard', KEYS[1]) - redis.call('llen', KEYS[2]) - redis.call('scard', KEYS[3]);
+`,
+    });
+
     redis.defineCommand("addqueue", {
       numberOfKeys: 5,
       lua: `
@@ -477,6 +490,10 @@ return inx;
       (await this.numPending()) === 0 &&
       (await this.numFailed()) > 0
     );
+  }
+
+  async numFound() {
+    return await this.redis.numfound(this.skey, this.esKey, this.exKey);
   }
 
   async trimToLimit(limit: number) {
