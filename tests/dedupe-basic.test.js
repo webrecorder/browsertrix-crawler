@@ -90,11 +90,11 @@ async function checkSizeStats(numUniq, key, db, minSizeDiff) {
   console.log(numUniq, result);
   expect(numUniq).toBeLessThan(Number(result.totalUrls));
 
-  const uniqSize = Number(result.uniqSize);
+  const uniqueSize = Number(result.uniqueSize);
   const totalSize = Number(result.totalSize);
 
-  expect(uniqSize).toBeLessThan(totalSize);
-  expect(totalSize - uniqSize).toBeGreaterThan(minSizeDiff);
+  expect(uniqueSize).toBeLessThan(totalSize);
+  expect(totalSize - uniqueSize).toBeGreaterThan(minSizeDiff);
 }
 
 test("check revisit records written on duplicate crawl, same collection, no wacz", async () => {

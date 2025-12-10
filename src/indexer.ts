@@ -124,10 +124,9 @@ export class CrawlIndexer {
     }
 
     if (params.removing) {
-      const removeset = await dedupeIndex.getRemoveSet();
-      if (removeset.size > 0) {
-        await dedupeIndex.removeCrawlIds(removeset);
-      }
+      await dedupeIndex.purgeUnusedCrawls();
+    } else {
+      await dedupeIndex.countUnusedCrawls();
     }
 
     logger.info("Done!");
