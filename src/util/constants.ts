@@ -24,6 +24,7 @@ export const EXTRACT_TEXT_TYPES = ["to-pages", "to-warc", "final-to-warc"];
 
 export const DUPE_ALL_HASH_KEY = "alldupes";
 export const DUPE_ALL_CRAWLS = "allcrawls";
+export const DUPE_ALL_COUNTS = "allcounts";
 
 export enum BxFunctionBindings {
   BehaviorLogFunc = "__bx_log",
