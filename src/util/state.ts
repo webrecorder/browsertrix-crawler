@@ -351,9 +351,9 @@ export class RedisDedupeIndex {
   ) {
     crawlId = crawlId || this.crawlId;
     if (isDupe) {
-      await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "uniqSize", size);
+      await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "uniqueSize", size);
       if (commitToAllKey) {
-        await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "uniqSize", size);
+        await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "uniqueSize", size);
       }
     }
     await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "totalSize", size);
@@ -451,10 +451,24 @@ export class RedisDedupeIndex {
     await this.dedupeRedis.sadd("noremove", crawlId);
   }
 
-  async getRemoveSet() {
-    const removeSet = await this.dedupeRedis.sdiff(DUPE_ALL_CRAWLS, "noremove");
+  async purgeUnusedCrawls() {
+    const removeSet = new Set<string>(
+      await this.dedupeRedis.sdiff(DUPE_ALL_CRAWLS, "noremove"),
+    );
+
+    if (removeSet.size > 0) {
+      await this.removeCrawlIds(removeSet);
+    }
+
     await this.dedupeRedis.del("noremove");
-    return new Set<string>(removeSet);
+    await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "removable", 0);
+  }
+
+  async countUnusedCrawls() {
+    const removeSet = new Set<string>(
+      await this.dedupeRedis.sdiff(DUPE_ALL_CRAWLS, "noremove"),
+    );
+    await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "removable", removeSet.size);
   }
 
   async removeCrawlIds(toRemove: Set<string>) {
