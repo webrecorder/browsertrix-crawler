@@ -138,9 +138,15 @@ export class WARCWriter implements IndexerOffsetLength {
     responseRecord: WARCRecord,
     requestRecord: WARCRecord,
     responseSerializer: WARCSerializer | undefined = undefined,
+    callback: ((length: number, offset: number) => void) | undefined,
   ) {
     this.addToQueue(() =>
-      this._writeRecordPair(responseRecord, requestRecord, responseSerializer),
+      this._writeRecordPair(
+        responseRecord,
+        requestRecord,
+        responseSerializer,
+        callback,
+      ),
     );
   }
 
@@ -148,6 +154,7 @@ export class WARCWriter implements IndexerOffsetLength {
     responseRecord: WARCRecord,
     requestRecord: WARCRecord,
     responseSerializer: WARCSerializer | undefined = undefined,
+    callback: ((length: number, offset: number) => void) | undefined,
   ) {
     const opts = this.useSHA1
       ? {
@@ -170,6 +177,10 @@ export class WARCWriter implements IndexerOffsetLength {
       responseRecord,
       responseSerializer,
     );
+
+    if (callback) {
+      callback(this.recordLength, this.offset);
+    }
 
     this._writeCDX(responseRecord);
 
