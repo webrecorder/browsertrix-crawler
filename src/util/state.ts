@@ -1434,8 +1434,10 @@ return inx;
 
   // DEPENDENT CRAWLS FOR DEDUPE (requires WACZ)
   async addDupeCrawlDependency(crawlId: string, index: string) {
-    await this.redis.sadd(`${this.uid}:duperef`, crawlId + " " + index);
-    await this.redis.sadd(`${this.crawlId}:reqCrawls`, crawlId);
+    if (crawlId !== this.crawlId) {
+      await this.redis.sadd(`${this.uid}:duperef`, crawlId + " " + index);
+      await this.redis.sadd(`${this.crawlId}:reqCrawls`, crawlId);
+    }
   }
 
   // async clearDupeCrawlDependency() {
