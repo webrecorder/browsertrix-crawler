@@ -183,11 +183,13 @@ export class CrawlIndexer {
 
       // only adding originals to dedupe against, don't want to dedupe against existing revisits
       if (cdx.mime === "warc/revisit") {
+        await dedupeIndex.addStats(true, cdx.length, crawlId, true);
         continue;
       }
 
       if (url && date && hash) {
         await dedupeIndex.addHashDupe(hash, url, date, crawlId, true);
+        await dedupeIndex.addStats(false, cdx.length, crawlId, true);
       } else {
         logger.warn("Skipping invalid CDXJ, data missing", {
           url,
