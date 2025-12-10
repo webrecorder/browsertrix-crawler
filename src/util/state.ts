@@ -9,6 +9,7 @@ import {
   ROBOTS_CACHE_LIMIT,
   DUPE_ALL_HASH_KEY,
   DUPE_ALL_CRAWLS,
+  DUPE_ALL_COUNTS,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -294,6 +295,9 @@ export class RedisDedupeIndex {
 
     // add to crawls list
     await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, this.crawlId);
+
+    // add counts
+    await this.addRemoveCrawlCounts(this.crawlId);
   }
 
   // GET OR ADD INDIVIDUAL HASHES
@@ -324,14 +328,52 @@ export class RedisDedupeIndex {
     url: string,
     date: string,
     crawlId?: string,
-    commit = false,
+    commitToAllKey = false,
   ) {
     date = date.replace(/[^\d]/g, "");
     hash = hash.split(":").at(-1)!;
     const val = `${this.dedupeKeyIndex} ${date} ${url}`;
     crawlId = crawlId || this.crawlId;
-    if ((await this.dedupeRedis.hsetnx(`h:${crawlId}`, hash, val)) && commit) {
-      await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId);
+    if (await this.dedupeRedis.hsetnx(`h:${crawlId}`, hash, val)) {
+      // first time seeing hash
+      if (commitToAllKey) {
+        await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId);
+      }
+    }
+  }
+
+  // COUNT STATS
+  async addStats(
+    isDupe: boolean,
+    size: number,
+    crawlId?: string,
+    commitToAllKey = false,
+  ) {
+    crawlId = crawlId || this.crawlId;
+    if (isDupe) {
+      await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "uniqSize", size);
+      if (commitToAllKey) {
+        await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "uniqSize", size);
+      }
+    }
+    await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "totalSize", size);
+    await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "totalUrls", 1);
+    if (commitToAllKey) {
+      await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "totalSize", size);
+      await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "totalUrls", 1);
+    }
+  }
+
+  async addRemoveCrawlCounts(crawlId: string, remove = false) {
+    // add or remove counts
+    const factor = remove ? -1 : 1;
+    const counts = await this.dedupeRedis.hgetall(`h:${crawlId}:counts`);
+    for (const [key, value] of Object.entries(counts)) {
+      await this.dedupeRedis.hincrby(
+        DUPE_ALL_COUNTS,
+        key,
+        Number(value) * factor,
+      );
     }
   }
 
@@ -444,6 +486,9 @@ export class RedisDedupeIndex {
       }
       await this.dedupeRedis.del(`h:${crawlId}`, `c:${crawlId}:wacz`);
       await this.dedupeRedis.srem(DUPE_ALL_CRAWLS, crawlId);
+
+      // remove counts
+      await this.addRemoveCrawlCounts(crawlId, true);
     }
   }
 }
