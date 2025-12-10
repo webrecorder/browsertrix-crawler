@@ -77,6 +77,26 @@ function loadDataPackageRelated(name) {
   return dataPackageJSON.relation;
 }
 
+async function redisGetHash(key, db=0) {
+  const redis = new Redis(`redis://127.0.0.1:37379/${db}`, { lazyConnect: true, retryStrategy: () => null });
+
+  await redis.connect({maxRetriesPerRequest: 50});
+
+  return await redis.hgetall(key);
+}
+
+async function checkSizeStats(numUniq, key, db, minSizeDiff) {
+  const result = await redisGetHash(key, db);
+  console.log(numUniq, result);
+  expect(numUniq).toBeLessThan(Number(result.totalUrls));
+
+  const uniqSize = Number(result.uniqSize);
+  const totalSize = Number(result.totalSize);
+
+  expect(uniqSize).toBeLessThan(totalSize);
+  expect(totalSize - uniqSize).toBeGreaterThan(minSizeDiff);
+}
+
 test("check revisit records written on duplicate crawl, same collection, no wacz", async () => {
 
   const collName = "dedupe-test-same-coll";
@@ -122,6 +142,8 @@ test("check revisit records written on duplicate crawl, same collection, no wacz
   expect(response).toBe(revisit);
 
   numResponses = response;
+
+  await checkSizeStats(numResponses, "allcounts", 0, 180000);
 });
 
 
@@ -167,6 +189,8 @@ test("check revisit records written on duplicate crawl, different collections, w
   expect(response).toBe(revisit);
 
   numResponses = response;
+
+  await checkSizeStats(numResponses, "allcounts", 1, 48400000);
 });
 
 
@@ -201,6 +225,8 @@ test("verify crawl with imported dupe index has same dupes as dedupe against ori
 
   // matches same number of revisits as original
   expect(revisit).toBe(numResponses);
+
+  await checkSizeStats(numResponses, "allcounts", 2, 48400000);
 });
 
 test("test requires in datapackage.json of wacz deduped against previous crawl", () => {

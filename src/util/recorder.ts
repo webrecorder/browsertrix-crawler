@@ -854,6 +854,7 @@ export class Recorder extends EventEmitter {
           errorReason,
         });
         await this.crawlState.addDupeCrawlDependency(crawlId, index);
+        await this.crawlState.addStats(true, reqresp.payload.length);
         return true;
       }
     }
@@ -1753,7 +1754,20 @@ export class Recorder extends EventEmitter {
       );
     }
 
-    this.writer.writeRecordPair(responseRecord, requestRecord, serializer);
+    const addStatsCallback = async (size: number) => {
+      try {
+        await this.crawlState.addStats(isDupe, size);
+      } catch (e) {
+        logger.warn("Error updating dedupe size", e, "recorder");
+      }
+    };
+
+    this.writer.writeRecordPair(
+      responseRecord,
+      requestRecord,
+      serializer,
+      addStatsCallback,
+    );
 
     this.addPageRecord(reqresp);
 
