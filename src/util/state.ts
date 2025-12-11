@@ -315,6 +315,7 @@ export class RedisDedupeIndex {
     crawlId?: string,
     commitToAllKey = false,
   ) {
+    url = normalizeUrl(url, normalizeUrlOpts);
     date = date.replace(/[^\d]/g, "");
     hash = hash.split(":").at(-1)!;
     const val = `${this.dedupeKeyIndex} ${date} ${url}`;
