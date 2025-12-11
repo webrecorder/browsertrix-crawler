@@ -113,10 +113,18 @@ export class CrawlIndexer {
             filename,
             crawlIdReal,
             "gzip",
+            !params.removing,
           );
         } else if (filename.endsWith(".cdx") || filename.endsWith(".cdxj")) {
           logger.debug("Processing CDX Index", { filename });
-          await this.ingestCDXJ(dedupeIndex, loader, filename, crawlIdReal);
+          await this.ingestCDXJ(
+            dedupeIndex,
+            loader,
+            filename,
+            crawlIdReal,
+            "",
+            !params.removing,
+          );
         }
       }
 
@@ -140,7 +148,8 @@ export class CrawlIndexer {
     loader: WACZLoader,
     filename: string,
     crawlId: string,
-    compression?: string,
+    compression: string,
+    commitToAllkey: boolean,
   ) {
     let reader = await loader.loadFile(filename);
 
@@ -182,12 +191,12 @@ export class CrawlIndexer {
 
       // only adding originals to dedupe against, don't want to dedupe against existing revisits
       if (cdx.mime === "warc/revisit") {
-        await dedupeIndex.addStats(true, cdx.length, crawlId, true);
+        await dedupeIndex.addStats(true, cdx.length, crawlId, commitToAllkey);
         continue;
       }
 
       if (url && date && hash) {
-        await dedupeIndex.addHashDupe(hash, url, date, crawlId, true);
+        await dedupeIndex.addHashDupe(hash, url, date, crawlId, commitToAllkey);
         await dedupeIndex.addStats(false, cdx.length, crawlId, true);
       } else {
         logger.warn("Skipping invalid CDXJ, data missing", {
