@@ -15,6 +15,7 @@ import {
   removeRangeAsQuery,
   rewriteDASH,
   rewriteHLS,
+  tsToDate,
 } from "@webrecorder/wabac";
 
 import { WARCRecord, multiValueHeader } from "warcio";
@@ -27,6 +28,7 @@ import { getProxyDispatcher } from "./proxy.js";
 import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
 import { DEFAULT_MAX_RETRIES } from "./constants.js";
+import { createHash } from "crypto";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -141,6 +143,8 @@ export class Recorder extends EventEmitter {
   pageid!: string;
 
   pageSeed?: ScopedSeed;
+  pageSeedDepth = 0;
+  minPageDedupeDepth = -1;
 
   frameIdToExecId: Map<string, number> | null;
 
@@ -163,6 +167,8 @@ export class Recorder extends EventEmitter {
     this.crawlState = crawler.crawlState;
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
+
+    this.minPageDedupeDepth = crawler.params.minPageDedupeDepth;
 
     this.writer = writer;
 
@@ -830,6 +836,28 @@ export class Recorder extends EventEmitter {
     }
 
     const rewritten = await this.rewriteResponse(reqresp, mimeType);
+
+    if (
+      url === this.pageUrl &&
+      reqresp.payload &&
+      this.minPageDedupeDepth >= 0 &&
+      this.pageSeedDepth >= this.minPageDedupeDepth
+    ) {
+      const hash =
+        "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
+      const res = await this.crawlState.getHashDupe(hash);
+      if (res) {
+        const { index, crawlId } = res;
+        const errorReason = "BlockedByResponse";
+        await cdp.send("Fetch.failRequest", {
+          requestId,
+          errorReason,
+        });
+        await this.crawlState.addDupeCrawlDependency(crawlId, index);
+        await this.crawlState.addStats(true, reqresp.payload.length);
+        return true;
+      }
+    }
 
     // not rewritten, and not streaming, return false to continue
     if (!rewritten && !streamingConsume) {
@@ -1519,11 +1547,9 @@ export class Recorder extends EventEmitter {
     const { url } = reqresp;
     const { logDetails } = this;
     try {
-      let readSize = await serializer.digestRecord();
-      if (serializer.httpHeadersBuff) {
-        readSize -= serializer.httpHeadersBuff.length;
-      }
-      reqresp.readSize = readSize;
+      reqresp.readSize = await serializer.digestRecord({
+        returnPayloadOnlySize: true,
+      });
       // set truncated field and recompute header buff
       if (reqresp.truncated) {
         logger.warn(
@@ -1615,14 +1641,18 @@ export class Recorder extends EventEmitter {
       !isRedirectStatus(status) &&
       !(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, status))
     ) {
-      logNetwork("Skipping dupe", { url, status, ...this.logDetails });
+      logNetwork("Skipping exact URL dupe in this crawl", {
+        url,
+        status,
+        ...this.logDetails,
+      });
       return false;
     }
 
-    const responseRecord = createResponse(reqresp, pageid, iter);
+    let responseRecord = createResponse(reqresp, pageid, iter);
     const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
-    const serializer = new WARCSerializer(responseRecord, {
+    let serializer = new WARCSerializer(responseRecord, {
       gzip,
       maxMemSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
     });
@@ -1633,6 +1663,7 @@ export class Recorder extends EventEmitter {
       ) {
         serializer.externalBuffer?.purge();
         await this.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
+        await this.crawlState.removeDupe(WRITE_DUPE_KEY, url, status);
         return false;
       }
 
@@ -1659,7 +1690,44 @@ export class Recorder extends EventEmitter {
         }
       }
     } else {
-      await serializer.digestRecord();
+      reqresp.readSize = await serializer.digestRecord({
+        returnPayloadOnlySize: true,
+      });
+    }
+
+    const hash = responseRecord.warcPayloadDigest || "";
+
+    // if (!(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, hash))) {
+    //   serializer.externalBuffer?.purge();
+    //   return false;
+    // }
+
+    const date = responseRecord.warcDate || "";
+
+    const isEmpty = reqresp.readSize === 0;
+
+    let isDupe = false;
+
+    if (!isEmpty && url) {
+      const res = await this.crawlState.getHashDupe(hash);
+
+      if (res) {
+        const { origUrl, origDate, crawlId, index } = res;
+        const date = tsToDate(origDate).toISOString();
+        // always write revisit here
+        // duplicate URLs in same crawl filtered out separately
+        serializer.externalBuffer?.purge();
+        ({ responseRecord, serializer } = await createRevisitForResponse(
+          responseRecord,
+          serializer,
+          origUrl,
+          date,
+        ));
+        await this.crawlState.addDupeCrawlDependency(crawlId, index);
+        isDupe = true;
+      } else {
+        // no dupe, continue
+      }
     }
 
     let modified = false;
@@ -1686,9 +1754,26 @@ export class Recorder extends EventEmitter {
       );
     }
 
-    this.writer.writeRecordPair(responseRecord, requestRecord, serializer);
+    const addStatsCallback = async (size: number) => {
+      try {
+        await this.crawlState.addStats(isDupe, size);
+      } catch (e) {
+        logger.warn("Error updating dedupe size", e, "recorder");
+      }
+    };
+
+    this.writer.writeRecordPair(
+      responseRecord,
+      requestRecord,
+      serializer,
+      addStatsCallback,
+    );
 
     this.addPageRecord(reqresp);
+
+    if (!isEmpty && !isDupe) {
+      await this.crawlState.addHashDupe(hash, url, date);
+    }
 
     return true;
   }
@@ -2031,12 +2116,12 @@ function createResponse(
     warcHeaders["WARC-Resource-Type"] = reqresp.resourceType;
   }
 
-  if (!contentIter) {
-    contentIter = [reqresp.payload] as Iterable<Uint8Array>;
-  }
-
   if (Object.keys(reqresp.extraOpts).length) {
     warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
+  }
+
+  if (!contentIter) {
+    contentIter = [reqresp.payload] as Iterable<Uint8Array>;
   }
 
   return WARCRecord.create(
@@ -2051,6 +2136,55 @@ function createResponse(
     },
     contentIter,
   );
+}
+
+// =================================================================
+const REVISIT_COPY_HEADERS = [
+  "WARC-Page-ID",
+  "WARC-Protocol",
+  "WARC-Resource-Type",
+  "WARC-JSON-Metadata",
+];
+
+// =================================================================
+// revisit
+async function createRevisitForResponse(
+  responseRecord: WARCRecord,
+  serializer: WARCSerializer,
+  refersToUrl: string,
+  refersToDate: string,
+) {
+  const payloadDigestForRevisit = responseRecord.warcPayloadDigest || "";
+
+  const warcHeaders: Record<string, string> = {};
+
+  const origWarcHeaders = responseRecord.warcHeaders.headers;
+
+  for (const header of REVISIT_COPY_HEADERS) {
+    if (origWarcHeaders.has(header)) {
+      warcHeaders[header] = origWarcHeaders.get(header)!;
+    }
+  }
+
+  const revisitRecord = WARCRecord.create({
+    url: responseRecord.warcTargetURI!,
+    date: responseRecord.warcDate!,
+    warcVersion: "WARC/1.1",
+    type: "revisit",
+    warcHeaders,
+    refersToUrl,
+    refersToDate,
+  });
+  revisitRecord.httpHeaders = responseRecord.httpHeaders;
+
+  serializer = new WARCSerializer(revisitRecord, {
+    gzip: true,
+    maxMemSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
+  });
+
+  await serializer.digestRecord({ payloadDigestForRevisit });
+
+  return { serializer, responseRecord: revisitRecord };
 }
 
 // =================================================================
