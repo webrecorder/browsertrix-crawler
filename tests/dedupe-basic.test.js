@@ -143,7 +143,7 @@ test("check revisit records written on duplicate crawl, same collection, no wacz
 
   numResponses = response;
 
-  await checkSizeStats(numResponses, "allcounts", 0, 180000);
+  await checkSizeStats(numResponses, "allcounts", 0, 10000);
 });
 
 
@@ -190,7 +190,7 @@ test("check revisit records written on duplicate crawl, different collections, w
 
   numResponses = response;
 
-  await checkSizeStats(numResponses, "allcounts", 1, 48400000);
+  await checkSizeStats(numResponses, "allcounts", 1, 27000);
 });
 
 
@@ -226,7 +226,7 @@ test("verify crawl with imported dupe index has same dupes as dedupe against ori
   // matches same number of revisits as original
   expect(revisit).toBe(numResponses);
 
-  await checkSizeStats(numResponses, "allcounts", 2, 48400000);
+  await checkSizeStats(numResponses, "allcounts", 2, 27000);
 });
 
 test("test requires in datapackage.json of wacz deduped against previous crawl", () => {
