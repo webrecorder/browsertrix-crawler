@@ -2809,18 +2809,18 @@ self.__bx_behaviors.selectMainBehavior();
       });
     });
 
+    let found = false;
     try {
-      await sitemapper.parse(sitemap, url);
+      found = await sitemapper.parse(sitemap, url);
     } catch (e) {
-      logger.warn(
-        "Sitemap for seed failed",
-        { url, sitemap, ...formatErr(e) },
-        "sitemap",
-      );
-      return;
+      //
     }
 
-    await p;
+    if (found) {
+      await p;
+    } else {
+      logger.warn("No sitemap for seed", { url, sitemap }, "sitemap");
+    }
   }
 
   async combineWARC() {
