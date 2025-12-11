@@ -349,7 +349,8 @@ export class RedisDedupeIndex {
     commitToAllKey = false,
   ) {
     crawlId = crawlId || this.crawlId;
-    if (isDupe) {
+    // if not a dupe, add to unique size count
+    if (!isDupe) {
       await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "uniqueSize", size);
       if (commitToAllKey) {
         await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "uniqueSize", size);
