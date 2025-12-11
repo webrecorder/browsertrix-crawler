@@ -74,7 +74,7 @@ export class CrawlIndexer {
       crawlId: params.sourceCrawlId,
     })) {
       await dedupeIndex.queueImportSource(entry.name, JSON.stringify(entry));
-      if (params.removing && entry.crawlId) {
+      if (entry.crawlId) {
         await dedupeIndex.markNotRemoved(entry.crawlId);
       }
     }

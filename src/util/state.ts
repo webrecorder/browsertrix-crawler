@@ -266,24 +266,23 @@ export class RedisDedupeIndex {
 
   // COMMIT DEDUPE TO SHARED INDEX
 
-  async commitDedupeDone() {
-    for await (const hashes of this.dedupeRedis.hscanStream(
-      `h:${this.crawlId}`,
-    )) {
+  async commitDedupeDone(crawlId?: string) {
+    crawlId = crawlId || this.crawlId;
+    for await (const hashes of this.dedupeRedis.hscanStream(`h:${crawlId}`)) {
       let isValue = false;
       for (const hash of hashes) {
         if (!isValue) {
-          await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, this.crawlId);
+          await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId);
         }
         isValue = !isValue;
       }
     }
 
     // add to crawls list
-    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, this.crawlId);
+    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
 
     // add counts
-    await this.addRemoveCrawlCounts(this.crawlId);
+    await this.addRemoveCrawlCounts(crawlId);
   }
 
   // GET OR ADD INDIVIDUAL HASHES
@@ -438,45 +437,47 @@ export class RedisDedupeIndex {
   }
 
   async purgeUnusedCrawls() {
-    const removeSet = new Set<string>(
-      await this.dedupeRedis.sdiff(DUPE_ALL_CRAWLS, "noremove"),
+    const noRemoveSet = new Set<string>(
+      await this.dedupeRedis.smembers("noremove"),
     );
 
-    if (removeSet.size > 0) {
-      await this.removeCrawlIds(removeSet);
-    }
+    await this.clearAndReadd(noRemoveSet);
 
     await this.dedupeRedis.del("noremove");
-    await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "removable", 0);
   }
 
   async countUnusedCrawls() {
-    const removeSet = new Set<string>(
-      await this.dedupeRedis.sdiff(DUPE_ALL_CRAWLS, "noremove"),
-    );
-    await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "removable", removeSet.size);
+    const removable =
+      (await this.dedupeRedis.scard(DUPE_ALL_CRAWLS)) -
+      (await this.dedupeRedis.scard("noremove"));
+    await this.dedupeRedis.del("noremove");
+    await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "removable", removable);
   }
 
-  async removeCrawlIds(toRemove: Set<string>) {
-    for await (const hashes of this.dedupeRedis.hscanStream(
-      DUPE_ALL_HASH_KEY,
-    )) {
-      let isValue = false;
-      let key = "";
-      for (const hash of hashes) {
-        if (!isValue) {
-          key = hash;
-        }
-        if (key && isValue && toRemove.has(hash)) {
-          await this.dedupeRedis.hdel(DUPE_ALL_HASH_KEY, key);
-        }
-        isValue = !isValue;
-      }
+  async clearAndReadd(readdCrawls: Set<string>) {
+    const TO_REMOVE_CRAWLS = "to-remove-crawls";
+
+    await this.dedupeRedis.rename(DUPE_ALL_CRAWLS, TO_REMOVE_CRAWLS);
+    await this.dedupeRedis.del(DUPE_ALL_HASH_KEY);
+    await this.dedupeRedis.del(DUPE_ALL_COUNTS);
+
+    // readd all crawls that should be kept
+    for (const crawlId of readdCrawls) {
+      await this.commitDedupeDone(crawlId);
+      await this.dedupeRedis.srem(TO_REMOVE_CRAWLS, crawlId);
     }
 
-    for (const crawlId of toRemove) {
-      const allWACZ = await this.dedupeRedis.lrange(`c:${crawlId}:wacz`, 0, -1);
-      for (const waczdata of allWACZ) {
+    // clear data for remaining
+    while (true) {
+      const crawlId = await this.dedupeRedis.spop(TO_REMOVE_CRAWLS);
+      if (!crawlId) {
+        break;
+      }
+      while (true) {
+        const waczdata = await this.dedupeRedis.lpop(`c:${crawlId}:wacz`);
+        if (!waczdata) {
+          break;
+        }
         try {
           const { filename } = JSON.parse(waczdata);
           await this.dedupeRedis.srem(this.sourceDone, filename);
@@ -484,12 +485,14 @@ export class RedisDedupeIndex {
           // ignore
         }
       }
-      await this.dedupeRedis.del(`h:${crawlId}`, `c:${crawlId}:wacz`);
-      await this.dedupeRedis.srem(DUPE_ALL_CRAWLS, crawlId);
-
-      // remove counts
-      await this.addRemoveCrawlCounts(crawlId, true);
+      await this.dedupeRedis.del(
+        `h:${crawlId}`,
+        `c:${crawlId}:wacz`,
+        `h:${crawlId}:counts`,
+      );
     }
+
+    await this.dedupeRedis.del(TO_REMOVE_CRAWLS);
   }
 }
 
