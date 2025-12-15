@@ -317,63 +317,69 @@ export class Browser {
 
     logger.info("Saving Browser Profile");
 
-    // First, determine valid local path
-    // can't save to http/https, so use default local path
-    if (
-      localFilename &&
-      (localFilename.startsWith("http:") ||
-        localFilename.startsWith("https") ||
-        localFilename.startsWith("@"))
-    ) {
-      localFilename = "";
-    }
-
-    if (localFilename && !localFilename.startsWith("/")) {
-      localFilename = path.resolve("/crawls/profiles/", localFilename);
-      logger.info(
-        `Absolute path for filename not provided, saving to ${localFilename}`,
-        "browser",
-      );
-    }
-
-    const profileFilename = localFilename || "/crawls/profiles/profile.tar.gz";
-
-    const outputDir = path.dirname(profileFilename);
-    if (outputDir && !fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    logger.info("Local profile saved", { profileFilename }, "browser");
-    child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {
-      cwd: this.profileDir,
-    });
-
-    let resource: UploadResult | null = null;
-
-    // Only storage relative remote path supported
-    if (remoteFilename && storage) {
-      // remote storage relative prefix, always storage relative here
-      if (remoteFilename.startsWith("@")) {
-        remoteFilename = remoteFilename.slice(1);
-      }
+    try {
+      // First, determine valid local path
+      // can't save to http/https, so use default local path
       if (
-        remoteFilename.startsWith("http:") ||
-        remoteFilename.startsWith("https:") ||
-        remoteFilename.startsWith("/")
+        localFilename &&
+        (localFilename.startsWith("http:") ||
+          localFilename.startsWith("https") ||
+          localFilename.startsWith("@"))
       ) {
-        logger.warn(
-          "Not saving remote profile, invalid target",
-          { remoteFilename },
+        localFilename = "";
+      }
+
+      if (localFilename && !localFilename.startsWith("/")) {
+        localFilename = path.resolve("/crawls/profiles/", localFilename);
+        logger.info(
+          `Absolute path for filename not provided, saving to ${localFilename}`,
           "browser",
         );
-      } else {
-        logger.info("Uploading to remote storage...", {}, "browser");
-        resource = await storage.uploadFile(profileFilename, remoteFilename);
       }
-    }
 
-    logger.info("Profile creation done", {}, "browser");
-    return resource;
+      const profileFilename =
+        localFilename || "/crawls/profiles/profile.tar.gz";
+
+      const outputDir = path.dirname(profileFilename);
+      if (outputDir && !fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+
+      logger.info("Local profile saved", { profileFilename }, "browser");
+      child_process.execFileSync("tar", ["cvfz", profileFilename, "./"], {
+        cwd: this.profileDir,
+      });
+
+      let resource: UploadResult | null = null;
+
+      // Only storage relative remote path supported
+      if (remoteFilename && storage) {
+        // remote storage relative prefix, always storage relative here
+        if (remoteFilename.startsWith("@")) {
+          remoteFilename = remoteFilename.slice(1);
+        }
+        if (
+          remoteFilename.startsWith("http:") ||
+          remoteFilename.startsWith("https:") ||
+          remoteFilename.startsWith("/")
+        ) {
+          logger.warn(
+            "Not saving remote profile, invalid target",
+            { remoteFilename },
+            "browser",
+          );
+        } else {
+          logger.info("Uploading to remote storage...", {}, "browser");
+          resource = await storage.uploadFile(profileFilename, remoteFilename);
+        }
+      }
+
+      logger.info("Profile creation done", {}, "browser");
+      return resource;
+    } catch (e) {
+      logger.error("Unable to save profile after crawl", e, "browser");
+      return null;
+    }
   }
 
   chromeArgs({
