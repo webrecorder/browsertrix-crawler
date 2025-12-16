@@ -140,6 +140,11 @@ class MyBehavior
     return window.location.href === "https://my-site.example.com/";
   }
 
+  // required: typically should be left as-is.
+  static init() {
+    return {};
+  }
+
   // optional: if true, will also check isMatch() and possibly run
   // this behavior in each iframe.
   // if false, or not defined, this behavior will be skipped for iframes.
