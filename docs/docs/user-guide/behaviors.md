@@ -171,11 +171,11 @@ class MyBehavior
   // When the iterator finishes, the behavior is done.
   // (See below for more info)
   async* run(ctx) {
-    //... yield ctx.getState("starting behavior");
+    //... yield ctx.Lib.getState(ctx, "starting behavior");
 
     // do something
 
-    //... yield ctx.getState("a step has been performed");
+    //... yield ctx.Lib.getState(ctx, "a step has been performed");
   }
 }
 ```
@@ -249,10 +249,10 @@ Using this standard function, the above code might be condensed as follows:
       if (elem.clickTwice) {
         elem.click();
         elem.click();
-        yield Lib.getState("Double-Clicked on elem", "dblClick");
+        yield Lib.getState(ctx, "Double-Clicked on elem", "dblClick");
       } else {
         elem.click();
-        yield Lib.getState("Single-Clicked on elem", "click");
+        yield Lib.getState(ctx, "Single-Clicked on elem", "click");
       }
     }
   }
