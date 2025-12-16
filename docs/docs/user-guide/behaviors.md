@@ -141,11 +141,12 @@ class MyBehavior
   }
 
   // required: typically should be left as-is.
-  // must return an object. `state` and `opts` properties of that object
-  // will be loaded into ctx when the behavior is run, if provided.
-  // this could be useful for injecting behaviors or if browsertrix
-  // and archiveweb.page allow passing options to custom behaviors in
-  // the future.
+  // must return an object, with optional fields:
+  //   state: passes fixed state to behavior context (ctx)
+  //   opts: passes options to behavior context (ctx). this may be
+  // useful when injecting behaviors directly into the browser, and
+  // provides a basis for passing options to custom behaviors from
+  // browsertrix and archiveweb.page in the future.
   static init() {
     return {};
   }
