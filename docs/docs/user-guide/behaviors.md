@@ -140,6 +140,17 @@ class MyBehavior
     return window.location.href === "https://my-site.example.com/";
   }
 
+  // required: typically should be left as-is.
+  // must return an object, with optional fields:
+  //   state: passes fixed state to behavior context (ctx)
+  //   opts: passes options to behavior context (ctx). this may be
+  // useful when injecting behaviors directly into the browser, and
+  // provides a basis for passing options to custom behaviors from
+  // browsertrix and archiveweb.page in the future.
+  static init() {
+    return {};
+  }
+
   // optional: if true, will also check isMatch() and possibly run
   // this behavior in each iframe.
   // if false, or not defined, this behavior will be skipped for iframes.
@@ -160,11 +171,11 @@ class MyBehavior
   // When the iterator finishes, the behavior is done.
   // (See below for more info)
   async* run(ctx) {
-    //... yield ctx.getState("starting behavior");
+    //... yield ctx.Lib.getState(ctx, "starting behavior");
 
     // do something
 
-    //... yield ctx.getState("a step has been performed");
+    //... yield ctx.Lib.getState(ctx, "a step has been performed");
   }
 }
 ```
@@ -238,10 +249,10 @@ Using this standard function, the above code might be condensed as follows:
       if (elem.clickTwice) {
         elem.click();
         elem.click();
-        yield Lib.getState("Double-Clicked on elem", "dblClick");
+        yield Lib.getState(ctx, "Double-Clicked on elem", "dblClick");
       } else {
         elem.click();
-        yield Lib.getState("Single-Clicked on elem", "click");
+        yield Lib.getState(ctx, "Single-Clicked on elem", "click");
       }
     }
   }
