@@ -85,16 +85,13 @@ async function redisGetHash(key, db=0) {
   return await redis.hgetall(key);
 }
 
-async function checkSizeStats(numUniq, key, db, minSizeDiff) {
+async function checkSizeStats(numUniq, key, db, minSize) {
   const result = await redisGetHash(key, db);
   console.log(numUniq, result);
   expect(numUniq).toBeLessThan(Number(result.totalUrls));
 
-  const uniqueSize = Number(result.uniqueSize);
-  const totalSize = Number(result.totalSize);
-
-  expect(uniqueSize).toBeLessThan(totalSize);
-  expect(totalSize - uniqueSize).toBeGreaterThan(minSizeDiff);
+  const sizeSaved = Number(result.sizeSaved);
+  expect(sizeSaved).toBeGreaterThan(minSize);
 }
 
 test("check revisit records written on duplicate crawl, same collection, no wacz", async () => {
@@ -143,7 +140,7 @@ test("check revisit records written on duplicate crawl, same collection, no wacz
 
   numResponses = response;
 
-  await checkSizeStats(numResponses, "allcounts", 0, 10000);
+  await checkSizeStats(numResponses, "allcounts", 0, 77000);
 });
 
 
@@ -190,7 +187,7 @@ test("check revisit records written on duplicate crawl, different collections, w
 
   numResponses = response;
 
-  await checkSizeStats(numResponses, "allcounts", 1, 27000);
+  await checkSizeStats(numResponses, "allcounts", 1, 48400000);
 });
 
 
@@ -226,7 +223,7 @@ test("verify crawl with imported dupe index has same dupes as dedupe against ori
   // matches same number of revisits as original
   expect(revisit).toBe(numResponses);
 
-  await checkSizeStats(numResponses, "allcounts", 2, 27000);
+  await checkSizeStats(numResponses, "allcounts", 2, 48400000);
 });
 
 test("test requires in datapackage.json of wacz deduped against previous crawl", () => {
