@@ -184,6 +184,7 @@ export class CrawlIndexer {
       const date = line.split(" ", 2)[1];
       const url = cdx.url;
       const hash = cdx.digest;
+      const size = Number(cdx.length);
 
       if (url.startsWith("urn:")) {
         continue;
@@ -194,13 +195,9 @@ export class CrawlIndexer {
         // check if original is already in index
         const res = await dedupeIndex.getHashDupe(hash, crawlId);
         if (res && res.size) {
-          await dedupeIndex.addStats(
-            res.size - cdx.length,
-            crawlId,
-            commitToAllkey,
-          );
+          await dedupeIndex.addStats(res.size - size, crawlId, commitToAllkey);
         } else {
-          await dedupeIndex.addRevisitSize(hash, cdx.length, crawlId);
+          await dedupeIndex.addRevisitSize(hash, size, crawlId);
         }
         continue;
       }
@@ -210,16 +207,11 @@ export class CrawlIndexer {
           hash,
           url,
           date,
-          cdx.length,
+          size,
           crawlId,
           commitToAllkey,
         );
-        await dedupeIndex.matchRevisitSize(
-          hash,
-          cdx.length,
-          crawlId,
-          commitToAllkey,
-        );
+        await dedupeIndex.matchRevisitSize(hash, size, crawlId, commitToAllkey);
       } else {
         logger.warn("Skipping invalid CDXJ, data missing", {
           url,
