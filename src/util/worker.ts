@@ -301,7 +301,12 @@ export class PageWorker {
     } finally {
       try {
         if (this.recorder) {
-          opts.data.ts = this.recorder.writePageInfoRecord();
+          const res = this.recorder.writePageInfoRecord();
+          if (res) {
+            const { size, ts } = res;
+            opts.data.ts = ts;
+            opts.data.size = size;
+          }
         }
       } catch (e) {
         logger.error(

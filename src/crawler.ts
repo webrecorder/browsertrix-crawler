@@ -98,6 +98,7 @@ type PageEntry = {
   title?: string;
   loadState?: number;
   mime?: string;
+  size?: number;
   seed?: boolean;
   text?: string;
   favIconUrl?: string;
@@ -2650,6 +2651,7 @@ self.__bx_behaviors.selectMainBehavior();
       text,
       loadState,
       mime,
+      size,
       favicon,
       status,
     } = state;
@@ -2672,6 +2674,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (mime) {
       row.mime = mime;
+    }
+    if (size) {
+      row.size = size;
     }
 
     if (status) {

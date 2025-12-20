@@ -66,6 +66,7 @@ export type PageInfoValue = {
   mime?: string;
   type?: string;
   error?: string;
+  size?: number;
   fromBrowserCache?: boolean;
 };
 
@@ -116,6 +117,7 @@ export class Recorder extends EventEmitter {
   pendingRequests!: Map<string, RequestResponseInfo>;
   skipIds!: Set<string>;
   pageInfo!: PageInfoRecord;
+  pageSize = 0;
   mainFrameId: string | null = null;
   skipRangeUrls!: Map<string, number>;
   skipPageInfo = false;
@@ -950,6 +952,7 @@ export class Recorder extends EventEmitter {
     this.skipRangeUrls = new Map<string, number>();
     this.skipPageInfo = false;
     this.pageFinished = false;
+    this.pageSize = 0;
     this.pageInfo = {
       pageid,
       urls: {},
@@ -963,8 +966,9 @@ export class Recorder extends EventEmitter {
   addPageRecord(reqresp: RequestResponseInfo) {
     if (this.isValidUrl(reqresp.url)) {
       const { status, resourceType: type } = reqresp;
+      const size = reqresp.readSize || reqresp.payload?.length || 0;
       const mime = reqresp.getMimeType();
-      const info: PageInfoValue = { status, mime, type };
+      const info: PageInfoValue = { status, mime, type, size };
       if (reqresp.errorText) {
         info.error = reqresp.errorText;
       }
@@ -973,6 +977,7 @@ export class Recorder extends EventEmitter {
       //   info.fromBrowserCache = true;
       // }
       this.pageInfo.urls[reqresp.getCanonURL()] = info;
+      this.pageSize += size;
     }
   }
 
@@ -983,7 +988,7 @@ export class Recorder extends EventEmitter {
         { url: "urn:pageinfo:" + this.pageUrl },
         "recorder",
       );
-      return;
+      return null;
     }
     const text = JSON.stringify(this.pageInfo, null, 2);
 
@@ -1000,7 +1005,7 @@ export class Recorder extends EventEmitter {
       "recorder",
     );
 
-    return this.pageInfo.ts;
+    return { ts: this.pageInfo.ts, size: this.pageSize };
   }
 
   async awaitPageResources() {

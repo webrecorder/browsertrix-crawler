@@ -94,6 +94,7 @@ export class PageState {
   title?: string;
   mime?: string;
   ts?: Date;
+  size?: number;
 
   callbacks: PageCallbacks = {};
 
