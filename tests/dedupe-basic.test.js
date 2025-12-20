@@ -229,9 +229,14 @@ test("import dupe index from json, reverse, revisits than orig, from wacz", asyn
   const importJson = {
     resources: [
       {
-       "name": "dedupe-test-dupe",
-       "path": "/crawls/collections/dedupe-test-dupe/dedupe-test-dupe.wacz",
-       "crawlId": "dedupe-test-dupe"
+        "name": "dedupe-test-dupe",
+        "path": "/crawls/collections/dedupe-test-dupe/dedupe-test-dupe.wacz",
+        "crawlId": "dedupe-test-dupe"
+      },
+      {
+        "name": "invalid-file",
+        "path": "/crawls/invalid-file",
+        "crawlId": "dedupe-test-dupe"
       },
       {
        "name": "dedupe-test-orig",
