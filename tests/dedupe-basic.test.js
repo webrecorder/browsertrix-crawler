@@ -12,6 +12,8 @@ function sleep(ms) {
 let redisId;
 let numResponses = 0;
 
+let sizeSaved = 0;
+
 beforeAll(() => {
   execSync("docker network create dedupe");
 
@@ -22,8 +24,6 @@ afterAll(async () => {
   execSync(`docker kill ${redisId}`);
 
   await sleep(3000);
-
-  //await Promise.allSettled([crawler1, crawler2]);
 
   execSync("docker network rm dedupe");
 });
@@ -92,6 +92,7 @@ async function checkSizeStats(numUniq, key, db, minSize) {
 
   const sizeSaved = Number(result.sizeSaved);
   expect(sizeSaved).toBeGreaterThan(minSize);
+  return sizeSaved;
 }
 
 test("check revisit records written on duplicate crawl, same collection, no wacz", async () => {
@@ -187,23 +188,20 @@ test("check revisit records written on duplicate crawl, different collections, w
 
   numResponses = response;
 
-  await checkSizeStats(numResponses, "allcounts", 1, 48400000);
+  sizeSaved = await checkSizeStats(numResponses, "allcounts", 1, 48400000);
 });
 
 
-test("import dupe index from wacz", async () => {
-  
+test("import dupe index, orig then revisits, from single wacz", async () => {
   execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedupe webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedupe-test-orig/dedupe-test-orig.wacz --sourceCrawlId dedupe-test-orig --redisDedupeUrl redis://dedupe-redis:6379/2`);
 
   const redis = new Redis("redis://127.0.0.1:37379/2", { lazyConnect: true, retryStrategy: () => null });
 
   await redis.connect({maxRetriesPerRequest: 50});
-
-  expect(await redis.hlen("alldupes")).toBe(numResponses);
 });
 
 
-test("verify crawl with imported dupe index has same dupes as dedupe against original", async () => {
+test("verify new crawl against imported dupe index has same dupes as dedupe against original", async () => {
   expect(await runCrawl("dedupe-test-dupe-2", {db: 2})).toBe(0);
 
   const dupeOrig = loadFirstWARC("dedupe-test-dupe-2");
@@ -225,6 +223,40 @@ test("verify crawl with imported dupe index has same dupes as dedupe against ori
 
   await checkSizeStats(numResponses, "allcounts", 2, 48400000);
 });
+
+test("import dupe index from json, reverse, revisits than orig, from wacz", async () => {
+
+  const importJson = {
+    resources: [
+      {
+       "name": "dedupe-test-dupe",
+       "path": "/crawls/collections/dedupe-test-dupe/dedupe-test-dupe.wacz",
+       "crawlId": "dedupe-test-dupe"
+      },
+      {
+       "name": "dedupe-test-orig",
+       "path": "/crawls/collections/dedupe-test-orig/dedupe-test-orig.wacz",
+       "crawlId": "dedupe-test-orig"
+      }
+    ]
+  };
+
+  fs.writeFileSync("./test-crawls/collections/dedupe-test-dupe/import-1.json", JSON.stringify(importJson), "utf-8");
+
+  execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedupe webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedupe-test-dupe/import-1.json --redisDedupeUrl redis://dedupe-redis:6379/3`);
+
+  const redis = new Redis("redis://127.0.0.1:37379/3", { lazyConnect: true, retryStrategy: () => null });
+
+  await redis.connect({maxRetriesPerRequest: 50});
+
+  expect(await redis.hlen("alldupes")).toBe(numResponses);
+
+  const sizeSavedImport = await checkSizeStats(numResponses, "allcounts", 3, 48400000);
+
+  expect(sizeSavedImport).toBe(sizeSaved);
+});
+
+
 
 test("test requires in datapackage.json of wacz deduped against previous crawl", () => {
   const res1 = loadDataPackageRelated("dedupe-test-dupe");
