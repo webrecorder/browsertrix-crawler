@@ -401,7 +401,7 @@ export class RedisDedupeIndex {
         const { size, crawlId } = JSON.parse(res);
         await this.addStats(origSize - size, crawlId, commitToAllKey);
       } catch (e) {
-        console.log(e);
+        logger.debug("Error adding revisit size", e, "state");
         // ignore
       }
     }
