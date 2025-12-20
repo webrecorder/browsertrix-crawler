@@ -191,13 +191,35 @@ export class CrawlIndexer {
 
       // only adding originals to dedupe against, don't want to dedupe against existing revisits
       if (cdx.mime === "warc/revisit") {
-        await dedupeIndex.addStats(true, cdx.length, crawlId, commitToAllkey);
+        // check if original is already in index
+        const res = await dedupeIndex.getHashDupe(hash, crawlId);
+        if (res && res.size) {
+          await dedupeIndex.addStats(
+            res.size - cdx.length,
+            crawlId,
+            commitToAllkey,
+          );
+        } else {
+          await dedupeIndex.addRevisitSize(hash, cdx.length, crawlId);
+        }
         continue;
       }
 
       if (url && date && hash) {
-        await dedupeIndex.addHashDupe(hash, url, date, crawlId, commitToAllkey);
-        await dedupeIndex.addStats(false, cdx.length, crawlId, true);
+        await dedupeIndex.addHashDupe(
+          hash,
+          url,
+          date,
+          cdx.length,
+          crawlId,
+          commitToAllkey,
+        );
+        await dedupeIndex.matchRevisitSize(
+          hash,
+          cdx.length,
+          crawlId,
+          commitToAllkey,
+        );
       } else {
         logger.warn("Skipping invalid CDXJ, data missing", {
           url,
