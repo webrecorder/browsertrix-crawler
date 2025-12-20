@@ -209,6 +209,7 @@ export type DedupeEntry = {
   origUrl: string;
   index: string;
   crawlId: string;
+  size: number;
 };
 
 // ============================================================================
@@ -305,20 +306,27 @@ export class RedisDedupeIndex {
       return null;
     }
     const val = value.split(" ");
-    return { origUrl: val[2], origDate: val[1], index: val[0], crawlId };
+    return {
+      origUrl: val[2],
+      origDate: val[1],
+      index: val[0],
+      size: Number(val[3]),
+      crawlId,
+    };
   }
 
   async addHashDupe(
     hash: string,
     url: string,
     date: string,
+    size: number,
     crawlId?: string,
     commitToAllKey = false,
   ) {
     url = normalizeUrl(url, normalizeUrlOpts);
     date = date.replace(/[^\d]/g, "");
     hash = hash.split(":").at(-1)!;
-    const val = `${this.dedupeKeyIndex} ${date} ${url}`;
+    const val = `${this.dedupeKeyIndex} ${date} ${url} ${size}`;
     crawlId = crawlId || this.crawlId;
     if (await this.dedupeRedis.hsetnx(`h:${crawlId}`, hash, val)) {
       // first time seeing hash
@@ -329,24 +337,21 @@ export class RedisDedupeIndex {
   }
 
   // COUNT STATS
-  async addStats(
-    isDupe: boolean,
-    size: number,
-    crawlId?: string,
-    commitToAllKey = false,
-  ) {
+  async addStats(dupeSize: number, crawlId?: string, commitToAllKey = false) {
     crawlId = crawlId || this.crawlId;
     // if not a dupe, add to unique size count
-    if (!isDupe) {
-      await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "uniqueSize", size);
+    if (dupeSize > 0) {
+      await this.dedupeRedis.hincrby(
+        `h:${crawlId}:counts`,
+        "sizeSaved",
+        dupeSize,
+      );
       if (commitToAllKey) {
-        await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "uniqueSize", size);
+        await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "sizeSaved", dupeSize);
       }
     }
-    await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "totalSize", size);
     await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "totalUrls", 1);
     if (commitToAllKey) {
-      await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "totalSize", size);
       await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "totalUrls", 1);
     }
   }
@@ -362,6 +367,35 @@ export class RedisDedupeIndex {
         Number(value) * factor,
       );
     }
+  }
+
+  async addRevisitSize(hash: string, size: number, crawlId: string) {
+    await this.dedupeRedis.lpush(
+      `rev:${hash}`,
+      JSON.stringify({ size, crawlId }),
+    );
+  }
+
+  async matchRevisitSize(
+    hash: string,
+    origSize: number,
+    crawlId: string,
+    commitToAllKey?: boolean,
+  ) {
+    while (true) {
+      const res = await this.dedupeRedis.lpop(`rev:${hash}`);
+      if (!res) {
+        break;
+      }
+      try {
+        const { size, crawlId } = JSON.parse(res);
+        await this.addStats(origSize - size, crawlId, commitToAllKey);
+      } catch (e) {
+        // ignore
+      }
+    }
+    await this.dedupeRedis.del(`rev:${hash}`);
+    await this.addStats(0, crawlId, commitToAllKey);
   }
 
   // IMPORT
