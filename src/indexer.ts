@@ -113,7 +113,7 @@ export class CrawlIndexer {
             filename,
             crawlIdReal,
             "gzip",
-            !params.removing,
+            true,
           );
         } else if (filename.endsWith(".cdx") || filename.endsWith(".cdxj")) {
           logger.debug("Processing CDX Index", { filename });
@@ -123,7 +123,7 @@ export class CrawlIndexer {
             filename,
             crawlIdReal,
             "",
-            !params.removing,
+            true,
           );
         }
       }
