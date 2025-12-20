@@ -193,7 +193,7 @@ export class CrawlIndexer {
       // only adding originals to dedupe against, don't want to dedupe against existing revisits
       if (cdx.mime === "warc/revisit") {
         // check if original is already in index
-        const res = await dedupeIndex.getHashDupe(hash, crawlId);
+        const res = await dedupeIndex.getHashDupe(hash);
         if (res && res.size) {
           await dedupeIndex.addStats(res.size - size, crawlId, commitToAllkey);
         } else {
