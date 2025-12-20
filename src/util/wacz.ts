@@ -403,7 +403,7 @@ export async function mergeCDXJ(
   const cdxFiles = addDirFiles(warcCdxDir);
 
   if (!cdxFiles.length) {
-    logger.info("No CDXJ files to merge");
+    logger.info("No CDXJ files to merge", {}, "wacz");
     return;
   }
 
