@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import yargs from "yargs";
-import { logger } from "./util/logger.js";
+import { formatErr, logger } from "./util/logger.js";
 import { getInfoString } from "./util/file_reader.js";
 import { openAsBlob } from "node:fs";
 import { WACZLoader } from "./util/wacz.js";
@@ -93,6 +93,16 @@ export class CrawlIndexer {
       count += 1;
       const loader = new WACZLoader(url);
       logger.debug(`Processing WACZ ${count} of ${total}`, { waczfile: url });
+
+      try {
+        await loader.init();
+      } catch (e) {
+        logger.warn("Skipping invalid WACZ file", {
+          waczfile: url,
+          ...formatErr(e),
+        });
+        continue;
+      }
 
       const crawlIdReal = crawlId || params.sourceCrawlId || url;
 
@@ -238,15 +248,19 @@ export class CrawlIndexer {
         url = URL.createObjectURL(blob);
       }
 
-      const resp = await fetch(url);
-      const json = await resp.json();
+      try {
+        const resp = await fetch(url);
+        const json = await resp.json();
 
-      for (const entry of json.resources) {
-        entry.url = entry.path;
-        yield* this.iterWACZ(entry);
+        for (const entry of json.resources) {
+          entry.url = entry.path;
+          yield* this.iterWACZ(entry);
+        }
+      } catch (e) {
+        logger.warn("Error loading from source", { url, ...formatErr(e) });
       }
     } else {
-      logger.warn("Unknown source", { url }, "replay");
+      logger.warn("Unknown source", { url });
     }
   }
 
