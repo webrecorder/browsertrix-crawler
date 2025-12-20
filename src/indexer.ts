@@ -165,6 +165,7 @@ export class CrawlIndexer {
     let count = 0;
 
     for await (const line of reader.iterLines()) {
+      count += 1;
       const inx = line.indexOf(" {");
       if (inx < 0) {
         logger.error("Skipping invalid CDXJ, no JSON", { line });
@@ -197,12 +198,10 @@ export class CrawlIndexer {
         if (res && res.size) {
           await dedupeIndex.addStats(res.size - size, crawlId, commitToAllkey);
         } else {
+          console.log("NO DUPE", hash, res);
           await dedupeIndex.addRevisitSize(hash, size, crawlId);
         }
-        continue;
-      }
-
-      if (url && date && hash) {
+      } else if (url && date && hash) {
         await dedupeIndex.addHashDupe(
           hash,
           url,
@@ -211,6 +210,7 @@ export class CrawlIndexer {
           crawlId,
           commitToAllkey,
         );
+        console.log("MATCH DUPE", hash, size);
         await dedupeIndex.matchRevisitSize(hash, size, crawlId, commitToAllkey);
       } else {
         logger.warn("Skipping invalid CDXJ, data missing", {
@@ -218,10 +218,7 @@ export class CrawlIndexer {
           date,
           digest: hash,
         });
-        continue;
       }
-
-      count += 1;
     }
 
     logger.debug("Processed", { count });
