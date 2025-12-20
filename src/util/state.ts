@@ -302,15 +302,11 @@ export class RedisDedupeIndex {
 
   // GET OR ADD INDIVIDUAL HASHES
 
-  async getHashDupe(
-    hash: string,
-    key = DUPE_ALL_HASH_KEY,
-    //url: string,
-  ): Promise<DedupeEntry | null> {
+  async getHashDupe(hash: string): Promise<DedupeEntry | null> {
     hash = hash.split(":").at(-1)!;
 
     // first, check the shared key
-    let crawlId = await this.dedupeRedis.hget(key, hash);
+    let crawlId = await this.dedupeRedis.hget(DUPE_ALL_HASH_KEY, hash);
     if (!crawlId) {
       // otherwise, try current crawl
       crawlId = this.crawlId;
