@@ -848,14 +848,14 @@ export class Recorder extends EventEmitter {
         "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
       const res = await this.crawlState.getHashDupe(hash);
       if (res) {
-        const { index, crawlId } = res;
+        const { index, crawlId, size } = res;
         const errorReason = "BlockedByResponse";
         await cdp.send("Fetch.failRequest", {
           requestId,
           errorReason,
         });
         await this.crawlState.addDupeCrawlDependency(crawlId, index);
-        await this.crawlState.addStats(true, reqresp.payload.length);
+        await this.crawlState.addStats(size - reqresp.payload.length);
         return true;
       }
     }
@@ -1708,12 +1708,14 @@ export class Recorder extends EventEmitter {
     const isEmpty = reqresp.readSize === 0;
 
     let isDupe = false;
+    let origRecSize = 0;
 
     if (!isEmpty && url) {
       const res = await this.crawlState.getHashDupe(hash);
 
       if (res) {
-        const { origUrl, origDate, crawlId, index } = res;
+        const { origUrl, origDate, crawlId, index, size } = res;
+        origRecSize = size;
         const date = tsToDate(origDate).toISOString();
         // always write revisit here
         // duplicate URLs in same crawl filtered out separately
@@ -1757,9 +1759,12 @@ export class Recorder extends EventEmitter {
 
     const addStatsCallback = async (size: number) => {
       try {
-        await this.crawlState.addStats(isDupe, size);
+        if (!isDupe) {
+          await this.crawlState.addHashDupe(hash, url, date, size);
+        }
+        await this.crawlState.addStats(origRecSize - size);
       } catch (e) {
-        logger.warn("Error updating dedupe size", e, "recorder");
+        logger.warn("Error adding dupe hash", e, "recorder");
       }
     };
 
@@ -1771,10 +1776,6 @@ export class Recorder extends EventEmitter {
     );
 
     this.addPageRecord(reqresp);
-
-    if (!isEmpty && !isDupe) {
-      await this.crawlState.addHashDupe(hash, url, date);
-    }
 
     return true;
   }
