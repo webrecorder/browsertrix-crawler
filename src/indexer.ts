@@ -9,7 +9,6 @@ import { initRedisWaitForSuccess } from "./util/redis.js";
 import { AsyncIterReader } from "warcio";
 import { RedisDedupeIndex } from "./util/state.js";
 import { basename } from "node:path";
-import { sleep } from "./util/timing.js";
 
 export type DedupeIndexEntry = {
   name: string;
@@ -138,7 +137,6 @@ export class CrawlIndexer {
     }
 
     logger.info("Done!");
-    await sleep(30);
     await dedupeIndex.markImportFinishedTS();
     process.exit(ExitCodes.Success);
   }
@@ -198,7 +196,6 @@ export class CrawlIndexer {
         if (res && res.size) {
           await dedupeIndex.addStats(res.size - size, crawlId, commitToAllkey);
         } else {
-          console.log("NO DUPE", hash, res);
           await dedupeIndex.addRevisitSize(hash, size, crawlId);
         }
       } else if (url && date && hash) {
@@ -210,7 +207,6 @@ export class CrawlIndexer {
           crawlId,
           commitToAllkey,
         );
-        console.log("MATCH DUPE", hash, size);
         await dedupeIndex.matchRevisitSize(hash, size, crawlId, commitToAllkey);
       } else {
         logger.warn("Skipping invalid CDXJ, data missing", {
