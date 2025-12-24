@@ -777,7 +777,8 @@ export const defaultArgs = [
   "--disable-breakpad",
   "--disable-client-side-phishing-detection",
   "--disable-component-extensions-with-background-pages",
-  //"--disable-component-update", // now required for chrome/brave
+  "--disable-component-update",
+  "--allow-brave-component-update", // disable general update, but allow brave update
   "--no-default-browser-check",
   "--disable-default-apps",
   "--disable-dev-shm-usage",
