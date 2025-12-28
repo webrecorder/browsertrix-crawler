@@ -36,7 +36,11 @@ afterAll(async () => {
   execSync(`docker kill -s SIGINT ${proxyAuthId}`);
   execSync(`docker kill -s SIGINT ${proxyNoAuthId}`);
   execSync(`docker kill -s SIGINT ${proxySSHId}`);
-  await sleep(5000);
+
+  execSync(`docker wait ${proxyAuthId}`);
+  execSync(`docker wait ${proxyNoAuthId}`);
+  execSync(`docker wait ${proxySSHId}`);
+
   execSync("docker network rm proxy-test-net");
 });
 

@@ -13,24 +13,6 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function waitContainerDone(containerId) {
-  // containerId is initially the full id, but docker ps
-  // only prints the short id (first 12 characters)
-  containerId = containerId.slice(0, 12);
-
-  while (true) {
-    try {
-      const res = execSync("docker ps -q", { encoding: "utf-8" });
-      if (res.indexOf(containerId) < 0) {
-        return;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    await sleep(500);
-  }
-}
-
 async function killContainer(containerId) {
   try {
     execSync(`docker kill -s SIGINT ${containerId}`);
@@ -38,7 +20,7 @@ async function killContainer(containerId) {
     return;
   }
 
-  await waitContainerDone(containerId);
+  execSync(`docker wait ${containerId}`);
 }
 
 
@@ -156,7 +138,7 @@ test("check crawl restarted with saved state", async () => {
   } catch (e) {
     console.log(e);
   } finally {
-    await waitContainerDone(containerId);
+    execSync(`docker wait ${containerId}`);
   }
 });
 

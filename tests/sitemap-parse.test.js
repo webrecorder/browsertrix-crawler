@@ -12,21 +12,7 @@ async function waitContainer(containerId) {
     return;
   }
 
-  // containerId is initially the full id, but docker ps
-  // only prints the short id (first 12 characters)
-  containerId = containerId.slice(0, 12);
-
-  while (true) {
-    try {
-      const res = child_process.execSync("docker ps -q", { encoding: "utf-8" });
-      if (res.indexOf(containerId) < 0) {
-        return;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    await sleep(500);
-  }
+  child_process.execSync(`docker wait ${containerId}`);
 }
 
 async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessThan=0, extra="") {
