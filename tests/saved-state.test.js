@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import yaml from "js-yaml";
@@ -20,7 +20,7 @@ async function killContainer(containerId) {
     return;
   }
 
-  execSync(`docker wait ${containerId}`);
+  spawnSync(`docker wait ${containerId}`);
 }
 
 
@@ -138,7 +138,7 @@ test("check crawl restarted with saved state", async () => {
   } catch (e) {
     console.log(e);
   } finally {
-    execSync(`docker wait ${containerId}`);
+    spawnSync(`docker wait ${containerId}`);
   }
 });
 

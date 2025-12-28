@@ -1,4 +1,4 @@
-import { execSync, exec } from "child_process";
+import { execSync, exec, spawnSync } from "child_process";
 import fs from "fs";
 import { Redis } from "ioredis";
 
@@ -15,7 +15,7 @@ beforeAll(() => {
 
 afterAll(async () => {
   execSync(`docker kill -s SIGINT ${minioId}`);
-  execSync(`docker wait ${minioId}`);
+  spawnSync(`docker wait ${minioId}`);
   execSync("docker network rm upload-test-net");
 });
 

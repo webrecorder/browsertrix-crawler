@@ -1,4 +1,4 @@
-import { execSync, exec } from "child_process";
+import { execSync, exec, spawnSync } from "child_process";
 
 import { getSafeProxyString } from "../dist/util/proxy.js";
 
@@ -37,9 +37,9 @@ afterAll(async () => {
   execSync(`docker kill -s SIGINT ${proxyNoAuthId}`);
   execSync(`docker kill -s SIGINT ${proxySSHId}`);
 
-  execSync(`docker wait ${proxyAuthId}`);
-  execSync(`docker wait ${proxyNoAuthId}`);
-  execSync(`docker wait ${proxySSHId}`);
+  spawnSync(`docker wait ${proxyAuthId}`);
+  spawnSync(`docker wait ${proxyNoAuthId}`);
+  spawnSync(`docker wait ${proxySSHId}`);
 
   execSync("docker network rm proxy-test-net");
 });

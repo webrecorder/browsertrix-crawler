@@ -12,7 +12,7 @@ async function waitContainer(containerId) {
     return;
   }
 
-  child_process.execSync(`docker wait ${containerId}`);
+  child_process.spawnSync(`docker wait ${containerId}`);
 }
 
 async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessThan=0, extra="") {

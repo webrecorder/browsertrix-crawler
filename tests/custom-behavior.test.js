@@ -220,7 +220,7 @@ test("test pushing behavior logs to redis", async () => {
   expect(customLogLineCount).toEqual(4);
 
   child_process.execSync(`docker kill ${redisId}`);
-  child_process.execSync(`docker wait ${redisId}`);
+  child_process.spawnSync(`docker wait ${redisId}`);
 
   child_process.execSync("docker network rm crawl");
 });

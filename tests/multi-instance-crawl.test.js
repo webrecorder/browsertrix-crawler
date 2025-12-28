@@ -1,4 +1,4 @@
-import {exec, execSync} from "child_process";
+import {exec, execSync, spawnSync} from "child_process";
 import fs from "fs";
 import { Redis } from "ioredis";
 
@@ -24,7 +24,8 @@ beforeAll(() => {
 
 afterAll(async () => {
   execSync(`docker kill ${redisId}`);
-  execSync(`docker wait ${redisId}`);
+
+  spawnSync(`docker wait ${redisId}`);
 
   await Promise.allSettled([crawler1, crawler2]);
 
