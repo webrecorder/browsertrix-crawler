@@ -84,6 +84,7 @@ export class S3StorageSync {
       },
       endpoint: url.href,
       region,
+      forcePathStyle: true,
     });
 
     this.bucketName = url.pathname.slice(1).split("/")[0];
