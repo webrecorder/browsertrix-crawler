@@ -8,11 +8,8 @@ import type { Readable } from "stream";
 import os from "os";
 import { createHash } from "crypto";
 
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-} from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
@@ -114,13 +111,24 @@ export class S3StorageSync {
 
     const waczStream = wacz.generate();
 
-    await this.client.send(
-      new PutObjectCommand({
+    const uploader = new Upload({
+      client: this.client,
+      params: {
         Bucket: this.bucketName,
         Key: this.objectPrefix + targetFilename,
         Body: waczStream,
-      }),
-    );
+      },
+
+      // (optional) concurrency configuration
+      // queueSize: 4,
+
+      // (optional) size of each part, in bytes, at least 5MB
+      partSize: 1024 * 1024 * 100,
+
+      leavePartsOnError: false,
+    });
+
+    await uploader.done();
 
     const hash = wacz.getHash();
     const path = targetFilename;
@@ -143,13 +151,24 @@ export class S3StorageSync {
     };
     logger.info("S3 file upload information", fileUploadInfo, "storage");
 
-    await this.client.send(
-      new PutObjectCommand({
+    const uploader = new Upload({
+      client: this.client,
+      params: {
         Bucket: this.bucketName,
         Key: this.objectPrefix + targetFilename,
         Body: fs.createReadStream(srcFilename),
-      }),
-    );
+      },
+
+      // (optional) concurrency configuration
+      // queueSize: 4,
+
+      // (optional) size of each part, in bytes, at least 5MB
+      partSize: 1024 * 1024 * 100,
+
+      leavePartsOnError: false,
+    });
+
+    await uploader.done();
 
     const hash = await checksumFile("sha256", srcFilename);
     const path = targetFilename;

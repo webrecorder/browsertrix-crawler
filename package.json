@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.554.0",
+    "@aws-sdk/lib-storage": "^3.958.0",
     "@novnc/novnc": "1.4.0",
     "@puppeteer/replay": "^3.1.3",
     "@webrecorder/wabac": "^2.24.5",
