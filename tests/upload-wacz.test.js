@@ -15,7 +15,7 @@ beforeAll(() => {
 
 afterAll(async () => {
   execSync(`docker kill -s SIGINT ${minioId}`);
-  spawnSync(`docker wait ${minioId}`);
+  spawnSync(`docker wait ${minioId}`, { shell: true, stdio: "ignore" });
   execSync("docker network rm upload-test-net");
 });
 

@@ -20,7 +20,7 @@ async function killContainer(containerId) {
     return;
   }
 
-  spawnSync(`docker wait ${containerId}`);
+  spawnSync(`docker wait ${containerId}`, { shell: true, stdio: "ignore" });
 }
 
 
@@ -138,7 +138,7 @@ test("check crawl restarted with saved state", async () => {
   } catch (e) {
     console.log(e);
   } finally {
-    spawnSync(`docker wait ${containerId}`);
+    spawnSync(`docker wait ${containerId}`, { shell: true, stdio: "ignore" });
   }
 });
 

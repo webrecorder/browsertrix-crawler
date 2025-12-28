@@ -25,7 +25,7 @@ beforeAll(() => {
 afterAll(async () => {
   execSync(`docker kill ${redisId}`);
 
-  spawnSync(`docker wait ${redisId}`);
+  spawnSync(`docker wait ${redisId}`, { shell: true, stdio: "ignore" });
 
   await Promise.allSettled([crawler1, crawler2]);
 
