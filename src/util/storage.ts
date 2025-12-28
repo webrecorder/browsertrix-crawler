@@ -19,11 +19,11 @@ import getFolderSize from "get-folder-size";
 
 import { WACZ } from "./wacz.js";
 //import { sleep, timedRun } from "./timing.js";
-//import { DEFAULT_MAX_RETRIES } from "./constants.js";
+import { DEFAULT_MAX_RETRIES } from "./constants.js";
 
 const DEFAULT_REGION = "us-east-1";
 
-//const DOWNLOAD_PROFILE_MAX_TIME = 60;
+const PART_SIZE = 1024 * 1024 * 100;
 
 // ===========================================================================
 export type UploadResult = {
@@ -82,7 +82,8 @@ export class S3StorageSync {
         accessKeyId: accessKey,
         secretAccessKey: secretKey,
       },
-      endpoint: url.href,
+      maxAttempts: DEFAULT_MAX_RETRIES,
+      endpoint: url.origin,
       region,
       forcePathStyle: true,
     });
@@ -102,34 +103,7 @@ export class S3StorageSync {
     wacz: WACZ,
     targetFilename: string,
   ): Promise<UploadResult> {
-    const fileUploadInfo = {
-      bucket: this.bucketName,
-      crawlId: this.crawlId,
-      prefix: this.objectPrefix,
-      targetFilename,
-    };
-    logger.info("S3 file upload information", fileUploadInfo, "storage");
-
-    const waczStream = wacz.generate();
-
-    const uploader = new Upload({
-      client: this.client,
-      params: {
-        Bucket: this.bucketName,
-        Key: this.objectPrefix + targetFilename,
-        Body: waczStream,
-      },
-
-      // (optional) concurrency configuration
-      // queueSize: 4,
-
-      // (optional) size of each part, in bytes, at least 5MB
-      partSize: 1024 * 1024 * 100,
-
-      leavePartsOnError: false,
-    });
-
-    await uploader.done();
+    await this.doUpload(targetFilename, wacz.generate());
 
     const hash = wacz.getHash();
     const path = targetFilename;
@@ -144,32 +118,7 @@ export class S3StorageSync {
     srcFilename: string,
     targetFilename: string,
   ): Promise<UploadResult> {
-    const fileUploadInfo = {
-      bucket: this.bucketName,
-      crawlId: this.crawlId,
-      prefix: this.objectPrefix,
-      targetFilename,
-    };
-    logger.info("S3 file upload information", fileUploadInfo, "storage");
-
-    const uploader = new Upload({
-      client: this.client,
-      params: {
-        Bucket: this.bucketName,
-        Key: this.objectPrefix + targetFilename,
-        Body: fs.createReadStream(srcFilename),
-      },
-
-      // (optional) concurrency configuration
-      // queueSize: 4,
-
-      // (optional) size of each part, in bytes, at least 5MB
-      partSize: 1024 * 1024 * 100,
-
-      leavePartsOnError: false,
-    });
-
-    await uploader.done();
+    await this.doUpload(targetFilename, fs.createReadStream(srcFilename));
 
     const hash = await checksumFile("sha256", srcFilename);
     const path = targetFilename;
@@ -178,6 +127,35 @@ export class S3StorageSync {
 
     // for backwards compatibility, keep 'bytes'
     return { path, size, hash, bytes: size };
+  }
+
+  private async doUpload(targetFilename: string, Body: Readable) {
+    const Bucket = this.bucketName;
+
+    const Key = this.objectPrefix + targetFilename;
+
+    const fileUploadInfo = {
+      bucket: Bucket,
+      key: Key,
+      endpoint: this.client.config.endpoint,
+      crawlId: this.crawlId,
+      prefix: this.objectPrefix,
+      targetFilename,
+    };
+
+    logger.info("S3 file upload information", fileUploadInfo, "storage");
+
+    const uploader = new Upload({
+      client: this.client,
+      params: { Bucket, Key, Body },
+
+      // (optional) size of each part, in bytes, at least 5MB
+      partSize: PART_SIZE,
+
+      leavePartsOnError: false,
+    });
+
+    await uploader.done();
   }
 
   async downloadFile(srcFilename: string, destFilename: string) {
