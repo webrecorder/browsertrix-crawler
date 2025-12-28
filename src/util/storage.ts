@@ -2,11 +2,17 @@ import child_process from "child_process";
 import fs from "fs";
 import fsp from "fs/promises";
 import util from "util";
+import { pipeline } from "stream/promises";
+import type { Readable } from "stream";
 
 import os from "os";
 import { createHash } from "crypto";
 
-import * as Minio from "minio";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
@@ -15,12 +21,12 @@ import { logger } from "./logger.js";
 import getFolderSize from "get-folder-size";
 
 import { WACZ } from "./wacz.js";
-import { sleep, timedRun } from "./timing.js";
-import { DEFAULT_MAX_RETRIES } from "./constants.js";
+//import { sleep, timedRun } from "./timing.js";
+//import { DEFAULT_MAX_RETRIES } from "./constants.js";
 
 const DEFAULT_REGION = "us-east-1";
 
-const DOWNLOAD_PROFILE_MAX_TIME = 60;
+//const DOWNLOAD_PROFILE_MAX_TIME = 60;
 
 // ===========================================================================
 export type UploadResult = {
@@ -33,7 +39,7 @@ export type UploadResult = {
 // ===========================================================================
 export class S3StorageSync {
   fullPrefix: string;
-  client: Minio.Client;
+  client: S3Client;
 
   bucketName: string;
   objectPrefix: string;
@@ -74,13 +80,12 @@ export class S3StorageSync {
 
     const region = process.env.STORE_REGION || DEFAULT_REGION;
 
-    this.client = new Minio.Client({
-      endPoint: url.hostname,
-      port: Number(url.port) || (url.protocol === "https:" ? 443 : 80),
-      useSSL: url.protocol === "https:",
-      accessKey,
-      secretKey,
-      partSize: 100 * 1024 * 1024,
+    this.client = new S3Client({
+      credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretKey,
+      },
+      endpoint: url.href,
       region,
     });
 
@@ -109,10 +114,12 @@ export class S3StorageSync {
 
     const waczStream = wacz.generate();
 
-    await this.client.putObject(
-      this.bucketName,
-      this.objectPrefix + targetFilename,
-      waczStream,
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: this.objectPrefix + targetFilename,
+        Body: waczStream,
+      }),
     );
 
     const hash = wacz.getHash();
@@ -136,10 +143,12 @@ export class S3StorageSync {
     };
     logger.info("S3 file upload information", fileUploadInfo, "storage");
 
-    await this.client.fPutObject(
-      this.bucketName,
-      this.objectPrefix + targetFilename,
-      srcFilename,
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: this.objectPrefix + targetFilename,
+        Body: fs.createReadStream(srcFilename),
+      }),
     );
 
     const hash = await checksumFile("sha256", srcFilename);
@@ -152,34 +161,15 @@ export class S3StorageSync {
   }
 
   async downloadFile(srcFilename: string, destFilename: string) {
-    let count = 0;
     logger.debug("Downloading profile", { srcFilename }, "storage");
-    while (true) {
-      try {
-        await timedRun(
-          this.client.fGetObject(
-            this.bucketName,
-            this.objectPrefix + srcFilename,
-            destFilename,
-          ),
-          DOWNLOAD_PROFILE_MAX_TIME,
-          "Timed out downloading profile",
-          {},
-          "storage",
-          true,
-          true,
-        );
-        break;
-      } catch (e) {
-        if (count <= DEFAULT_MAX_RETRIES) {
-          count += 1;
-          await sleep(5);
-          logger.warn("Retry downloading profile", {}, "storage");
-        } else {
-          throw new Error("Profile could not be downloaded");
-        }
-      }
-    }
+
+    const res = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: this.objectPrefix + srcFilename,
+      }),
+    );
+    await pipeline(res.Body as Readable, fs.createWriteStream(destFilename));
   }
 
   async uploadCollWACZ(
