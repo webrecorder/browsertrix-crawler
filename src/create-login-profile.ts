@@ -185,13 +185,12 @@ async function main() {
       "RANDR",
     ]);
 
-    //await fsp.mkdir(path.join(homedir(), ".vnc"), {recursive: true});
+    const passwd = process.env.VNC_PASS || "";
 
     child_process.execSync(
-      `ulimit -n 65536; x11vnc -bg -forever -ncache_cr -xdamage -usepw ` +
-        `-shared -rfbport 6080 -passwd ${
-          process.env.VNC_PASS || ""
-        } -display ${DISPLAY}`,
+      `ulimit -n 8192;` +
+        `x11vnc -bg -forever -ncache_cr -xdamage -usepw ` +
+        `-shared -rfbport 6080 -passwd ${passwd} -display ${DISPLAY}`,
       { stdio: "ignore" },
     );
   }
