@@ -185,23 +185,14 @@ async function main() {
       "RANDR",
     ]);
 
-    //await fsp.mkdir(path.join(homedir(), ".vnc"), {recursive: true});
+    const passwd = process.env.VNC_PASS || "";
 
-    //child_process.spawnSync("x11vnc", ["-storepasswd", process.env.VNC_PASS, path.join(homedir(), ".vnc", "passwd")]);
-
-    child_process.spawn("x11vnc", [
-      "-forever",
-      "-ncache_cr",
-      "-xdamage",
-      "-usepw",
-      "-shared",
-      "-rfbport",
-      "6080",
-      "-passwd",
-      process.env.VNC_PASS || "",
-      "-display",
-      DISPLAY,
-    ]);
+    child_process.execSync(
+      `ulimit -n 8192;` +
+        `x11vnc -loop -forever -ncache_cr -xdamage -usepw ` +
+        `-shared -rfbport 6080 -passwd ${passwd} -display ${DISPLAY} &`,
+      { stdio: "ignore" },
+    );
   }
 
   const browser = new Browser(os.tmpdir());
