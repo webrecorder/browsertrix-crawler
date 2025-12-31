@@ -196,7 +196,7 @@ async function main() {
       "-usepw",
       "-shared",
       "-rfbport",
-      "6080",
+      "6081",
       "-passwd",
       process.env.VNC_PASS || "",
       "-display",
