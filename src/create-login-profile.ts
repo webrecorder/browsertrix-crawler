@@ -189,8 +189,8 @@ async function main() {
 
     child_process.execSync(
       `ulimit -n 8192;` +
-        `x11vnc -bg -forever -ncache_cr -xdamage -usepw ` +
-        `-shared -rfbport 6080 -passwd ${passwd} -display ${DISPLAY}`,
+        `x11vnc -loop -forever -ncache_cr -xdamage -usepw ` +
+        `-shared -rfbport 6080 -passwd ${passwd} -display ${DISPLAY} &`,
       { stdio: "ignore" },
     );
   }
