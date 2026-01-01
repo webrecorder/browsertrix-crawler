@@ -1,8 +1,6 @@
 import * as child_process from "child_process";
 import fs from "fs";
 import fsp from "node:fs/promises";
-import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
 import crypto from "crypto";
 
 import path from "path";
@@ -33,6 +31,7 @@ import { Recorder } from "./recorder.js";
 import { timedRun } from "./timing.js";
 import assert from "node:assert";
 import { replaceDir } from "./file_reader.js";
+import { stream } from "undici";
 
 type BtrixChromeOpts = {
   proxyServer?: string;
@@ -249,13 +248,13 @@ export class Browser {
         "browser",
       );
 
-      const resp = await fetch(profileRemoteSrc);
-      await pipeline(
-        // TODO: Fix this the next time the file is edited.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Readable.fromWeb(resp.body as any),
+      await stream(profileRemoteSrc, { method: "GET" }, () =>
         fs.createWriteStream(profileLocalSrc),
       );
+
+      // await pipeline(resp.body,
+      //   fs.createWriteStream(profileLocalSrc),
+      // );
     } else if (profileRemoteSrc && profileRemoteSrc.startsWith("@")) {
       const storage = initStorage();
 

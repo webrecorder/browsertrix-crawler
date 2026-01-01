@@ -17,6 +17,7 @@ import getFolderSize from "get-folder-size";
 import { WACZ } from "./wacz.js";
 import { sleep, timedRun } from "./timing.js";
 import { DEFAULT_MAX_RETRIES } from "./constants.js";
+import { request } from "undici";
 
 const DEFAULT_REGION = "us-east-1";
 
@@ -216,7 +217,7 @@ export class S3StorageSync {
         this.webhookUrl.startsWith("http://") ||
         this.webhookUrl.startsWith("https://")
       ) {
-        await fetch(this.webhookUrl, {
+        await request(this.webhookUrl, {
           method: "POST",
           body: JSON.stringify(body),
         });
