@@ -12,7 +12,6 @@ import { Dispatcher, request } from "undici";
 
 import {
   getCustomRewriter,
-  getStatusText,
   removeRangeAsQuery,
   rewriteDASH,
   rewriteHLS,
@@ -1706,10 +1705,7 @@ class AsyncFetcher {
   cdp: CDPSession | null = null;
 
   stream?: string;
-  //resp?: Response;
-  respHeaders?: Headers;
   body?: Dispatcher.BodyMixin & Readable;
-  abort?: AbortController;
 
   maxFetchSize: number;
 
@@ -1818,12 +1814,9 @@ class AsyncFetcher {
   }
 
   async doCancel() {
-    const { abort, body } = this;
+    const { body } = this;
     if (body) {
       body.destroy();
-    } else if (abort) {
-      abort.abort();
-      this.abort = undefined;
     }
   }
 
@@ -1847,7 +1840,7 @@ class AsyncFetcher {
       });
     }
 
-    this.abort = new AbortController();
+    //this.abort = new AbortController();
 
     const resp = await request(url!, {
       method: (method || "GET") as Dispatcher.HttpMethod,
@@ -1855,41 +1848,35 @@ class AsyncFetcher {
       body: reqresp.postData || undefined,
       //redirect: this.manualRedirect ? "manual" : "follow",
       dispatcher,
-      signal: this.abort.signal,
+      //signal: this.abort.signal,
     });
-    resp.body.on("error", () => console.log("aborted"));
 
-    const respHeaders = new Headers();
+    // do nothing
+    resp.body.on("error", () => {});
 
     for (const [name, value] of Object.entries(resp.headers)) {
       if (value instanceof Array) {
-        respHeaders.set(name, multiValueHeader(name, value));
-      } else if (value) {
-        respHeaders.set(name, value);
+        resp.headers[name] = multiValueHeader(name, value);
       }
     }
 
     if (
       reqresp.expectedSize < 0 &&
-      respHeaders.get("content-length") &&
-      !respHeaders.get("content-encoding")
+      resp.headers["content-length"] &&
+      !resp.headers["content-encoding"]
     ) {
-      reqresp.expectedSize = Number(respHeaders.get("content-length") || -1);
+      reqresp.expectedSize = Number(resp.headers["content-length"] || -1);
     }
 
     if (reqresp.expectedSize === 0) {
-      //reqresp.fillFetchResponse(resp);
-      reqresp.responseHeaders = Object.fromEntries(respHeaders);
-      reqresp.setStatus(resp.statusCode, getStatusText(resp.statusCode));
+      reqresp.fillFetchResponse(resp);
       reqresp.payload = new Uint8Array();
       return true;
     } else if (!resp.body) {
       return false;
     }
 
-    //reqresp.fillFetchResponse(resp);
-    reqresp.responseHeaders = Object.fromEntries(respHeaders);
-    reqresp.setStatus(resp.statusCode, getStatusText(resp.statusCode));
+    reqresp.fillFetchResponse(resp);
     this.body = resp.body;
     //this.resp = resp;
     return true;
@@ -1965,9 +1952,9 @@ class AsyncFetcher {
   async *takeReader(reader: Readable) {
     let size = 0;
     try {
-      for await (const chunk of reader) {
-        size += chunk.length;
-        yield chunk;
+      for await (const value of reader) {
+        size += value.length;
+        yield value;
       }
       // while (true) {
       //   const { value, done } = await reader.read();
