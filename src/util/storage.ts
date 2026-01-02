@@ -14,12 +14,12 @@ import { Upload } from "@aws-sdk/lib-storage";
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 
-// @ts-expect-error (incorrect types on get-folder-size)
 import getFolderSize from "get-folder-size";
 
 import { WACZ } from "./wacz.js";
-//import { sleep, timedRun } from "./timing.js";
+
 import { DEFAULT_MAX_RETRIES } from "./constants.js";
+import { CrawlerArgs } from "./argParser.js";
 
 const DEFAULT_REGION = "us-east-1";
 
@@ -46,20 +46,23 @@ export class S3StorageSync {
   crawlId: string;
   webhookUrl?: string;
 
-  // TODO: Fix this the next time the file is edited.
-
   constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    urlOrData: string | any,
+    urlOrData:
+      | string
+      | {
+          endpointUrl: string;
+          accessKey: string;
+          secretKey: string;
+        },
     {
       webhookUrl,
       userId,
       crawlId,
     }: { webhookUrl?: string; userId: string; crawlId: string },
   ) {
-    let url;
-    let accessKey;
-    let secretKey;
+    let url: URL;
+    let accessKey: string;
+    let secretKey: string;
 
     if (typeof urlOrData === "string") {
       url = new URL(urlOrData);
@@ -233,8 +236,8 @@ export function initStorage() {
     process.env.STORE_ENDPOINT_URL + (process.env.STORE_PATH || "");
   const storeInfo = {
     endpointUrl,
-    accessKey: process.env.STORE_ACCESS_KEY,
-    secretKey: process.env.STORE_SECRET_KEY,
+    accessKey: process.env.STORE_ACCESS_KEY || "",
+    secretKey: process.env.STORE_SECRET_KEY || "",
   };
 
   const opts = {
@@ -268,9 +271,7 @@ export async function isDiskFull(collDir: string) {
 
 export async function checkDiskUtilization(
   collDir: string,
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  params: Record<string, any>,
+  params: CrawlerArgs,
   archiveDirSize: number,
   dfOutput = null,
   doLog = true,
@@ -352,9 +353,7 @@ export async function getDiskUsage(path = "/crawls", dfOutput = null) {
   const keys = lines[0].split(/\s+/gi);
   const rows = lines.slice(1).map((line) => {
     const values = line.split(/\s+/gi);
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return keys.reduce((o: Record<string, any>, k, index) => {
+    return keys.reduce((o: Record<string, string>, k, index) => {
       o[k] = values[index];
       return o;
     }, {});
