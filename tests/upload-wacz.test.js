@@ -2,32 +2,38 @@ import { execSync, exec } from "child_process";
 import fs from "fs";
 import { Redis } from "ioredis";
 
+import { S3Client, PutBucketPolicyCommand } from "@aws-sdk/client-s3";
+
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
-let minioId;
+const ACCESS = "ROOT";
+const SECRET = "TESTSECRET";
+const BUCKET_NAME = "test-bucket"
+
+let storageId;
 
 beforeAll(() => {
   execSync("docker network create upload-test-net");
-  minioId = execSync("docker run --rm -d -p 9000:9000 -p 9001:9001 --name minio --network=upload-test-net minio/minio server /data --console-address ':9001'", {encoding: "utf-8"});
+  storageId = execSync(`docker run --rm -d -p 39900:9000 --name s3storage --network=upload-test-net versity/versitygw --port :9000 --access ${ACCESS} --secret ${SECRET} posix /tmp/`, {encoding: "utf-8"});
 });
 
 
 afterAll(async () => {
-  execSync(`docker kill -s SIGINT ${minioId}`);
+  execSync(`docker kill -s SIGINT ${storageId}`);
   await sleep(5000);
   execSync("docker network rm upload-test-net");
 });
 
 test("run crawl with upload", async () => {
 
-  execSync(`docker exec ${minioId.trim()} mc mb /data/test-bucket`);
+  execSync(`docker exec ${storageId.trim()} mkdir -p /tmp/${BUCKET_NAME}`);
 
   const child = exec(
     "docker run --rm " + 
-    "-e STORE_ENDPOINT_URL=http://minio:9000/test-bucket/ " +
-    "-e STORE_ACCESS_KEY=minioadmin " + 
-    "-e STORE_SECRET_KEY=minioadmin " + 
+    `-e STORE_ENDPOINT_URL=http://s3storage:9000/${BUCKET_NAME}/ ` +
+    `-e STORE_ACCESS_KEY=${ACCESS} ` +
+    `-e STORE_SECRET_KEY=${SECRET} ` +
     "-e STORE_PATH=prefix/ " +
     "--network=upload-test-net " +
     "-p 36390:6379 -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit 2 --collection upload-test --crawlId upload-test --writePagesToRedis --debugAccessRedis --generateWACZ",
@@ -72,13 +78,52 @@ test("run crawl with upload", async () => {
   }
 
   // ensure bucket is public
-  execSync(`docker exec ${minioId.trim()} mc alias set local http://127.0.0.1:9000 minioadmin minioadmin`);
-  execSync(`docker exec ${minioId.trim()} mc anonymous set download local/test-bucket`);
+  await makeBucketPublic();
+
+  // equivalent command with 'mc', leaving for reference for now
+  // execSync(`docker run --entrypoint /bin/sh --network=upload-test-net minio/mc -c "mc alias set local http://s3storage:9000 ${ACCESS} ${SECRET} && mc anonymous set download local/${BUCKET_NAME}"`);
+
 
   // wait for crawler to finish
   await crawlFinished;
 
   // ensure WACZ exists at the specified filename
-  const resp = await fetch(`http://127.0.0.1:9000/test-bucket/prefix/${filename}`);
+  const resp = await fetch(`http://127.0.0.1:39900/${BUCKET_NAME}/prefix/${filename}`);
   expect(resp.status).toBe(200);
 });
+
+async function makeBucketPublic() {
+  try {
+    const publicPolicy = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Sid: "PublicReadGetObject",
+          Effect: "Allow",
+          Principal: "*",
+          Action: "s3:GetObject",
+          Resource: `arn:aws:s3:::${BUCKET_NAME}/*`
+        },
+      ],
+    };
+
+    const s3client = new S3Client({
+      credentials: {
+        accessKeyId: ACCESS,
+        secretAccessKey: SECRET
+      },
+      endpoint: "http://127.0.0.1:39900",
+      region: "us-east-1",
+      forcePathStyle: true,
+    });
+
+    const command = new PutBucketPolicyCommand({
+      Bucket: BUCKET_NAME,
+      Policy: JSON.stringify(publicPolicy),
+    });
+
+    await s3client.send(command);
+  } catch (e) {
+    console.error("Error applying policy", e);
+  }
+};
