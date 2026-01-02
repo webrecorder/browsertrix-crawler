@@ -2,10 +2,12 @@ import * as child_process from "child_process";
 import fs from "fs";
 import fsp from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
+import assert from "node:assert";
 import crypto from "crypto";
 
 import path from "path";
+
+import { request } from "undici";
 
 import { formatErr, LogContext, logger } from "./logger.js";
 import { getSafeProxyString } from "./proxy.js";
@@ -31,7 +33,6 @@ import puppeteer, {
 } from "puppeteer-core";
 import { Recorder } from "./recorder.js";
 import { timedRun } from "./timing.js";
-import assert from "node:assert";
 import { replaceDir } from "./file_reader.js";
 
 type BtrixChromeOpts = {
@@ -249,13 +250,9 @@ export class Browser {
         "browser",
       );
 
-      const resp = await fetch(profileRemoteSrc);
-      await pipeline(
-        // TODO: Fix this the next time the file is edited.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Readable.fromWeb(resp.body as any),
-        fs.createWriteStream(profileLocalSrc),
-      );
+      const resp = await request(profileRemoteSrc);
+
+      await pipeline(resp.body, fs.createWriteStream(profileLocalSrc));
     } else if (profileRemoteSrc && profileRemoteSrc.startsWith("@")) {
       const storage = initStorage();
 

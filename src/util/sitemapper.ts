@@ -1,5 +1,5 @@
 import { Readable } from "stream";
-import { ReadableStream } from "node:stream/web";
+import zlib from "zlib";
 import EventEmitter from "events";
 
 import sax from "sax";
@@ -9,7 +9,7 @@ import { logger, formatErr } from "./logger.js";
 import { DETECT_SITEMAP } from "./constants.js";
 import { sleep } from "./timing.js";
 
-import { fetch, Response } from "undici";
+import { Dispatcher, request } from "undici";
 import { getProxyDispatcher } from "./proxy.js";
 
 const SITEMAP_CONCURRENCY = 5;
@@ -64,13 +64,15 @@ export class SitemapReader extends EventEmitter {
 
   async _fetchWithRetry(url: string, expectedCT = XML_CONTENT_TYPES) {
     while (true) {
-      const resp = await fetch(url, {
+      const resp = await request(url, {
         headers: this.headers,
         dispatcher: getProxyDispatcher(url),
       });
 
-      if (resp.ok) {
-        const ct = resp.headers.get("content-type");
+      const { statusCode, headers } = resp;
+
+      if (statusCode === 200) {
+        const ct = headers["content-type"] as string;
         if (expectedCT && ct && !expectedCT.includes(ct.split(";")[0])) {
           logger.debug(
             "Not loading sitemap: invalid content-type",
@@ -82,7 +84,7 @@ export class SitemapReader extends EventEmitter {
         return resp;
       }
 
-      const retry = resp.headers.get("retry-after");
+      const retry = headers["retry-after"];
 
       if (retry) {
         logger.debug(
@@ -90,13 +92,13 @@ export class SitemapReader extends EventEmitter {
           { retrySeconds: retry },
           "sitemap",
         );
-        await sleep(parseInt(retry));
+        await sleep(parseInt(retry as string));
         continue;
       }
 
       logger.debug(
         "Not loading sitemap: invalid status code",
-        { status: resp.status },
+        { status: statusCode },
         "sitemap",
       );
       return null;
@@ -158,7 +160,9 @@ export class SitemapReader extends EventEmitter {
         return sitemapFound;
       }
 
-      const text = await resp.text();
+      const { body } = resp;
+
+      const text = await body.text();
 
       text.replace(/^Sitemap:\s?([^\s]+)$/gim, (m, urlStr) => {
         try {
@@ -198,7 +202,10 @@ export class SitemapReader extends EventEmitter {
     }
   }
 
-  private async parseSitemapFromResponse(url: string, resp: Response) {
+  private async parseSitemapFromResponse(
+    url: string,
+    resp: Dispatcher.ResponseData,
+  ) {
     let resolve: () => void;
     let reject: () => void;
 
@@ -231,11 +238,11 @@ export class SitemapReader extends EventEmitter {
 
   private doParseSitemapFromResponse(
     url: string,
-    resp: Response,
+    resp: Dispatcher.ResponseData,
     resolve: () => void,
     reject: () => void,
   ) {
-    let stream;
+    let stream: Readable;
 
     const { body } = resp;
     if (!body) {
@@ -243,29 +250,20 @@ export class SitemapReader extends EventEmitter {
       reject();
       return;
     }
+
     // decompress .gz sitemaps
-    // if content-encoding is gzip, then likely already being decompressed by fetch api
-    if (
-      url.endsWith(".gz") &&
-      resp.headers.get("content-encoding") !== "gzip"
-    ) {
-      const ds = new DecompressionStream("gzip");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      stream = body.pipeThrough(ds as any);
+    if (url.endsWith(".gz")) {
+      stream = body.pipe(zlib.createGunzip());
     } else {
       stream = body;
     }
 
-    const readableNodeStream = Readable.fromWeb(
-      stream as ReadableStream<Uint8Array>,
-    );
-
-    readableNodeStream.on("error", (e: Error) => {
+    stream.on("error", (e: Error) => {
       logger.warn("Error parsing sitemap", formatErr(e), "sitemap");
       reject();
     });
 
-    this.initSaxParser(url, readableNodeStream, resolve, reject);
+    this.initSaxParser(url, stream, resolve, reject);
   }
 
   private initSaxParser(

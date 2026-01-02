@@ -16,6 +16,7 @@ import { makeZip, InputWithoutMeta } from "client-zip";
 import { logger, formatErr } from "./logger.js";
 import { streamFinish } from "./warcwriter.js";
 import { getDirSize } from "./storage.js";
+import { request } from "undici";
 
 const DATAPACKAGE_JSON = "datapackage.json";
 const DATAPACKAGE_DIGEST_JSON = "datapackage-digest.json";
@@ -267,12 +268,12 @@ export class WACZ {
       }
 
       try {
-        const response = await fetch(this.signingUrl, {
+        const response = await request(this.signingUrl, {
           method: "POST",
           headers,
           body,
         });
-        digest.signedData = await response.json();
+        digest.signedData = (await response.body.json()) as string;
       } catch (e) {
         logger.warn(
           "Failed to sign WACZ, continuing w/o signature",

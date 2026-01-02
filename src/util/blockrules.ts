@@ -4,7 +4,7 @@ import { logger, formatErr } from "./logger.js";
 import { HTTPRequest, Page } from "puppeteer-core";
 import { Browser } from "./browser.js";
 
-import { fetch } from "undici";
+import { request } from "undici";
 import { getProxyDispatcher } from "./proxy.js";
 
 const RULE_TYPES = ["block", "allowOnly"];
@@ -264,7 +264,7 @@ export class BlockRules {
   }
 
   async isTextMatch(
-    request: HTTPRequest,
+    _: HTTPRequest,
     reqUrl: string,
     frameTextMatch: RegExp,
     // TODO: Fix this the next time the file is edited.
@@ -272,10 +272,10 @@ export class BlockRules {
     logDetails: Record<string, any>,
   ) {
     try {
-      const res = await fetch(reqUrl, {
+      const { body } = await request(reqUrl, {
         dispatcher: getProxyDispatcher(reqUrl),
       });
-      const text = await res.text();
+      const text = await body.text();
 
       return !!text.match(frameTextMatch);
     } catch (e) {
@@ -301,7 +301,7 @@ export class BlockRules {
     const body = this.blockErrMsg;
     const putUrl = new URL(this.blockPutUrl);
     putUrl.searchParams.set("url", url);
-    await fetch(putUrl.href, {
+    await request(putUrl.href, {
       method: "PUT",
       headers: { "Content-Type": "text/html" },
       body,

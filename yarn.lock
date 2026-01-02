@@ -2527,13 +2527,13 @@ fd-slicer@~1.1.0:
   dependencies:
     pend "~1.2.0"
 
-fetch-socks@^1.3.0:
-  version "1.3.0"
-  resolved "https://registry.yarnpkg.com/fetch-socks/-/fetch-socks-1.3.0.tgz#1f07b26924b5e7370aa23fd6e9332a5863736d1b"
-  integrity sha512-Cq7O53hoNiVeOs6u54f8M/H/w2yzhmnTQ3tcAJj9FNKYOeNGmt8qNU1zpWOzJD09f0uqfmBXxLbzWPsnT6GcRw==
+fetch-socks@^1.3.2:
+  version "1.3.2"
+  resolved "https://registry.yarnpkg.com/fetch-socks/-/fetch-socks-1.3.2.tgz#1b59a382049fc349bd2ac885860882b2635022ca"
+  integrity sha512-vkH5+Zgj2yEbU57Cei0iyLgTZ4OkEKJj56Xu3ViB5dpsl599JgEooQ3x6NVagIFRHWnWJ+7K0MO0aIV1TMgvnw==
   dependencies:
-    socks "^2.8.1"
-    undici "^6.10.1"
+    socks "^2.8.2"
+    undici ">=6"
 
 file-entry-cache@^6.0.1:
   version "6.0.1"
@@ -3028,6 +3028,11 @@ ioredis@^5.3.2:
     redis-errors "^1.2.0"
     redis-parser "^3.0.0"
     standard-as-callback "^2.1.0"
+
+ip-address@^10.0.1:
+  version "10.1.0"
+  resolved "https://registry.yarnpkg.com/ip-address/-/ip-address-10.1.0.tgz#d8dcffb34d0e02eb241427444a6e23f5b0595aa4"
+  integrity sha512-XXADHxXmvT9+CRxhXg56LJovE+bmWnEWB78LB83VZTprKTmaC5QfruXocxzTZ2Kl0DNwKuBdlIhjL8LeY8Sf8Q==
 
 ip-address@^9.0.5:
   version "9.0.5"
@@ -4971,7 +4976,15 @@ socks-proxy-agent@^8.0.5:
     debug "^4.3.4"
     socks "^2.8.3"
 
-socks@^2.8.1, socks@^2.8.3:
+socks@^2.8.2:
+  version "2.8.7"
+  resolved "https://registry.yarnpkg.com/socks/-/socks-2.8.7.tgz#e2fb1d9a603add75050a2067db8c381a0b5669ea"
+  integrity sha512-HLpt+uLy/pxB+bum/9DzAgiKS8CX1EvbWxI4zlmgGCExImLdiad2iCwXT5Z4c9c3Eq8rP2318mPW2c+QbtjK8A==
+  dependencies:
+    ip-address "^10.0.1"
+    smart-buffer "^4.2.0"
+
+socks@^2.8.3:
   version "2.8.3"
   resolved "https://registry.yarnpkg.com/socks/-/socks-2.8.3.tgz#1ebd0f09c52ba95a09750afe3f3f9f724a800cb5"
   integrity sha512-l5x7VUUWbjVFbafGLxPWkYsHIhEvmF85tbIeFZWc8ZPtoMyybuEhL7Jye/ooC4/d48FgOjSJXgsF/AJPYCW8Zw==
@@ -5474,10 +5487,10 @@ undici-types@~6.19.2, undici-types@~6.19.8:
   resolved "https://registry.yarnpkg.com/undici-types/-/undici-types-6.19.8.tgz#35111c9d1437ab83a7cdc0abae2f26d88eda0a02"
   integrity sha512-ve2KP6f/JnbPBFyobGHuerC9g1FYGn/F8n1LWTwNxCEzd6IfqTwUQcNXgEtmmQ6DlRrC1hrSrBnCZPokRrDHjw==
 
-undici@^6.10.1, undici@^6.18.2:
-  version "6.21.0"
-  resolved "https://registry.yarnpkg.com/undici/-/undici-6.21.0.tgz#4b3d3afaef984e07b48e7620c34ed8a285ed4cd4"
-  integrity sha512-BUgJXc752Kou3oOIuU1i+yZZypyZRqNPW0vqoMPl8VaoalSfeR0D8/t4iAS3yirs79SSMTxTag+ZC86uswv+Cw==
+undici@>=6, undici@^7.16.0:
+  version "7.16.0"
+  resolved "https://registry.yarnpkg.com/undici/-/undici-7.16.0.tgz#cb2a1e957726d458b536e3f076bf51f066901c1a"
+  integrity sha512-QEg3HPMll0o3t2ourKwOeUAZ159Kn9mx5pnzHRQO8+Wixmh88YdZRiIwat0iNzNNXn0yoEtXJqFpyW7eM8BV7g==
 
 union@~0.5.0:
   version "0.5.0"

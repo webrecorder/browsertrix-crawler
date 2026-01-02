@@ -23,6 +23,7 @@ import { MAX_URL_LENGTH } from "./util/reqresp.js";
 import { openAsBlob } from "fs";
 import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
+import { request } from "undici";
 
 // RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
@@ -182,8 +183,9 @@ export class ReplayCrawler extends Crawler {
         url = URL.createObjectURL(blob);
       }
 
-      const resp = await fetch(url);
-      const json = await resp.json();
+      const resp = await request(url);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const json = (await resp.body.json()) as any;
 
       // if json contains pages, just load them directly
       if (json.pages) {
