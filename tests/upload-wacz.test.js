@@ -78,10 +78,11 @@ test("run crawl with upload", async () => {
   }
 
   // ensure bucket is public
+  await makeBucketPublic();
+
+  // equivalent command with 'mc', leaving for reference for now
   // execSync(`docker run --entrypoint /bin/sh --network=upload-test-net minio/mc -c "mc alias set local http://s3storage:9000 ${ACCESS} ${SECRET} && mc anonymous set download local/${BUCKET_NAME}"`);
 
-  //execSync(`docker run --network=upload-test-net -e AWS_ACCESS_KEY=${ACCESS} -e AWS_SECRET_KEY=${SECRET} d3fk/s3cmd setacl s3://${BUCKET_NAME}/ --host=http://s3storage:9000 --host-bucket=http://s3storage:9000 --acl-public`);
-  await makeBucketPublic();
 
   // wait for crawler to finish
   await crawlFinished;
