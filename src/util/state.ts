@@ -7,11 +7,15 @@ import {
   MAX_DEPTH,
   DEFAULT_MAX_RETRIES,
   ROBOTS_CACHE_LIMIT,
+  DUPE_ALL_HASH_KEY,
+  DUPE_ALL_CRAWLS,
+  DUPE_ALL_COUNTS,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 import { interpolateFilename, UploadResult } from "./storage.js";
 import normalizeUrl, { Options as NormamlizeUrlOptions } from "normalize-url";
+import { WACZ } from "./wacz.js";
 
 // ============================================================================
 export enum LoadState {
@@ -45,11 +49,11 @@ const normalizeUrlOpts: NormamlizeUrlOptions = {
 
 // ============================================================================
 // treat 0 or 206 as 200 for purposes of dedup
-function normalizeDedupStatus(status: number): number {
+export function normalizeDedupeStatus(status: number): string {
   if (status === 0 || status === 206) {
-    return 200;
+    return "200";
   }
-  return status;
+  return status + "";
 }
 
 // ============================================================================
@@ -214,12 +218,353 @@ export type SaveState = {
 };
 
 // ============================================================================
-export class RedisCrawlState {
+export type DedupeEntry = {
+  origDate: string;
+  origUrl: string;
+  index: string;
+  crawlId: string;
+  size: number;
+};
+
+// ============================================================================
+export type DedupeSourceEntry = {
+  filename: string;
+  size?: number;
+  hash?: string;
+};
+
+// ============================================================================
+export class RedisDedupeIndex {
+  dedupeRedis: Redis;
+  crawlId: string;
+  dedupeKeyIndex = 0;
+  dedupeCurrFilename = "";
+
+  sourceDone = "src:d";
+  sourceQ = "src:q";
+  pendingQ = "pending:q";
+  sourceP = "src:p";
+  pendingPrefix = "pending:q:";
+
+  constructor(dedupeRedis: Redis, crawlId: string) {
+    this.dedupeRedis = dedupeRedis;
+    this.crawlId = crawlId;
+  }
+
+  // DEDUPE SOURCE WACZ (to track dependencies)
+
+  async addSourceWACZForDedupe(filename: string) {
+    const crawlId = this.crawlId;
+    const count =
+      (await this.dedupeRedis.rpush(
+        `c:${crawlId}:wacz`,
+        JSON.stringify({ filename }),
+      )) - 1;
+    this.dedupeCurrFilename = filename;
+    this.dedupeKeyIndex = count;
+  }
+
+  async updateDedupeSourceWACZ(wacz: WACZ) {
+    const value: DedupeSourceEntry = {
+      filename: wacz.getLocalFilename() || this.dedupeCurrFilename,
+      hash: wacz.getHash(),
+      size: wacz.getSize(),
+    };
+
+    const crawlId = this.crawlId;
+    await this.dedupeRedis.lset(
+      `c:${crawlId}:wacz`,
+      this.dedupeKeyIndex,
+      JSON.stringify(value),
+    );
+  }
+
+  // COMMIT DEDUPE TO SHARED INDEX
+
+  async commitDedupeDone(crawlId?: string) {
+    crawlId = crawlId || this.crawlId;
+    for await (const hashes of this.dedupeRedis.hscanStream(`h:${crawlId}`)) {
+      let isValue = false;
+      for (const hash of hashes) {
+        if (!isValue) {
+          await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId);
+        }
+        isValue = !isValue;
+      }
+    }
+
+    // commit imported waczs list
+    const numWacz = await this.dedupeRedis.llen(`c:${crawlId}:wacz`);
+
+    for (let i = 0; i < numWacz; i++) {
+      const waczdata = await this.dedupeRedis.lindex(`c:${crawlId}:wacz`, i);
+      if (!waczdata) {
+        continue;
+      }
+      try {
+        const { filename } = JSON.parse(waczdata);
+        await this.dedupeRedis.sadd(this.sourceDone, filename);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // add to crawls list
+    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
+
+    // add counts
+    await this.addRemoveCrawlCounts(crawlId);
+  }
+
+  // GET OR ADD INDIVIDUAL HASHES
+
+  async getHashDupe(hash: string): Promise<DedupeEntry | null> {
+    hash = hash.split(":").at(-1)!;
+
+    // first, check the shared key
+    let crawlId = await this.dedupeRedis.hget(DUPE_ALL_HASH_KEY, hash);
+    if (!crawlId) {
+      // otherwise, try current crawl
+      crawlId = this.crawlId;
+    }
+    const value = await this.dedupeRedis.hget(`h:${crawlId}`, hash);
+    if (!value) {
+      return null;
+    }
+    const val = value.split(" ");
+    return {
+      origUrl: val[2],
+      origDate: val[1],
+      index: val[0],
+      size: Number(val[3]),
+      crawlId,
+    };
+  }
+
+  async addHashDupe(
+    hash: string,
+    url: string,
+    date: string,
+    size: number,
+    crawlId?: string,
+    commitToAllKey = false,
+  ) {
+    url = normalizeUrl(url, normalizeUrlOpts);
+    date = date.replace(/[^\d]/g, "");
+    hash = hash.split(":").at(-1)!;
+    const val = `${this.dedupeKeyIndex} ${date} ${url} ${size}`;
+    crawlId = crawlId || this.crawlId;
+    if (await this.dedupeRedis.hsetnx(`h:${crawlId}`, hash, val)) {
+      // first time seeing hash
+      if (commitToAllKey) {
+        await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId);
+      }
+    }
+  }
+
+  // COUNT STATS
+  async addStats(dupeSize: number, crawlId?: string, commitToAllKey = false) {
+    crawlId = crawlId || this.crawlId;
+    // if not a dupe, add to unique size count
+    if (dupeSize > 0) {
+      await this.dedupeRedis.hincrby(
+        `h:${crawlId}:counts`,
+        "sizeSaved",
+        dupeSize,
+      );
+      if (commitToAllKey) {
+        await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "sizeSaved", dupeSize);
+      }
+    }
+    await this.dedupeRedis.hincrby(`h:${crawlId}:counts`, "totalUrls", 1);
+    if (commitToAllKey) {
+      await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "totalUrls", 1);
+    }
+  }
+
+  async addRemoveCrawlCounts(crawlId: string, remove = false) {
+    // add or remove counts
+    const factor = remove ? -1 : 1;
+    const counts = await this.dedupeRedis.hgetall(`h:${crawlId}:counts`);
+    for (const [key, value] of Object.entries(counts)) {
+      await this.dedupeRedis.hincrby(
+        DUPE_ALL_COUNTS,
+        key,
+        Number(value) * factor,
+      );
+    }
+  }
+
+  async addRevisitSize(hash: string, size: number, crawlId: string) {
+    await this.dedupeRedis.lpush(
+      `rev:${hash}`,
+      JSON.stringify({ size, crawlId }),
+    );
+  }
+
+  async matchRevisitSize(
+    hash: string,
+    origSize: number,
+    crawlId: string,
+    commitToAllKey?: boolean,
+  ) {
+    while (true) {
+      const res = await this.dedupeRedis.lpop(`rev:${hash}`);
+      if (!res) {
+        break;
+      }
+      try {
+        const { size, crawlId } = JSON.parse(res);
+        await this.addStats(origSize - size, crawlId, commitToAllKey);
+      } catch (e) {
+        logger.debug("Error adding revisit size", e, "state");
+        // ignore
+      }
+    }
+    await this.dedupeRedis.del(`rev:${hash}`);
+    await this.addStats(0, crawlId, commitToAllKey);
+  }
+
+  // IMPORT
+
+  async queueImportSource(id: string, data: string) {
+    // already handled this source
+    if (await this.dedupeRedis.sismember(this.sourceDone, id)) {
+      return;
+    }
+    await this.dedupeRedis.lpush(this.sourceQ, data);
+  }
+
+  async addImportedSourceForDedupe(crawlId: string, entry: DedupeSourceEntry) {
+    return (
+      (await this.dedupeRedis.rpush(
+        `c:${crawlId}:wacz`,
+        JSON.stringify(entry),
+      )) - 1
+    );
+  }
+
+  async markImportSourceDone(id: string, crawlId: string) {
+    await this.dedupeRedis.sadd(this.sourceDone, id);
+    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
+  }
+
+  async nextQueuedImportSource() {
+    let res: string | null = await this.dedupeRedis.lmove(
+      this.sourceQ,
+      this.pendingQ,
+      "RIGHT",
+      "LEFT",
+    );
+    // use circular pending Q to support retries
+    if (!res) {
+      const len = await this.dedupeRedis.llen(this.pendingQ);
+      for (let i = 0; i < len; i++) {
+        res = await this.dedupeRedis.lmove(
+          this.pendingQ,
+          this.pendingQ,
+          "RIGHT",
+          "LEFT",
+        );
+        if (res) {
+          const { id } = JSON.parse(res);
+          if (await this.dedupeRedis.get(this.pendingPrefix + id)) {
+            res = null;
+            continue;
+          } else {
+            break;
+          }
+        }
+      }
+    }
+
+    if (!res) {
+      return null;
+    }
+
+    await this.dedupeRedis.lrem(this.pendingQ, 1, res);
+    const { name } = JSON.parse(res);
+    const remaining = (await this.dedupeRedis.llen(this.sourceQ)) + 1;
+    await this.dedupeRedis.setex(this.pendingPrefix + name, "1", 300);
+    return { name, entry: res, remaining };
+  }
+
+  async markImportFinishedTS() {
+    await this.dedupeRedis.set("last_update_ts", new Date().toISOString());
+  }
+
+  // REMOVE ON IMPORT
+
+  async markNotRemoved(crawlId: string) {
+    await this.dedupeRedis.sadd("noremove", crawlId);
+  }
+
+  async purgeUnusedCrawls() {
+    const noRemoveSet = new Set<string>(
+      await this.dedupeRedis.smembers("noremove"),
+    );
+
+    await this.clearAndReadd(noRemoveSet);
+
+    await this.dedupeRedis.del("noremove");
+  }
+
+  async countUnusedCrawls() {
+    const removable =
+      (await this.dedupeRedis.scard(DUPE_ALL_CRAWLS)) -
+      (await this.dedupeRedis.scard("noremove"));
+    await this.dedupeRedis.del("noremove");
+    await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "removableCrawls", removable);
+  }
+
+  async clearAndReadd(readdCrawls: Set<string>) {
+    const TO_REMOVE_CRAWLS = "to-remove-crawls";
+
+    await this.dedupeRedis.rename(DUPE_ALL_CRAWLS, TO_REMOVE_CRAWLS);
+    await this.dedupeRedis.del(DUPE_ALL_HASH_KEY);
+    await this.dedupeRedis.del(DUPE_ALL_COUNTS);
+
+    // readd all crawls that should be kept
+    for (const crawlId of readdCrawls) {
+      await this.commitDedupeDone(crawlId);
+      await this.dedupeRedis.srem(TO_REMOVE_CRAWLS, crawlId);
+    }
+
+    // clear data for remaining
+    while (true) {
+      const crawlId = await this.dedupeRedis.spop(TO_REMOVE_CRAWLS);
+      if (!crawlId) {
+        break;
+      }
+      while (true) {
+        const waczdata = await this.dedupeRedis.lpop(`c:${crawlId}:wacz`);
+        if (!waczdata) {
+          break;
+        }
+        try {
+          const { filename } = JSON.parse(waczdata);
+          await this.dedupeRedis.srem(this.sourceDone, filename);
+        } catch (e) {
+          // ignore
+        }
+      }
+      await this.dedupeRedis.del(
+        `h:${crawlId}`,
+        `c:${crawlId}:wacz`,
+        `h:${crawlId}:counts`,
+      );
+    }
+
+    await this.dedupeRedis.del(TO_REMOVE_CRAWLS);
+  }
+}
+
+// ============================================================================
+export class RedisCrawlState extends RedisDedupeIndex {
   redis: Redis;
   maxRetries: number;
 
   uid: string;
-  key: string;
   maxPageTime: number;
 
   qkey: string;
@@ -248,40 +593,41 @@ export class RedisCrawlState {
     maxPageTime: number,
     uid: string,
     maxRetries?: number,
+    dedupeRedis?: Redis,
   ) {
+    super(dedupeRedis || redis, key);
     this.redis = redis;
 
     this.uid = uid;
-    this.key = key;
     this.maxPageTime = maxPageTime;
     this.maxRetries = maxRetries ?? DEFAULT_MAX_RETRIES;
 
-    this.qkey = this.key + ":q";
-    this.pkey = this.key + ":p";
-    this.skey = this.key + ":s";
+    this.qkey = this.crawlId + ":q";
+    this.pkey = this.crawlId + ":p";
+    this.skey = this.crawlId + ":s";
     // done (integer)
-    this.dkey = this.key + ":d";
+    this.dkey = this.crawlId + ":d";
     // failed final, no more retry
-    this.fkey = this.key + ":f";
+    this.fkey = this.crawlId + ":f";
     // crawler errors
-    this.ekey = this.key + ":e";
+    this.ekey = this.crawlId + ":e";
     // crawler behavior script messages
-    this.bkey = this.key + ":b";
+    this.bkey = this.crawlId + ":b";
     // cached robots.txt bodies (per-origin)
-    this.rkey = this.key + ":r";
+    this.rkey = this.crawlId + ":r";
     // LRU cache of robots.txt keys
-    this.lkey = this.key + ":l";
+    this.lkey = this.crawlId + ":l";
     // pages
-    this.pageskey = this.key + ":pages";
+    this.pageskey = this.crawlId + ":pages";
 
-    this.esKey = this.key + ":extraSeeds";
-    this.esMap = this.key + ":esMap";
+    this.esKey = this.crawlId + ":extraSeeds";
+    this.esMap = this.crawlId + ":esMap";
 
     // stores URLs that have been seen but excluded
     // (eg. redirect-to-excluded or trimmed)
-    this.exKey = this.key + ":excluded";
+    this.exKey = this.crawlId + ":excluded";
 
-    this.sitemapDoneKey = this.key + ":sitemapDone";
+    this.sitemapDoneKey = this.crawlId + ":sitemapDone";
 
     this._initLuaCommands(this.redis);
   }
@@ -534,29 +880,29 @@ return inx;
   }
 
   async setFailReason(reason: string) {
-    await this.redis.set(`${this.key}:failReason`, reason);
+    await this.redis.set(`${this.crawlId}:failReason`, reason);
   }
 
   async setStatus(status_: string) {
-    await this.redis.hset(`${this.key}:status`, this.uid, status_);
+    await this.redis.hset(`${this.crawlId}:status`, this.uid, status_);
   }
 
   async getStatus(): Promise<string> {
-    return (await this.redis.hget(`${this.key}:status`, this.uid)) || "";
+    return (await this.redis.hget(`${this.crawlId}:status`, this.uid)) || "";
   }
 
   async setWACZFilename(): Promise<string> {
     const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
-    this.waczFilename = interpolateFilename(filename, this.key);
+    this.waczFilename = interpolateFilename(filename, this.crawlId);
     if (
       !(await this.redis.hsetnx(
-        `${this.key}:nextWacz`,
+        `${this.crawlId}:nextWacz`,
         this.uid,
         this.waczFilename,
       ))
     ) {
       this.waczFilename = await this.redis.hget(
-        `${this.key}:nextWacz`,
+        `${this.crawlId}:nextWacz`,
         this.uid,
       );
       logger.debug(
@@ -582,20 +928,20 @@ return inx;
   }
 
   async clearWACZFilename(): Promise<void> {
-    await this.redis.hdel(`${this.key}:nextWacz`, this.uid);
+    await this.redis.hdel(`${this.crawlId}:nextWacz`, this.uid);
     this.waczFilename = null;
   }
 
   async setArchiveSize(size: number) {
-    return await this.redis.hset(`${this.key}:size`, this.uid, size);
+    return await this.redis.hset(`${this.crawlId}:size`, this.uid, size);
   }
 
   async isCrawlStopped() {
-    if ((await this.redis.get(`${this.key}:stopping`)) === "1") {
+    if ((await this.redis.get(`${this.crawlId}:stopping`)) === "1") {
       return true;
     }
 
-    if ((await this.redis.hget(`${this.key}:stopone`, this.uid)) === "1") {
+    if ((await this.redis.hget(`${this.crawlId}:stopone`, this.uid)) === "1") {
       return true;
     }
 
@@ -603,7 +949,7 @@ return inx;
   }
 
   async isCrawlPaused() {
-    if ((await this.redis.get(`${this.key}:paused`)) === "1") {
+    if ((await this.redis.get(`${this.crawlId}:paused`)) === "1") {
       return true;
     }
 
@@ -611,13 +957,13 @@ return inx;
   }
 
   async isCrawlCanceled() {
-    return (await this.redis.get(`${this.key}:canceled`)) === "1";
+    return (await this.redis.get(`${this.crawlId}:canceled`)) === "1";
   }
 
   // note: not currently called in crawler, but could be
   // crawl may be stopped by setting this elsewhere in shared redis
   async stopCrawl() {
-    await this.redis.set(`${this.key}:stopping`, "1");
+    await this.redis.set(`${this.crawlId}:stopping`, "1");
   }
 
   async processMessage(seeds: ScopedSeed[]) {
@@ -707,7 +1053,7 @@ return inx;
   }
 
   async incFailCount() {
-    const key = `${this.key}:status:failcount:${this.uid}`;
+    const key = `${this.crawlId}:status:failcount:${this.uid}`;
     const res = await this.redis.incr(key);
 
     // consider failed if 3 failed retries in 60 secs
@@ -1064,21 +1410,26 @@ return inx;
   async addIfNoDupe(key: string, url: string, status: number) {
     url = normalizeUrl(url, normalizeUrlOpts);
     return (
-      (await this.redis.sadd(key, normalizeDedupStatus(status) + "|" + url)) ===
-      1
+      (await this.redis.sadd(
+        key,
+        normalizeDedupeStatus(status) + "|" + url,
+      )) === 1
     );
   }
 
   async removeDupe(key: string, url: string, status: number) {
-    return await this.redis.srem(key, normalizeDedupStatus(status) + "|" + url);
+    return await this.redis.srem(
+      key,
+      normalizeDedupeStatus(status) + "|" + url,
+    );
   }
 
   async isInUserSet(value: string) {
-    return (await this.redis.sismember(this.key + ":user", value)) === 1;
+    return (await this.redis.sismember(this.crawlId + ":user", value)) === 1;
   }
 
   async addToUserSet(value: string) {
-    return (await this.redis.sadd(this.key + ":user", value)) === 1;
+    return (await this.redis.sadd(this.crawlId + ":user", value)) === 1;
   }
 
   async logError(error: string) {
@@ -1200,6 +1551,42 @@ return inx;
 
   async markProfileUploaded(result: UploadResult & { modified?: string }) {
     result.modified = this._timestamp();
-    await this.redis.set(`${this.key}:profileUploaded`, JSON.stringify(result));
+    await this.redis.set(
+      `${this.crawlId}:profileUploaded`,
+      JSON.stringify(result),
+    );
+  }
+
+  // DEPENDENT CRAWLS FOR DEDUPE (requires WACZ)
+  async addDupeCrawlDependency(crawlId: string, index: string) {
+    if (crawlId !== this.crawlId) {
+      await this.redis.sadd(`${this.uid}:duperef`, crawlId + " " + index);
+      await this.redis.sadd(`${this.crawlId}:reqCrawls`, crawlId);
+    }
+  }
+
+  // async clearDupeCrawlDependency() {
+  //   await this.redis.del(`${this.uid}:duperef`);
+  // }
+
+  // Requires crawling with WACZ to match dependencies
+  async getDupeDependentCrawls() {
+    const dependRefs = await this.redis.smembers(`${this.uid}:duperef`);
+    const crawlIds = [];
+    for (const value of dependRefs) {
+      const [crawlId, index] = value.split(" ");
+      if (crawlId && crawlId !== this.crawlId) {
+        const source = await this.dedupeRedis.lindex(
+          `c:${crawlId}:wacz`,
+          Number(index),
+        );
+        if (source) {
+          const entry = JSON.parse(source);
+          entry.crawlId = crawlId;
+          crawlIds.push(entry);
+        }
+      }
+    }
+    return crawlIds;
   }
 }

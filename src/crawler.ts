@@ -31,7 +31,7 @@ import {
 } from "./util/storage.js";
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
-import { initRedis } from "./util/redis.js";
+import { initRedisWaitForSuccess } from "./util/redis.js";
 import { logger, formatErr, LogDetails, LogContext } from "./util/logger.js";
 import { WorkerState, closeWorkers, runWorkers } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
@@ -203,6 +203,7 @@ export class Crawler {
     | null = null;
 
   recording: boolean;
+  deduping = false;
 
   constructor() {
     const args = this.parseArgs();
@@ -342,6 +343,9 @@ export class Crawler {
 
   async initCrawlState() {
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
+    const dedupeRedisUrl = this.params.redisDedupeUrl || redisUrl;
+
+    this.deduping = dedupeRedisUrl !== redisUrl;
 
     if (!redisUrl.startsWith("redis://")) {
       logger.fatal(
@@ -349,24 +353,19 @@ export class Crawler {
       );
     }
 
-    let redis;
-
-    while (true) {
-      try {
-        redis = await initRedis(redisUrl);
-        break;
-      } catch (e) {
-        //logger.fatal("Unable to connect to state store Redis: " + redisUrl);
-        logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
-        await sleep(1);
-      }
-    }
+    const redis = await initRedisWaitForSuccess(redisUrl);
 
     logger.debug(
       `Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`,
       {},
       "state",
     );
+
+    let dedupeRedis = redis;
+
+    if (redisUrl !== dedupeRedisUrl) {
+      dedupeRedis = await initRedisWaitForSuccess(dedupeRedisUrl);
+    }
 
     logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
 
@@ -376,6 +375,7 @@ export class Crawler {
       this.maxPageTime,
       os.hostname(),
       this.params.maxPageRetries,
+      dedupeRedis,
     );
 
     if (this.params.logErrorsToRedis) {
@@ -1095,7 +1095,7 @@ self.__bx_behaviors.selectMainBehavior();
     const { page, cdp, data, workerid, callbacks, recorder } = opts;
     data.callbacks = callbacks;
 
-    const { url, seedId } = data;
+    const { url, seedId, depth } = data;
 
     const auth = this.seeds[seedId].authHeader();
 
@@ -1168,6 +1168,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (recorder) {
       recorder.pageSeed = seed;
+      recorder.pageSeedDepth = depth;
     }
 
     // run custom driver here, if any
@@ -1346,6 +1347,7 @@ self.__bx_behaviors.selectMainBehavior();
     } else {
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
+        this.limitHit = false;
       } else {
         const retry = await this.crawlState.markFailed(url, noRetries);
 
@@ -1711,8 +1713,11 @@ self.__bx_behaviors.selectMainBehavior();
       this.storage = initStorage();
     }
 
-    if (this.params.generateWACZ && this.storage) {
-      await this.crawlState.setWACZFilename();
+    if (this.params.generateWACZ && (this.storage || this.deduping)) {
+      const filename = await this.crawlState.setWACZFilename();
+      if (this.deduping) {
+        await this.crawlState.addSourceWACZForDedupe(filename);
+      }
     }
 
     if (POST_CRAWL_STATES.includes(initState)) {
@@ -1911,19 +1916,35 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (this.params.generateWACZ && generateFiles) {
-      const uploaded = await this.generateWACZ();
+      const wacz = await this.generateWACZ();
 
-      if (uploaded && this.uploadAndDeleteLocal) {
-        await this.crawlState.setArchiveSize(0);
-        logger.info(
-          `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
-        );
-        try {
-          fs.rmSync(this.collDir, { recursive: true, force: true });
-        } catch (e) {
-          logger.warn(`Unable to clear ${this.collDir} before exit`, e);
+      if (wacz) {
+        await this.crawlState.clearWACZFilename();
+
+        if (this.deduping) {
+          await this.crawlState.updateDedupeSourceWACZ(wacz);
+        }
+
+        if (this.storage && this.uploadAndDeleteLocal) {
+          await this.crawlState.setArchiveSize(0);
+
+          logger.info(
+            `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
+          );
+          try {
+            fs.rmSync(this.collDir, { recursive: true, force: true });
+          } catch (e) {
+            logger.warn(`Unable to clear ${this.collDir} before exit`, e);
+          }
         }
       }
+    }
+
+    if (this.deduping) {
+      //await this.crawlState.clearDupeCrawlRef();
+
+      // commit crawl data to main index
+      await this.crawlState.commitDedupeDone();
     }
 
     if (this.finalExit && generateFiles && this.params.saveProfile) {
@@ -1963,7 +1984,7 @@ self.__bx_behaviors.selectMainBehavior();
     await streamFinish(logFH);
   }
 
-  async generateWACZ() {
+  async generateWACZ(): Promise<WACZ | null> {
     logger.info("Generating WACZ");
     await this.crawlState.setStatus("generate-wacz");
 
@@ -1977,11 +1998,11 @@ self.__bx_behaviors.selectMainBehavior();
     if (!warcFileList.length) {
       // if finished, just return
       if (isFinished || (await this.crawlState.isCrawlCanceled())) {
-        return;
+        return null;
       }
       // possibly restarted after committing, so assume done here!
       if ((await this.crawlState.numDone()) > 0) {
-        return;
+        return null;
       }
       // fail crawl otherwise
       logger.fatal("No WARC Files, assuming crawl failed");
@@ -2001,6 +2022,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.closeLog();
 
+    const requires = await this.crawlState.getDupeDependentCrawls();
+
     const waczOpts: WACZInitOpts = {
       input: warcFileList.map((x) => path.join(this.archivesDir, x)),
       output: waczPath,
@@ -2009,6 +2032,7 @@ self.__bx_behaviors.selectMainBehavior();
       warcCdxDir: this.warcCdxDir,
       indexesDir: this.indexesDir,
       softwareString: this.infoString,
+      requires,
     };
 
     if (process.env.WACZ_SIGN_URL) {
@@ -2038,13 +2062,8 @@ self.__bx_behaviors.selectMainBehavior();
         const targetFilename = await this.crawlState.getWACZFilename();
 
         await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
-
-        await this.crawlState.clearWACZFilename();
-
-        return true;
       }
-
-      return false;
+      return wacz;
     } catch (e) {
       logger.error("Error creating WACZ", e);
       if (!streaming) {
@@ -2053,6 +2072,8 @@ self.__bx_behaviors.selectMainBehavior();
         await this.setStatusAndExit(ExitCodes.UploadFailed, "interrupted");
       }
     }
+
+    return null;
   }
 
   logMemory() {
@@ -2217,7 +2238,11 @@ self.__bx_behaviors.selectMainBehavior();
           if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
             // excluded in recorder
             data.pageSkipped = true;
-            logger.warn("Page Load Blocked, skipping", { msg, loadState });
+            logger.warn(
+              "Page Load Blocked, skipping",
+              { msg, loadState },
+              "pageStatus",
+            );
             throw new Error("logged");
           } else {
             return this.pageFailed("Page Load Failed", retry, {
