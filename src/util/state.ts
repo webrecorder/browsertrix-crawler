@@ -293,6 +293,22 @@ export class RedisDedupeIndex {
       }
     }
 
+    // commit imported waczs list
+    const numWacz = await this.dedupeRedis.llen(`c:${crawlId}:wacz`);
+
+    for (let i = 0; i < numWacz; i++) {
+      const waczdata = await this.dedupeRedis.lindex(`c:${crawlId}:wacz`, i);
+      if (!waczdata) {
+        continue;
+      }
+      try {
+        const { filename } = JSON.parse(waczdata);
+        await this.dedupeRedis.sadd(this.sourceDone, filename);
+      } catch (e) {
+        // ignore
+      }
+    }
+
     // add to crawls list
     await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
 
@@ -498,7 +514,7 @@ export class RedisDedupeIndex {
       (await this.dedupeRedis.scard(DUPE_ALL_CRAWLS)) -
       (await this.dedupeRedis.scard("noremove"));
     await this.dedupeRedis.del("noremove");
-    await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "removable", removable);
+    await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "removableCrawls", removable);
   }
 
   async clearAndReadd(readdCrawls: Set<string>) {
