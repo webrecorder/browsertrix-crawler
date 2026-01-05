@@ -96,6 +96,7 @@ export class CrawlIndexer {
 
       try {
         await loader.init();
+        await loader.zipreader!.load();
       } catch (e) {
         logger.warn("Skipping invalid WACZ file", {
           waczfile: url,
