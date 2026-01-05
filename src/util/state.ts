@@ -277,6 +277,14 @@ export class RedisDedupeIndex {
       this.dedupeKeyIndex,
       JSON.stringify(value),
     );
+
+    if (value.size) {
+      await this.dedupeRedis.hincrby(
+        `h:${crawlId}:counts`,
+        "totalSize",
+        value.size,
+      );
+    }
   }
 
   // COMMIT DEDUPE TO SHARED INDEX
@@ -436,12 +444,16 @@ export class RedisDedupeIndex {
   }
 
   async addImportedSourceForDedupe(crawlId: string, entry: DedupeSourceEntry) {
-    return (
-      (await this.dedupeRedis.rpush(
-        `c:${crawlId}:wacz`,
-        JSON.stringify(entry),
-      )) - 1
-    );
+    await this.dedupeRedis.rpush(`c:${crawlId}:wacz`, JSON.stringify(entry));
+
+    if (entry.size) {
+      await this.dedupeRedis.hincrby(
+        `h:${crawlId}:counts`,
+        "totalSize",
+        entry.size,
+      );
+      await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, "totalSize", entry.size);
+    }
   }
 
   async markImportSourceDone(id: string, crawlId: string) {
