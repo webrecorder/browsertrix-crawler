@@ -1841,6 +1841,7 @@ class AsyncFetcher {
     dispatcher = dispatcher.compose((dispatch) => {
       return (opts, handler) => {
         if (opts.headers) {
+          // store full actual headers that are sent for the request
           reqresp.requestHeaders = opts.headers as Record<string, string>;
         }
         return dispatch(opts, handler);
