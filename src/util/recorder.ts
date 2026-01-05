@@ -1815,7 +1815,7 @@ class AsyncFetcher {
 
   async doCancel() {
     const { body } = this;
-    if (body) {
+    if (body && !body.destroyed) {
       body.destroy();
     }
   }
@@ -1840,15 +1840,14 @@ class AsyncFetcher {
       });
     }
 
-    //this.abort = new AbortController();
-
     const resp = await request(url!, {
       method: (method || "GET") as Dispatcher.HttpMethod,
       headers,
       body: reqresp.postData || undefined,
-      //redirect: this.manualRedirect ? "manual" : "follow",
+      // match fetch() max redirects if not doing manual redirects
+      // https://fetch.spec.whatwg.org/#http-redirect-fetch
+      maxRedirections: this.manualRedirect ? 0 : 20,
       dispatcher,
-      //signal: this.abort.signal,
     });
 
     // do nothing
