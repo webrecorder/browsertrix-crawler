@@ -8,7 +8,7 @@ import {
   isRedirectStatus,
 } from "./reqresp.js";
 
-import { Dispatcher, request } from "undici";
+import { Agent, Dispatcher, interceptors, request } from "undici";
 
 import {
   getCustomRewriter,
@@ -54,6 +54,8 @@ const RW_MIME_TYPES = [
 ];
 
 const encoder = new TextEncoder();
+
+const defaultAgent = new Agent();
 
 // =================================================================
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1827,26 +1829,28 @@ class AsyncFetcher {
 
     const headers = reqresp.getRequestHeadersDict();
 
-    let dispatcher = getProxyDispatcher(url);
+    let dispatcher = getProxyDispatcher(url) || defaultAgent;
 
-    if (dispatcher) {
-      dispatcher = dispatcher.compose((dispatch) => {
-        return (opts, handler) => {
-          if (opts.headers) {
-            reqresp.requestHeaders = opts.headers as Record<string, string>;
-          }
-          return dispatch(opts, handler);
-        };
-      });
+    if (!this.manualRedirect) {
+      // match fetch() max redirects if not doing manual redirects
+      // https://fetch.spec.whatwg.org/#http-redirect-fetch
+      const redirector = interceptors.redirect({ maxRedirections: 20 });
+      dispatcher = dispatcher.compose(redirector);
     }
+
+    dispatcher = dispatcher.compose((dispatch) => {
+      return (opts, handler) => {
+        if (opts.headers) {
+          reqresp.requestHeaders = opts.headers as Record<string, string>;
+        }
+        return dispatch(opts, handler);
+      };
+    });
 
     const resp = await request(url!, {
       method: (method || "GET") as Dispatcher.HttpMethod,
       headers,
       body: reqresp.postData || undefined,
-      // match fetch() max redirects if not doing manual redirects
-      // https://fetch.spec.whatwg.org/#http-redirect-fetch
-      maxRedirections: this.manualRedirect ? 0 : 20,
       dispatcher,
     });
 
