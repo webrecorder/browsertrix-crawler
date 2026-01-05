@@ -122,8 +122,8 @@ Options:
                                             d()    [string] [default: "/crawls"]
       --mobileDevice                        Emulate mobile device by name from:
                                             https://github.com/puppeteer/puppete
-                                            er/blob/main/src/common/DeviceDescri
-                                            ptors.ts                    [string]
+                                            er/blob/main/packages/puppeteer-core
+                                            /src/common/Device.ts       [string]
       --userAgent                           Override user-agent with specified s
                                             tring                       [string]
       --userAgentSuffix                     Append suffix to existing browser us
