@@ -6,6 +6,7 @@ import { Crawler } from "./crawler.js";
 import { ReplayCrawler } from "./replaycrawler.js";
 import fs from "node:fs";
 import { ExitCodes, InterruptReason } from "./util/constants.js";
+import { ExtractTextCrawler } from "./extract-text-crawler.js";
 
 let crawler: Crawler | null = null;
 
@@ -54,6 +55,8 @@ process.on("SIGABRT", async () => {
 
 if (process.argv[1].endsWith("qa")) {
   crawler = new ReplayCrawler();
+} else if (process.argv[1].endsWith("extractText")) {
+  crawler = new ExtractTextCrawler();
 } else {
   crawler = new Crawler();
 }
