@@ -212,11 +212,15 @@ export class ExtractTextCrawler extends Crawler {
           id: record.warcHeaders.headers.get("WARC-Record-ID"),
           title: record.warcHeaders.headers.get("WARC-Record-ID"),
           loadState: 4, // TODO figure out better approach
-          mime: record.httpHeaders?.headers.get("Content-Type"),
+          mime:
+            record.httpHeaders?.headers.get("Content-Type") ||
+            record.warcHeaders.headers.get("WARC-Identified-Payload-Type"),
           status: record.httpHeaders?.statusCode,
+          ts: record.warcDate,
           seed: true,
           depth: 0,
         };
+        logger.info("Loaded page from WARC", { page });
         await this.addPage(JSON.stringify(page), count++);
       }
     }
@@ -494,25 +498,13 @@ export class ExtractTextCrawler extends Crawler {
     await this.processPageInfo(page, data);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async compareText(page: Page, state: PageState, url: string, date: Date) {
-    const origText = await this.fetchOrigText(
-      page,
-      "text",
-      url,
-      date.toISOString().replace(/[^\d]/g, ""),
-    );
+    const origText = ""; // TODO grab corresponding text from WET file
     const replayText = state.text;
 
-    if (origText === undefined || replayText === undefined) {
-      logger.warn(
-        "Text missing for comparison",
-        {
-          url,
-          origTextLen: origText?.length,
-          replayTextLen: replayText?.length,
-        },
-        "replay",
-      );
+    if (replayText === undefined) {
+      logger.warn("Replay text missing for comparison", { url });
       return;
     }
 
