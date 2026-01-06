@@ -242,6 +242,7 @@ export class RedisDedupeIndex {
 
   sourceDone = "src:d";
   sourceQ = "src:q";
+  sourceQSet = "src:qset";
   pendingQ = "pending:q";
   sourceP = "src:p";
   pendingPrefix = "pending:q:";
@@ -440,6 +441,9 @@ export class RedisDedupeIndex {
     if (await this.dedupeRedis.sismember(this.sourceDone, id)) {
       return;
     }
+    if (!(await this.dedupeRedis.sadd(this.sourceQSet, id))) {
+      return;
+    }
     await this.dedupeRedis.lpush(this.sourceQ, data);
   }
 
@@ -496,6 +500,7 @@ export class RedisDedupeIndex {
 
     await this.dedupeRedis.lrem(this.pendingQ, 1, res);
     const { name } = JSON.parse(res);
+    await this.dedupeRedis.srem(this.sourceQSet, name);
     const remaining = (await this.dedupeRedis.llen(this.sourceQ)) + 1;
     await this.dedupeRedis.setex(this.pendingPrefix + name, "1", 300);
     return { name, entry: res, remaining };
