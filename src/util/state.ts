@@ -726,9 +726,20 @@ return inx;
     }: QueueEntry,
     limit = 0,
   ) {
-    url = normalizeUrl(url, normalizeUrlOpts);
+    let normalizedUrl = url;
+    try {
+      normalizedUrl = normalizeUrl(url, normalizeUrlOpts);
+    } catch (e) {
+      logger.warn("Error normalizing URL", { error: e, url, pageid, seedId });
+    }
     const added = this._timestamp();
-    const data: QueueEntry = { added, url, seedId, depth, extraHops };
+    const data: QueueEntry = {
+      added,
+      url: normalizedUrl,
+      seedId,
+      depth,
+      extraHops,
+    };
 
     if (ts) {
       data.ts = ts;
@@ -747,7 +758,7 @@ return inx;
       this.skey,
       this.esKey,
       this.exKey,
-      url,
+      normalizedUrl,
       this._getScore(data),
       JSON.stringify(data),
       limit,
