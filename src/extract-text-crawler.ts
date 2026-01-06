@@ -9,12 +9,12 @@ import { PageInfoRecord, PageInfoValue, Recorder } from "./util/recorder.js";
 
 import { ZipRangeReader, createLoader } from "@webrecorder/wabac";
 
-import { AsyncIterReader } from "warcio";
+import { AsyncIterReader, WARCParser } from "warcio";
 import { parseArgs } from "./util/argParser.js";
 
 import levenshtein from "js-levenshtein";
 import { MAX_URL_LENGTH } from "./util/reqresp.js";
-import { openAsBlob } from "fs";
+import { openAsBlob, createReadStream } from "fs";
 import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
 
@@ -190,8 +190,35 @@ export class ExtractTextCrawler extends Crawler {
           }
         }
       }
+    } else if (path.endsWith(".warc")) {
+      const reader = createReadStream(url);
+      const warcReader = new AsyncIterReader(reader);
+      await this.loadPagesForWARC(warcReader);
     } else {
-      logger.warn("Unknown replay source", { url }, "replay");
+      logger.warn(
+        "Unknown replay source (extract text)",
+        { url, path },
+        "replay",
+      );
+    }
+  }
+  async loadPagesForWARC(reader: AsyncIterReader) {
+    const parser = new WARCParser(reader);
+    let count = 0;
+    for await (const record of parser) {
+      if (record.warcHeaders.headers.get("WARC-Type") === "response") {
+        const page = {
+          url: record.warcTargetURI,
+          id: record.warcHeaders.headers.get("WARC-Record-ID"),
+          title: record.warcHeaders.headers.get("WARC-Record-ID"),
+          loadState: 4, // TODO figure out better approach
+          mime: record.httpHeaders?.headers.get("Content-Type"),
+          status: record.httpHeaders?.statusCode,
+          seed: true,
+          depth: 0,
+        };
+        await this.addPage(JSON.stringify(page), count++);
+      }
     }
   }
 
@@ -225,7 +252,7 @@ export class ExtractTextCrawler extends Crawler {
   }
 
   async _addPageIfInScope({ url, ts, id, mime }: ReplayPage, depth: number) {
-    if (mime && mime !== "text/html") {
+    if (mime && !mime.includes("text/html")) {
       logger.info("Skipping non-HTML page", { url, mime }, "replay");
       return;
     }
