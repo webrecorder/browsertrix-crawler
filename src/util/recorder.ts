@@ -855,7 +855,9 @@ export class Recorder extends EventEmitter {
           errorReason,
         });
         await this.crawlState.addDupeCrawlDependency(crawlId, index);
-        await this.crawlState.addStats(size - reqresp.payload.length);
+        await this.crawlState.addConservedSizeStat(
+          size - reqresp.payload.length,
+        );
         return true;
       }
     }
@@ -1762,7 +1764,8 @@ export class Recorder extends EventEmitter {
         if (!isDupe) {
           await this.crawlState.addHashDupe(hash, url, date, size);
         }
-        await this.crawlState.addStats(origRecSize - size);
+        await this.crawlState.addUrlStat(isDupe);
+        await this.crawlState.addConservedSizeStat(origRecSize - size);
       } catch (e) {
         logger.warn("Error adding dupe hash", e, "recorder");
       }
