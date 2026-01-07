@@ -85,6 +85,7 @@ export class S3StorageSync {
         accessKeyId: accessKey,
         secretAccessKey: secretKey,
       },
+      requestChecksumCalculation: "WHEN_REQUIRED",
       maxAttempts: DEFAULT_MAX_RETRIES,
       endpoint: url.origin,
       region,
