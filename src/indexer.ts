@@ -18,6 +18,8 @@ export type DedupeIndexEntry = {
   hash?: string;
 };
 
+const MIN_UNDUPE_SIZE = 1000;
+
 export class CrawlIndexer {
   constructor() {}
 
@@ -79,20 +81,18 @@ export class CrawlIndexer {
     }
 
     let count = 0;
-    let total = 0;
     let res;
 
     while ((res = await dedupeIndex.nextQueuedImportSource())) {
       const { name, entry, remaining } = res;
-      if (!total) {
-        total = remaining;
-      }
       const { url, crawlId, size, hash } = JSON.parse(
         entry,
       ) as DedupeIndexEntry;
       count += 1;
       const loader = new WACZLoader(url);
-      logger.debug(`Processing WACZ ${count} of ${total}`, { waczfile: url });
+      logger.debug(`Processing WACZ ${count}, Remaining ${remaining}`, {
+        waczfile: url,
+      });
 
       try {
         await loader.init();
@@ -205,10 +205,15 @@ export class CrawlIndexer {
         // check if original is already in index
         const res = await dedupeIndex.getHashDupe(hash);
         if (res && res.size) {
-          await dedupeIndex.addStats(res.size - size, crawlId, commitToAllkey);
+          await dedupeIndex.addConservedSizeStat(
+            res.size - size,
+            crawlId,
+            commitToAllkey,
+          );
         } else {
           await dedupeIndex.addRevisitSize(hash, size, crawlId);
         }
+        await dedupeIndex.addUrlStat(true, crawlId, commitToAllkey);
       } else if (url && date && hash) {
         await dedupeIndex.addHashDupe(
           hash,
@@ -217,8 +222,10 @@ export class CrawlIndexer {
           size,
           crawlId,
           commitToAllkey,
+          MIN_UNDUPE_SIZE,
         );
         await dedupeIndex.matchRevisitSize(hash, size, crawlId, commitToAllkey);
+        await dedupeIndex.addUrlStat(false, crawlId, commitToAllkey);
       } else {
         logger.warn("Skipping invalid CDXJ, data missing", {
           url,

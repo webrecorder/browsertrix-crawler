@@ -87,12 +87,12 @@ async function redisGetHash(key, db=0) {
 
 async function checkSizeStats(numUniq, key, db, minSize) {
   const result = await redisGetHash(key, db);
-  console.log(numUniq, result);
+  console.log(result);
   expect(numUniq).toBeLessThan(Number(result.totalUrls));
 
-  const sizeSaved = Number(result.sizeSaved);
-  expect(sizeSaved).toBeGreaterThan(minSize);
-  return sizeSaved;
+  const conservedSize = Number(result.conservedSize);
+  expect(conservedSize).toBeGreaterThan(minSize);
+  return conservedSize;
 }
 
 test("check revisit records written on duplicate crawl, same collection, no wacz", async () => {
