@@ -326,7 +326,7 @@ class ArgParser {
 
         mobileDevice: {
           describe:
-            "Emulate mobile device by name from: https://github.com/puppeteer/puppeteer/blob/main/src/common/DeviceDescriptors.ts",
+            "Emulate mobile device by name from: https://github.com/puppeteer/puppeteer/blob/main/packages/puppeteer-core/src/common/Device.ts",
           type: "string",
         },
 

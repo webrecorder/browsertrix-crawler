@@ -74,6 +74,7 @@ import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
+import { request } from "undici";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -1069,9 +1070,10 @@ self.__bx_behaviors.selectMainBehavior();
 
   async getFavicon(page: Page, logDetails: LogDetails): Promise<string> {
     try {
-      const resp = await fetch("http://127.0.0.1:9221/json");
-      if (resp.status === 200) {
-        const browserJson = await resp.json();
+      const resp = await request("http://127.0.0.1:9221/json");
+      if (resp.statusCode === 200) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const browserJson = (await resp.body.json()) as any[];
         for (const jsons of browserJson) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if (jsons.id === (page.target() as any)._targetId) {

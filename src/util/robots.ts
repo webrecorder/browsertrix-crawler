@@ -1,4 +1,4 @@
-import { fetch } from "undici";
+import { request } from "undici";
 import robotsParser, { Robot } from "robots-parser";
 
 import { LogDetails, logger } from "./logger.js";
@@ -102,20 +102,20 @@ async function fetchRobots(
 ): Promise<string | null> {
   logger.debug("Fetching robots.txt", { url, ...logDetails }, "robots");
 
-  const resp = await fetch(url, {
+  const { statusCode, body } = await request(url, {
     headers,
     dispatcher: getProxyDispatcher(url),
   });
 
-  if (resp.ok) {
-    const buff = await resp.arrayBuffer();
+  if (statusCode === 200) {
+    const buff = await body.arrayBuffer();
     // only decode and store at most 100K
     return new TextDecoder().decode(buff.slice(0, 100000));
   }
 
   logger.debug(
     "Robots.txt invalid, storing empty value",
-    { url, status: resp.status },
+    { url, status: statusCode },
     "robots",
   );
 

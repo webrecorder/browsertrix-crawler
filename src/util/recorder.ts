@@ -8,7 +8,7 @@ import {
   isRedirectStatus,
 } from "./reqresp.js";
 
-import { fetch, Response } from "undici";
+import { Agent, Dispatcher, interceptors, request } from "undici";
 
 import {
   getCustomRewriter,
@@ -27,6 +27,7 @@ import { getProxyDispatcher } from "./proxy.js";
 import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
 import { DEFAULT_MAX_RETRIES } from "./constants.js";
+import { Readable } from "stream";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -53,6 +54,8 @@ const RW_MIME_TYPES = [
 ];
 
 const encoder = new TextEncoder();
+
+const defaultAgent = new Agent();
 
 // =================================================================
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1704,8 +1707,7 @@ class AsyncFetcher {
   cdp: CDPSession | null = null;
 
   stream?: string;
-  resp?: Response;
-  abort?: AbortController;
+  body?: Dispatcher.BodyMixin & Readable;
 
   maxFetchSize: number;
 
@@ -1784,15 +1786,16 @@ class AsyncFetcher {
 
   async loadBody() {
     try {
-      const { reqresp, useBrowserNetwork, resp, stream, cdp, recorder } = this;
+      const { reqresp, useBrowserNetwork, body, stream, cdp, recorder } = this;
 
       let iter: AsyncIterable<Uint8Array> | undefined;
       if (reqresp.expectedSize === 0) {
         iter = undefined;
       } else if (stream && useBrowserNetwork && cdp) {
         iter = recorder.takeStreamIter(this.reqresp, cdp, stream);
-      } else if (resp && resp.body) {
-        iter = this.takeReader(resp.body.getReader());
+      } else if (body) {
+        //iter = this.takeReader(resp.body.getReader());
+        iter = this.takeReader(body);
       } else {
         throw new Error("resp body missing");
       }
@@ -1813,10 +1816,9 @@ class AsyncFetcher {
   }
 
   async doCancel() {
-    const { abort } = this;
-    if (abort) {
-      abort.abort();
-      this.abort = undefined;
+    const { body } = this;
+    if (body && !body.destroyed) {
+      body.destroy();
     }
   }
 
@@ -1827,36 +1829,47 @@ class AsyncFetcher {
 
     const headers = reqresp.getRequestHeadersDict();
 
-    let dispatcher = getProxyDispatcher(url);
+    let dispatcher = getProxyDispatcher(url) || defaultAgent;
 
-    if (dispatcher) {
-      dispatcher = dispatcher.compose((dispatch) => {
-        return (opts, handler) => {
-          if (opts.headers) {
-            reqresp.requestHeaders = opts.headers as Record<string, string>;
-          }
-          return dispatch(opts, handler);
-        };
-      });
+    if (!this.manualRedirect) {
+      // match fetch() max redirects if not doing manual redirects
+      // https://fetch.spec.whatwg.org/#http-redirect-fetch
+      const redirector = interceptors.redirect({ maxRedirections: 20 });
+      dispatcher = dispatcher.compose(redirector);
     }
 
-    this.abort = new AbortController();
+    dispatcher = dispatcher.compose((dispatch) => {
+      return (opts, handler) => {
+        if (opts.headers) {
+          // store full actual headers that are sent for the request
+          reqresp.requestHeaders = opts.headers as Record<string, string>;
+        }
+        return dispatch(opts, handler);
+      };
+    });
 
-    const resp = await fetch(url!, {
-      method,
+    const resp = await request(url!, {
+      method: (method || "GET") as Dispatcher.HttpMethod,
       headers,
       body: reqresp.postData || undefined,
-      redirect: this.manualRedirect ? "manual" : "follow",
       dispatcher,
-      signal: this.abort.signal,
     });
+
+    // do nothing
+    resp.body.on("error", () => {});
+
+    for (const [name, value] of Object.entries(resp.headers)) {
+      if (value instanceof Array) {
+        resp.headers[name] = multiValueHeader(name, value);
+      }
+    }
 
     if (
       reqresp.expectedSize < 0 &&
-      resp.headers.get("content-length") &&
-      !resp.headers.get("content-encoding")
+      resp.headers["content-length"] &&
+      !resp.headers["content-encoding"]
     ) {
-      reqresp.expectedSize = Number(resp.headers.get("content-length") || -1);
+      reqresp.expectedSize = Number(resp.headers["content-length"] || -1);
     }
 
     if (reqresp.expectedSize === 0) {
@@ -1868,7 +1881,8 @@ class AsyncFetcher {
     }
 
     reqresp.fillFetchResponse(resp);
-    this.resp = resp;
+    this.body = resp.body;
+    //this.resp = resp;
     return true;
   }
 
@@ -1939,18 +1953,22 @@ class AsyncFetcher {
     return true;
   }
 
-  async *takeReader(reader: ReadableStreamDefaultReader<Uint8Array>) {
+  async *takeReader(reader: Readable) {
     let size = 0;
     try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-          break;
-        }
-
+      for await (const value of reader) {
         size += value.length;
         yield value;
       }
+      // while (true) {
+      //   const { value, done } = await reader.read();
+      //   if (done) {
+      //     break;
+      //   }
+
+      //   size += value.length;
+      //   yield value;
+      // }
     } catch (e) {
       logger.warn(
         "takeReader interrupted",

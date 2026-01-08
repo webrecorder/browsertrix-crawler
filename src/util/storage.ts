@@ -11,6 +11,8 @@ import { createHash } from "crypto";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 
+import { request } from "undici";
+
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 
@@ -208,7 +210,7 @@ export class S3StorageSync {
         this.webhookUrl.startsWith("http://") ||
         this.webhookUrl.startsWith("https://")
       ) {
-        await fetch(this.webhookUrl, {
+        await request(this.webhookUrl, {
           method: "POST",
           body: JSON.stringify(body),
         });
