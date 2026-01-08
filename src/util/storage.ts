@@ -2,26 +2,30 @@ import child_process from "child_process";
 import fs from "fs";
 import fsp from "fs/promises";
 import util from "util";
+import { pipeline } from "stream/promises";
+import type { Readable } from "stream";
 
 import os from "os";
 import { createHash } from "crypto";
 
-import * as Minio from "minio";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+
+import { request } from "undici";
 
 import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 
-// @ts-expect-error (incorrect types on get-folder-size)
 import getFolderSize from "get-folder-size";
 
 import { WACZ } from "./wacz.js";
-import { sleep, timedRun } from "./timing.js";
+
 import { DEFAULT_MAX_RETRIES } from "./constants.js";
-import { request } from "undici";
+import { CrawlerArgs } from "./argParser.js";
 
 const DEFAULT_REGION = "us-east-1";
 
-const DOWNLOAD_PROFILE_MAX_TIME = 60;
+const PART_SIZE = 1024 * 1024 * 100;
 
 // ===========================================================================
 export type UploadResult = {
@@ -34,7 +38,7 @@ export type UploadResult = {
 // ===========================================================================
 export class S3StorageSync {
   fullPrefix: string;
-  client: Minio.Client;
+  client: S3Client;
 
   bucketName: string;
   objectPrefix: string;
@@ -44,20 +48,23 @@ export class S3StorageSync {
   crawlId: string;
   webhookUrl?: string;
 
-  // TODO: Fix this the next time the file is edited.
-
   constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    urlOrData: string | any,
+    urlOrData:
+      | string
+      | {
+          endpointUrl: string;
+          accessKey: string;
+          secretKey: string;
+        },
     {
       webhookUrl,
       userId,
       crawlId,
     }: { webhookUrl?: string; userId: string; crawlId: string },
   ) {
-    let url;
-    let accessKey;
-    let secretKey;
+    let url: URL;
+    let accessKey: string;
+    let secretKey: string;
 
     if (typeof urlOrData === "string") {
       url = new URL(urlOrData);
@@ -75,14 +82,16 @@ export class S3StorageSync {
 
     const region = process.env.STORE_REGION || DEFAULT_REGION;
 
-    this.client = new Minio.Client({
-      endPoint: url.hostname,
-      port: Number(url.port) || (url.protocol === "https:" ? 443 : 80),
-      useSSL: url.protocol === "https:",
-      accessKey,
-      secretKey,
-      partSize: 100 * 1024 * 1024,
+    this.client = new S3Client({
+      credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretKey,
+      },
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      maxAttempts: DEFAULT_MAX_RETRIES,
+      endpoint: url.origin,
       region,
+      forcePathStyle: true,
     });
 
     this.bucketName = url.pathname.slice(1).split("/")[0];
@@ -100,21 +109,7 @@ export class S3StorageSync {
     wacz: WACZ,
     targetFilename: string,
   ): Promise<UploadResult> {
-    const fileUploadInfo = {
-      bucket: this.bucketName,
-      crawlId: this.crawlId,
-      prefix: this.objectPrefix,
-      targetFilename,
-    };
-    logger.info("S3 file upload information", fileUploadInfo, "storage");
-
-    const waczStream = wacz.generate();
-
-    await this.client.putObject(
-      this.bucketName,
-      this.objectPrefix + targetFilename,
-      waczStream,
-    );
+    await this.doUpload(targetFilename, wacz.generate());
 
     const hash = wacz.getHash();
     const path = targetFilename;
@@ -129,19 +124,7 @@ export class S3StorageSync {
     srcFilename: string,
     targetFilename: string,
   ): Promise<UploadResult> {
-    const fileUploadInfo = {
-      bucket: this.bucketName,
-      crawlId: this.crawlId,
-      prefix: this.objectPrefix,
-      targetFilename,
-    };
-    logger.info("S3 file upload information", fileUploadInfo, "storage");
-
-    await this.client.fPutObject(
-      this.bucketName,
-      this.objectPrefix + targetFilename,
-      srcFilename,
-    );
+    await this.doUpload(targetFilename, fs.createReadStream(srcFilename));
 
     const hash = await checksumFile("sha256", srcFilename);
     const path = targetFilename;
@@ -152,35 +135,45 @@ export class S3StorageSync {
     return { path, size, hash, bytes: size };
   }
 
+  private async doUpload(targetFilename: string, Body: Readable) {
+    const Bucket = this.bucketName;
+
+    const Key = this.objectPrefix + targetFilename;
+
+    const fileUploadInfo = {
+      bucket: Bucket,
+      key: Key,
+      endpoint: this.client.config.endpoint,
+      crawlId: this.crawlId,
+      prefix: this.objectPrefix,
+      targetFilename,
+    };
+
+    logger.info("S3 file upload information", fileUploadInfo, "storage");
+
+    const uploader = new Upload({
+      client: this.client,
+      params: { Bucket, Key, Body },
+
+      // (optional) size of each part, in bytes, at least 5MB
+      partSize: PART_SIZE,
+
+      leavePartsOnError: false,
+    });
+
+    await uploader.done();
+  }
+
   async downloadFile(srcFilename: string, destFilename: string) {
-    let count = 0;
     logger.debug("Downloading profile", { srcFilename }, "storage");
-    while (true) {
-      try {
-        await timedRun(
-          this.client.fGetObject(
-            this.bucketName,
-            this.objectPrefix + srcFilename,
-            destFilename,
-          ),
-          DOWNLOAD_PROFILE_MAX_TIME,
-          "Timed out downloading profile",
-          {},
-          "storage",
-          true,
-          true,
-        );
-        break;
-      } catch (e) {
-        if (count <= DEFAULT_MAX_RETRIES) {
-          count += 1;
-          await sleep(5);
-          logger.warn("Retry downloading profile", {}, "storage");
-        } else {
-          throw new Error("Profile could not be downloaded");
-        }
-      }
-    }
+
+    const res = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: this.objectPrefix + srcFilename,
+      }),
+    );
+    await pipeline(res.Body as Readable, fs.createWriteStream(destFilename));
   }
 
   async uploadCollWACZ(
@@ -246,8 +239,8 @@ export function initStorage() {
     process.env.STORE_ENDPOINT_URL + (process.env.STORE_PATH || "");
   const storeInfo = {
     endpointUrl,
-    accessKey: process.env.STORE_ACCESS_KEY,
-    secretKey: process.env.STORE_SECRET_KEY,
+    accessKey: process.env.STORE_ACCESS_KEY || "",
+    secretKey: process.env.STORE_SECRET_KEY || "",
   };
 
   const opts = {
@@ -281,9 +274,7 @@ export async function isDiskFull(collDir: string) {
 
 export async function checkDiskUtilization(
   collDir: string,
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  params: Record<string, any>,
+  params: CrawlerArgs,
   archiveDirSize: number,
   dfOutput = null,
   doLog = true,
@@ -365,9 +356,7 @@ export async function getDiskUsage(path = "/crawls", dfOutput = null) {
   const keys = lines[0].split(/\s+/gi);
   const rows = lines.slice(1).map((line) => {
     const values = line.split(/\s+/gi);
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return keys.reduce((o: Record<string, any>, k, index) => {
+    return keys.reduce((o: Record<string, string>, k, index) => {
       o[k] = values[index];
       return o;
     }, {});
