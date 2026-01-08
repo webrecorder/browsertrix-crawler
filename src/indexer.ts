@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import yargs from "yargs";
 import { formatErr, logger } from "./util/logger.js";
-import { getInfoString } from "./util/file_reader.js";
-import { openAsBlob } from "node:fs";
+import { getFileOrUrlJson, getInfoString } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
 import { ExitCodes } from "./util/constants.js";
 import { initRedisWaitForSuccess } from "./util/redis.js";
@@ -239,7 +238,7 @@ export class CrawlIndexer {
   }
 
   async *iterWACZ(entry: DedupeIndexEntry): AsyncIterable<DedupeIndexEntry> {
-    let { url } = entry;
+    const { url } = entry;
     let path = url;
 
     try {
@@ -251,14 +250,10 @@ export class CrawlIndexer {
     if (path.endsWith(".wacz")) {
       yield entry;
     } else if (path.endsWith(".json")) {
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        const blob = await openAsBlob(url);
-        url = URL.createObjectURL(blob);
-      }
-
       try {
-        const resp = await fetch(url);
-        const json = await resp.json();
+        const json = (await getFileOrUrlJson(url)) as {
+          resources: (DedupeIndexEntry & { path: string })[];
+        };
 
         for (const entry of json.resources) {
           entry.url = entry.path;
