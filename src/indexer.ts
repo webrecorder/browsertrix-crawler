@@ -9,7 +9,6 @@ import { initRedisWaitForSuccess } from "./util/redis.js";
 import { AsyncIterReader } from "warcio";
 import { RedisDedupeIndex } from "./util/state.js";
 import { basename } from "node:path";
-import { request } from "undici";
 
 export type DedupeIndexEntry = {
   name: string;
@@ -253,14 +252,13 @@ export class CrawlIndexer {
       yield entry;
     } else if (path.endsWith(".json")) {
       if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        console.log("URL", url);
         const blob = await openAsBlob(url);
         url = URL.createObjectURL(blob);
       }
 
       try {
-        const { body } = await request(url);
-        const json = (await body.json()) as {
+        const resp = await fetch(url);
+        const json = (await resp.json()) as {
           resources: (DedupeIndexEntry & { path: string })[];
         };
 
