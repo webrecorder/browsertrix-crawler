@@ -253,6 +253,7 @@ export class CrawlIndexer {
       yield entry;
     } else if (path.endsWith(".json")) {
       if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        console.log("URL", url);
         const blob = await openAsBlob(url);
         url = URL.createObjectURL(blob);
       }
