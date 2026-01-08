@@ -7,7 +7,7 @@ import {
 import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
 import { HTML_TYPES } from "./constants.js";
-import { Response } from "undici";
+import { Dispatcher } from "undici";
 
 const CONTENT_LENGTH = "content-length";
 const CONTENT_RANGE = "content-range";
@@ -211,9 +211,11 @@ export class RequestResponseInfo {
     this.extraOpts.ipType = params.resourceIPAddressSpace;
   }
 
-  fillFetchResponse(response: Response) {
-    this.responseHeaders = Object.fromEntries(response.headers);
-    this.setStatus(response.status, response.statusText);
+  fillFetchResponse(response: Dispatcher.ResponseData) {
+    this.responseHeaders = response.headers as Record<string, string>;
+    this.setStatus(response.statusCode);
+    // this.responseHeaders = Object.fromEntries(response.headers);
+    // this.setStatus(response.status, response.statusText);
   }
 
   fillRequestExtraInfo(

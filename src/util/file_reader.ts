@@ -1,7 +1,7 @@
 import fsp from "fs/promises";
 import path from "path";
 import crypto from "crypto";
-import { fetch } from "undici";
+import { request } from "undici";
 import util from "util";
 import { exec as execCallback } from "child_process";
 
@@ -78,13 +78,13 @@ async function writeUrlContentsToFile(
   }
 
   try {
-    const res = await fetch(url, {
+    const res = await request(url, {
       dispatcher: useProxy ? getProxyDispatcher(url) : undefined,
     });
-    if (!res.ok) {
-      throw new Error(`Invalid response, status: ${res.status}`);
+    if (res.statusCode !== 200) {
+      throw new Error(`Invalid response, status: ${res.statusCode}`);
     }
-    const fileContents = await res.text();
+    const fileContents = await res.body.text();
 
     const filepath = await getTempFile(targetDir, filename);
 

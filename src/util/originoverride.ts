@@ -2,7 +2,7 @@ import { HTTPRequest, Page } from "puppeteer-core";
 import { formatErr, logger } from "./logger.js";
 import { Browser } from "./browser.js";
 
-import { fetch } from "undici";
+import { request as httpRequest } from "undici";
 import { getProxyDispatcher } from "./proxy.js";
 
 export class OriginOverride {
@@ -46,14 +46,14 @@ export class OriginOverride {
           headers.set("origin", orig.origin);
         }
 
-        const resp = await fetch(newUrl, {
+        const resp = await httpRequest(newUrl, {
           headers,
           dispatcher: getProxyDispatcher(newUrl),
         });
 
-        const body = Buffer.from(await resp.arrayBuffer());
-        const respHeaders = Object.fromEntries(resp.headers);
-        const status = resp.status;
+        const body = Buffer.from(await resp.body.arrayBuffer());
+        const respHeaders = resp.headers;
+        const status = resp.statusCode;
 
         logger.debug(
           "Origin overridden",
