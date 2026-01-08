@@ -17,7 +17,6 @@ import pixelmatch from "pixelmatch";
 
 import levenshtein from "js-levenshtein";
 import { MAX_URL_LENGTH } from "./util/reqresp.js";
-import { openAsBlob } from "fs";
 import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
 import { getFileOrUrlJson } from "./util/file_reader.js";
