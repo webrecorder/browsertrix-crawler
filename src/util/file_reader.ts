@@ -52,6 +52,17 @@ export async function replaceDir(
   }
 }
 
+export async function getFileOrUrlJson(urlOrFile: string) {
+  if (!urlOrFile.startsWith("http://") && !urlOrFile.startsWith("https://")) {
+    const data = await fsp.readFile(urlOrFile, { encoding: "utf8" });
+    return JSON.parse(data);
+  }
+
+  const { body } = await request(urlOrFile);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (await body.json()) as any;
+}
+
 async function writeUrlContentsToFile(
   targetDir: string,
   url: string,
