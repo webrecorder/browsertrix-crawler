@@ -9,6 +9,7 @@ import { initRedisWaitForSuccess } from "./util/redis.js";
 import { AsyncIterReader } from "warcio";
 import { RedisDedupeIndex } from "./util/state.js";
 import { basename } from "node:path";
+import { request } from "undici";
 
 export type DedupeIndexEntry = {
   name: string;
@@ -257,8 +258,10 @@ export class CrawlIndexer {
       }
 
       try {
-        const resp = await fetch(url);
-        const json = await resp.json();
+        const { body } = await request(url);
+        const json = (await body.json()) as {
+          resources: (DedupeIndexEntry & { path: string })[];
+        };
 
         for (const entry of json.resources) {
           entry.url = entry.path;
