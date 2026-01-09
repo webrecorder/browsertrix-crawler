@@ -483,17 +483,18 @@ export class RedisDedupeIndex {
     await this.dedupeRedis.lpush(this.sourceQ, data);
   }
 
-  async addImportedSourceForDedupe(crawlId: string, entry: DedupeSourceEntry) {
+  async markImportSourceDone(
+    id: string,
+    crawlId: string,
+    entry: DedupeSourceEntry,
+  ) {
+    await this.dedupeRedis.sadd(this.sourceDone, id);
+    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
     await this.dedupeRedis.rpush(`c:${crawlId}:wacz`, JSON.stringify(entry));
 
     if (entry.size) {
       await this.incrStat("totalCrawlSize", entry.size, crawlId, true);
     }
-  }
-
-  async markImportSourceDone(id: string, crawlId: string) {
-    await this.dedupeRedis.sadd(this.sourceDone, id);
-    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
   }
 
   async nextQueuedImportSource() {
@@ -537,7 +538,12 @@ export class RedisDedupeIndex {
     return { name, entry: res, remaining };
   }
 
+  async setUpdateProgress(percent: number) {
+    await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "updateProgress", percent);
+  }
+
   async markImportFinishedTS() {
+    await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "updateProgress", "1");
     await this.dedupeRedis.set("last_update_ts", new Date().toISOString());
   }
 
@@ -562,7 +568,7 @@ export class RedisDedupeIndex {
       DUPE_ALL_CRAWLS,
       this.noremove,
     );
-    console.log(removable);
+
     await this.dedupeRedis.del(this.noremove);
 
     let total = 0;
@@ -593,8 +599,12 @@ export class RedisDedupeIndex {
     await this.dedupeRedis.del(DUPE_ALL_HASH_KEY);
     await this.dedupeRedis.del(DUPE_ALL_COUNTS);
 
+    const numCrawls = readdCrawls.size;
+    let count = 0;
+
     // readd all crawls that should be kept
     for (const crawlId of readdCrawls) {
+      await this.setUpdateProgress(0.5 + 0.5 * (count++ / numCrawls));
       await this.commitDedupeDone(crawlId);
       await this.dedupeRedis.srem(TO_REMOVE_CRAWLS, crawlId);
     }
