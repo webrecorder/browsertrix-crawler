@@ -87,9 +87,17 @@ export class CrawlIndexer {
       const { url, crawlId, size, hash } = JSON.parse(
         entry,
       ) as DedupeIndexEntry;
+      const percent = count / (count + remaining);
+
+      // if removing, scale progress % by half as purge will be second half
+      await dedupeIndex.setUpdateProgress(
+        percent * (params.removing ? 0.5 : 1),
+      );
+
       count += 1;
       const loader = new WACZLoader(url);
-      logger.debug(`Processing WACZ ${count}, Remaining ${remaining}`, {
+
+      logger.debug(`Processing WACZ ${count} of ${remaining + count}`, {
         waczfile: url,
       });
 
@@ -106,38 +114,29 @@ export class CrawlIndexer {
 
       const crawlIdReal = crawlId || params.sourceCrawlId || url;
 
-      await dedupeIndex.addImportedSourceForDedupe(crawlIdReal, {
+      for await (const file of loader.iterFiles("indexes/")) {
+        const filename = file.filename;
+        const compress = filename.endsWith(".cdx.gz") ? "gzip" : "";
+
+        logger.debug(`Processing CDX ${compress ? "GZ " : ""}Index`, {
+          filename,
+        });
+
+        await this.ingestCDXJ(
+          dedupeIndex,
+          loader,
+          filename,
+          crawlIdReal,
+          compress,
+          true,
+        );
+      }
+
+      await dedupeIndex.markImportSourceDone(name, crawlIdReal, {
         filename: name,
         size,
         hash,
       });
-
-      for await (const file of loader.iterFiles("indexes/")) {
-        const filename = file.filename;
-        if (filename.endsWith(".cdx.gz")) {
-          logger.debug("Processing CDX GZ Index", { filename });
-          await this.ingestCDXJ(
-            dedupeIndex,
-            loader,
-            filename,
-            crawlIdReal,
-            "gzip",
-            true,
-          );
-        } else if (filename.endsWith(".cdx") || filename.endsWith(".cdxj")) {
-          logger.debug("Processing CDX Index", { filename });
-          await this.ingestCDXJ(
-            dedupeIndex,
-            loader,
-            filename,
-            crawlIdReal,
-            "",
-            true,
-          );
-        }
-      }
-
-      await dedupeIndex.markImportSourceDone(name, crawlIdReal);
     }
 
     if (params.removing) {
