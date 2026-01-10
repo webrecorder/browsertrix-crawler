@@ -370,36 +370,42 @@ export class RedisDedupeIndex {
     };
   }
 
+  getHashValue(hash: string, url: string, date: string, size: number) {
+    url = normalizeUrl(url, normalizeUrlOpts);
+    date = date.replace(/[^\d]/g, "");
+    const key = hash.split(":").at(-1)!;
+    const val = `${this.dedupeKeyIndex} ${date} ${url} ${size}`;
+    return { key, val };
+  }
+
   async addHashDupe(
     hash: string,
     url: string,
     date: string,
     size: number,
-    crawlId?: string,
-    commitToAllKey = false,
-    minUndupedSizeTrack = 0,
+    isDupe: boolean,
+    origRecSize: number,
   ) {
-    url = normalizeUrl(url, normalizeUrlOpts);
-    date = date.replace(/[^\d]/g, "");
-    hash = hash.split(":").at(-1)!;
-    const val = `${this.dedupeKeyIndex} ${date} ${url} ${size}`;
-    crawlId = crawlId || this.crawlId;
+    // optimized addHashDupe into single pipeline
+    const pipe = this.dedupeRedis.pipeline();
 
-    const res = await this.dedupeRedis.hsetnx(`h:${crawlId}`, hash, val);
+    const rootKey = `h:${this.crawlId}`;
+    const statsKey = rootKey + ":counts";
 
-    // first time seeing hash
-    if (res && commitToAllKey) {
-      if (!(await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId))) {
-        // track "redundant" size
-        if (minUndupedSizeTrack && size > minUndupedSizeTrack) {
-          await this.dedupeRedis.hincrby(
-            DUPE_ALL_COUNTS,
-            "estimatedRedundantSize",
-            size - minUndupedSizeTrack,
-          );
-        }
-      }
+    if (!isDupe) {
+      const { key, val } = this.getHashValue(hash, url, date, size);
+      pipe.hsetnx(rootKey, key, val);
+    } else {
+      pipe.hincrby(statsKey, "dupeUrls", 1);
     }
+    pipe.hincrby(statsKey, "totalUrls", 1);
+
+    const conservedSize = origRecSize - size;
+    if (conservedSize > 0) {
+      pipe.hincrby(statsKey, "conservedSize", conservedSize);
+    }
+
+    await pipe.exec();
   }
 
   // COUNT STATS
@@ -466,7 +472,6 @@ export class RedisDedupeIndex {
       }
     }
     await this.dedupeRedis.del(`rev:${hash}`);
-    await this.addConservedSizeStat(0, crawlId, commitToAllKey);
   }
 
   // IMPORT
@@ -480,6 +485,31 @@ export class RedisDedupeIndex {
       return;
     }
     await this.dedupeRedis.lpush(this.sourceQ, data);
+  }
+
+  async addImportedHashDupe(
+    hash: string,
+    url: string,
+    date: string,
+    size: number,
+    crawlId: string,
+    minUndupedSizeTrack = 0,
+  ) {
+    const { key, val } = this.getHashValue(hash, url, date, size);
+
+    let isNew = await this.dedupeRedis.hsetnx(`h:${crawlId}`, key, val);
+    if (isNew) {
+      isNew = await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, key, crawlId);
+    }
+
+    // track "redundant" size
+    if (!isNew && minUndupedSizeTrack && size > minUndupedSizeTrack) {
+      await this.dedupeRedis.hincrby(
+        DUPE_ALL_COUNTS,
+        "estimatedRedundantSize",
+        size - minUndupedSizeTrack,
+      );
+    }
   }
 
   async markImportSourceDone(
