@@ -213,7 +213,7 @@ export class CrawlIndexer {
       crlfDelay: Infinity,
     });
 
-    let promises = [];
+    //let promises = [];
 
     for await (const line of lineStream) {
       count += 1;
@@ -223,10 +223,10 @@ export class CrawlIndexer {
         continue;
       }
 
-      if (promises.length >= 4096) {
-        await Promise.allSettled(promises);
-        promises = [];
-      }
+      // if (promises.length >= 4096) {
+      //   await Promise.allSettled(promises);
+      //   promises = [];
+      // }
 
       if (count % 1000 === 0) {
         logger.debug("Lines processed", { count });
@@ -292,12 +292,13 @@ export class CrawlIndexer {
         }
       };
 
-      promises.push(process());
+      //promises.push(process());
+      await process();
     }
 
-    if (promises.length) {
-      await Promise.allSettled(promises);
-    }
+    // if (promises.length) {
+    //   await Promise.allSettled(promises);
+    // }
 
     logger.debug("Processed", { count });
   }
