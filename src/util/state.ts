@@ -384,20 +384,19 @@ export class RedisDedupeIndex {
     hash = hash.split(":").at(-1)!;
     const val = `${this.dedupeKeyIndex} ${date} ${url} ${size}`;
     crawlId = crawlId || this.crawlId;
-    if (await this.dedupeRedis.hsetnx(`h:${crawlId}`, hash, val)) {
-      // first time seeing hash
-      if (commitToAllKey) {
-        if (
-          !(await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId))
-        ) {
-          // track "redundant" size
-          if (minUndupedSizeTrack && size > minUndupedSizeTrack) {
-            await this.dedupeRedis.hincrby(
-              DUPE_ALL_COUNTS,
-              "estimatedRedundantSize",
-              size - minUndupedSizeTrack,
-            );
-          }
+
+    await this.dedupeRedis.hsetnx(`h:${crawlId}`, hash, val);
+
+    // first time seeing hash
+    if (commitToAllKey) {
+      if (!(await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId))) {
+        // track "redundant" size
+        if (minUndupedSizeTrack && size > minUndupedSizeTrack) {
+          await this.dedupeRedis.hincrby(
+            DUPE_ALL_COUNTS,
+            "estimatedRedundantSize",
+            size - minUndupedSizeTrack,
+          );
         }
       }
     }

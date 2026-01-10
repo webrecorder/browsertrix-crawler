@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 import yargs from "yargs";
+import fs from "fs";
 import { formatErr, logger } from "./util/logger.js";
 import { getFileOrUrlJson, getInfoString } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
 import { ExitCodes } from "./util/constants.js";
 import { initRedisWaitForSuccess } from "./util/redis.js";
-import { AsyncIterReader } from "warcio";
 import { RedisDedupeIndex } from "./util/state.js";
 import { basename } from "node:path";
+import { Readable } from "node:stream";
+import readline from "node:readline";
+import { createGunzip } from "node:zlib";
 
 export type DedupeIndexEntry = {
   name: string;
@@ -94,10 +97,11 @@ export class CrawlIndexer {
         percent * (params.removing ? 0.5 : 1),
       );
 
-      count += 1;
       const loader = new WACZLoader(url);
 
-      logger.debug(`Processing WACZ ${count} of ${remaining + count}`, {
+      count++;
+
+      logger.debug(`Processing WACZ ${count} of ${remaining + count - 1}`, {
         waczfile: url,
       });
 
@@ -116,9 +120,21 @@ export class CrawlIndexer {
 
       for await (const file of loader.iterFiles("indexes/")) {
         const filename = file.filename;
-        const compress = filename.endsWith(".cdx.gz") ? "gzip" : "";
 
-        logger.debug(`Processing CDX ${compress ? "GZ " : ""}Index`, {
+        let compress = "",
+          display = "";
+
+        if (filename.endsWith(".cdx.gz")) {
+          compress = "gzip";
+          display = "CDX GZ";
+        } else if (filename.endsWith(".cdx")) {
+          compress = "";
+          display = "CDX";
+        } else {
+          continue;
+        }
+
+        logger.debug(`Processing ${display} Index`, {
           filename,
         });
 
@@ -158,20 +174,48 @@ export class CrawlIndexer {
     compression: string,
     commitToAllkey: boolean,
   ) {
-    let reader = await loader.loadFile(filename);
+    const reader = await loader.loadFile(filename);
 
     if (!reader) {
       logger.error("File not found, skipping!");
       return;
     }
 
+    const writable = Readable.from(reader).pipe(
+      fs.createWriteStream("/tmp/buff"),
+    );
+
+    await new Promise<void>((resolve) =>
+      writable.on("finish", () => {
+        console.log("FULLY READ CDX");
+        resolve();
+      }),
+    );
+
+    //const data = await reader.readFully();
+
+    // if (compression === "gzip") {
+    //   reader = new AsyncIterReader(reader, "gzip", false);
+    // }
+
+    let nodeStream: Readable = fs.createReadStream("/tmp/buff");
+
     if (compression === "gzip") {
-      reader = new AsyncIterReader(reader, "gzip", false);
+      const gunzip = createGunzip({ chunkSize: 64 * 1024 });
+      nodeStream = nodeStream.pipe(gunzip);
     }
 
     let count = 0;
 
-    for await (const line of reader.iterLines()) {
+    const lineStream = readline.createInterface({
+      input: nodeStream,
+      // crlfDelay handles both LF ('\n') and CR LF ('\r\n') as single line breaks
+      crlfDelay: Infinity,
+    });
+
+    let promises = [];
+
+    for await (const line of lineStream) {
       count += 1;
       const inx = line.indexOf(" {");
       if (inx < 0) {
@@ -179,8 +223,17 @@ export class CrawlIndexer {
         continue;
       }
 
+      if (promises.length >= 4096) {
+        await Promise.allSettled(promises);
+        promises = [];
+      }
+
+      if (count % 1000 === 0) {
+        logger.debug("Lines processed", { count });
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let cdx: Record<string, any>;
+      let cdx: Record<string, any> = {};
 
       try {
         cdx = JSON.parse(line.slice(inx));
@@ -198,39 +251,52 @@ export class CrawlIndexer {
         continue;
       }
 
-      // only adding originals to dedupe against, don't want to dedupe against existing revisits
-      if (cdx.mime === "warc/revisit") {
-        // check if original is already in index
-        const res = await dedupeIndex.getHashDupe(hash);
-        if (res && res.size) {
-          await dedupeIndex.addConservedSizeStat(
-            res.size - size,
+      const process = async () => {
+        // only adding originals to dedupe against, don't want to dedupe against existing revisits
+        if (cdx.mime === "warc/revisit") {
+          // check if original is already in index
+          const res = await dedupeIndex.getHashDupe(hash);
+          if (res && res.size) {
+            await dedupeIndex.addConservedSizeStat(
+              res.size - size,
+              crawlId,
+              commitToAllkey,
+            );
+          } else {
+            await dedupeIndex.addRevisitSize(hash, size, crawlId);
+          }
+          await dedupeIndex.addUrlStat(true, crawlId, commitToAllkey);
+        } else if (url && date && hash) {
+          await dedupeIndex.addHashDupe(
+            hash,
+            url,
+            date,
+            size,
+            crawlId,
+            commitToAllkey,
+            MIN_UNDUPE_SIZE,
+          );
+          await dedupeIndex.matchRevisitSize(
+            hash,
+            size,
             crawlId,
             commitToAllkey,
           );
+          await dedupeIndex.addUrlStat(false, crawlId, commitToAllkey);
         } else {
-          await dedupeIndex.addRevisitSize(hash, size, crawlId);
+          logger.warn("Skipping invalid CDXJ, data missing", {
+            url,
+            date,
+            digest: hash,
+          });
         }
-        await dedupeIndex.addUrlStat(true, crawlId, commitToAllkey);
-      } else if (url && date && hash) {
-        await dedupeIndex.addHashDupe(
-          hash,
-          url,
-          date,
-          size,
-          crawlId,
-          commitToAllkey,
-          MIN_UNDUPE_SIZE,
-        );
-        await dedupeIndex.matchRevisitSize(hash, size, crawlId, commitToAllkey);
-        await dedupeIndex.addUrlStat(false, crawlId, commitToAllkey);
-      } else {
-        logger.warn("Skipping invalid CDXJ, data missing", {
-          url,
-          date,
-          digest: hash,
-        });
-      }
+      };
+
+      promises.push(process());
+    }
+
+    if (promises.length) {
+      await Promise.allSettled(promises);
     }
 
     logger.debug("Processed", { count });
