@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import yargs from "yargs";
-import fs from "fs";
 import { formatErr, logger } from "./util/logger.js";
 import { getFileOrUrlJson, getInfoString } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
@@ -121,8 +120,8 @@ export class CrawlIndexer {
       for await (const file of loader.iterFiles("indexes/")) {
         const filename = file.filename;
 
-        let compress = "",
-          display = "";
+        let compress = "";
+        let display = "";
 
         if (filename.endsWith(".cdx.gz")) {
           compress = "gzip";
@@ -181,24 +180,24 @@ export class CrawlIndexer {
       return;
     }
 
-    const writable = Readable.from(reader).pipe(
-      fs.createWriteStream("/tmp/buff"),
-    );
+    // const writable = Readable.from(reader).pipe(
+    //   fs.createWriteStream("/tmp/buff"),
+    // );
 
-    await new Promise<void>((resolve) =>
-      writable.on("finish", () => {
-        console.log("FULLY READ CDX");
-        resolve();
-      }),
-    );
+    // await new Promise<void>((resolve) =>
+    //   writable.on("finish", () => {
+    //     console.log("FULLY READ CDX");
+    //     resolve();
+    //   }),
+    // );
 
-    //const data = await reader.readFully();
+    const data = await reader.readFully();
 
     // if (compression === "gzip") {
     //   reader = new AsyncIterReader(reader, "gzip", false);
     // }
 
-    let nodeStream: Readable = fs.createReadStream("/tmp/buff");
+    let nodeStream: Readable = Readable.from([data]);
 
     if (compression === "gzip") {
       const gunzip = createGunzip({ chunkSize: 64 * 1024 });
@@ -209,11 +208,10 @@ export class CrawlIndexer {
 
     const lineStream = readline.createInterface({
       input: nodeStream,
-      // crlfDelay handles both LF ('\n') and CR LF ('\r\n') as single line breaks
       crlfDelay: Infinity,
     });
 
-    //let promises = [];
+    let promises = [];
 
     for await (const line of lineStream) {
       count += 1;
@@ -223,10 +221,10 @@ export class CrawlIndexer {
         continue;
       }
 
-      // if (promises.length >= 4096) {
-      //   await Promise.allSettled(promises);
-      //   promises = [];
-      // }
+      if (promises.length >= 4096) {
+        await Promise.allSettled(promises);
+        promises = [];
+      }
 
       if (count % 1000 === 0) {
         logger.debug("Lines processed", { count });
@@ -292,13 +290,12 @@ export class CrawlIndexer {
         }
       };
 
-      //promises.push(process());
-      await process();
+      promises.push(process());
     }
 
-    // if (promises.length) {
-    //   await Promise.allSettled(promises);
-    // }
+    if (promises.length) {
+      await Promise.allSettled(promises);
+    }
 
     logger.debug("Processed", { count });
   }
