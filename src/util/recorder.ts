@@ -1711,7 +1711,6 @@ export class Recorder extends EventEmitter {
 
     const isEmpty = reqresp.readSize === 0;
 
-    let isDupe = false;
     let origRecSize = 0;
 
     if (!isEmpty && url) {
@@ -1731,7 +1730,6 @@ export class Recorder extends EventEmitter {
           date,
         ));
         await this.crawlState.addDupeCrawlDependency(crawlId, index);
-        isDupe = true;
       } else {
         // no dupe, continue
       }
@@ -1768,14 +1766,7 @@ export class Recorder extends EventEmitter {
         // }
         // await this.crawlState.addUrlStat(isDupe);
         // await this.crawlState.addConservedSizeStat(origRecSize - size);
-        await this.crawlState.addHashDupe(
-          hash,
-          url,
-          date,
-          size,
-          isDupe,
-          origRecSize,
-        );
+        await this.crawlState.addHashDupe(hash, url, date, size, origRecSize);
       } catch (e) {
         logger.warn("Error adding dupe hash", e, "recorder");
       }
