@@ -126,7 +126,7 @@ export class CrawlIndexer {
         if (filename.endsWith(".cdx.gz")) {
           compress = "gzip";
           display = "CDX GZ";
-        } else if (filename.endsWith(".cdx")) {
+        } else if (filename.endsWith(".cdx") || filename.endsWith(".cdxj")) {
           compress = "";
           display = "CDX";
         } else {
