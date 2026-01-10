@@ -383,7 +383,6 @@ export class RedisDedupeIndex {
     url: string,
     date: string,
     size: number,
-    isDupe: boolean,
     origRecSize: number,
   ) {
     // optimized addHashDupe into single pipeline
@@ -392,7 +391,7 @@ export class RedisDedupeIndex {
     const rootKey = `h:${this.crawlId}`;
     const statsKey = rootKey + ":counts";
 
-    if (!isDupe) {
+    if (!origRecSize) {
       const { key, val } = this.getHashValue(hash, url, date, size);
       pipe.hsetnx(rootKey, key, val);
     } else {
@@ -400,9 +399,8 @@ export class RedisDedupeIndex {
     }
     pipe.hincrby(statsKey, "totalUrls", 1);
 
-    const conservedSize = origRecSize - size;
-    if (conservedSize > 0) {
-      pipe.hincrby(statsKey, "conservedSize", conservedSize);
+    if (origRecSize && origRecSize > size) {
+      pipe.hincrby(statsKey, "conservedSize", origRecSize - size);
     }
 
     await pipe.exec();
