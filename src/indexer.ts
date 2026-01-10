@@ -23,6 +23,10 @@ export type DedupeIndexEntry = {
 
 const MIN_UNDUPE_SIZE = 1000;
 
+const TMP_CDX_BUFF = "/tmp/cdxbuff";
+
+const PROMISE_SYNC_BATCH_SIZE = 4096;
+
 export class CrawlIndexer {
   constructor() {}
 
@@ -182,10 +186,11 @@ export class CrawlIndexer {
       return;
     }
 
-    // fully read to local buffer first
-    await pipeline(reader, fs.createWriteStream("/tmp/buff"));
+    // fully read to local buffer first, since CDX files are fairly small
+    // to avoid having extra overhead of open connection
+    await pipeline(reader, fs.createWriteStream(TMP_CDX_BUFF));
 
-    let nodeStream: Readable = fs.createReadStream("/tmp/buff");
+    let nodeStream: Readable = fs.createReadStream(TMP_CDX_BUFF);
 
     if (compression === "gzip") {
       const gunzip = createGunzip({ chunkSize: 64 * 1024 });
@@ -209,7 +214,7 @@ export class CrawlIndexer {
         continue;
       }
 
-      if (promises.length >= 4096) {
+      if (promises.length >= PROMISE_SYNC_BATCH_SIZE) {
         await Promise.allSettled(promises);
         promises = [];
       }
@@ -253,13 +258,12 @@ export class CrawlIndexer {
           }
           await dedupeIndex.addUrlStat(true, crawlId, commitToAllkey);
         } else if (url && date && hash) {
-          await dedupeIndex.addHashDupe(
+          await dedupeIndex.addImportedHashDupe(
             hash,
             url,
             date,
             size,
             crawlId,
-            commitToAllkey,
             MIN_UNDUPE_SIZE,
           );
           await dedupeIndex.matchRevisitSize(
