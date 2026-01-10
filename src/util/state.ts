@@ -385,10 +385,10 @@ export class RedisDedupeIndex {
     const val = `${this.dedupeKeyIndex} ${date} ${url} ${size}`;
     crawlId = crawlId || this.crawlId;
 
-    await this.dedupeRedis.hsetnx(`h:${crawlId}`, hash, val);
+    const res = await this.dedupeRedis.hsetnx(`h:${crawlId}`, hash, val);
 
     // first time seeing hash
-    if (commitToAllKey) {
+    if (res && commitToAllKey) {
       if (!(await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId))) {
         // track "redundant" size
         if (minUndupedSizeTrack && size > minUndupedSizeTrack) {
