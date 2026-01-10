@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import yargs from "yargs";
+import fs from "fs";
 import { formatErr, logger } from "./util/logger.js";
 import { getFileOrUrlJson, getInfoString } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
@@ -8,6 +9,7 @@ import { initRedisWaitForSuccess } from "./util/redis.js";
 import { RedisDedupeIndex } from "./util/state.js";
 import { basename } from "node:path";
 import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import readline from "node:readline";
 import { createGunzip } from "node:zlib";
 
@@ -180,24 +182,10 @@ export class CrawlIndexer {
       return;
     }
 
-    // const writable = Readable.from(reader).pipe(
-    //   fs.createWriteStream("/tmp/buff"),
-    // );
+    // fully read to local buffer first
+    await pipeline(reader, fs.createWriteStream("/tmp/buff"));
 
-    // await new Promise<void>((resolve) =>
-    //   writable.on("finish", () => {
-    //     console.log("FULLY READ CDX");
-    //     resolve();
-    //   }),
-    // );
-
-    const data = await reader.readFully();
-
-    // if (compression === "gzip") {
-    //   reader = new AsyncIterReader(reader, "gzip", false);
-    // }
-
-    let nodeStream: Readable = Readable.from([data]);
+    let nodeStream: Readable = fs.createReadStream("/tmp/buff");
 
     if (compression === "gzip") {
       const gunzip = createGunzip({ chunkSize: 64 * 1024 });
