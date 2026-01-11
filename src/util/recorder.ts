@@ -850,16 +850,16 @@ export class Recorder extends EventEmitter {
         "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
       const res = await this.crawlState.getHashDupe(hash);
       if (res) {
-        const { index, crawlId, size } = res;
+        const { index, crawlId } = res;
         const errorReason = "BlockedByResponse";
         await cdp.send("Fetch.failRequest", {
           requestId,
           errorReason,
         });
         await this.crawlState.addDupeCrawlDependency(crawlId, index);
-        await this.crawlState.addConservedSizeStat(
-          size - reqresp.payload.length,
-        );
+        // await this.crawlState.addConservedSizeStat(
+        //   size - reqresp.payload.length,
+        // );
         return true;
       }
     }

@@ -28,7 +28,8 @@ const TMP_CDX_BUFF = "/tmp/cdxbuff";
 const PROMISE_SYNC_BATCH_SIZE = 4096;
 
 export class CrawlIndexer {
-  constructor() {}
+  interrupted = false;
+  hasUnresolvedRevisits = false;
 
   initArgs() {
     return yargs(process.argv)
@@ -65,9 +66,9 @@ export class CrawlIndexer {
   async run() {
     logger.setDebugLogging(true);
 
-    process.on("SIGINT", () => this.handleTerminate("SIGINT"));
+    process.on("SIGINT", () => this.handleInterrupt("SIGINT"));
 
-    process.on("SIGTERM", () => this.handleTerminate("SIGTERM"));
+    process.on("SIGTERM", () => this.handleInterrupt("SIGTERM"));
 
     logger.info(await getInfoString());
 
@@ -149,7 +150,6 @@ export class CrawlIndexer {
           filename,
           crawlIdReal,
           compress,
-          true,
         );
       }
 
@@ -158,6 +158,11 @@ export class CrawlIndexer {
         size,
         hash,
       });
+
+      if (this.interrupted) {
+        logger.info("Interrupting!");
+        process.exit(ExitCodes.SignalInterrupted);
+      }
     }
 
     if (params.removing) {
@@ -177,7 +182,6 @@ export class CrawlIndexer {
     filename: string,
     crawlId: string,
     compression: string,
-    commitToAllkey: boolean,
   ) {
     const reader = await loader.loadFile(filename);
 
@@ -247,18 +251,16 @@ export class CrawlIndexer {
         if (cdx.mime === "warc/revisit") {
           // check if original is already in index
           const res = await dedupeIndex.getHashDupe(hash);
+          let origSize = 0;
           if (res && res.size) {
-            await dedupeIndex.addConservedSizeStat(
-              res.size - size,
-              crawlId,
-              commitToAllkey,
-            );
+            origSize = res.size;
           } else {
-            await dedupeIndex.addRevisitSize(hash, size, crawlId);
+            this.hasUnresolvedRevisits = true;
           }
-          await dedupeIndex.addUrlStat(true, crawlId, commitToAllkey);
+
+          await dedupeIndex.addImportedHashDupe(hash, size, crawlId, origSize);
         } else if (url && date && hash) {
-          await dedupeIndex.addImportedHashDupe(
+          await dedupeIndex.addImportedHashNew(
             hash,
             url,
             date,
@@ -266,13 +268,9 @@ export class CrawlIndexer {
             crawlId,
             MIN_UNDUPE_SIZE,
           );
-          await dedupeIndex.matchRevisitSize(
-            hash,
-            size,
-            crawlId,
-            commitToAllkey,
-          );
-          await dedupeIndex.addUrlStat(false, crawlId, commitToAllkey);
+          if (this.hasUnresolvedRevisits) {
+            await dedupeIndex.matchRevisitSize(hash, size);
+          }
         } else {
           logger.warn("Skipping invalid CDXJ, data missing", {
             url,
@@ -322,9 +320,9 @@ export class CrawlIndexer {
     }
   }
 
-  handleTerminate(signame: string) {
-    logger.info(`Got signal ${signame}, exiting`);
-    process.exit(ExitCodes.SignalInterrupted);
+  handleInterrupt(signame: string) {
+    logger.info(`Got signal ${signame}, interrupting after this file`);
+    this.interrupted = true;
   }
 }
 
