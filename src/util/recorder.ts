@@ -1766,7 +1766,7 @@ export class Recorder extends EventEmitter {
         // }
         // await this.crawlState.addUrlStat(isDupe);
         // await this.crawlState.addConservedSizeStat(origRecSize - size);
-        await this.crawlState.addHashDupe(hash, url, date, size, origRecSize);
+        await this.crawlState.addHashNew(hash, url, date, size, origRecSize);
       } catch (e) {
         logger.warn("Error adding dupe hash", e, "recorder");
       }
