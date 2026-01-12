@@ -1794,7 +1794,6 @@ class AsyncFetcher {
       } else if (stream && useBrowserNetwork && cdp) {
         iter = recorder.takeStreamIter(this.reqresp, cdp, stream);
       } else if (body) {
-        //iter = this.takeReader(resp.body.getReader());
         iter = this.takeReader(body);
       } else {
         throw new Error("resp body missing");
@@ -1960,15 +1959,6 @@ class AsyncFetcher {
         size += value.length;
         yield value;
       }
-      // while (true) {
-      //   const { value, done } = await reader.read();
-      //   if (done) {
-      //     break;
-      //   }
-
-      //   size += value.length;
-      //   yield value;
-      // }
     } catch (e) {
       logger.warn(
         "takeReader interrupted",
