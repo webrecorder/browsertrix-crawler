@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 import yargs from "yargs";
+import fs from "fs";
 import { formatErr, logger } from "./util/logger.js";
 import { getFileOrUrlJson, getInfoString } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
 import { ExitCodes } from "./util/constants.js";
 import { initRedisWaitForSuccess } from "./util/redis.js";
-import { AsyncIterReader } from "warcio";
 import { RedisDedupeIndex } from "./util/state.js";
 import { basename } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import readline from "node:readline";
+import { createGunzip } from "node:zlib";
 
 export type DedupeIndexEntry = {
   name: string;
@@ -19,8 +23,13 @@ export type DedupeIndexEntry = {
 
 const MIN_UNDUPE_SIZE = 1000;
 
+const TMP_CDX_BUFF = "/tmp/cdxbuff";
+
+const PROMISE_SYNC_BATCH_SIZE = 4096;
+
 export class CrawlIndexer {
-  constructor() {}
+  interrupted = false;
+  hasUnresolvedRevisits = false;
 
   initArgs() {
     return yargs(process.argv)
@@ -57,9 +66,9 @@ export class CrawlIndexer {
   async run() {
     logger.setDebugLogging(true);
 
-    process.on("SIGINT", () => this.handleTerminate("SIGINT"));
+    process.on("SIGINT", () => this.handleInterrupt("SIGINT"));
 
-    process.on("SIGTERM", () => this.handleTerminate("SIGTERM"));
+    process.on("SIGTERM", () => this.handleInterrupt("SIGTERM"));
 
     logger.info(await getInfoString());
 
@@ -87,9 +96,18 @@ export class CrawlIndexer {
       const { url, crawlId, size, hash } = JSON.parse(
         entry,
       ) as DedupeIndexEntry;
-      count += 1;
+      const percent = count / (count + remaining);
+
+      // if removing, scale progress % by half as purge will be second half
+      await dedupeIndex.setUpdateProgress(
+        percent * (params.removing ? 0.5 : 1),
+      );
+
       const loader = new WACZLoader(url);
-      logger.debug(`Processing WACZ ${count}, Remaining ${remaining}`, {
+
+      count++;
+
+      logger.debug(`Processing WACZ ${count} of ${remaining + count - 1}`, {
         waczfile: url,
       });
 
@@ -106,38 +124,45 @@ export class CrawlIndexer {
 
       const crawlIdReal = crawlId || params.sourceCrawlId || url;
 
-      await dedupeIndex.addImportedSourceForDedupe(crawlIdReal, {
+      for await (const file of loader.iterFiles("indexes/")) {
+        const filename = file.filename;
+
+        let compress = "";
+        let display = "";
+
+        if (filename.endsWith(".cdx.gz")) {
+          compress = "gzip";
+          display = "CDX GZ";
+        } else if (filename.endsWith(".cdx") || filename.endsWith(".cdxj")) {
+          compress = "";
+          display = "CDX";
+        } else {
+          continue;
+        }
+
+        logger.debug(`Processing ${display} Index`, {
+          filename,
+        });
+
+        await this.ingestCDXJ(
+          dedupeIndex,
+          loader,
+          filename,
+          crawlIdReal,
+          compress,
+        );
+      }
+
+      await dedupeIndex.markImportSourceDone(name, crawlIdReal, {
         filename: name,
         size,
         hash,
       });
 
-      for await (const file of loader.iterFiles("indexes/")) {
-        const filename = file.filename;
-        if (filename.endsWith(".cdx.gz")) {
-          logger.debug("Processing CDX GZ Index", { filename });
-          await this.ingestCDXJ(
-            dedupeIndex,
-            loader,
-            filename,
-            crawlIdReal,
-            "gzip",
-            true,
-          );
-        } else if (filename.endsWith(".cdx") || filename.endsWith(".cdxj")) {
-          logger.debug("Processing CDX Index", { filename });
-          await this.ingestCDXJ(
-            dedupeIndex,
-            loader,
-            filename,
-            crawlIdReal,
-            "",
-            true,
-          );
-        }
+      if (this.interrupted) {
+        logger.info("Interrupting!");
+        process.exit(ExitCodes.SignalInterrupted);
       }
-
-      await dedupeIndex.markImportSourceDone(name, crawlIdReal);
     }
 
     if (params.removing) {
@@ -157,22 +182,35 @@ export class CrawlIndexer {
     filename: string,
     crawlId: string,
     compression: string,
-    commitToAllkey: boolean,
   ) {
-    let reader = await loader.loadFile(filename);
+    const reader = await loader.loadFile(filename);
 
     if (!reader) {
       logger.error("File not found, skipping!");
       return;
     }
 
+    // fully read to local buffer first, since CDX files are fairly small
+    // to avoid having extra overhead of open connection
+    await pipeline(reader, fs.createWriteStream(TMP_CDX_BUFF));
+
+    let nodeStream: Readable = fs.createReadStream(TMP_CDX_BUFF);
+
     if (compression === "gzip") {
-      reader = new AsyncIterReader(reader, "gzip", false);
+      const gunzip = createGunzip({ chunkSize: 64 * 1024 });
+      nodeStream = nodeStream.pipe(gunzip);
     }
 
     let count = 0;
 
-    for await (const line of reader.iterLines()) {
+    const lineStream = readline.createInterface({
+      input: nodeStream,
+      crlfDelay: Infinity,
+    });
+
+    let promises = [];
+
+    for await (const line of lineStream) {
       count += 1;
       const inx = line.indexOf(" {");
       if (inx < 0) {
@@ -180,8 +218,17 @@ export class CrawlIndexer {
         continue;
       }
 
+      if (promises.length >= PROMISE_SYNC_BATCH_SIZE) {
+        await Promise.allSettled(promises);
+        promises = [];
+      }
+
+      if (count % 1000 === 0) {
+        logger.debug("Lines processed", { count });
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let cdx: Record<string, any>;
+      let cdx: Record<string, any> = {};
 
       try {
         cdx = JSON.parse(line.slice(inx));
@@ -199,39 +246,45 @@ export class CrawlIndexer {
         continue;
       }
 
-      // only adding originals to dedupe against, don't want to dedupe against existing revisits
-      if (cdx.mime === "warc/revisit") {
-        // check if original is already in index
-        const res = await dedupeIndex.getHashDupe(hash);
-        if (res && res.size) {
-          await dedupeIndex.addConservedSizeStat(
-            res.size - size,
+      const process = async () => {
+        // only adding originals to dedupe against, don't want to dedupe against existing revisits
+        if (cdx.mime === "warc/revisit") {
+          // check if original is already in index
+          const res = await dedupeIndex.getHashDupe(hash);
+          let origSize = 0;
+          if (res && res.size) {
+            origSize = res.size;
+          } else {
+            this.hasUnresolvedRevisits = true;
+          }
+
+          await dedupeIndex.addImportedHashDupe(hash, size, crawlId, origSize);
+        } else if (url && date && hash) {
+          await dedupeIndex.addImportedHashNew(
+            hash,
+            url,
+            date,
+            size,
             crawlId,
-            commitToAllkey,
+            MIN_UNDUPE_SIZE,
           );
+          if (this.hasUnresolvedRevisits) {
+            await dedupeIndex.matchRevisitSize(hash, size);
+          }
         } else {
-          await dedupeIndex.addRevisitSize(hash, size, crawlId);
+          logger.warn("Skipping invalid CDXJ, data missing", {
+            url,
+            date,
+            digest: hash,
+          });
         }
-        await dedupeIndex.addUrlStat(true, crawlId, commitToAllkey);
-      } else if (url && date && hash) {
-        await dedupeIndex.addHashDupe(
-          hash,
-          url,
-          date,
-          size,
-          crawlId,
-          commitToAllkey,
-          MIN_UNDUPE_SIZE,
-        );
-        await dedupeIndex.matchRevisitSize(hash, size, crawlId, commitToAllkey);
-        await dedupeIndex.addUrlStat(false, crawlId, commitToAllkey);
-      } else {
-        logger.warn("Skipping invalid CDXJ, data missing", {
-          url,
-          date,
-          digest: hash,
-        });
-      }
+      };
+
+      promises.push(process());
+    }
+
+    if (promises.length) {
+      await Promise.allSettled(promises);
     }
 
     logger.debug("Processed", { count });
@@ -267,9 +320,9 @@ export class CrawlIndexer {
     }
   }
 
-  handleTerminate(signame: string) {
-    logger.info(`Got signal ${signame}, exiting`);
-    process.exit(ExitCodes.SignalInterrupted);
+  handleInterrupt(signame: string) {
+    logger.info(`Got signal ${signame}, interrupting after this file`);
+    this.interrupted = true;
   }
 }
 
