@@ -848,16 +848,16 @@ export class Recorder extends EventEmitter {
         "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
       const res = await this.crawlState.getHashDupe(hash);
       if (res) {
-        const { index, crawlId, size } = res;
+        const { index, crawlId } = res;
         const errorReason = "BlockedByResponse";
         await cdp.send("Fetch.failRequest", {
           requestId,
           errorReason,
         });
         await this.crawlState.addDupeCrawlDependency(crawlId, index);
-        await this.crawlState.addConservedSizeStat(
-          size - reqresp.payload.length,
-        );
+        // await this.crawlState.addConservedSizeStat(
+        //   size - reqresp.payload.length,
+        // );
         return true;
       }
     }
@@ -1709,7 +1709,6 @@ export class Recorder extends EventEmitter {
 
     const isEmpty = reqresp.readSize === 0;
 
-    let isDupe = false;
     let origRecSize = 0;
 
     if (!isEmpty && url) {
@@ -1729,7 +1728,6 @@ export class Recorder extends EventEmitter {
           date,
         ));
         await this.crawlState.addDupeCrawlDependency(crawlId, index);
-        isDupe = true;
       } else {
         // no dupe, continue
       }
@@ -1761,11 +1759,12 @@ export class Recorder extends EventEmitter {
 
     const addStatsCallback = async (size: number) => {
       try {
-        if (!isDupe) {
-          await this.crawlState.addHashDupe(hash, url, date, size);
-        }
-        await this.crawlState.addUrlStat(isDupe);
-        await this.crawlState.addConservedSizeStat(origRecSize - size);
+        // if (!isDupe) {
+        //   await this.crawlState.addHashDupe(hash, url, date, size);
+        // }
+        // await this.crawlState.addUrlStat(isDupe);
+        // await this.crawlState.addConservedSizeStat(origRecSize - size);
+        await this.crawlState.addHashNew(hash, url, date, size, origRecSize);
       } catch (e) {
         logger.warn("Error adding dupe hash", e, "recorder");
       }
