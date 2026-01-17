@@ -12,6 +12,9 @@ let crawler: Crawler | null = null;
 let lastSigInt = 0;
 let forceTerm = false;
 
+// min time between subsequent signals to exit immediately
+const MIN_SIG_INT_MS = 1000;
+
 async function handleTerminate(signame: string) {
   logger.info(`${signame} received...`);
   if (!crawler || !crawler.crawlState) {
@@ -32,9 +35,16 @@ async function handleTerminate(signame: string) {
     if (!crawler.interruptReason) {
       logger.info("SIGNAL: interrupt request received...");
       crawler.gracefulFinishOnInterrupt(InterruptReason.SignalInterrupted);
-    } else if (forceTerm || Date.now() - lastSigInt > 200) {
+    } else if (
+      forceTerm ||
+      (lastSigInt && Date.now() - lastSigInt > MIN_SIG_INT_MS)
+    ) {
       logger.info("SIGNAL: stopping crawl now...");
-      await crawler.serializeAndExit();
+      if (!(await crawler.serializeAndExit())) {
+        logger.info(
+          "SIGNAL: crawler already in post-processing, waiting for graceful exit",
+        );
+      }
     }
     lastSigInt = Date.now();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

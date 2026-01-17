@@ -1626,6 +1626,12 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async serializeAndExit() {
+    const initState = await this.crawlState.getStatus();
+    // don't do anything if already post-processing!
+    if (this.postCrawling || POST_CRAWL_STATES.includes(initState)) {
+      return false;
+    }
+
     await this.serializeConfig();
 
     if (this.interruptReason) {
@@ -1638,11 +1644,12 @@ self.__bx_behaviors.selectMainBehavior();
           ExitCodes.SignalInterruptedForce,
           "interrupted",
         );
-        return;
+        return true;
       }
     }
 
     await this.setStatusAndExit(ExitCodes.Success, "done");
+    return true;
   }
 
   async isCrawlRunning() {
