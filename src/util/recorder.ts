@@ -993,7 +993,7 @@ export class Recorder extends EventEmitter {
     this.writer.writeNewResourceRecord(
       {
         buffer: new TextEncoder().encode(dom),
-        resourceType: "",
+        resourceType: "domsnapshot",
         contentType: "text/html",
         url,
         date: this.pageInfo.ts,
@@ -1608,11 +1608,6 @@ export class Recorder extends EventEmitter {
     reqresp: RequestResponseInfo,
     iter?: AsyncIterable<Uint8Array>,
   ): Promise<boolean> {
-
-    if (this.useDomSnapshot && url === this.pageInfo.url) {
-      return;
-    }
-
     // always include in pageinfo record if going to serialize to WARC
     // even if serialization does not happen, indicates this URL was on the page
     this.addPageRecord(reqresp);
