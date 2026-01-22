@@ -31,7 +31,7 @@ afterAll(async () => {
 function runCrawl(name, {db = 0, limit = 4, wacz = true} = {}) {
   fs.rmSync(`./test-crawls/collections/${name}`, { recursive: true, force: true });
 
-  const crawler = exec(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedupe -e CRAWL_ID=${name} webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit ${limit} --exclude community --collection ${name} --redisDedupeUrl redis://dedupe-redis:6379/${db} ${wacz ? "--generateWACZ" : ""}`);
+  const crawler = exec(`docker run -v $PWD/test-crawls:/crawls --network=dedupe -e CRAWL_ID=${name} webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit ${limit} --exclude community --collection ${name} --redisDedupeUrl redis://dedupe-redis:6379/${db} ${wacz ? "--generateWACZ" : ""}`);
 
   return new Promise((resolve) => {
     crawler.on("exit", (code) => {
@@ -193,7 +193,7 @@ test("check revisit records written on duplicate crawl, different collections, w
 
 
 test("import dupe index, orig then revisits, from single wacz", async () => {
-  execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedupe webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedupe-test-orig/dedupe-test-orig.wacz --sourceCrawlId dedupe-test-orig --redisDedupeUrl redis://dedupe-redis:6379/2`);
+  execSync(`docker run -v $PWD/test-crawls:/crawls --network=dedupe webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedupe-test-orig/dedupe-test-orig.wacz --sourceCrawlId dedupe-test-orig --redisDedupeUrl redis://dedupe-redis:6379/2`);
 
   const redis = new Redis("redis://127.0.0.1:37379/2", { lazyConnect: true, retryStrategy: () => null });
 
@@ -248,7 +248,7 @@ test("import dupe index from json, reverse, revisits than orig, from wacz", asyn
 
   fs.writeFileSync("./test-crawls/collections/dedupe-test-dupe/import-1.json", JSON.stringify(importJson), "utf-8");
 
-  execSync(`docker run --rm -v $PWD/test-crawls:/crawls --network=dedupe webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedupe-test-dupe/import-1.json --redisDedupeUrl redis://dedupe-redis:6379/3`);
+  execSync(`docker run -v $PWD/test-crawls:/crawls --network=dedupe webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedupe-test-dupe/import-1.json --redisDedupeUrl redis://dedupe-redis:6379/3`);
 
   const redis = new Redis("redis://127.0.0.1:37379/3", { lazyConnect: true, retryStrategy: () => null });
 
