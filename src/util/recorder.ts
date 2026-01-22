@@ -1759,11 +1759,6 @@ export class Recorder extends EventEmitter {
 
     const addStatsCallback = async (size: number) => {
       try {
-        // if (!isDupe) {
-        //   await this.crawlState.addHashDupe(hash, url, date, size);
-        // }
-        // await this.crawlState.addUrlStat(isDupe);
-        // await this.crawlState.addConservedSizeStat(origRecSize - size);
         await this.crawlState.addHashNew(hash, url, date, size, origRecSize);
       } catch (e) {
         logger.warn("Error adding dupe hash", e, "recorder");
