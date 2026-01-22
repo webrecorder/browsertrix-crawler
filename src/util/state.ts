@@ -360,7 +360,7 @@ export class RedisDedupeIndex {
     }
     this.incrTotalUrls(pipe, statsKey);
 
-    if (origRecSize && origRecSize > size) {
+    if (origRecSize) {
       this.incrDeduped(pipe, statsKey, origRecSize - size);
     }
 
