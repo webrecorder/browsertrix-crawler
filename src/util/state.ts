@@ -518,17 +518,19 @@ export class RedisDedupeIndex {
     await pipe.exec();
   }
 
-  async nextQueuedImportSource() {
+  async nextQueuedImportSource(progressScale = 1.0) {
     let res: string | null = await this.dedupeRedis.lmove(
       this.sourceQ,
       this.pendingQ,
       "RIGHT",
       "LEFT",
     );
+
+    const numPending = await this.dedupeRedis.llen(this.pendingQ);
+
     // use circular pending Q to support retries
     if (!res) {
-      const len = await this.dedupeRedis.llen(this.pendingQ);
-      for (let i = 0; i < len; i++) {
+      for (let i = 0; i < numPending; i++) {
         res = await this.dedupeRedis.lmove(
           this.pendingQ,
           this.pendingQ,
@@ -551,12 +553,23 @@ export class RedisDedupeIndex {
       return null;
     }
 
-    await this.dedupeRedis.lrem(this.pendingQ, 1, res);
     const { name } = JSON.parse(res);
-    await this.dedupeRedis.srem(this.sourceQSet, name);
-    const remaining = (await this.dedupeRedis.llen(this.sourceQ)) + 1;
-    await this.dedupeRedis.setex(this.pendingPrefix + name, "1", 300);
-    return { name, entry: res, remaining };
+
+    const pipe = this.dedupeRedis.pipeline();
+    pipe.lrem(this.pendingQ, 1, res);
+    pipe.srem(this.sourceQSet, name);
+    pipe.setex(this.pendingPrefix + name, "1", 300);
+    await pipe.exec();
+
+    const remaining = await this.dedupeRedis.llen(this.sourceQ);
+    const done = await this.dedupeRedis.scard(this.sourceDone);
+    const total = remaining + done + numPending;
+
+    const percent = done / total;
+
+    await this.setUpdateProgress(percent * progressScale);
+
+    return { name, entry: res, done, total };
   }
 
   async setUpdateProgress(percent: number) {

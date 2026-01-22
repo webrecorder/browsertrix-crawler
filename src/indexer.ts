@@ -88,28 +88,24 @@ export class CrawlIndexer {
       }
     }
 
-    let count = 0;
     let res;
 
-    while ((res = await dedupeIndex.nextQueuedImportSource())) {
-      const { name, entry, remaining } = res;
+    // if removing, scale progress % by half as purge will be second half
+    while (
+      (res = await dedupeIndex.nextQueuedImportSource(
+        params.removing ? 0.5 : 1,
+      ))
+    ) {
+      const { name, entry, done, total } = res;
       const { url, crawlId, size, hash } = JSON.parse(
         entry,
       ) as DedupeIndexEntry;
-      const percent = count / (count + remaining);
 
-      // if removing, scale progress % by half as purge will be second half
-      await dedupeIndex.setUpdateProgress(
-        percent * (params.removing ? 0.5 : 1),
-      );
-
-      const loader = new WACZLoader(url);
-
-      count++;
-
-      logger.debug(`Processing WACZ ${count} of ${remaining + count - 1}`, {
+      logger.debug(`Processing WACZ ${done + 1} of ${total}`, {
         waczfile: url,
       });
+
+      const loader = new WACZLoader(url);
 
       try {
         await loader.init();
