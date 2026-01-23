@@ -397,11 +397,11 @@ export class RedisDedupeIndex {
   }
 
   // COUNT STATS
-  incrDeduped(pipe: ChainableCommander, key: string, value: number) {
+  incrDeduped(pipe: ChainableCommander, key: string, value: number, count = 1) {
     if (value > 0) {
       pipe.hincrby(key, "conservedSize", value);
     }
-    pipe.hincrby(key, "dupeUrls", 1);
+    pipe.hincrby(key, "dupeUrls", count);
   }
 
   incrTotalUrls(pipe: ChainableCommander, key: string) {
@@ -493,7 +493,7 @@ export class RedisDedupeIndex {
   }
 
   async matchRevisitSize(hash: string, origSize: number) {
-    const incrMap: Record<string, number> = {};
+    const incrMap: Record<string, { size: number; count: number }> = {};
 
     const length = 25;
     let start = 0;
@@ -507,7 +507,13 @@ export class RedisDedupeIndex {
 
       for (const entry of sizeEntries) {
         const { size, crawlId } = JSON.parse(entry);
-        incrMap[crawlId] = (incrMap[crawlId] || 0) + (origSize - size);
+        let res = incrMap[crawlId];
+        if (!res) {
+          res = { size: 0, count: 0 };
+          incrMap[crawlId] = res;
+        }
+        res.size += origSize - size;
+        res.count += 1;
       }
 
       if (sizeEntries.length < length) {
@@ -518,9 +524,9 @@ export class RedisDedupeIndex {
 
     const pipe = this.dedupeRedis.pipeline();
 
-    for (const [crawlId, value] of Object.entries(incrMap)) {
-      this.incrDeduped(pipe, `h:${crawlId}:counts`, value);
-      this.incrDeduped(pipe, DUPE_ALL_COUNTS, value);
+    for (const [crawlId, { size, count }] of Object.entries(incrMap)) {
+      this.incrDeduped(pipe, `h:${crawlId}:counts`, size, count);
+      this.incrDeduped(pipe, DUPE_ALL_COUNTS, size, count);
     }
 
     pipe.del(`rev:${hash}`);
