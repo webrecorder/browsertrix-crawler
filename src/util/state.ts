@@ -482,10 +482,6 @@ export class RedisDedupeIndex {
 
     // if orig size is not known, queue for later to resolve
     if (!origRecSize) {
-      //pipe.lpush(`rev:${hash}`, JSON.stringify({ size, crawlId }));
-      // pipe.hincrby("rev", `${hash}:s`, size);
-      // pipe.hincrby("rev", `${hash}:c`, 1);
-
       pipe.hincrby(`rev:${hash}:s`, crawlId, size);
       pipe.hincrby(`rev:${hash}:c`, crawlId, 1);
     }
@@ -502,7 +498,7 @@ export class RedisDedupeIndex {
 
   async matchRevisitSize(hash: string, origSize: number) {
     const revCounts = await this.dedupeRedis.hgetall(`rev:${hash}:c`);
-    if (!revCounts || !Object.keys(revCounts).length) {
+    if (!Object.keys(revCounts).length) {
       return;
     }
     const revSizes = await this.dedupeRedis.hgetall(`rev:${hash}:s`);
