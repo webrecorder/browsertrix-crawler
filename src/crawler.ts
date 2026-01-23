@@ -644,6 +644,7 @@ export class Crawler {
       if (!finished) {
         if (canceled) {
           status = "canceled";
+          await this.cleanupOnCancel();
         } else if (stopped) {
           status = "done";
           logger.info("Crawl gracefully stopped on request");
@@ -1619,7 +1620,17 @@ self.__bx_behaviors.selectMainBehavior();
 
   async checkCanceled() {
     if (this.crawlState && (await this.crawlState.isCrawlCanceled())) {
+      await this.cleanupOnCancel();
       await this.setStatusAndExit(ExitCodes.Success, "canceled");
+      return true;
+    }
+
+    return false;
+  }
+
+  async cleanupOnCancel() {
+    if (this.deduping) {
+      await this.crawlState.clearUncommitted();
     }
   }
 
@@ -1666,8 +1677,7 @@ self.__bx_behaviors.selectMainBehavior();
       return false;
     }
 
-    if (await this.crawlState.isCrawlCanceled()) {
-      await this.setStatusAndExit(ExitCodes.Success, "canceled");
+    if (await this.checkCanceled()) {
       return false;
     }
 
@@ -1734,6 +1744,9 @@ self.__bx_behaviors.selectMainBehavior();
       if (this.deduping) {
         await this.crawlState.addSourceWACZForDedupe(filename);
       }
+    }
+    if (this.deduping) {
+      await this.crawlState.addUncommited();
     }
 
     if (POST_CRAWL_STATES.includes(initState)) {
@@ -1912,8 +1925,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const generateFiles =
-      !this.params.dryRun &&
-      (!this.interruptReason || this.finalExit || this.uploadAndDeleteLocal);
+      !this.params.dryRun && (this.finalExit || this.uploadAndDeleteLocal);
 
     if (
       (this.params.generateCDX || this.params.generateWACZ) &&
@@ -1956,13 +1968,18 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.finalExit && generateFiles && this.deduping) {
+    // from here, actions that should happen on final crawler exit (not temp interrupt)
+    if (!this.finalExit) {
+      return;
+    }
+
+    if (this.deduping) {
       // commit crawl data to main index
       logger.info("Committing dedupe index");
       await this.crawlState.commitDedupeDone();
     }
 
-    if (this.finalExit && generateFiles && this.params.saveProfile) {
+    if (this.params.saveProfile && generateFiles) {
       const resource = await this.browser.saveProfile(
         this.params.saveProfile,
         this.storage,
@@ -1973,7 +1990,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.waitOnDone && (!this.interruptReason || this.finalExit)) {
+    if (this.params.waitOnDone) {
       this.done = true;
       logger.info("All done, waiting for signal...");
       await this.crawlState.setStatus("done");
