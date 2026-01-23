@@ -276,6 +276,12 @@ export class RedisDedupeIndex {
 
   async commitDedupeDone(crawlId?: string) {
     crawlId = crawlId || this.crawlId;
+
+    // set this first, as crawl is considered 'committed' as soon
+    // as data is partially merged in
+    await this.dedupeRedis.srem(DUPE_UNCOMMITTED, crawlId);
+    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
+
     for await (const hashes of this.dedupeRedis.hscanStream(`h:${crawlId}`)) {
       let isValue = false;
       for (const hash of hashes) {
@@ -301,10 +307,6 @@ export class RedisDedupeIndex {
         // ignore
       }
     }
-
-    // add to crawls list
-    await this.dedupeRedis.srem(DUPE_UNCOMMITTED, crawlId);
-    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
 
     // add counts
     await this.addCrawlCounts(crawlId);
