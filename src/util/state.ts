@@ -10,6 +10,7 @@ import {
   DUPE_ALL_HASH_KEY,
   DUPE_ALL_CRAWLS,
   DUPE_ALL_COUNTS,
+  DUPE_UNCOMMITTED,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -302,10 +303,36 @@ export class RedisDedupeIndex {
     }
 
     // add to crawls list
+    await this.dedupeRedis.srem(DUPE_UNCOMMITTED, crawlId);
     await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
 
     // add counts
     await this.addCrawlCounts(crawlId);
+  }
+
+  // ADD UNCOMITTED CRAWL
+  async addUncommited() {
+    if (this.crawlId) {
+      await this.dedupeRedis.sadd(DUPE_UNCOMMITTED, this.crawlId);
+    }
+  }
+
+  // CLEAR UNCOMMITTED
+  async clearUncommitted() {
+    if (this.crawlId) {
+      await this.dedupeRedis.srem(DUPE_UNCOMMITTED, this.crawlId);
+      await this.deleteCrawlDedupeKeys(this.crawlId);
+    }
+  }
+
+  async clearAllUncommitted() {
+    while (true) {
+      const crawlId = await this.dedupeRedis.spop(DUPE_UNCOMMITTED);
+      if (!crawlId) {
+        break;
+      }
+      await this.deleteCrawlDedupeKeys(crawlId);
+    }
   }
 
   // GET OR ADD INDIVIDUAL HASHES
@@ -661,14 +688,18 @@ export class RedisDedupeIndex {
           // ignore
         }
       }
-      await this.dedupeRedis.del(
-        `h:${crawlId}`,
-        `c:${crawlId}:wacz`,
-        `h:${crawlId}:counts`,
-      );
+      await this.deleteCrawlDedupeKeys(crawlId);
     }
 
     await this.dedupeRedis.del(TO_REMOVE_CRAWLS);
+  }
+
+  private async deleteCrawlDedupeKeys(crawlId: string) {
+    await this.dedupeRedis.del(
+      `h:${crawlId}`,
+      `c:${crawlId}:wacz`,
+      `h:${crawlId}:counts`,
+    );
   }
 }
 
