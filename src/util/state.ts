@@ -482,7 +482,12 @@ export class RedisDedupeIndex {
 
     // if orig size is not known, queue for later to resolve
     if (!origRecSize) {
-      pipe.lpush(`rev:${hash}`, JSON.stringify({ size, crawlId }));
+      //pipe.lpush(`rev:${hash}`, JSON.stringify({ size, crawlId }));
+      // pipe.hincrby("rev", `${hash}:s`, size);
+      // pipe.hincrby("rev", `${hash}:c`, 1);
+
+      pipe.hincrby(`rev:${hash}:s`, crawlId, size);
+      pipe.hincrby(`rev:${hash}:c`, crawlId, 1);
     }
 
     // incr dedupe count, and size if known
@@ -496,37 +501,40 @@ export class RedisDedupeIndex {
   }
 
   async matchRevisitSize(hash: string, origSize: number) {
-    const incrMap: Record<string, number> = {};
-
-    const length = 25;
-    let start = 0;
-
-    while (true) {
-      const sizeEntries = await this.dedupeRedis.lrange(
-        `rev:${hash}`,
-        start,
-        start + length,
-      );
-
-      for (const entry of sizeEntries) {
-        const { size, crawlId } = JSON.parse(entry);
-        incrMap[crawlId] = (incrMap[crawlId] || 0) + (origSize - size);
-      }
-
-      if (sizeEntries.length < length) {
-        break;
-      }
-      start += length;
+    const revCounts = await this.dedupeRedis.hgetall(`rev:${hash}:c`);
+    if (!revCounts || !Object.keys(revCounts).length) {
+      return;
     }
+    const revSizes = await this.dedupeRedis.hgetall(`rev:${hash}:s`);
 
     const pipe = this.dedupeRedis.pipeline();
 
-    for (const [crawlId, size] of Object.entries(incrMap)) {
-      this.incrDeduped(pipe, `h:${crawlId}:counts`, size, 0);
-      this.incrDeduped(pipe, DUPE_ALL_COUNTS, size, 0);
+    let totalSize = 0;
+    let totalCount = 0;
+
+    // compute size saved per crawl, and add totals
+    for (const [crawlId, count] of Object.entries(revCounts)) {
+      const size = Number(revSizes[crawlId]);
+      totalSize += size;
+
+      this.incrDeduped(
+        pipe,
+        `h:${crawlId}:counts`,
+        Number(count) * origSize - size,
+        0,
+      );
+      totalCount += Number(count);
     }
 
-    pipe.del(`rev:${hash}`);
+    // incr total size saved
+    this.incrDeduped(
+      pipe,
+      DUPE_ALL_COUNTS,
+      totalCount * origSize - totalSize,
+      0,
+    );
+
+    pipe.del(`rev:${hash}:c`, `rev:${hash}:s`);
 
     await pipe.exec();
   }
