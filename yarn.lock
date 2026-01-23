@@ -7167,6 +7167,19 @@ warcio@^2.4.7:
     uuid-random "^1.3.2"
     yargs "^17.7.2"
 
+"warcio@git+https://github.com/webrecorder/warcio.js#multi-value-allow-always":
+  version "2.4.8"
+  resolved "git+https://github.com/webrecorder/warcio.js#07f8e3805766083304f3c02735b735d19c6320cc"
+  dependencies:
+    "@types/pako" "^1.0.7"
+    "@types/stream-buffers" "^3.0.7"
+    base32-encode "^2.0.0"
+    hash-wasm "^4.9.0"
+    pako "^1.0.11"
+    tempy "^3.1.0"
+    uuid-random "^1.3.2"
+    yargs "^17.7.2"
+
 webdriver-bidi-protocol@0.3.10:
   version "0.3.10"
   resolved "https://registry.yarnpkg.com/webdriver-bidi-protocol/-/webdriver-bidi-protocol-0.3.10.tgz#437405564ff7e200371468f4f1eba1ff5537e119"
