@@ -7153,23 +7153,10 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.4.7:
-  version "2.4.7"
-  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.7.tgz#7c3918463e550f62fe63df5f76a871424e74097a"
-  integrity sha512-WGRqvoUqSalAkx+uJ8xnrxiiSPZ7Ru/h7iKC2XmuMMSOUSnS917l4V+qpaN9thAsZkZ+8qJRtee3uyOjlq4Dgg==
-  dependencies:
-    "@types/pako" "^1.0.7"
-    "@types/stream-buffers" "^3.0.7"
-    base32-encode "^2.0.0"
-    hash-wasm "^4.9.0"
-    pako "^1.0.11"
-    tempy "^3.1.0"
-    uuid-random "^1.3.2"
-    yargs "^17.7.2"
-
-"warcio@git+https://github.com/webrecorder/warcio.js#multi-value-allow-always":
+warcio@^2.4.7, warcio@^2.4.8:
   version "2.4.8"
-  resolved "git+https://github.com/webrecorder/warcio.js#07f8e3805766083304f3c02735b735d19c6320cc"
+  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.8.tgz#88338acfab62d24d0bdaabab075bc46e14e82304"
+  integrity sha512-e8s3lec1NKVz3Yt5V2Dz150opuZSLpLQDclshYj+QxW89mnej5Pv+0ndfSJc+Cy3x2WWjhhUB9WQZCpSm0M22g==
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"
