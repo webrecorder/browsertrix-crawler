@@ -23,6 +23,13 @@ import { WARCWriter } from "./warcwriter.js";
 import { LoadState, PageState, RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
+
+// Headers allowed to have multiple values per warcio.js validation
+const MULTI_VALUE_ALLOWED = [
+  "set-cookie",
+  "warc-concurrent-to",
+  "warc-protocol",
+];
 import { getProxyDispatcher } from "./proxy.js";
 import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
@@ -1859,7 +1866,13 @@ class AsyncFetcher {
 
     for (const [name, value] of Object.entries(resp.headers)) {
       if (value instanceof Array) {
-        resp.headers[name] = multiValueHeader(name, value);
+        // Only use multiValueHeader for allowed headers (set-cookie, warc-concurrent-to, warc-protocol)
+        // For other headers, join with comma per HTTP spec
+        if (MULTI_VALUE_ALLOWED.includes(name.toLowerCase())) {
+          resp.headers[name] = multiValueHeader(name, value);
+        } else {
+          resp.headers[name] = value.join(", ");
+        }
       }
     }
 
