@@ -6,7 +6,7 @@ import util from "util";
 import { exec as execCallback } from "child_process";
 
 import { formatErr, logger } from "./logger.js";
-import { getProxyDispatcher } from "./proxy.js";
+import { getDefaultDispatcher, getProxyDispatcher } from "./proxy.js";
 import { parseRecorderFlowJson } from "./flowbehavior.js";
 
 const exec = util.promisify(execCallback);
@@ -90,7 +90,7 @@ async function writeUrlContentsToFile(
 
   try {
     const res = await request(url, {
-      dispatcher: useProxy ? getProxyDispatcher(url) : undefined,
+      dispatcher: useProxy ? getProxyDispatcher(url) : getDefaultDispatcher(),
     });
     if (res.statusCode !== 200) {
       throw new Error(`Invalid response, status: ${res.statusCode}`);

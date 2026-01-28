@@ -2,7 +2,7 @@ import net from "net";
 import child_process from "child_process";
 import fs from "fs";
 
-import { Agent, Dispatcher, ProxyAgent } from "undici";
+import { Agent, Dispatcher, interceptors, ProxyAgent } from "undici";
 import yaml from "js-yaml";
 
 import { logger } from "./logger.js";
@@ -22,7 +22,12 @@ const SSH_WAIT_TIMEOUT = 30000;
 type ProxyEntry = {
   proxyUrl: string;
   dispatcher: Dispatcher;
+  redirectDispatcher: Dispatcher;
 };
+
+const defaultDispatcher = new Agent();
+
+const defaultRedirectDispatcher = addRedirectInterceptor(defaultDispatcher);
 
 export type ProxyServerConfig = {
   matchHosts?: Record<string, string>;
@@ -192,7 +197,7 @@ export async function initSingleProxy(
   detached: boolean,
   sshProxyPrivateKeyFile?: string,
   sshProxyKnownHostsFile?: string,
-): Promise<{ proxyUrl: string; dispatcher: Dispatcher }> {
+): Promise<ProxyEntry> {
   logger.debug("Initing proxy", {
     url: getSafeProxyString(proxyUrl),
     localPort,
@@ -215,18 +220,37 @@ export async function initSingleProxy(
   };
 
   const dispatcher = createDispatcher(proxyUrl, agentOpts);
-  return { proxyUrl, dispatcher };
+  const redirectDispatcher = addRedirectInterceptor(dispatcher);
+  return { proxyUrl, dispatcher, redirectDispatcher };
 }
 
-export function getProxyDispatcher(url: string) {
+export function addRedirectInterceptor(dispatcher: Dispatcher) {
+  // match fetch() max redirects if not doing manual redirects
+  // https://fetch.spec.whatwg.org/#http-redirect-fetch
+  const redirector = interceptors.redirect({ maxRedirections: 20 });
+  return dispatcher.compose(redirector);
+}
+
+export function getProxyDispatcher(url: string, withRedirect = true) {
   // find url match by regex first
-  for (const [rx, { dispatcher }] of proxyMap.entries()) {
+  for (const [rx, { dispatcher, redirectDispatcher }] of proxyMap.entries()) {
     if (rx && url.match(rx)) {
-      return dispatcher;
+      return withRedirect ? redirectDispatcher : dispatcher;
     }
   }
-  // if default proxy set, return default dispatcher, otherwise no dispatcher
-  return defaultProxyEntry ? defaultProxyEntry.dispatcher : undefined;
+
+  // if default proxy set, return dispatcher from default proxy, otherwise a default dispatcher
+  if (defaultProxyEntry) {
+    return withRedirect
+      ? defaultProxyEntry.redirectDispatcher
+      : defaultProxyEntry.dispatcher;
+  } else {
+    return getDefaultDispatcher(withRedirect);
+  }
+}
+
+export function getDefaultDispatcher(withRedirect = true) {
+  return withRedirect ? defaultRedirectDispatcher : defaultDispatcher;
 }
 
 export function createDispatcher(
