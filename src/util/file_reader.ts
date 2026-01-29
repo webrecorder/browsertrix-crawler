@@ -6,7 +6,7 @@ import util from "util";
 import { exec as execCallback } from "child_process";
 
 import { formatErr, logger } from "./logger.js";
-import { getDefaultDispatcher, getProxyDispatcher } from "./proxy.js";
+import { getFollowRedirectDispatcher } from "./proxy.js";
 import { parseRecorderFlowJson } from "./flowbehavior.js";
 
 const exec = util.promisify(execCallback);
@@ -69,7 +69,6 @@ async function writeUrlContentsToFile(
   pathPrefix: string,
   pathDefaultExt: string,
   fetchNew = false,
-  useProxy = false,
 ): Promise<string> {
   const filename =
     path.basename(new URL(url).pathname) || "index." + pathDefaultExt;
@@ -90,7 +89,7 @@ async function writeUrlContentsToFile(
 
   try {
     const res = await request(url, {
-      dispatcher: useProxy ? getProxyDispatcher(url) : getDefaultDispatcher(),
+      dispatcher: getFollowRedirectDispatcher(),
     });
     if (res.statusCode !== 200) {
       throw new Error(`Invalid response, status: ${res.statusCode}`);
@@ -120,7 +119,6 @@ export async function collectOnlineSeedFile(
       url,
       "seeds-",
       ".txt",
-      false,
       false,
     );
     logger.info("Seed file downloaded", { url, path: filepath });
@@ -241,7 +239,6 @@ async function collectOnlineBehavior(
       "behaviors-",
       ".js",
       true,
-      false,
     );
     logger.info(
       "Custom behavior file downloaded",

@@ -10,7 +10,7 @@ import path from "path";
 import { request } from "undici";
 
 import { formatErr, LogContext, logger } from "./logger.js";
-import { getDefaultDispatcher, getSafeProxyString } from "./proxy.js";
+import { getFollowRedirectDispatcher, getSafeProxyString } from "./proxy.js";
 import { initStorage, S3StorageSync, UploadResult } from "./storage.js";
 
 import {
@@ -251,7 +251,7 @@ export class Browser {
       );
 
       const resp = await request(profileRemoteSrc, {
-        dispatcher: getDefaultDispatcher(),
+        dispatcher: getFollowRedirectDispatcher(),
       });
 
       await pipeline(resp.body, fs.createWriteStream(profileLocalSrc));

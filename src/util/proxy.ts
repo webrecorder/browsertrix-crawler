@@ -17,17 +17,38 @@ const SSH_PROXY_LOCAL_PORT = 9722;
 
 const SSH_WAIT_TIMEOUT = 30000;
 
-//let proxyDispatcher: Dispatcher | undefined = undefined;
-
 type ProxyEntry = {
   proxyUrl: string;
   dispatcher: Dispatcher;
   redirectDispatcher: Dispatcher;
 };
 
-const defaultDispatcher = new Agent();
+// Opts for all requests
+const baseOpts: Agent.Options = {
+  headersTimeout: FETCH_HEADERS_TIMEOUT_SECS * 1000,
 
-const defaultRedirectDispatcher = addRedirectInterceptor(defaultDispatcher);
+  // allow HTTP/2 connections
+  allowH2: true,
+};
+
+// Opts for all archival content requests
+const contentAgentOpts: Agent.Options = {
+  ...baseOpts,
+
+  // ignore invalid SSL certs (matches browser settings)
+  connect: {
+    rejectUnauthorized: false,
+  },
+};
+
+// dispatcher for archival content without following redirects
+const contentDispatcher = new Agent(contentAgentOpts);
+
+// dispatcher for archival content with following redirects
+const contentRedirectDispatcher = addRedirectInterceptor(contentDispatcher);
+
+// dispatcher for following redirects, non-archival content, trust SSL
+const followRedirectDispatcher = new Agent(baseOpts);
 
 export type ProxyServerConfig = {
   matchHosts?: Record<string, string>;
@@ -215,11 +236,7 @@ export async function initSingleProxy(
     );
   }
 
-  const agentOpts: Agent.Options = {
-    headersTimeout: FETCH_HEADERS_TIMEOUT_SECS * 1000,
-  };
-
-  const dispatcher = createDispatcher(proxyUrl, agentOpts);
+  const dispatcher = createDispatcher(proxyUrl, contentAgentOpts);
   const redirectDispatcher = addRedirectInterceptor(dispatcher);
   return { proxyUrl, dispatcher, redirectDispatcher };
 }
@@ -245,12 +262,12 @@ export function getProxyDispatcher(url: string, withRedirect = true) {
       ? defaultProxyEntry.redirectDispatcher
       : defaultProxyEntry.dispatcher;
   } else {
-    return getDefaultDispatcher(withRedirect);
+    return withRedirect ? contentRedirectDispatcher : contentDispatcher;
   }
 }
 
-export function getDefaultDispatcher(withRedirect = true) {
-  return withRedirect ? defaultRedirectDispatcher : defaultDispatcher;
+export function getFollowRedirectDispatcher() {
+  return followRedirectDispatcher;
 }
 
 export function createDispatcher(
