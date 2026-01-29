@@ -188,12 +188,13 @@ export class SitemapReader extends EventEmitter {
       logger.debug("Parsing sitemap XML", url, "sitemap");
 
       const resp = await this._fetchWithRetry(url);
-      if (resp) {
-        await this.parseSitemapFromResponse(url, resp);
-        return true;
+      if (!resp) {
+        return false;
       }
 
-      return false;
+      await this.parseSitemapFromResponse(url, resp);
+
+      return true;
     } catch (e) {
       logger.warn("Sitemap parse failed", { url, ...formatErr(e) }, "sitemap");
       return false;
