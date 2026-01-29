@@ -7153,10 +7153,10 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.4.7:
-  version "2.4.7"
-  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.7.tgz#7c3918463e550f62fe63df5f76a871424e74097a"
-  integrity sha512-WGRqvoUqSalAkx+uJ8xnrxiiSPZ7Ru/h7iKC2XmuMMSOUSnS917l4V+qpaN9thAsZkZ+8qJRtee3uyOjlq4Dgg==
+warcio@^2.4.7, warcio@^2.4.9:
+  version "2.4.9"
+  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.9.tgz#8f47bf1aca535ac2b3005d27220f9aa301ddec68"
+  integrity sha512-+Omi3ayMOwk1PlnnCu8EcEzRSFBtFYS8t2oD5/12M99fHEHQv80qkbltfrwJ1Qo2e2+4ieI5nGtes0TSTZrGmg==
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"

@@ -973,8 +973,14 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    await page.exposeFunction(BxFunctionBindings.AddToSeenSet, (data: string) =>
-      this.crawlState.addToUserSet(data),
+    await page.exposeFunction(
+      BxFunctionBindings.AddToSeenSet,
+      (data: string) => {
+        if (data && (data.startsWith("https:") || data.startsWith("http:"))) {
+          void callbacks.addLink(data);
+        }
+        return this.crawlState.addToUserSet(data);
+      },
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
