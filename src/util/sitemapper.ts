@@ -194,11 +194,12 @@ export class SitemapReader extends EventEmitter {
 
       await this.parseSitemapFromResponse(url, resp);
 
-      await this.checkIfDone();
       return true;
     } catch (e) {
       logger.warn("Sitemap parse failed", { url, ...formatErr(e) }, "sitemap");
       return false;
+    } finally {
+      await this.checkIfDone();
     }
   }
 
