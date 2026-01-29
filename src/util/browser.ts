@@ -34,6 +34,7 @@ import puppeteer, {
 import { Recorder } from "./recorder.js";
 import { timedRun } from "./timing.js";
 import { replaceDir } from "./file_reader.js";
+import { Readable } from "node:stream";
 
 type BtrixChromeOpts = {
   proxyServer?: string;
@@ -73,6 +74,8 @@ export class Browser {
 
   browser?: PptrBrowser | null = null;
   firstCDP: CDPSession | null = null;
+  loadCDP: CDPSession | null = null;
+  loadFrameId = "";
 
   recorders: Recorder[] = [];
 
@@ -749,6 +752,89 @@ export class Browser {
 
   async waitForNetworkIdle(page: Page, params: WaitForNetworkIdleOptions) {
     return await page.waitForNetworkIdle(params);
+  }
+
+  async loadUrl(url: string): Promise<null | {
+    headers: Record<string, string>;
+    statusCode: number;
+    stream: Readable;
+  }> {
+    const options = { disableCache: false, includeCredentials: true };
+
+    let result = null;
+
+    try {
+      if (!this.loadCDP) {
+        const { cdp } = await this.newWindowPageWithCDP();
+        this.loadCDP = cdp;
+        const { frameId } = await cdp.send("Page.navigate", {
+          url: "about:blank",
+        });
+        this.loadFrameId = frameId;
+      }
+
+      result = await this.loadCDP!.send("Network.loadNetworkResource", {
+        frameId: this.loadFrameId,
+        url,
+        options,
+      });
+    } catch (e) {
+      logger.debug(
+        "Browser Network.loadNetworkResource failed",
+        { url, ...formatErr(e) },
+        "browser",
+      );
+      return null;
+    }
+
+    const { stream, headers, httpStatusCode, success, netError, netErrorName } =
+      result.resource;
+
+    if (!success || !headers || !stream || !httpStatusCode) {
+      //await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
+      logger.debug(
+        "Network.loadNetworkResource failed, attempting node fetch",
+        {
+          url,
+          netErrorName,
+          netError,
+          httpStatusCode,
+        },
+        "browser",
+      );
+      return null;
+    }
+
+    async function* iterStream(cdp: CDPSession, stream: string) {
+      try {
+        while (true) {
+          const { data, base64Encoded, eof } = await cdp.send("IO.read", {
+            handle: stream,
+            size: 1024 * 64,
+          });
+          yield Buffer.from(data, base64Encoded ? "base64" : "utf-8");
+
+          if (eof) {
+            break;
+          }
+        }
+      } catch (e) {
+        logger.warn("takeStream read failed", { url }, "browser");
+        return null;
+      } finally {
+        try {
+          await cdp.send("IO.close", { handle: stream });
+        } catch (e) {
+          logger.warn("takeStream close failed", { url }, "browser");
+        }
+      }
+    }
+
+    return {
+      headers,
+      statusCode: httpStatusCode,
+      stream: Readable.from(iterStream(this.loadCDP!, stream)),
+    };
   }
 
   async setViewport(page: Page, params: Viewport) {

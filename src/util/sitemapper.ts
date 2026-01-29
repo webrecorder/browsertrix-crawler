@@ -9,13 +9,19 @@ import { logger, formatErr } from "./logger.js";
 import { DETECT_SITEMAP } from "./constants.js";
 import { sleep } from "./timing.js";
 
-import { Dispatcher, request } from "undici";
+import { request } from "undici";
 import { getProxyDispatcher } from "./proxy.js";
+import { Browser } from "./browser.js";
+import { text } from "stream/consumers";
 
 const SITEMAP_CONCURRENCY = 5;
 
 const TEXT_CONTENT_TYPE = ["text/plain"];
-const XML_CONTENT_TYPES = ["text/xml", "application/xml"];
+const XML_CONTENT_TYPES = [
+  "text/xml",
+  "application/xml",
+  "binary/octet-stream",
+];
 
 export type SitemapOpts = {
   headers?: Record<string, string>;
@@ -40,9 +46,12 @@ export class SitemapReader extends EventEmitter {
   count = 0;
   limit: number;
 
-  constructor(opts: SitemapOpts) {
+  browser: Browser;
+
+  constructor(opts: SitemapOpts, browser: Browser) {
     super();
     this.headers = opts.headers;
+    this.browser = browser;
 
     this.queue = new PQueue({ concurrency: SITEMAP_CONCURRENCY });
 
@@ -62,17 +71,42 @@ export class SitemapReader extends EventEmitter {
     return ct.split(";")[0];
   }
 
-  async _fetchWithRetry(url: string, expectedCT = XML_CONTENT_TYPES) {
-    while (true) {
-      const resp = await request(url, {
-        headers: this.headers,
-        dispatcher: getProxyDispatcher(url),
-      });
+  async _fetchWithRetry(
+    url: string,
+    expectedCT = XML_CONTENT_TYPES,
+    //noRetry = false
+  ): Promise<null | Readable> {
+    //let count = 0;
 
-      const { statusCode, headers } = resp;
+    while (true) {
+      let statusCode = 0;
+      let headers;
+      let stream: Readable;
+
+      try {
+        const resp = await request(url, {
+          headers: this.headers,
+          dispatcher: getProxyDispatcher(url),
+        });
+
+        statusCode = resp.statusCode;
+        headers = resp.headers;
+        stream = resp.body;
+      } catch (e) {
+        //
+      }
+
+      if (statusCode !== 200) {
+        const browserRes = await this.browser.loadUrl(url);
+        if (browserRes) {
+          headers = browserRes.headers;
+          statusCode = browserRes.statusCode;
+          stream = browserRes.stream;
+        }
+      }
 
       if (statusCode === 200) {
-        const ct = headers["content-type"] as string;
+        const ct = headers!["content-type"] as string;
         if (expectedCT && ct && !expectedCT.includes(ct.split(";")[0])) {
           logger.debug(
             "Not loading sitemap: invalid content-type",
@@ -81,10 +115,16 @@ export class SitemapReader extends EventEmitter {
           );
           return null;
         }
-        return resp;
+        return stream!;
       }
 
-      const retry = headers["retry-after"];
+      const retry = headers!["retry-after"];
+
+      // if (!noRetry && !retry && (statusCode === 403 || statusCode === 429) && count < 2) {
+      //   logger.debug("Sitemap: possible rate limit, waiting", {statusCode}, "sitemap");
+      //   retry = "30";
+      //   count++;
+      // }
 
       if (retry) {
         logger.debug(
@@ -160,11 +200,10 @@ export class SitemapReader extends EventEmitter {
         return sitemapFound;
       }
 
-      const { body } = resp;
+      //const text = await body.text();
+      const theText = await text(resp);
 
-      const text = await body.text();
-
-      text.replace(/^Sitemap:\s?([^\s]+)$/gim, (m, urlStr) => {
+      theText.replace(/^Sitemap:\s?([^\s]+)$/gim, (m, urlStr) => {
         try {
           const url = new URL(urlStr, robotsUrl).href;
           logger.debug("Sitemap: Added from robots", { url }, "sitemap");
@@ -188,8 +227,8 @@ export class SitemapReader extends EventEmitter {
       logger.debug("Parsing sitemap XML", url, "sitemap");
 
       const resp = await this._fetchWithRetry(url);
-      if (resp) {
-        await this.parseSitemapFromResponse(url, resp);
+      if (!resp) {
+        return false;
       }
 
       await this.parseSitemapFromResponse(url, resp);
@@ -203,10 +242,7 @@ export class SitemapReader extends EventEmitter {
     }
   }
 
-  private async parseSitemapFromResponse(
-    url: string,
-    resp: Dispatcher.ResponseData,
-  ) {
+  private async parseSitemapFromResponse(url: string, resp: Readable) {
     let resolve: () => void;
     let reject: () => void;
 
@@ -239,13 +275,12 @@ export class SitemapReader extends EventEmitter {
 
   private doParseSitemapFromResponse(
     url: string,
-    resp: Dispatcher.ResponseData,
+    body: Readable,
     resolve: () => void,
     reject: () => void,
   ) {
     let stream: Readable;
 
-    const { body } = resp;
     if (!body) {
       logger.warn("Sitemap missing response body", {}, "sitemap");
       reject();
