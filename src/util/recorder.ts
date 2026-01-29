@@ -1776,7 +1776,7 @@ class AsyncFetcher {
     } catch (e) {
       logger.warn(
         "Async load headers failed",
-        { ...formatErr(e), ...this.recorder.logDetails },
+        { ...formatErr(e), url: this.reqresp.url, ...this.recorder.logDetails },
         "fetch",
       );
     }
