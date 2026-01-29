@@ -305,7 +305,6 @@ export class BlockRules {
       method: "PUT",
       headers: { "Content-Type": "text/html" },
       body,
-      dispatcher: getProxyDispatcher(putUrl.href),
     });
   }
 }
