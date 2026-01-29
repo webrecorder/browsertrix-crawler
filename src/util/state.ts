@@ -209,7 +209,8 @@ export type SaveState = {
   failed: string[];
   errors: string[];
   extraSeeds: string[];
-  sitemapDone: boolean;
+  sitemapDoneSet?: string[];
+  sitemapCounts?: Record<string, string>;
   excluded?: string[];
 };
 
@@ -238,7 +239,8 @@ export class RedisCrawlState {
 
   exKey: string;
 
-  sitemapDoneKey: string;
+  sitemapDoneSetKey: string;
+  sitemapCountKey: string;
 
   waczFilename: string | null = null;
 
@@ -281,7 +283,8 @@ export class RedisCrawlState {
     // (eg. redirect-to-excluded or trimmed)
     this.exKey = this.key + ":excluded";
 
-    this.sitemapDoneKey = this.key + ":sitemapDone";
+    this.sitemapDoneSetKey = this.key + ":sitemapDoneSet";
+    this.sitemapCountKey = this.key + ":sitemapCount";
 
     this._initLuaCommands(this.redis);
   }
@@ -788,18 +791,22 @@ return inx;
     const failed = await this._iterListKeys(this.fkey, seen);
     const errors = await this.getErrorList();
     const extraSeeds = await this._iterListKeys(this.esKey, seen);
-    const sitemapDone = await this.isSitemapDone();
+    const sitemapsSet = await this._iterSet(this.sitemapDoneSetKey);
+    const sitemapCounts = await this.redis.hgetall(this.sitemapCountKey);
     const excludedSet = await this._iterSet(this.exKey);
 
     const finished = [...seen.values()];
     const excluded = [...excludedSet.values()];
+
+    const sitemapDoneSet = [...sitemapsSet.values()];
 
     return {
       extraSeeds,
       finished,
       queued,
       pending,
-      sitemapDone,
+      sitemapDoneSet,
+      sitemapCounts,
       failed,
       errors,
       excluded,
@@ -890,6 +897,8 @@ return inx;
     await this.redis.del(this.skey);
     await this.redis.del(this.ekey);
     await this.redis.del(this.exKey);
+    await this.redis.del(this.sitemapDoneSetKey);
+    await this.redis.del(this.sitemapCountKey);
 
     let seen: string[] = [];
 
@@ -942,10 +951,6 @@ return inx;
 
       await this.redis.zadd(this.qkey, this._getScore(data), json);
       seen.push(data.url);
-
-      if (state.sitemapDone) {
-        await this.markSitemapDone();
-      }
     }
 
     // backwards compatibility: not using done, instead 'finished'
@@ -988,6 +993,16 @@ return inx;
 
     if (state.excluded?.length) {
       await this.redis.sadd(this.exKey, state.excluded);
+    }
+
+    if (state.sitemapDoneSet) {
+      for (const url of state.sitemapDoneSet) {
+        await this.markSitemapDone(url);
+      }
+    }
+
+    if (state.sitemapCounts) {
+      await this.redis.hmset(this.sitemapCountKey, state.sitemapCounts);
     }
 
     return seen.length;
@@ -1190,12 +1205,25 @@ return inx;
     return seeds;
   }
 
-  async isSitemapDone() {
-    return (await this.redis.get(this.sitemapDoneKey)) == "1";
+  async numSitemapsDone() {
+    return await this.redis.scard(this.sitemapDoneSetKey);
   }
 
-  async markSitemapDone() {
-    await this.redis.set(this.sitemapDoneKey, "1");
+  async isSitemapDone(url: string) {
+    return await this.redis.sismember(this.sitemapDoneSetKey, url);
+  }
+
+  async markSitemapDone(url: string) {
+    await this.redis.sadd(this.sitemapDoneSetKey, url);
+  }
+
+  async getSitemapCount(url: string) {
+    const res = await this.redis.hget(this.sitemapCountKey, url);
+    return res && res !== "0";
+  }
+
+  async setSitemapCount(url: string, count: number) {
+    await this.redis.hset(this.sitemapCountKey, url, count);
   }
 
   async markProfileUploaded(result: UploadResult & { modified?: string }) {

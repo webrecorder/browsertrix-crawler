@@ -76,7 +76,7 @@ export class SitemapReader extends EventEmitter {
         if (expectedCT && ct && !expectedCT.includes(ct.split(";")[0])) {
           logger.debug(
             "Not loading sitemap: invalid content-type",
-            { ct },
+            { ct, url },
             "sitemap",
           );
           return null;
@@ -98,7 +98,7 @@ export class SitemapReader extends EventEmitter {
 
       logger.debug(
         "Not loading sitemap: invalid status code",
-        { status: statusCode },
+        { status: statusCode, url },
         "sitemap",
       );
       return null;
@@ -188,8 +188,8 @@ export class SitemapReader extends EventEmitter {
       logger.debug("Parsing sitemap XML", url, "sitemap");
 
       const resp = await this._fetchWithRetry(url);
-      if (!resp) {
-        return false;
+      if (resp) {
+        await this.parseSitemapFromResponse(url, resp);
       }
 
       await this.parseSitemapFromResponse(url, resp);

@@ -1877,7 +1877,39 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   protected async _addInitialSeeds() {
-    for (let i = 0; i < this.seeds.length; i++) {
+    const sitemapPromises: Promise<number>[] = [];
+
+    const total = this.seeds.length;
+    let finishedCount = 0;
+
+    const wrapParseSitemap = async (seed: ScopedSeed, i: number) => {
+      const url = this.seeds[i].url;
+
+      await this.crawlState.setSitemapCount(url, -2);
+      try {
+        return await timedRun(
+          this.parseSitemap(seed, i),
+          1200,
+          "Full Sitemap Timed Out",
+          { url },
+          "sitemap",
+          false,
+          true,
+        );
+      } catch (e) {
+        await this.crawlState.setSitemapCount(url, -1);
+        return -1;
+      } finally {
+        finishedCount++;
+        logger.info(
+          `Sitemap ${finishedCount} of ${total}`,
+          { finishedCount, total },
+          "sitemap",
+        );
+      }
+    };
+
+    for (let i = 0; i < total; i++) {
       const seed = this.seeds[i];
       if (!(await this.queueUrl(i, seed.url, 0, 0))) {
         if (this.limitHit) {
@@ -1885,7 +1917,10 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
 
-      if (seed.sitemap) {
+      if (this.params.sitemapOnly) {
+        sitemapPromises.push(wrapParseSitemap(seed, i));
+        //await wrapParseSitemap(seed, i);
+      } else if (seed.sitemap) {
         await timedRun(
           this.parseSitemap(seed, i),
           SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
@@ -1894,6 +1929,19 @@ self.__bx_behaviors.selectMainBehavior();
           "sitemap",
         );
       }
+    }
+
+    if (this.params.sitemapOnly) {
+      const res = await Promise.allSettled(sitemapPromises);
+      console.log("SITEMAPS FOUND", res);
+      for (let i = 0; i < this.seeds.length; i++) {
+        console.log(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          `SIZE: ${(res[i] as any).value || 0}   URL: ${this.seeds[i].url}`,
+        );
+      }
+      await this.serializeConfig();
+      await this.setStatusAndExit(ExitCodes.Success, "done");
     }
   }
 
@@ -2737,7 +2785,7 @@ self.__bx_behaviors.selectMainBehavior();
 
   async parseSitemap({ url, sitemap }: ScopedSeed, seedId: number) {
     if (!sitemap) {
-      return;
+      return 0;
     }
 
     if (
@@ -2746,12 +2794,12 @@ self.__bx_behaviors.selectMainBehavior();
       !this.params.extraHops
     ) {
       logger.info("Single page crawl, skipping sitemap", {}, "sitemap");
-      return;
+      return 0;
     }
 
-    if (await this.crawlState.isSitemapDone()) {
+    if (await this.crawlState.isSitemapDone(url)) {
       logger.info("Sitemap already processed, skipping", {}, "sitemap");
-      return;
+      return 0;
     }
 
     const fromDate = this.params.sitemapFromDate
@@ -2779,24 +2827,34 @@ self.__bx_behaviors.selectMainBehavior();
 
     let finished = false;
 
-    const p = new Promise<void>((resolve) => {
-      sitemapper.on("end", () => {
-        resolve();
+    const seedUrl = url;
+
+    const onEnd = async (resolve: (n: number) => void) => {
+      try {
+        await this.crawlState.setSitemapCount(seedUrl, sitemapper.count);
+        resolve(sitemapper.count);
         if (!finished) {
           logger.info(
             "Sitemap Parsing Finished",
-            { urlsFound: sitemapper.count, limitHit: sitemapper.atLimit() },
+            {
+              seed: url,
+              urlsFound: sitemapper.count,
+              limitHit: sitemapper.atLimit(),
+            },
             "sitemap",
           );
-          this.crawlState
-            .markSitemapDone()
-            .catch((e) => logger.warn("Error marking sitemap done", e));
+          await this.crawlState.markSitemapDone(seedUrl);
           finished = true;
         }
-      });
+      } catch (e) {
+        logger.warn("Sitemap onEnd error", e, "sitemap");
+      }
+    };
 
-      sitemapper.on("url", ({ url }) => {
+    const onUrl = async (resolve: (n: number) => void, url: string) => {
+      try {
         const count = sitemapper.count;
+        await this.crawlState.setSitemapCount(seedUrl, sitemapper.count);
         if (count % 10 ** power === 0) {
           if (count % 10 ** (power + 1) === 0 && power <= 3) {
             power++;
@@ -2809,19 +2867,25 @@ self.__bx_behaviors.selectMainBehavior();
             "sitemap",
           );
         }
-        this.queueInScopeUrls(seedId, [url], 0, 0, true).catch((e) =>
-          logger.warn("Error queuing urls", e, "links"),
-        );
-        if (count >= 100 && !resolved) {
+        await this.queueInScopeUrls(seedId, [url], 0, 0, true);
+
+        if (!this.params.sitemapOnly && count >= 100 && !resolved) {
           logger.info(
             "Sitemap partially parsed, continue parsing large sitemap in the background",
             { urlsFound: count },
             "sitemap",
           );
-          resolve();
+          resolve(count);
           resolved = true;
         }
-      });
+      } catch (e) {
+        logger.warn("Sitemap onUrl error", e, "sitemap");
+      }
+    };
+
+    const p = new Promise<number>((resolve) => {
+      sitemapper.on("end", () => onEnd(resolve));
+      sitemapper.on("url", ({ url }) => onUrl(resolve, url));
     });
 
     let found = false;
@@ -2832,10 +2896,13 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (found) {
-      await p;
+      return await p;
     } else {
       logger.warn("No sitemap for seed", { url, sitemap }, "sitemap");
+      await this.crawlState.markSitemapDone(seedUrl);
     }
+
+    return 0;
   }
 
   async combineWARC() {

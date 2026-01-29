@@ -361,6 +361,13 @@ class ArgParser {
           type: "string",
         },
 
+        sitemapOnly: {
+          describe:
+            "if set, only parse sitemap and print number of URLs and exit",
+          type: "boolean",
+          default: false,
+        },
+
         statsFilename: {
           type: "string",
           describe:
