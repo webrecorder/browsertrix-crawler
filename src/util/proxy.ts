@@ -48,7 +48,7 @@ const contentDispatcher = new Agent(contentAgentOpts);
 const contentRedirectDispatcher = addRedirectInterceptor(contentDispatcher);
 
 // dispatcher for following redirects, non-archival content, trust SSL
-const followRedirectDispatcher = new Agent(baseOpts);
+const followRedirectDispatcher = addRedirectInterceptor(new Agent(baseOpts));
 
 export type ProxyServerConfig = {
   matchHosts?: Record<string, string>;
