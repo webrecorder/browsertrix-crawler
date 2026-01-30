@@ -1,5 +1,5 @@
 import { Options, default as normalize } from "normalize-url";
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 
 // URL normalization options for consistent URL handling across the crawler
 // Query parameters are sorted alphabetically by the normalize-url library
