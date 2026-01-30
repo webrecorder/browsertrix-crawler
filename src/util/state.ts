@@ -363,7 +363,7 @@ export class RedisDedupeIndex {
   }
 
   getHashValue(hash: string, url: string, date: string, size: number) {
-    url = normalizeUrl(url, normalizeUrlOpts);
+    url = normalizeUrl(url);
     date = date.replace(/[^\d]/g, "");
     const key = hash.split(":").at(-1)!;
     const val = `${this.dedupeKeyIndex} ${date} ${url} ${size}`;
