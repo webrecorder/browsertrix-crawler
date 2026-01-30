@@ -326,3 +326,35 @@ seeds:
   expect(seeds[8].exclude).toEqual([/false/]);
   expect(seeds[9].exclude).toEqual([/true/]);
 });
+
+test("scopeType page should match URLs with reordered query parameters", async () => {
+  const seeds = await getSeeds(`
+seeds:
+  - url: https://example.com/page?foo=bar&baz=qux
+    scopeType: page
+`);
+
+  expect(seeds.length).toEqual(1);
+  expect(seeds[0].scopeType).toEqual("page");
+  expect(seeds[0].include).toEqual([]);
+  expect(seeds[0].maxDepth).toEqual(0);
+  expect(seeds[0].maxExtraHops).toEqual(0);
+
+  // Test with the same URL (should match)
+  const result1 = seeds[0].isIncluded(
+    "https://example.com/page?foo=bar&baz=qux",
+    0,
+    0
+  );
+  expect(result1).not.toBe(false);
+  expect(result1.isOOS).toBe(false);
+
+  // Test with reordered query parameters (should still match)
+  const result2 = seeds[0].isIncluded(
+    "https://example.com/page?baz=qux&foo=bar",
+    0,
+    0
+  );
+  expect(result2).not.toBe(false);
+  expect(result2.isOOS).toBe(false);
+});
