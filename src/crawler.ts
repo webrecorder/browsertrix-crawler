@@ -1154,6 +1154,7 @@ self.__bx_behaviors.selectMainBehavior();
           "fetch",
         );
       } else {
+        await this.awaitPageExtraDelay(opts);
         return;
       }
     }
