@@ -53,6 +53,7 @@ async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessTh
       if (finished >= numExpected) {
         break;
       }
+      await sleep(500);
     }
   } catch (e) {
     console.error(e);
