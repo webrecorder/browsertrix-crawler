@@ -4,8 +4,7 @@ import { MAX_DEPTH } from "./constants.js";
 import { collectOnlineSeedFile } from "./file_reader.js";
 import { logger } from "./logger.js";
 import { type CrawlerArgs } from "./argParser.js";
-import normalizeUrlLib from "normalize-url";
-import { normalizeUrlOpts } from "./normalizeurlopts.js";
+import { normalizeUrl } from "./normalize.js";
 
 type ScopeType =
   | "prefix"
@@ -66,7 +65,7 @@ export class ScopedSeed {
     parsedUrl.password = "";
 
     // Normalize URL with sorted query parameters for consistent matching
-    this.url = normalizeUrlLib(parsedUrl.href, normalizeUrlOpts);
+    this.url = normalizeUrl(parsedUrl.href);
     this.include = parseRx(include);
     this.exclude = parseRx(exclude);
 
@@ -254,7 +253,7 @@ export class ScopedSeed {
     }
 
     // Normalize URL with sorted query parameters for consistent matching
-    url = normalizeUrlLib(urlParsed.href, normalizeUrlOpts);
+    url = normalizeUrl(urlParsed.href);
 
     if (url === this.url) {
       return { url, isOOS: false };

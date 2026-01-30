@@ -11,8 +11,7 @@ import {
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
 import { interpolateFilename, UploadResult } from "./storage.js";
-import normalizeUrl from "normalize-url";
-import { normalizeUrlOpts } from "./normalizeurlopts.js";
+import { normalizeUrl } from "./normalize.js";
 
 // ============================================================================
 export enum LoadState {
@@ -713,7 +712,7 @@ return inx;
     }: QueueEntry,
     limit = 0,
   ) {
-    url = normalizeUrl(url, normalizeUrlOpts);
+    url = normalizeUrl(url);
     const added = this._timestamp();
     const data: QueueEntry = { added, url, seedId, depth, extraHops };
 
@@ -1049,7 +1048,7 @@ return inx;
   }
 
   async addIfNoDupe(key: string, url: string, status: number) {
-    url = normalizeUrl(url, normalizeUrlOpts);
+    url = normalizeUrl(url);
     return (
       (await this.redis.sadd(key, normalizeDedupStatus(status) + "|" + url)) ===
       1

@@ -1,8 +1,9 @@
-import { Options as NormalizeUrlOptions } from "normalize-url";
+import { Options, default as normalize } from "normalize-url";
+import { logger } from "./logger";
 
 // URL normalization options for consistent URL handling across the crawler
 // Query parameters are sorted alphabetically by the normalize-url library
-export const normalizeUrlOpts: NormalizeUrlOptions = {
+export const normalizeUrlOpts: Options = {
   defaultProtocol: "https",
   stripAuthentication: false,
   stripTextFragment: false,
@@ -14,3 +15,12 @@ export const normalizeUrlOpts: NormalizeUrlOptions = {
   sortQueryParameters: true,
   removePath: false,
 };
+
+export function normalizeUrl(url: string) {
+  try {
+    return normalize(url, normalizeUrlOpts);
+  } catch (e) {
+    logger.warn("normalizeUrl failed for url, using unmodified url", { url });
+    return url;
+  }
+}
