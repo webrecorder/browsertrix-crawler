@@ -10,7 +10,7 @@ import path from "path";
 import { request } from "undici";
 
 import { formatErr, LogContext, logger } from "./logger.js";
-import { getSafeProxyString } from "./proxy.js";
+import { getFollowRedirectDispatcher, getSafeProxyString } from "./proxy.js";
 import { initStorage, S3StorageSync, UploadResult } from "./storage.js";
 
 import {
@@ -250,7 +250,9 @@ export class Browser {
         "browser",
       );
 
-      const resp = await request(profileRemoteSrc);
+      const resp = await request(profileRemoteSrc, {
+        dispatcher: getFollowRedirectDispatcher(),
+      });
 
       await pipeline(resp.body, fs.createWriteStream(profileLocalSrc));
     } else if (profileRemoteSrc && profileRemoteSrc.startsWith("@")) {
