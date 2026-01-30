@@ -12,20 +12,18 @@ async function waitContainer(containerId) {
     return;
   }
 
-  // containerId is initially the full id, but docker ps
-  // only prints the short id (first 12 characters)
-  containerId = containerId.slice(0, 12);
+  await sleep(1100);
 
-  while (true) {
-    try {
-      const res = child_process.execSync("docker ps -q", { encoding: "utf-8" });
-      if (res.indexOf(containerId) < 0) {
-        return;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    await sleep(500);
+  try {
+    child_process.execSync(`docker kill -s SIGINT ${containerId}`);
+  } catch (e) {
+    return;
+  }
+
+  try {
+    child_process.execSync(`docker container wait ${containerId}`);
+  } catch (e) {
+    return;
   }
 }
 
@@ -38,8 +36,6 @@ async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessTh
   const redis = new Redis("redis://127.0.0.1:36381/0", { lazyConnect: true, retryStrategy: () => null });
 
   let finished = 0;
-
-  let count = 0;
 
   try {
     await redis.connect({
@@ -56,15 +52,10 @@ async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessTh
         break;
       }
       await sleep(500);
-      if (count++ > 100) {
-        console.log("not done?");
-        break;
-      }
     }
   } catch (e) {
     console.error(e);
   } finally {
-    console.log("kill container: " + containerId);
     await waitContainer(containerId);
   }
 
