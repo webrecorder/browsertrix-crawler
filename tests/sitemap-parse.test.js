@@ -39,6 +39,8 @@ async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessTh
 
   let finished = 0;
 
+  let count = 0;
+
   try {
     await redis.connect({
       maxRetriesPerRequest: 100,
@@ -54,10 +56,15 @@ async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessTh
         break;
       }
       await sleep(500);
+      if (count++ > 100) {
+        console.log("not done?");
+        break;
+      }
     }
   } catch (e) {
     console.error(e);
   } finally {
+    console.log("kill container: " + containerId);
     await waitContainer(containerId);
   }
 
