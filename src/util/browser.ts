@@ -398,9 +398,12 @@ export class Browser {
       "--remote-debugging-port=9221",
       "--remote-allow-origins=*",
       "--autoplay-policy=no-user-gesture-required",
-      `--user-agent=${userAgent || this.getDefaultUA()}`,
       ...extraArgs,
     ];
+
+    if (userAgent) {
+      args.push(`--user-agent=${userAgent}`);
+    }
 
     if (proxyServer) {
       const proxyString = getSafeProxyString(proxyServer);
@@ -424,7 +427,7 @@ export class Browser {
         version = child_process.execFileSync(browser, ["--version"], {
           encoding: "utf8",
         });
-        const match = version && version.match(/[\d.]+/);
+        const match = version && version.match(/[\d]+/);
         if (match) {
           version = match[0];
         }
@@ -433,7 +436,7 @@ export class Browser {
       console.error(e);
     }
 
-    return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
+    return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version}.0.0.0 Safari/537.36`;
   }
 
   getBrowserExe() {
