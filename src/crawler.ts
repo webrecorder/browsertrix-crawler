@@ -1121,7 +1121,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     let result = false;
 
-    if (recorder) {
+    if (recorder && !this.params.skipDirectFetch) {
       try {
         const headers = auth
           ? { Authorization: auth, ...this.headers }

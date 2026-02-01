@@ -13,5 +13,6 @@
     ],
     "DownloadDirectory": "/dev/null",
     "SpellcheckEnabled": false,
-    "HttpsUpgradesEnabled": false
+    "HttpsUpgradesEnabled": false,
+    "WebRtcIPHandling": "disable_non_proxied_udp"
 }

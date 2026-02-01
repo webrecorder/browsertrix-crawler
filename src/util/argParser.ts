@@ -458,6 +458,12 @@ class ArgParser {
           default: -1,
         },
 
+        skipDirectFetch: {
+          describe: "If set, will skip direct fetch",
+          type: "boolean",
+          default: true,
+        },
+
         saveState: {
           describe:
             "If the crawl state should be serialized to the crawls/ directory. Defaults to 'partial', only saved when crawl is interrupted",
