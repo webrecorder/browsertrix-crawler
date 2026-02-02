@@ -461,7 +461,7 @@ class ArgParser {
         skipDirectFetch: {
           describe: "If set, will skip direct fetch",
           type: "boolean",
-          default: true,
+          default: false,
         },
 
         saveState: {
