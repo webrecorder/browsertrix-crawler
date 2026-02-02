@@ -92,7 +92,7 @@ export type AsyncFetchOptions = {
   maxFetchSize?: number;
   manualRedirect?: boolean;
   useBrowserNetwork?: boolean;
-  cdp?: CDPSession;
+  cdp: CDPSession | null;
 };
 
 // =================================================================
@@ -461,7 +461,12 @@ export class Recorder extends EventEmitter {
           reqresp.requestId = "0";
 
           const expectedSize = reqresp.expectedSize ? reqresp.expectedSize : -1;
-          this.addAsyncFetch({ reqresp, expectedSize, recorder: this });
+          this.addAsyncFetch({
+            reqresp,
+            expectedSize,
+            recorder: this,
+            cdp: null,
+          });
           return;
         }
         break;
@@ -1385,7 +1390,7 @@ export class Recorder extends EventEmitter {
       recorder: this,
       ignoreDupe: true,
       manualRedirect: true,
-      useBrowserNetwork: false,
+      cdp,
     });
 
     if (!(await fetcher.loadHeaders())) {
@@ -1486,15 +1491,19 @@ export class Recorder extends EventEmitter {
       );
       reqresp.truncated = "disconnect";
     } finally {
-      try {
-        await cdp.send("IO.close", { handle: stream });
-      } catch (e) {
-        logger.warn(
-          "takeStream close failed",
-          { url: reqresp.url, ...this.logDetails },
-          "recorder",
-        );
-      }
+      await this.closeIOStream(stream, cdp, reqresp.url);
+    }
+  }
+
+  async closeIOStream(stream: string, cdp: CDPSession, url: string) {
+    try {
+      await cdp.send("IO.close", { handle: stream });
+    } catch (e) {
+      logger.warn(
+        "takeStream close failed",
+        { url, ...this.logDetails },
+        "recorder",
+      );
     }
   }
 
@@ -1704,7 +1713,7 @@ class AsyncFetcher {
 
   cdp: CDPSession | null = null;
 
-  stream?: string;
+  stream: string | null = null;
   body?: Dispatcher.BodyMixin & Readable;
 
   maxFetchSize: number;
@@ -1723,6 +1732,7 @@ class AsyncFetcher {
     maxFetchSize = MAX_BROWSER_DEFAULT_FETCH_SIZE,
     manualRedirect = false,
     useBrowserNetwork = true,
+    cdp = null,
   }: AsyncFetchOptions) {
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
@@ -1736,6 +1746,8 @@ class AsyncFetcher {
     this.maxFetchSize = maxFetchSize;
 
     this.manualRedirect = manualRedirect;
+
+    this.cdp = cdp;
   }
 
   async load() {
@@ -1755,18 +1767,15 @@ class AsyncFetcher {
     let success = false;
     try {
       if (this.useBrowserNetwork) {
-        const { method, expectedSize, inPageContext } = this.reqresp;
-        if (
-          method !== "GET" ||
-          expectedSize > MAX_NETWORK_LOAD_SIZE ||
-          !inPageContext
-        ) {
+        const { method, expectedSize } = this.reqresp;
+        if (method !== "GET" || expectedSize > MAX_NETWORK_LOAD_SIZE) {
           this.useBrowserNetwork = false;
         }
       }
       if (this.useBrowserNetwork) {
         success = await this.loadHeadersNetwork();
       }
+
       if (!success) {
         this.useBrowserNetwork = false;
         success = await this.loadHeadersFetch();
@@ -1813,9 +1822,13 @@ class AsyncFetcher {
   }
 
   async doCancel() {
-    const { body } = this;
+    const { body, stream, cdp, reqresp } = this;
     if (body && !body.destroyed) {
       body.destroy();
+    }
+    if (stream && cdp) {
+      await this.recorder.closeIOStream(stream, cdp, reqresp.url);
+      this.stream = null;
     }
   }
 
