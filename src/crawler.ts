@@ -329,13 +329,12 @@ export class Crawler {
       return this.params.userAgent;
     }
 
-    // if device set, it overrides the default Chrome UA
-    if (!this.emulateDevice.userAgent) {
-      this.emulateDevice.userAgent = this.browser.getDefaultUA();
-    }
-
     // suffix to append to default userAgent
     if (this.params.userAgentSuffix) {
+      // get default if not set
+      if (!this.emulateDevice.userAgent) {
+        this.emulateDevice.userAgent = this.browser.getDefaultUA();
+      }
       this.emulateDevice.userAgent += " " + this.params.userAgentSuffix;
     }
 
