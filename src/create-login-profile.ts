@@ -236,7 +236,7 @@ async function main() {
 
   const waitUntil: PuppeteerLifeCycleEvent = "load";
 
-  await page.setCacheEnabled(false);
+  //await page.setCacheEnabled(false);
 
   if (!params.automated) {
     await browser.setupPage({ page, cdp });
