@@ -673,6 +673,7 @@ export class Recorder extends EventEmitter {
             reqresp: reqrespNew,
             expectedSize: parseInt(range.split("/")[1]),
             recorder: this,
+            useBrowserNetwork: !isBrowserContext,
             cdp,
           });
         }
@@ -717,16 +718,12 @@ export class Recorder extends EventEmitter {
           this.addAsyncFetch({
             reqresp: reqrespNew,
             recorder: this,
+            useBrowserNetwork: !isBrowserContext,
             cdp,
           });
         }
         return false;
       }
-    }
-
-    // indicate that this is intercepted in the page context
-    if (!isBrowserContext) {
-      reqresp.inPageContext = true;
     }
 
     // Already being handled by a different handler
@@ -800,6 +797,7 @@ export class Recorder extends EventEmitter {
           reqresp,
           expectedSize: contentLen,
           recorder: this,
+          useBrowserNetwork: !isBrowserContext,
           cdp,
         };
 
@@ -1370,6 +1368,9 @@ export class Recorder extends EventEmitter {
     crawler,
     state,
   }: DirectFetchRequest): Promise<boolean> {
+    if (!this.mainFrameId) {
+      return false;
+    }
     const reqresp = new RequestResponseInfo("0");
     const ts = new Date();
 
@@ -1382,6 +1383,7 @@ export class Recorder extends EventEmitter {
     reqresp.method = "GET";
     reqresp.requestHeaders = headers;
     reqresp.ts = ts;
+    reqresp.frameId = this.mainFrameId;
 
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
     // should not get here, as dupe pages tracked via seen list
@@ -1767,8 +1769,12 @@ class AsyncFetcher {
     let success = false;
     try {
       if (this.useBrowserNetwork) {
-        const { method, expectedSize } = this.reqresp;
-        if (method !== "GET" || expectedSize > MAX_NETWORK_LOAD_SIZE) {
+        const { method, expectedSize, frameId } = this.reqresp;
+        if (
+          method !== "GET" ||
+          expectedSize > MAX_NETWORK_LOAD_SIZE ||
+          !frameId
+        ) {
           this.useBrowserNetwork = false;
         }
       }
