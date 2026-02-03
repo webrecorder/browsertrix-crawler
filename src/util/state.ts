@@ -13,6 +13,7 @@ import {
   DUPE_UNCOMMITTED,
   CrawlStatus,
   SkippedReason,
+  RATE_LIMIT_TTL,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -100,6 +101,8 @@ export class PageState {
   skipBehaviors = false;
   pageSkipped = false;
   pageSkipReason: SkippedReason | null = null;
+  pageRateLimited = 0;
+  pageRateLimitedRetryAfter = 0;
   noRetries = false;
 
   isDirectFetched = false;
@@ -798,6 +801,9 @@ export class RedisCrawlState extends RedisDedupeIndex {
 
   includedCrawls: Set<string> = new Set<string>();
 
+  rateLimitTTL: number;
+  rateLimitInterruptCount: number;
+
   constructor(
     redis: Redis,
     key: string,
@@ -805,6 +811,8 @@ export class RedisCrawlState extends RedisDedupeIndex {
     uid: string,
     maxRetries?: number,
     dedupeRedis?: Redis,
+    rateLimitTTL?: number,
+    rateLimitInterruptCount?: number,
   ) {
     super(dedupeRedis || redis, key);
     this.redis = redis;
@@ -839,6 +847,9 @@ export class RedisCrawlState extends RedisDedupeIndex {
     this.exKey = this.crawlId + ":excluded";
 
     this.sitemapDoneKey = this.crawlId + ":sitemapDone";
+
+    this.rateLimitTTL = rateLimitTTL || RATE_LIMIT_TTL;
+    this.rateLimitInterruptCount = rateLimitInterruptCount || -1;
 
     this._initLuaCommands(this.redis);
   }
@@ -941,7 +952,9 @@ if json then
 
   redis.call('hdel', KEYS[1], ARGV[1]);
 
-  if retry < tonumber(ARGV[2]) then
+  local maxRetries = tonumber(ARGV[2]);
+
+  if maxRetries == -1 or retry < maxRetries then
     retry = retry + 1;
     data['retry'] = retry;
     json = cjson.encode(data);
@@ -1025,16 +1038,21 @@ return inx;
   async markFinished(url: string) {
     await this.redis.hdel(this.pkey, url);
 
+    await this.redis.del(
+      `${this.crawlId}:rateLimited`,
+      `${this.crawlId}:rateLimitedDirect`,
+    );
+
     return await this.redis.incr(this.dkey);
   }
 
-  async markFailed(url: string, noRetries = false) {
+  async markFailed(url: string, noRetries = false, alwaysRetry = false) {
     return await this.redis.requeuefailed(
       this.pkey,
       this.qkey,
       this.fkey,
       url,
-      noRetries ? 0 : this.maxRetries,
+      noRetries ? 0 : alwaysRetry ? -1 : this.maxRetries,
       MAX_DEPTH,
     );
   }
@@ -1043,6 +1061,72 @@ return inx;
     await this.redis.hdel(this.pkey, url);
 
     await this.redis.sadd(this.exKey, url);
+  }
+
+  async incRateLimited(
+    rateLimitStatus: number,
+    retryAfter = 0,
+    isDirectFetch = false,
+  ) {
+    if (rateLimitStatus < 400 || rateLimitStatus === 404) {
+      return false;
+    }
+
+    const statVal = rateLimitStatus + (isDirectFetch ? " d" : "");
+
+    // track rate limit stats
+    await this.redis.hincrby(`${this.crawlId}:rateStats`, statVal, 1);
+
+    const key = this.crawlId + (isDirectFetch ? ":rateDirect" : ":rate");
+
+    let incBy = 1;
+
+    if (rateLimitStatus === 429 && this.rateLimitInterruptCount > 0) {
+      incBy = this.rateLimitInterruptCount;
+    }
+    if (retryAfter > 0) {
+      logger.debug(
+        "Rate limited with custom Retry-After",
+        { retryAfter },
+        "state",
+      );
+    } else {
+      retryAfter = this.rateLimitTTL;
+    }
+    const res = await this.redis.incrby(key, incBy);
+    await this.redis.expire(key, retryAfter);
+
+    const isLimited =
+      this.rateLimitInterruptCount > 0 && res >= this.rateLimitInterruptCount;
+
+    if (isLimited) {
+      const rateLimitKey = this.getRateLimitKey(isDirectFetch);
+      await this.redis.set(rateLimitKey, isLimited ? "1" : "");
+      await this.redis.expire(rateLimitKey, retryAfter);
+
+      if (!isDirectFetch) {
+        logger.debug(
+          "Rate Limit Interrupt Count Reached, interrupting crawl on too many rate limited pages",
+          {
+            rateLimitCount: res,
+            interruptCount: this.rateLimitInterruptCount,
+          },
+          "state",
+        );
+      }
+    }
+  }
+
+  getRateLimitKey(isDirectFetch: boolean) {
+    return (
+      this.crawlId + (isDirectFetch ? ":rateLimitedDirect" : ":rateLimited")
+    );
+  }
+
+  async isRateLimited(isDirectFetch: boolean) {
+    const rateLimitKey = this.getRateLimitKey(isDirectFetch);
+    const res = await this.redis.get(rateLimitKey);
+    return res === "1";
   }
 
   recheckScope(data: QueueEntry, seeds: ScopedSeed[]) {

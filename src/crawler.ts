@@ -50,6 +50,8 @@ import {
   BxFunctionBindings,
   MAX_JS_DIALOG_PER_PAGE,
   CrawlStatus,
+  STATUS_UNKNOWN_ERROR,
+  STATUS_IS_HTML_NO_DIRECT_FETCH,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -396,6 +398,8 @@ export class Crawler {
       os.hostname(),
       this.params.maxPageRetries,
       dedupeRedis,
+      this.params.rateLimitTimeout,
+      this.params.rateLimitInterruptCount,
     );
 
     if (this.params.logErrorsToRedis) {
@@ -687,6 +691,9 @@ export class Crawler {
               break;
             case InterruptReason.TimeLimit:
               exitCode = ExitCodes.TimeLimit;
+              break;
+            case InterruptReason.RateLimited:
+              exitCode = ExitCodes.RateLimited;
               break;
           }
         }
@@ -1159,15 +1166,27 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    let result = false;
+    const doDirectFetch = async () => {
+      if (!recorder) {
+        return false;
+      }
+      if (await this.crawlState.isRateLimited(true)) {
+        logger.warn(
+          "Direct fetch skipped, rate limited",
+          { url, ...logDetails },
+          "fetch",
+        );
+        return false;
+      }
 
-    if (recorder) {
+      let status = 0;
+
       try {
         const headers = auth
           ? { Authorization: auth, ...this.headers }
           : this.headers;
 
-        result = await timedRun(
+        status = await timedRun(
           recorder.directFetchCapture({
             url,
             headers,
@@ -1179,6 +1198,8 @@ self.__bx_behaviors.selectMainBehavior();
           "Direct fetch of page URL timed out",
           logDetails,
           "fetch",
+          false,
+          true,
         );
       } catch (e) {
         logger.error(
@@ -1186,18 +1207,36 @@ self.__bx_behaviors.selectMainBehavior();
           { e, ...logDetails },
           "fetch",
         );
+        // indicate this was some other error
+        status = STATUS_UNKNOWN_ERROR;
       }
 
-      if (!result) {
+      // only consider successful if direct fetch status code is 200
+      if (status === STATUS_IS_HTML_NO_DIRECT_FETCH) {
         logger.debug(
-          "Direct fetch response not accepted, continuing with browser fetch",
+          "Direct fetch indicates HTML page, continuing with browser fetch",
           logDetails,
           "fetch",
         );
+      } else if (status != 200) {
+        logger.debug(
+          "Direct fetch resulted in error response, continuing with browser fetch",
+          { status, ...logDetails },
+          "fetch",
+        );
+        if (this.params.rateLimitStatusCodes.includes(status)) {
+          await this.crawlState.incRateLimited(status, 0, true);
+        }
+        return false;
       } else {
-        await this.awaitPageExtraDelay(opts);
-        return;
+        return true;
       }
+    };
+
+    if (recorder && (await doDirectFetch())) {
+      // return if direct fetch succeeds
+      await this.awaitPageExtraDelay(opts);
+      return;
     }
 
     opts.markPageUsed();
@@ -1373,7 +1412,16 @@ self.__bx_behaviors.selectMainBehavior();
   async pageFinished(data: PageState, lastErrorText = "") {
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url, pageSkipped, noRetries } = data;
+    const {
+      loadState,
+      logDetails,
+      depth,
+      url,
+      pageSkipped,
+      pageRateLimited,
+      pageRateLimitedRetryAfter,
+      noRetries,
+    } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       await this.writePage(data);
@@ -1398,10 +1446,21 @@ self.__bx_behaviors.selectMainBehavior();
         }
         this.limitHit = false;
       } else {
-        const retry = await this.crawlState.markFailed(url, noRetries);
+        const retry = await this.crawlState.markFailed(
+          url,
+          noRetries,
+          !!pageRateLimited,
+        );
 
         if (this.healthChecker) {
           this.healthChecker.incError();
+        }
+        if (pageRateLimited) {
+          await this.crawlState.incRateLimited(
+            pageRateLimited,
+            pageRateLimitedRetryAfter,
+            false,
+          );
         }
 
         if (retry < 0) {
@@ -1695,6 +1754,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (await this.crawlState.isCrawlPaused()) {
       interrupt = InterruptReason.CrawlPaused;
+    }
+
+    if (!interrupt && (await this.crawlState.isRateLimited(false))) {
+      interrupt = InterruptReason.RateLimited;
     }
 
     if (interrupt) {
@@ -2262,6 +2325,20 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  pageSkipped(
+    reason: string,
+    loadDetails: Record<string, string>,
+    data: PageState,
+  ) {
+    data.pageSkipped = true;
+    logger.warn(
+      reason,
+      { ...loadDetails, loadState: data.loadState },
+      "pageStatus",
+    );
+    throw new Error("logged");
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pageFailed(msg: string, retry: number, msgData: any) {
     if (retry < this.params.maxPageRetries) {
@@ -2372,10 +2449,17 @@ self.__bx_behaviors.selectMainBehavior();
 
           if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
             // excluded in recorder
-            data.pageSkipped = true;
-            logger.warn(
+            return this.pageSkipped(
               "Page Load Blocked, skipping",
-              { msg, loadState },
+              { msg },
+              data,
+            );
+          } else if (msg.startsWith("net::ERR_HTTP2_PROTOCOL_ERROR")) {
+            // treat as rate limit, page blocked
+            data.pageRateLimited = STATUS_UNKNOWN_ERROR;
+            logger.warn(
+              "Page load interrupted, possibly rate limited",
+              { url, msg, ...logDetails },
               "pageStatus",
             );
             throw new Error("logged");
@@ -2401,7 +2485,8 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const respUrl = resp.url().split("#")[0];
-    const isChromeError = page.url().startsWith("chrome-error://");
+    const pageUrl = page.url();
+    const isChromeError = pageUrl.startsWith("chrome-error://");
 
     if (
       depth === 0 &&
@@ -2425,6 +2510,15 @@ self.__bx_behaviors.selectMainBehavior();
 
     const status = resp.status();
     data.status = status;
+
+    if (!isChromeError && data.pageRateLimited) {
+      logger.warn(
+        "Page possibly rate limited, retrying",
+        { url, status, ...logDetails },
+        "pageStatus",
+      );
+      throw new Error("logged");
+    }
 
     let failed = isChromeError;
 
@@ -2469,6 +2563,16 @@ self.__bx_behaviors.selectMainBehavior();
     // - if first response was received, but not fully loaded
     if (fullLoadedResponse || downloadResponse) {
       data.loadState = LoadState.FULL_PAGE_LOADED;
+    }
+
+    if (!isChromeError && pageUrl !== urlNoHash) {
+      if (!(await this.crawlState.addToUserSet(pageUrl))) {
+        return this.pageSkipped(
+          "Page dynamically changed to seen page, skipping",
+          { pageUrl, url },
+          data,
+        );
+      }
     }
 
     if (!data.isHTMLPage) {
