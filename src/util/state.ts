@@ -1295,6 +1295,10 @@ return inx;
     );
   }
 
+  async addToSeen(url: string) {
+    return this.redis.sadd(this.skey, url);
+  }
+
   async nextFromQueue() {
     const json = await this._getNext();
 
