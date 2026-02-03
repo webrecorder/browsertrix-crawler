@@ -5,6 +5,7 @@ import { sleep, timedRun } from "./timing.js";
 import {
   RequestResponseInfo,
   isHTMLMime,
+  isRateLimitStatus,
   isRedirectStatus,
 } from "./reqresp.js";
 
@@ -120,6 +121,7 @@ export class Recorder extends EventEmitter {
   mainFrameId: string | null = null;
   skipRangeUrls!: Map<string, number>;
   skipPageInfo = false;
+  skipRecordingPage = false;
 
   swTargetId?: string | null;
   swFrameIds = new Set<string>();
@@ -744,13 +746,17 @@ export class Recorder extends EventEmitter {
         responseHeaders,
       );
 
-      if (errorReason) {
+      if (errorReason === "BlockedByResponse") {
         this.skipPageInfo = true;
         await cdp.send("Fetch.failRequest", {
           requestId,
           errorReason,
         });
         return true;
+      }
+
+      if (errorReason === "ConnectionRefused") {
+        this.skipRecordingPage = true;
       }
 
       logger.debug("Setting page timestamp", {
@@ -931,6 +937,10 @@ export class Recorder extends EventEmitter {
         logger.debug("Redirect check error", e, "recorder");
       }
     }
+
+    if (isRateLimitStatus(reqresp.status)) {
+      return "ConnectionRefused";
+    }
   }
 
   startPage({ pageid, url }: { pageid: string; url: string }) {
@@ -950,6 +960,7 @@ export class Recorder extends EventEmitter {
     this.skipIds = new Set();
     this.skipRangeUrls = new Map<string, number>();
     this.skipPageInfo = false;
+    this.skipRecordingPage = false;
     this.pageFinished = false;
     this.pageInfo = {
       pageid,
@@ -978,7 +989,7 @@ export class Recorder extends EventEmitter {
   }
 
   writePageInfoRecord() {
-    if (this.skipPageInfo) {
+    if (this.skipPageInfo || this.skipRecordingPage) {
       logger.debug(
         "Skipping writing pageinfo for blocked page",
         { url: "urn:pageinfo:" + this.pageUrl },
@@ -1580,6 +1591,10 @@ export class Recorder extends EventEmitter {
     reqresp: RequestResponseInfo,
     iter?: AsyncIterable<Uint8Array>,
   ): Promise<boolean> {
+    if (this.skipRecordingPage) {
+      return false;
+    }
+
     // always include in pageinfo record if going to serialize to WARC
     // even if serialization does not happen, indicates this URL was on the page
     this.addPageRecord(reqresp);
@@ -1739,6 +1754,10 @@ class AsyncFetcher {
   }
 
   async load() {
+    if (this.recorder.skipRecordingPage) {
+      return false;
+    }
+
     for (let i = 0; i < DEFAULT_MAX_RETRIES; i++) {
       if (!(await this.loadHeaders())) {
         continue;

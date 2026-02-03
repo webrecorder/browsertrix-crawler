@@ -429,3 +429,7 @@ export function isHTMLMime(mime: string) {
 export function isRedirectStatus(status: number) {
   return status >= 300 && status < 400 && status !== 304;
 }
+
+export function isRateLimitStatus(status: number) {
+  return [403, 429, 503].includes(status);
+}
