@@ -1368,9 +1368,6 @@ export class Recorder extends EventEmitter {
     crawler,
     state,
   }: DirectFetchRequest): Promise<boolean> {
-    if (!this.mainFrameId) {
-      return false;
-    }
     const reqresp = new RequestResponseInfo("0");
     const ts = new Date();
 
@@ -1383,7 +1380,8 @@ export class Recorder extends EventEmitter {
     reqresp.method = "GET";
     reqresp.requestHeaders = headers;
     reqresp.ts = ts;
-    reqresp.frameId = this.mainFrameId;
+    // if frameId is undefined, will not do browser network fetch
+    reqresp.frameId = this.mainFrameId || undefined;
 
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
     // should not get here, as dupe pages tracked via seen list
