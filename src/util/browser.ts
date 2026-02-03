@@ -686,12 +686,17 @@ export class Browser {
 
     const device = this.emulateDevice;
 
+    const cdp = await target.createCDPSession();
+
     if (device && page) {
       if (device.viewport) {
         await page.setViewport(device.viewport);
       }
       if (device.userAgent) {
-        await page.setUserAgent(device.userAgent);
+        // set via emulation domain for, may be more complete
+        await cdp.send("Emulation.setUserAgentOverride", {
+          userAgent: device.userAgent,
+        });
       }
       await page.setExtraHTTPHeaders({
         "sec-ch-ua": `"Not(A:Brand";v="8", "Chromium";v="${this.majorVersion}", "Brave";v="${this.majorVersion}"`,
@@ -699,8 +704,6 @@ export class Browser {
         "sec-ch-ua-platform": '"Linux"',
       });
     }
-
-    const cdp = await target.createCDPSession();
 
     return { page, cdp };
   }
