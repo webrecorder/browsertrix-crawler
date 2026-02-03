@@ -85,9 +85,13 @@ export class Browser {
   screenHeight: number;
   screenWHRatio: number;
 
+  majorVersion: string;
+
   constructor(rootDir: string) {
     this.downloadsDir = path.join(rootDir, "downloads");
     this.profileDir = path.join(rootDir, "profile");
+
+    this.majorVersion = this.getMajorVersion();
 
     // must be provided, part of Dockerfile
     assert(process.env.GEOMETRY);
@@ -398,12 +402,9 @@ export class Browser {
       "--remote-debugging-port=9221",
       "--remote-allow-origins=*",
       "--autoplay-policy=no-user-gesture-required",
+      `--user-agent=${userAgent || this.getDefaultUA()}`,
       ...extraArgs,
     ];
-
-    if (userAgent) {
-      args.push(`--user-agent=${userAgent}`);
-    }
 
     if (proxyServer) {
       const proxyString = getSafeProxyString(proxyServer);
@@ -418,7 +419,7 @@ export class Browser {
     return args;
   }
 
-  getDefaultUA() {
+  getMajorVersion() {
     let version: string | undefined = process.env.BROWSER_VERSION;
 
     try {
@@ -429,14 +430,17 @@ export class Browser {
         });
         const match = version && version.match(/[\d]+/);
         if (match) {
-          version = match[0];
+          return match[0];
         }
       }
     } catch (e) {
       console.error(e);
     }
+    return "";
+  }
 
-    return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version}.0.0.0 Safari/537.36`;
+  getDefaultUA() {
+    return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${this.majorVersion}.0.0.0 Safari/537.36`;
   }
 
   getBrowserExe() {
@@ -683,13 +687,17 @@ export class Browser {
     const device = this.emulateDevice;
 
     if (device && page) {
-      if (device.viewport && device.userAgent) {
-        // TODO: Fix this the next time the file is edited.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await page.emulate(device as any);
-      } else if (device.userAgent) {
+      if (device.viewport) {
+        await page.setViewport(device.viewport);
+      }
+      if (device.userAgent) {
         await page.setUserAgent(device.userAgent);
       }
+      await page.setExtraHTTPHeaders({
+        "sec-ch-ua": `"Not(A:Brand";v="8", "Chromium";v="${this.majorVersion}", "Brave";v="${this.majorVersion}"`,
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Linux"',
+      });
     }
 
     const cdp = await target.createCDPSession();
