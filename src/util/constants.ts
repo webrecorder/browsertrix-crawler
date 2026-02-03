@@ -90,6 +90,7 @@ export enum ExitCodes {
   TimeLimit = 15,
   DiskUtilization = 16,
   Fatal = 17,
+  RateLimited = 18,
   ProxyError = 21,
   UploadFailed = 22,
 }

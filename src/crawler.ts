@@ -70,7 +70,11 @@ import {
   setWARCInfo,
   streamFinish,
 } from "./util/warcwriter.js";
-import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
+import {
+  isHTMLMime,
+  isRateLimitStatus,
+  isRedirectStatus,
+} from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
@@ -1338,7 +1342,15 @@ self.__bx_behaviors.selectMainBehavior();
     }
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url, pageSkipped, noRetries } = data;
+    const {
+      loadState,
+      logDetails,
+      depth,
+      url,
+      pageSkipped,
+      pageRateLimited,
+      noRetries,
+    } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       await this.writePage(data);
@@ -1363,6 +1375,15 @@ self.__bx_behaviors.selectMainBehavior();
 
         if (this.healthChecker) {
           this.healthChecker.incError();
+        }
+        if (pageRateLimited) {
+          if (
+            (await this.crawlState.incRateLimited()) &&
+            this.params.restartsOnError
+          ) {
+            await this.serializeConfig();
+            await this.setStatusAndExit(ExitCodes.RateLimited, "interrupted");
+          }
         }
 
         if (retry < 0) {
@@ -2322,6 +2343,16 @@ self.__bx_behaviors.selectMainBehavior();
 
     const status = resp.status();
     data.status = status;
+
+    if (!isChromeError && isRateLimitStatus(status)) {
+      logger.warn(
+        "Page possibly rate limited, retrying",
+        { url, status, ...logDetails },
+        "pageStatus",
+      );
+      data.pageRateLimited = true;
+      throw new Error("logged");
+    }
 
     let failed = isChromeError;
 

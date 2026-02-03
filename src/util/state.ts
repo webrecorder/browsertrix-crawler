@@ -95,6 +95,7 @@ export class PageState {
 
   skipBehaviors = false;
   pageSkipped = false;
+  pageRateLimited = false;
   noRetries = false;
 
   asyncLoading = false;
@@ -715,6 +716,7 @@ export class RedisDedupeIndex {
 export class RedisCrawlState extends RedisDedupeIndex {
   redis: Redis;
   maxRetries: number;
+  rateLimit = 0;
 
   uid: string;
   maxPageTime: number;
@@ -965,6 +967,7 @@ return inx;
 
   async markFinished(url: string) {
     await this.redis.hdel(this.pkey, url);
+    await this.clearRateLimit();
 
     return await this.redis.incr(this.dkey);
   }
@@ -984,6 +987,20 @@ return inx;
     await this.redis.hdel(this.pkey, url);
 
     await this.redis.sadd(this.exKey, url);
+  }
+
+  async incRateLimited() {
+    //const key = this.crawlId + ":rate";
+    //const RATE_LIMIT_TIME = 300;
+    const RATE_LIMIT_MAX = 5;
+    //const res = await this.redis.incr(key);
+    //await this.redis.expire(key, RATE_LIMIT_TIME);
+    const res = ++this.rateLimit;
+    return res >= RATE_LIMIT_MAX;
+  }
+
+  async clearRateLimit() {
+    this.rateLimit = 0;
   }
 
   recheckScope(data: QueueEntry, seeds: ScopedSeed[]) {
