@@ -693,7 +693,7 @@ export class Browser {
         await page.setViewport(device.viewport);
       }
       if (device.userAgent) {
-        // set via emulation domain for, may be more complete
+        // set via Emulation instead of Network, may be more complete override
         await cdp.send("Emulation.setUserAgentOverride", {
           userAgent: device.userAgent,
         });
