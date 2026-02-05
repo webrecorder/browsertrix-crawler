@@ -719,9 +719,9 @@ class ArgParser {
           default: "Browsertrix/1.x",
         },
 
-        listPagesNotQueued: {
+        listNotQueued: {
           describe:
-            "If set, write pages not queued and reason to pages/pagesNotQueued.jsonl",
+            "If set, write information about URLs not queued to reports/notQueued.jsonl",
           type: "boolean",
           default: false,
         },

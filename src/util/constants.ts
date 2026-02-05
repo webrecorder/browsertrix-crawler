@@ -100,7 +100,7 @@ export enum InterruptReason {
 }
 
 export enum NotQueuedReason {
-  OutOfScope = "OutOfScope",
-  PageLimit = "PageLimit",
-  RobotsTxt = "RobotsTxt",
+  OutOfScope = "outOfScope",
+  PageLimit = "pageLimit",
+  RobotsTxt = "robotsTxt",
 }
