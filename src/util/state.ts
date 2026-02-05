@@ -990,12 +990,11 @@ return inx;
   }
 
   async incRateLimited() {
-    //const key = this.crawlId + ":rate";
-    //const RATE_LIMIT_TIME = 300;
+    const key = this.key + ":rate";
+    const RATE_LIMIT_TIME = 300;
     const RATE_LIMIT_MAX = 5;
-    //const res = await this.redis.incr(key);
-    //await this.redis.expire(key, RATE_LIMIT_TIME);
-    const res = ++this.rateLimit;
+    const res = await this.redis.incr(key);
+    await this.redis.expire(key, RATE_LIMIT_TIME);
     return res >= RATE_LIMIT_MAX;
   }
 
@@ -1267,10 +1266,6 @@ return inx;
       JSON.stringify(data),
       limit,
     );
-  }
-
-  async addToSeen(url: string) {
-    return this.redis.sadd(this.skey, url);
   }
 
   async nextFromQueue() {
