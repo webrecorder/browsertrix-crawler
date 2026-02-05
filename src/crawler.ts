@@ -1833,10 +1833,12 @@ self.__bx_behaviors.selectMainBehavior();
       this.otherPagesFile,
       "Non-Seed Pages",
     );
-    this.pagesNotQueuedFH = await this.initPages(
-      this.pagesNotQueuedFile,
-      "Pages Not Queued",
-    );
+    if (this.params.listPagesNotQueued) {
+      this.pagesNotQueuedFH = await this.initPages(
+        this.pagesNotQueuedFile,
+        "Pages Not Queued",
+      );
+    }
 
     this.adBlockRules = new AdBlockRules(
       this.captureBasePrefix,
@@ -2860,6 +2862,10 @@ self.__bx_behaviors.selectMainBehavior();
     depth: number,
     reason: NotQueuedReason,
   ) {
+    if (!this.params.listPagesNotQueued) {
+      return;
+    }
+
     const ts = new Date();
 
     let seed = false;

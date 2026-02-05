@@ -736,6 +736,13 @@ class ArgParser {
           type: "string",
           default: "Browsertrix/1.x",
         },
+
+        listPagesNotQueued: {
+          describe:
+            "If set, write pages not queued and reason to pages/pagesNotQueued.jsonl",
+          type: "boolean",
+          default: false,
+        },
       });
   }
 
