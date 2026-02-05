@@ -1260,13 +1260,7 @@ self.__bx_behaviors.selectMainBehavior();
         data.contentCheckAllowed = true;
 
         const res = await timedRun(
-          this.runBehaviors(
-            page,
-            cdp,
-            data.filteredFrames,
-            opts.frameIdToExecId,
-            logDetails,
-          ),
+          this.runBehaviors(page, cdp, data.filteredFrames, logDetails),
           this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
@@ -1412,11 +1406,54 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  async runBehaviorsInFrame(
+    frame: Frame,
+    logDetails: LogDetails,
+  ): Promise<boolean> {
+    const RUN_BEHAVIORS = `
+        if (!self.__bx_behaviors) {
+          console.error("__bx_behaviors missing, can't run behaviors");
+        } else {
+          self.__bx_behaviors.run();
+        }`;
+
+    const frameUrl = frame.url();
+
+    const details: LogDetails = { frameUrl, ...logDetails };
+
+    if (!frameUrl || frame.detached) {
+      logger.debug(
+        "Run Script Skipped, frame no longer attached or has no URL",
+        details,
+      );
+      return false;
+    }
+
+    const isTopFrame = !frame.parentFrame();
+
+    if (isTopFrame) {
+      logger.debug("Run Script Started", details, "behavior");
+    } else {
+      logger.debug("Run Script Started in iframe", details, "behavior");
+    }
+
+    try {
+      await frame.evaluate(RUN_BEHAVIORS);
+      return true;
+    } catch (e) {
+      logger.error(
+        "Run Script Failed",
+        { ...formatErr(e), details },
+        "behavior",
+      );
+    }
+    return false;
+  }
+
   async runBehaviors(
     page: Page,
     cdp: CDPSession,
     frames: Frame[],
-    frameIdToExecId: Map<string, number>,
     logDetails: LogDetails,
   ) {
     try {
@@ -1432,23 +1469,19 @@ self.__bx_behaviors.selectMainBehavior();
         "behavior",
       );
 
-      const results = await Promise.allSettled(
-        frames.map((frame) =>
-          this.browser.evaluateWithCLI(
-            cdp,
-            frame,
-            frameIdToExecId,
-            `
-          if (!self.__bx_behaviors) {
-            console.error("__bx_behaviors missing, can't run behaviors");
-          } else {
-            self.__bx_behaviors.run();
-          }`,
-            logDetails,
-            "behavior",
-          ),
-        ),
+      const newFrames: Promise<boolean>[] = [];
+
+      page.on("framenavigated", (frame) => {
+        newFrames.push(this.runBehaviorsInFrame(frame, logDetails));
+      });
+
+      let results = await Promise.allSettled(
+        frames.map((frame) => this.runBehaviorsInFrame(frame, logDetails)),
       );
+
+      if (newFrames.length) {
+        results = [...results, ...(await Promise.allSettled(newFrames))];
+      }
 
       for (const res of results) {
         const { status, reason }: { status: string; reason?: unknown } = res;
