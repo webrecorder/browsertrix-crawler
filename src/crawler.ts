@@ -2366,6 +2366,14 @@ self.__bx_behaviors.selectMainBehavior();
               { msg },
               data,
             );
+          } else if (msg.startsWith("net::ERR_CONNECTION_REFUSED")) {
+            data.pageRateLimited = true;
+            return this.pageFailed("Page Load Failed, Rate Limited", retry, {
+              msg,
+              url,
+              loadState,
+              ...logDetails,
+            });
           } else {
             return this.pageFailed("Page Load Failed", retry, {
               msg,

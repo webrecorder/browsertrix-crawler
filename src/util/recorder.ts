@@ -878,6 +878,14 @@ export class Recorder extends EventEmitter {
     //   }
     // }
 
+    if (!rewritten && url === this.pageUrl && this.skipRecordingPage) {
+      await cdp.send("Fetch.failRequest", {
+        requestId,
+        errorReason: "ConnectionRefused",
+      });
+      return true;
+    }
+
     // not rewritten, and not streaming, return false to continue
     if (!rewritten && !streamingConsume) {
       if (!reqresp.payload) {
@@ -1238,8 +1246,14 @@ export class Recorder extends EventEmitter {
       case "application/x-javascript": {
         const rw = getCustomRewriter(url, isHTMLMime(contentType));
 
+        string = payload.toString();
+
+        if (string.indexOf(`src="/_Incapsula_Resource?`) > 0) {
+          this.skipRecordingPage = true;
+          return false;
+        }
+
         if (rw) {
-          string = payload.toString();
           newString = rw.rewrite(string, { live: true, save: extraOpts });
         }
         break;
