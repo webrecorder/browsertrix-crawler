@@ -120,7 +120,7 @@ export class Crawler {
 
   pagesFH?: WriteStream | null = null;
   extraPagesFH?: WriteStream | null = null;
-  pagesNotQueuedFH?: WriteStream | null = null;
+  notQueuedFH?: WriteStream | null = null;
   logFH: WriteStream | null = null;
 
   crawlId: string;
@@ -151,7 +151,9 @@ export class Crawler {
   pagesDir: string;
   seedPagesFile: string;
   otherPagesFile: string;
-  pagesNotQueuedFile: string;
+
+  reportsDir: string;
+  notQueuedFile: string;
 
   archivesDir: string;
   warcCdxDir: string;
@@ -287,7 +289,12 @@ export class Crawler {
     // pages file
     this.seedPagesFile = path.join(this.pagesDir, "pages.jsonl");
     this.otherPagesFile = path.join(this.pagesDir, "extraPages.jsonl");
-    this.pagesNotQueuedFile = path.join(this.pagesDir, "pagesNotQueued.jsonl");
+
+    // reports directory
+    this.reportsDir = path.join(this.collDir, "reports");
+
+    // reports files
+    this.notQueuedFile = path.join(this.reportsDir, "notQueued.jsonl");
 
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
@@ -1833,10 +1840,11 @@ self.__bx_behaviors.selectMainBehavior();
       this.otherPagesFile,
       "Non-Seed Pages",
     );
-    if (this.params.listPagesNotQueued) {
-      this.pagesNotQueuedFH = await this.initPages(
-        this.pagesNotQueuedFile,
+    if (this.params.listNotQueued) {
+      this.notQueuedFH = await this.initPages(
+        this.notQueuedFile,
         "Pages Not Queued",
+        true,
       );
     }
 
@@ -1945,15 +1953,15 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.pagesNotQueuedFH) {
+    if (this.notQueuedFH) {
       try {
         await new Promise<void>((resolve) =>
-          this.pagesNotQueuedFH!.close(() => resolve()),
+          this.notQueuedFH!.close(() => resolve()),
         );
       } catch (e) {
         // ignore
       } finally {
-        this.pagesNotQueuedFH = null;
+        this.notQueuedFH = null;
       }
     }
   }
@@ -2739,11 +2747,13 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async initPages(filename: string, title: string) {
+  async initPages(filename: string, title: string, isReport: boolean = false) {
     let fh = null;
 
     try {
-      await fsp.mkdir(this.pagesDir, { recursive: true });
+      await fsp.mkdir(isReport ? this.reportsDir : this.pagesDir, {
+        recursive: true,
+      });
 
       const createNew = !fs.existsSync(filename);
 
@@ -2862,7 +2872,7 @@ self.__bx_behaviors.selectMainBehavior();
     depth: number,
     reason: NotQueuedReason,
   ) {
-    if (!this.params.listPagesNotQueued) {
+    if (!this.params.listNotQueued) {
       return;
     }
 
@@ -2878,7 +2888,7 @@ self.__bx_behaviors.selectMainBehavior();
     const row = { url, seedUrl, depth, seed, reason, ts };
     const processedRow = JSON.stringify(row) + "\n";
 
-    if (!this.pagesNotQueuedFH) {
+    if (!this.notQueuedFH) {
       logger.error(
         "Can't write pages not queued, missing stream",
         {},
@@ -2888,11 +2898,11 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     try {
-      this.pagesNotQueuedFH.write(processedRow);
+      this.notQueuedFH.write(processedRow);
     } catch (err) {
       logger.warn(
         "Page append failed",
-        { pagesFile: this.pagesNotQueuedFile },
+        { pagesFile: this.notQueuedFile },
         "pageStatus",
       );
     }

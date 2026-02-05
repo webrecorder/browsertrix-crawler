@@ -119,7 +119,7 @@ export type CrawlStatus =
 export const WARC_REFERS_TO_CONTAINER = "WARC-Refers-To-Container";
 
 export enum NotQueuedReason {
-  OutOfScope = "OutOfScope",
-  PageLimit = "PageLimit",
-  RobotsTxt = "RobotsTxt",
+  OutOfScope = "outOfScope",
+  PageLimit = "pageLimit",
+  RobotsTxt = "robotsTxt",
 }
