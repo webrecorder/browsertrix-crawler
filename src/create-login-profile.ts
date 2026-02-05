@@ -236,7 +236,6 @@ async function main() {
 
   const waitUntil: PuppeteerLifeCycleEvent = "load";
 
-
   if (!params.automated) {
     await browser.setupPage({ page, cdp });
 
