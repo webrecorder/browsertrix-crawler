@@ -123,6 +123,7 @@ export class Crawler {
 
   pagesFH?: WriteStream | null = null;
   extraPagesFH?: WriteStream | null = null;
+  pagesNotQueuedFH?: WriteStream | null = null;
   logFH: WriteStream | null = null;
 
   crawlId: string;
@@ -153,6 +154,7 @@ export class Crawler {
   pagesDir: string;
   seedPagesFile: string;
   otherPagesFile: string;
+  pagesNotQueuedFile: string;
 
   archivesDir: string;
   warcCdxDir: string;
@@ -285,6 +287,7 @@ export class Crawler {
     // pages file
     this.seedPagesFile = path.join(this.pagesDir, "pages.jsonl");
     this.otherPagesFile = path.join(this.pagesDir, "extraPages.jsonl");
+    this.pagesNotQueuedFile = path.join(this.pagesDir, "pagesNotQueued.jsonl");
 
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
@@ -1761,6 +1764,10 @@ self.__bx_behaviors.selectMainBehavior();
       this.otherPagesFile,
       "Non-Seed Pages",
     );
+    this.pagesNotQueuedFH = await this.initPages(
+      this.pagesNotQueuedFile,
+      "Pages Not Queued",
+    );
 
     this.adBlockRules = new AdBlockRules(
       this.captureBasePrefix,
@@ -1864,6 +1871,18 @@ self.__bx_behaviors.selectMainBehavior();
         // ignore
       } finally {
         this.extraPagesFH = null;
+      }
+    }
+
+    if (this.pagesNotQueuedFH) {
+      try {
+        await new Promise<void>((resolve) =>
+          this.pagesNotQueuedFH!.close(() => resolve()),
+        );
+      } catch (e) {
+        // ignore
+      } finally {
+        this.pagesNotQueuedFH = null;
       }
     }
   }
@@ -2736,6 +2755,44 @@ self.__bx_behaviors.selectMainBehavior();
       logger.warn(
         "Page append failed",
         { pagesFile: depth > 0 ? this.otherPagesFile : this.seedPagesFile },
+        "pageStatus",
+      );
+    }
+  }
+
+  async writePageNotQueued(
+    url: string,
+    seedUrl: string,
+    depth: number,
+    reason: string,
+  ) {
+    const ts = new Date();
+
+    let seed = false;
+    if (depth === 0) {
+      seed = true;
+    }
+
+    // todo: do we want to write to redis?
+
+    const row = { url, seedUrl, depth, seed, reason, ts };
+    const processedRow = JSON.stringify(row) + "\n";
+
+    if (!this.pagesNotQueuedFH) {
+      logger.error(
+        "Can't write pages not queued, missing stream",
+        {},
+        "pageStatus",
+      );
+      return;
+    }
+
+    try {
+      this.pagesNotQueuedFH.write(processedRow);
+    } catch (err) {
+      logger.warn(
+        "Page append failed",
+        { pagesFile: this.pagesNotQueuedFile },
         "pageStatus",
       );
     }
