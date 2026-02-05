@@ -330,6 +330,9 @@ Options:
       --robotsAgent                         Agent to check in addition to '*' fo
                                             r robots rules
                                            [string] [default: "Browsertrix/1.x"]
+      --listPagesNotQueued                  If set, write pages not queued and r
+                                            eason to pages/pagesNotQueued.jsonl
+                                                      [boolean] [default: false]
       --config                              Path to YAML config file
 ```
 
