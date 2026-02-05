@@ -46,6 +46,7 @@ import {
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
   ExitCodes,
   InterruptReason,
+  NotQueuedReason,
   BxFunctionBindings,
   MAX_JS_DIALOG_PER_PAGE,
 } from "./util/constants.js";
@@ -792,7 +793,13 @@ export class Crawler {
       seedId,
     );
 
-    return !!seed.isIncluded(url, depth, extraHops, logDetails);
+    const res = seed.isIncluded(url, depth, extraHops, logDetails);
+
+    if (!res) {
+      this.writePageNotQueued(url, seed.url, depth, NotQueuedReason.OutOfScope);
+    }
+
+    return !!res;
   }
 
   async setupPage(opts: WorkerState) {
@@ -2532,6 +2539,13 @@ self.__bx_behaviors.selectMainBehavior();
         );
 
         if (!res) {
+          const seedUrl = this.seeds[seedId].url || "";
+          this.writePageNotQueued(
+            possibleUrl,
+            seedUrl,
+            depth,
+            NotQueuedReason.OutOfScope,
+          );
           continue;
         }
 
@@ -2586,12 +2600,15 @@ self.__bx_behaviors.selectMainBehavior();
     ts = 0,
     pageid?: string,
   ) {
+    const seedUrl = this.seeds[seedId].url || "";
+
     if (this.limitHit) {
       logger.debug(
         "Page URL not queued, at page limit",
         { url, ...logDetails },
         "links",
       );
+      this.writePageNotQueued(url, seedUrl, depth, NotQueuedReason.PageLimit);
       return false;
     }
 
@@ -2604,6 +2621,7 @@ self.__bx_behaviors.selectMainBehavior();
         { url, ...logDetails },
         "links",
       );
+      this.writePageNotQueued(url, seedUrl, depth, NotQueuedReason.RobotsTxt);
       return false;
     }
 
@@ -2629,6 +2647,7 @@ self.__bx_behaviors.selectMainBehavior();
           );
         }
         this.limitHit = true;
+        this.writePageNotQueued(url, seedUrl, depth, NotQueuedReason.PageLimit);
         return false;
 
       case QueueState.DUPE_URL:
@@ -2760,11 +2779,11 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async writePageNotQueued(
+  writePageNotQueued(
     url: string,
     seedUrl: string,
     depth: number,
-    reason: string,
+    reason: NotQueuedReason,
   ) {
     const ts = new Date();
 
