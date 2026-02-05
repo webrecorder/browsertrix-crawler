@@ -2642,6 +2642,11 @@ self.__bx_behaviors.selectMainBehavior();
     pageid?: string,
   ) {
     if (this.limitHit) {
+      logger.debug(
+        "Page URL not queued, at page limit",
+        { url, ...logDetails },
+        "links",
+      );
       return false;
     }
 
