@@ -1410,42 +1410,57 @@ self.__bx_behaviors.selectMainBehavior();
     frame: Frame,
     logDetails: LogDetails,
   ): Promise<boolean> {
-    const RUN_BEHAVIORS = `
-        if (!self.__bx_behaviors) {
-          console.error("__bx_behaviors missing, can't run behaviors");
-        } else {
-          self.__bx_behaviors.run();
-        }`;
+    const RUN_BEHAVIORS = `async () => {
+      if (!self.__bx_behaviors) {
+        console.error("__bx_behaviors missing, can't run behaviors");
+      } else {
+        self.__bx_behaviors.run();
+      }
+    };`;
 
     const frameUrl = frame.url();
+    const isTopFrame = !frame.parentFrame();
 
-    const details: LogDetails = { frameUrl, ...logDetails };
+    const details: LogDetails = { frameUrl, isTopFrame, ...logDetails };
 
     if (!frameUrl || frame.detached) {
       logger.debug(
-        "Run Script Skipped, frame no longer attached or has no URL",
+        "Run Behaviors Skipped, frame no longer attached or has no URL",
         details,
       );
       return false;
     }
 
-    const isTopFrame = !frame.parentFrame();
-
     if (isTopFrame) {
-      logger.debug("Run Script Started", details, "behavior");
+      logger.debug("Run Behaviors Started", details, "behavior");
     } else {
-      logger.debug("Run Script Started in iframe", details, "behavior");
+      logger.debug("Run Behaviors Started in iframe", details, "behavior");
     }
 
     try {
       await frame.evaluate(RUN_BEHAVIORS);
       return true;
     } catch (e) {
-      logger.error(
-        "Run Script Failed",
-        { ...formatErr(e), details },
-        "behavior",
-      );
+      const msg = (e as Error).message;
+      if (
+        msg.indexOf("Target closed") >= 0 ||
+        msg.indexOf("Execution context was destroyed") >= 0
+      ) {
+        // only warn for top-frame, expected that iframes may be created/removed frequently
+        if (isTopFrame) {
+          logger.warn(
+            "Run Behaviors Interrupted, navigated away",
+            details,
+            "behavior",
+          );
+        }
+      } else {
+        logger.error(
+          "Run Behaviors Failed",
+          { ...details, ...formatErr(e) },
+          "behavior",
+        );
+      }
     }
     return false;
   }
