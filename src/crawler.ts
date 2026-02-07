@@ -1201,6 +1201,11 @@ self.__bx_behaviors.selectMainBehavior();
     opts.pageBlockUnload = false;
 
     await this.awaitPageExtraDelay(opts);
+
+    // wait for any browser network fetches to finish before moving on to another page
+    if (recorder) {
+      await recorder.browserFetchQ.onIdle();
+    }
   }
 
   async doPostLoadActions(opts: WorkerState, saveOutput = false) {

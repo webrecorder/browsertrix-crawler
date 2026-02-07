@@ -112,7 +112,11 @@ export class Recorder extends EventEmitter {
 
   crawlState: RedisCrawlState;
 
-  fetcherQ: PQueue;
+  // fetching using browser network, should be cleared before moving to new page
+  browserFetchQ: PQueue;
+
+  // fetching using node, does not need to be cleared before moving to new page
+  asyncFetchQ: PQueue;
 
   pendingRequests!: Map<string, RequestResponseInfo>;
   skipIds!: Set<string>;
@@ -167,7 +171,8 @@ export class Recorder extends EventEmitter {
 
     this.writer = writer;
 
-    this.fetcherQ = new PQueue({ concurrency: 1 });
+    this.browserFetchQ = new PQueue({ concurrency: 1 });
+    this.asyncFetchQ = new PQueue({ concurrency: 1 });
 
     this.frameIdToExecId = null;
   }
@@ -876,8 +881,11 @@ export class Recorder extends EventEmitter {
 
   addAsyncFetch(opts: AsyncFetchOptions) {
     if (!this.stopping) {
+      const { cdp, useBrowserNetwork } = opts;
       const fetcher = new AsyncFetcher(opts);
-      void this.fetcherQ.add(() => fetcher.load());
+      const fetchQ =
+        !!cdp && useBrowserNetwork ? this.browserFetchQ : this.asyncFetchQ;
+      void fetchQ.add(() => fetcher.load());
     }
   }
 
@@ -1092,8 +1100,9 @@ export class Recorder extends EventEmitter {
     await this.crawlState.setStatus("pending-wait");
 
     const finishFetch = async () => {
-      logger.debug("Finishing Fetcher Queue", this.logDetails, "recorder");
-      await this.fetcherQ.onIdle();
+      logger.debug("Finishing Fetcher Queues", this.logDetails, "recorder");
+      await this.browserFetchQ.onIdle();
+      await this.asyncFetchQ.onIdle();
     };
 
     if (timeout > 0) {
@@ -1106,7 +1115,8 @@ export class Recorder extends EventEmitter {
       );
     }
 
-    this.fetcherQ.clear();
+    this.browserFetchQ.clear();
+    this.asyncFetchQ.clear();
 
     logger.debug("Finishing WARC writing", this.logDetails, "recorder");
 
@@ -1405,7 +1415,7 @@ export class Recorder extends EventEmitter {
     }
     if (!this.stopping) {
       state.asyncLoading = true;
-      void this.fetcherQ.add(() => fetcher.loadDirectPage(state, crawler));
+      void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
     }
     return true;
   }
