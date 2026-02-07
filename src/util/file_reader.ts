@@ -33,16 +33,16 @@ async function getTempFile(
   );
 }
 
-export async function replaceDir(
-  sourceDir: string,
-  destDir: string,
-  exists: boolean,
-) {
+export async function replaceDir(sourceDir: string, destDir: string) {
+  // remove destDir if it exists
+  try {
+    await fsp.rm(destDir, { force: true, recursive: true });
+  } catch (e) {
+    // ignore
+  }
+
   // Move new dir to new location
   try {
-    if (exists) {
-      await fsp.rm(destDir, { force: true, recursive: true });
-    }
     //await exec(`mv ${sourceDir} ${destDir}`);
     await fsp.rename(sourceDir, destDir);
   } catch (e) {
@@ -218,7 +218,7 @@ async function collectGitBehaviors(
     }
   }
 
-  await replaceDir(pathToCollect, behaviorsDir, exists);
+  await replaceDir(pathToCollect, behaviorsDir);
 
   // remove the rest of the repo that we're not using
   if (relPath) {

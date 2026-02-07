@@ -218,7 +218,7 @@ export class Browser {
       await this.loadProfile(profileUrl, tmpProfileDest, tmpProfileDir);
 
       // replace old profile dir with new profile dir
-      await replaceDir(tmpProfileDir, this.profileDir, exists);
+      await replaceDir(tmpProfileDir, this.profileDir);
 
       // replace old tarball with new tarball
       await fsp.rename(tmpProfileDest, profileTarGz);
