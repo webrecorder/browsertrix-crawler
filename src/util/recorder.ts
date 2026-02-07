@@ -127,6 +127,7 @@ export class Recorder extends EventEmitter {
   skipRangeUrls!: Map<string, number>;
   skipPageInfo = false;
   skipRecordingPage = false;
+  state: PageState | null = null;
 
   swTargetId?: string | null;
   swFrameIds = new Set<string>();
@@ -768,7 +769,7 @@ export class Recorder extends EventEmitter {
       }
 
       if (errorReason === "ConnectionRefused") {
-        this.skipRecordingPage = true;
+        this.markRateLimited();
       }
 
       logger.debug("Setting page timestamp", {
@@ -878,14 +879,6 @@ export class Recorder extends EventEmitter {
     //   }
     // }
 
-    if (!rewritten && url === this.pageUrl && this.skipRecordingPage) {
-      await cdp.send("Fetch.failRequest", {
-        requestId,
-        errorReason: "ConnectionRefused",
-      });
-      return true;
-    }
-
     // not rewritten, and not streaming, return false to continue
     if (!rewritten && !streamingConsume) {
       if (!reqresp.payload) {
@@ -994,7 +987,15 @@ export class Recorder extends EventEmitter {
     }
   }
 
-  startPage({ pageid, url }: { pageid: string; url: string }) {
+  startPage({
+    pageid,
+    url,
+    state,
+  }: {
+    pageid: string;
+    url: string;
+    state: PageState;
+  }) {
     this.pageid = pageid;
     this.pageUrl = url;
     this.finalPageUrl = this.pageUrl;
@@ -1013,6 +1014,7 @@ export class Recorder extends EventEmitter {
     this.skipPageInfo = false;
     this.skipRecordingPage = false;
     this.pageFinished = false;
+    this.state = state;
     this.pageInfo = {
       pageid,
       urls: {},
@@ -1021,6 +1023,13 @@ export class Recorder extends EventEmitter {
       tsStatus: 999,
     };
     this.mainFrameId = null;
+  }
+
+  markRateLimited() {
+    this.skipRecordingPage = true;
+    if (this.state) {
+      this.state.pageRateLimited = true;
+    }
   }
 
   addPageRecord(reqresp: RequestResponseInfo) {
@@ -1249,7 +1258,7 @@ export class Recorder extends EventEmitter {
         string = payload.toString();
 
         if (string.indexOf(`src="/_Incapsula_Resource?`) > 0) {
-          this.skipRecordingPage = true;
+          this.markRateLimited();
           return false;
         }
 

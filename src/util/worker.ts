@@ -273,7 +273,7 @@ export class PageWorker {
     this.logDetails = { page: url, workerid };
 
     if (this.recorder) {
-      this.recorder.startPage({ pageid, url });
+      this.recorder.startPage({ pageid, url, state: data });
     }
 
     try {
