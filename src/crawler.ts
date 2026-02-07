@@ -2227,9 +2227,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     const urlNoHash = url.split("#")[0];
 
-    const pageUrl = page.url().split("#")[0];
-
-    const fullRefresh = urlNoHash === pageUrl;
+    const fullRefresh = urlNoHash === page.url().split("#")[0];
 
     try {
       if (!fullRefresh) {
@@ -2304,6 +2302,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const respUrl = resp.url().split("#")[0];
+    const pageUrl = page.url();
     const isChromeError = pageUrl.startsWith("chrome-error://");
 
     if (
@@ -2384,11 +2383,7 @@ self.__bx_behaviors.selectMainBehavior();
       data.loadState = LoadState.FULL_PAGE_LOADED;
     }
 
-    if (
-      !isChromeError &&
-      pageUrl !== urlNoHash &&
-      !pageUrl.startsWith("about:blank")
-    ) {
+    if (!isChromeError && pageUrl !== urlNoHash) {
       if (!(await this.crawlState.addToUserSet(pageUrl))) {
         return this.pageSkipped(
           "Page dynamically changed to seen page, skipping",
