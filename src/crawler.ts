@@ -71,11 +71,7 @@ import {
   createWARCInfo,
   setWARCInfo,
 } from "./util/warcwriter.js";
-import {
-  isHTMLMime,
-  isRateLimitStatus,
-  isRedirectStatus,
-} from "./util/reqresp.js";
+import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
@@ -2416,14 +2412,6 @@ self.__bx_behaviors.selectMainBehavior();
               { msg },
               data,
             );
-          } else if (msg.startsWith("net::ERR_CONNECTION_REFUSED")) {
-            data.pageRateLimited = true;
-            return this.pageFailed("Page Load Failed, Rate Limited", retry, {
-              msg,
-              url,
-              loadState,
-              ...logDetails,
-            });
           } else {
             return this.pageFailed("Page Load Failed", retry, {
               msg,
@@ -2472,13 +2460,12 @@ self.__bx_behaviors.selectMainBehavior();
     const status = resp.status();
     data.status = status;
 
-    if (!isChromeError && isRateLimitStatus(status)) {
+    if (!isChromeError && data.pageRateLimited) {
       logger.warn(
         "Page possibly rate limited, retrying",
         { url, status, ...logDetails },
         "pageStatus",
       );
-      data.pageRateLimited = true;
       throw new Error("logged");
     }
 
