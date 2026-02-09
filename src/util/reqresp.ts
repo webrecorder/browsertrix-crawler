@@ -337,7 +337,7 @@ export class RequestResponseInfo {
   }
 
   isCached() {
-    return this.fromCache && !this.payload;
+    return (this.fromCache && !this.payload) || this.status === 304;
   }
 
   deleteRange() {
@@ -369,7 +369,7 @@ export class RequestResponseInfo {
       );
       const contentRange = headers.get(CONTENT_RANGE);
       if (contentRange !== `bytes 0-${contentLength - 1}/${contentLength}`) {
-        return false;
+        return true;
       }
     }
 
