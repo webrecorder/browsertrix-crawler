@@ -59,9 +59,6 @@ export class RequestResponseInfo {
   // fetchContinued - avoid duplicate fetch response handling
   fetchContinued = false;
 
-  // is handled in page context
-  inPageContext = false;
-
   // misc
   fromServiceWorker = false;
   fromCache = false;
