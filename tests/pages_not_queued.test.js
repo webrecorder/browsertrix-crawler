@@ -26,7 +26,7 @@ test("ensure notQueued.jsonl was written as expected", () => {
     "utf8",
   );
 
-  const pageCount = 0
+  let pageCount = 0
 
   for (const line of notQueued.trim().split("\n")) {
     const data = JSON.parse(line);
