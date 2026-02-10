@@ -1410,13 +1410,12 @@ self.__bx_behaviors.selectMainBehavior();
     frame: Frame,
     logDetails: LogDetails,
   ): Promise<boolean> {
-    const RUN_BEHAVIORS = `async () => {
+    const RUN_BEHAVIORS = `
       if (!self.__bx_behaviors) {
         console.error("__bx_behaviors missing, can't run behaviors");
       } else {
         self.__bx_behaviors.run();
-      }
-    };`;
+      }`;
 
     const frameUrl = frame.url();
     const isTopFrame = !frame.parentFrame();
