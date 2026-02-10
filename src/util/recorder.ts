@@ -29,7 +29,6 @@ import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
 import { DEFAULT_MAX_RETRIES } from "./constants.js";
 import { Readable } from "stream";
-import { createHash } from "crypto";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -145,7 +144,7 @@ export class Recorder extends EventEmitter {
 
   pageSeed?: ScopedSeed;
   pageSeedDepth = 0;
-  minPageDedupeDepth = -1;
+  //minPageDedupeDepth = -1;
 
   frameIdToExecId: Map<string, number> | null;
 
@@ -169,7 +168,7 @@ export class Recorder extends EventEmitter {
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
 
-    this.minPageDedupeDepth = crawler.params.minPageDedupeDepth;
+    //this.minPageDedupeDepth = crawler.params.minPageDedupeDepth;
 
     this.writer = writer;
 
@@ -838,29 +837,32 @@ export class Recorder extends EventEmitter {
 
     const rewritten = await this.rewriteResponse(reqresp, mimeType);
 
-    if (
-      url === this.pageUrl &&
-      reqresp.payload &&
-      this.minPageDedupeDepth >= 0 &&
-      this.pageSeedDepth >= this.minPageDedupeDepth
-    ) {
-      const hash =
-        "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
-      const res = await this.crawlState.getHashDupe(hash);
-      if (res) {
-        const { index, crawlId } = res;
-        const errorReason = "BlockedByResponse";
-        await cdp.send("Fetch.failRequest", {
-          requestId,
-          errorReason,
-        });
-        await this.crawlState.addDupeCrawlDependency(crawlId, index);
-        // await this.crawlState.addConservedSizeStat(
-        //   size - reqresp.payload.length,
-        // );
-        return true;
-      }
-    }
+    // ** WIP: Experimental page-level dedupe **
+    // Will abort page loading in case of duplicate
+    // TODO: Write revisit record, track page as a duplicate in page list
+    // if (
+    //   url === this.pageUrl &&
+    //   reqresp.payload &&
+    //   this.minPageDedupeDepth >= 0 &&
+    //   this.pageSeedDepth >= this.minPageDedupeDepth
+    // ) {
+    //   const hash =
+    //     "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
+    //   const res = await this.crawlState.getHashDupe(hash);
+    //   if (res) {
+    //     const { index, crawlId } = res;
+    //     const errorReason = "BlockedByResponse";
+    //     await cdp.send("Fetch.failRequest", {
+    //       requestId,
+    //       errorReason,
+    //     });
+    //     await this.crawlState.addDupeCrawlDependency(crawlId, index);
+    //     // await this.crawlState.addConservedSizeStat(
+    //     //   size - reqresp.payload.length,
+    //     // );
+    //     return true;
+    //   }
+    // }
 
     // not rewritten, and not streaming, return false to continue
     if (!rewritten && !streamingConsume) {
