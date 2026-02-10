@@ -231,7 +231,6 @@ export class RedisDedupeIndex {
   sourceQ = "src:q";
   sourceQSet = "src:qset";
   pendingQ = "pending:q";
-  sourceP = "src:p";
   pendingPrefix = "pending:q:";
 
   noremove = "noremove:" + Date.now();

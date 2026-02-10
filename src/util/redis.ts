@@ -39,9 +39,7 @@ export async function initRedisWaitForSuccess(redisUrl: string, retrySecs = 1) {
   while (true) {
     try {
       return await initRedis(redisUrl);
-      break;
     } catch (e) {
-      //logger.fatal("Unable to connect to state store Redis: " + redisUrl);
       logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
       await sleep(retrySecs);
     }

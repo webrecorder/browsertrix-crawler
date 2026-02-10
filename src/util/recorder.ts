@@ -1702,11 +1702,6 @@ export class Recorder extends EventEmitter {
 
     const hash = responseRecord.warcPayloadDigest || "";
 
-    // if (!(await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, hash))) {
-    //   serializer.externalBuffer?.purge();
-    //   return false;
-    // }
-
     const date = responseRecord.warcDate || "";
 
     const isEmpty = reqresp.readSize === 0;
