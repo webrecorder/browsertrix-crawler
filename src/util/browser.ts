@@ -9,7 +9,7 @@ import path from "path";
 
 import { request } from "undici";
 
-import { formatErr, LogContext, logger } from "./logger.js";
+import { formatErr, logger } from "./logger.js";
 import { getFollowRedirectDispatcher, getSafeProxyString } from "./proxy.js";
 import { initStorage, S3StorageSync, UploadResult } from "./storage.js";
 
@@ -20,7 +20,6 @@ import {
 } from "./constants.js";
 
 import puppeteer, {
-  Frame,
   HTTPRequest,
   Page,
   LaunchOptions,
@@ -454,83 +453,6 @@ export class Browser {
         return file;
       }
     }
-  }
-
-  async evaluateWithCLI(
-    cdp: CDPSession,
-    frame: Frame,
-    frameIdToExecId: Map<string, number>,
-    funcString: string,
-    logData: Record<string, string>,
-    contextName: LogContext,
-  ) {
-    const frameUrl = frame.url();
-    // TODO: Fix this the next time the file is edited.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let details: Record<string, any> = { frameUrl, ...logData };
-
-    if (!frameUrl || frame.detached) {
-      logger.debug(
-        "Run Script Skipped, frame no longer attached or has no URL",
-        details,
-        contextName,
-      );
-      return false;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const frameId = (frame as any)._id;
-
-    const contextId = frameIdToExecId.get(frameId);
-
-    if (!contextId) {
-      logger.warn(
-        "Not running behavior, missing CDP context id for frame id",
-        { frameId },
-        "browser",
-      );
-      return;
-    }
-
-    const isTopFrame = !frame.parentFrame();
-
-    if (isTopFrame) {
-      logger.debug("Run Script Started", details, contextName);
-    } else {
-      logger.debug("Run Script Started in iframe", details, contextName);
-    }
-
-    // from puppeteer _evaluateInternal() but with includeCommandLineAPI: true
-    //const contextId = context._contextId;
-    const expression = funcString + "\n//# sourceURL=__evaluation_script__";
-
-    const { exceptionDetails, result } = await cdp.send("Runtime.evaluate", {
-      expression,
-      contextId,
-      returnByValue: true,
-      awaitPromise: true,
-      userGesture: true,
-      includeCommandLineAPI: true,
-    });
-
-    if (exceptionDetails) {
-      if (exceptionDetails.stackTrace) {
-        details = {
-          ...exceptionDetails.stackTrace,
-          text: exceptionDetails.text,
-          ...details,
-        };
-      }
-      logger.error("Run Script Failed", details, contextName);
-    } else {
-      if (isTopFrame) {
-        logger.debug("Run Script Finished", details, contextName);
-      } else {
-        logger.debug("Run Script Finished in iframe", details, contextName);
-      }
-    }
-
-    return result.value;
   }
 
   isLaunched() {
