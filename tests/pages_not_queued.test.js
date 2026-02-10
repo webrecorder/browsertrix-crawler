@@ -1,4 +1,5 @@
 import child_process from "child_process";
+import fs from "fs";
 
 const doValidate = process.argv.filter((x) => x.startsWith('-validate'))[0];
 const testIf = (condition, ...args) => condition ? test(...args) : test.skip(...args);
