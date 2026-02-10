@@ -990,7 +990,7 @@ return inx;
   }
 
   async incRateLimited() {
-    const key = this.key + ":rate";
+    const key = this.crawlId + ":rate";
     const RATE_LIMIT_TIME = 300;
     const RATE_LIMIT_MAX = 5;
     const res = await this.redis.incr(key);
