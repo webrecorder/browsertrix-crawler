@@ -40,7 +40,7 @@ export enum BxFunctionBindings {
 }
 
 export const MAX_DEPTH = 1000000;
-export const DEFAULT_MAX_RETRIES = 2;
+export const DEFAULT_MAX_RETRIES = 5;
 
 export const FETCH_HEADERS_TIMEOUT_SECS = 30;
 export const PAGE_OP_TIMEOUT_SECS = 5;
@@ -90,6 +90,7 @@ export enum ExitCodes {
   TimeLimit = 15,
   DiskUtilization = 16,
   Fatal = 17,
+  RateLimited = 18,
   ProxyError = 21,
   UploadFailed = 22,
 }

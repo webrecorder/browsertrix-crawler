@@ -1337,7 +1337,15 @@ self.__bx_behaviors.selectMainBehavior();
     }
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url, pageSkipped, noRetries } = data;
+    const {
+      loadState,
+      logDetails,
+      depth,
+      url,
+      pageSkipped,
+      pageRateLimited,
+      noRetries,
+    } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       await this.writePage(data);
@@ -1362,6 +1370,15 @@ self.__bx_behaviors.selectMainBehavior();
 
         if (this.healthChecker) {
           this.healthChecker.incError();
+        }
+        if (pageRateLimited) {
+          if (
+            (await this.crawlState.incRateLimited()) &&
+            this.params.restartsOnError
+          ) {
+            await this.serializeConfig();
+            await this.setStatusAndExit(ExitCodes.RateLimited, "interrupted");
+          }
         }
 
         if (retry < 0) {
@@ -2211,6 +2228,20 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  pageSkipped(
+    reason: string,
+    loadDetails: Record<string, string>,
+    data: PageState,
+  ) {
+    data.pageSkipped = true;
+    logger.warn(
+      reason,
+      { ...loadDetails, loadState: data.loadState },
+      "pageStatus",
+    );
+    throw new Error("logged");
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pageFailed(msg: string, retry: number, msgData: any) {
     if (retry < this.params.maxPageRetries) {
@@ -2321,13 +2352,11 @@ self.__bx_behaviors.selectMainBehavior();
 
           if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
             // excluded in recorder
-            data.pageSkipped = true;
-            logger.warn(
+            return this.pageSkipped(
               "Page Load Blocked, skipping",
-              { msg, loadState },
-              "pageStatus",
+              { msg },
+              data,
             );
-            throw new Error("logged");
           } else {
             return this.pageFailed("Page Load Failed", retry, {
               msg,
@@ -2350,7 +2379,8 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const respUrl = resp.url().split("#")[0];
-    const isChromeError = page.url().startsWith("chrome-error://");
+    const pageUrl = page.url();
+    const isChromeError = pageUrl.startsWith("chrome-error://");
 
     if (
       depth === 0 &&
@@ -2374,6 +2404,15 @@ self.__bx_behaviors.selectMainBehavior();
 
     const status = resp.status();
     data.status = status;
+
+    if (!isChromeError && data.pageRateLimited) {
+      logger.warn(
+        "Page possibly rate limited, retrying",
+        { url, status, ...logDetails },
+        "pageStatus",
+      );
+      throw new Error("logged");
+    }
 
     let failed = isChromeError;
 
@@ -2418,6 +2457,16 @@ self.__bx_behaviors.selectMainBehavior();
     // - if first response was received, but not fully loaded
     if (fullLoadedResponse || downloadResponse) {
       data.loadState = LoadState.FULL_PAGE_LOADED;
+    }
+
+    if (!isChromeError && pageUrl !== urlNoHash) {
+      if (!(await this.crawlState.addToUserSet(pageUrl))) {
+        return this.pageSkipped(
+          "Page dynamically changed to seen page, skipping",
+          { pageUrl, url },
+          data,
+        );
+      }
     }
 
     if (!data.isHTMLPage) {
