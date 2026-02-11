@@ -74,7 +74,7 @@ test("check that notQueued.jsonl file made it into WACZ datapackage.json", () =>
   ).toBe(true);
 
   const data = fs.readFileSync(
-    "test-crawls/collections/wr-net/wacz/datapackage.json",
+    "test-crawls/collections/wr-not-queued/wacz/datapackage.json",
     "utf8",
   );
 
