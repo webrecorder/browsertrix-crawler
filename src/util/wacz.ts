@@ -154,7 +154,9 @@ export class WACZ {
       ...addDirFiles(this.logsDir),
     ];
 
-    const files = this.reportsDir ? [...baseFiles, ...addDirFiles(this.reportsDir)] : baseFiles;
+    const files = this.reportsDir
+      ? [...baseFiles, ...addDirFiles(this.reportsDir)]
+      : baseFiles;
 
     const zip = makeZip(
       this.iterDirForZip(files),
