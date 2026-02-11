@@ -42,13 +42,15 @@ const contentAgentOpts: Agent.Options = {
 };
 
 // dispatcher for archival content without following redirects
-const contentDispatcher = new Agent(contentAgentOpts);
+const contentDispatcher = addDecompressInterceptor(new Agent(contentAgentOpts));
 
 // dispatcher for archival content with following redirects
 const contentRedirectDispatcher = addRedirectInterceptor(contentDispatcher);
 
 // dispatcher for following redirects, non-archival content, trust SSL
-const followRedirectDispatcher = addRedirectInterceptor(new Agent(baseOpts));
+const followRedirectDispatcher = addRedirectInterceptor(
+  addDecompressInterceptor(new Agent(baseOpts)),
+);
 
 export type ProxyServerConfig = {
   matchHosts?: Record<string, string>;
@@ -236,7 +238,9 @@ export async function initSingleProxy(
     );
   }
 
-  const dispatcher = createDispatcher(proxyUrl, contentAgentOpts);
+  const dispatcher = addDecompressInterceptor(
+    createDispatcher(proxyUrl, contentAgentOpts),
+  );
   const redirectDispatcher = addRedirectInterceptor(dispatcher);
   return { proxyUrl, dispatcher, redirectDispatcher };
 }
@@ -246,6 +250,11 @@ export function addRedirectInterceptor(dispatcher: Dispatcher) {
   // https://fetch.spec.whatwg.org/#http-redirect-fetch
   const redirector = interceptors.redirect({ maxRedirections: 20 });
   return dispatcher.compose(redirector);
+}
+
+export function addDecompressInterceptor(dispatcher: Dispatcher) {
+  const decompress = interceptors.decompress();
+  return dispatcher.compose(decompress);
 }
 
 export function getProxyDispatcher(url: string, withRedirect = true) {
@@ -270,10 +279,7 @@ export function getFollowRedirectDispatcher() {
   return followRedirectDispatcher;
 }
 
-export function createDispatcher(
-  proxyUrl: string,
-  opts: Agent.Options,
-): Dispatcher {
+function createDispatcher(proxyUrl: string, opts: Agent.Options): Dispatcher {
   if (proxyUrl.startsWith("http://") || proxyUrl.startsWith("https://")) {
     // HTTP PROXY does not support auth, as it's not supported in the browser
     // so must drop username/password for consistency
