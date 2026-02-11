@@ -990,7 +990,7 @@ return inx;
   }
 
   async incRateLimited(rateLimitStatus: number) {
-    const key = this.key + ":rate";
+    const key = this.crawlId + ":rate";
     const RATE_LIMIT_TIME = 300;
     const RATE_LIMIT_MAX = 3;
 
