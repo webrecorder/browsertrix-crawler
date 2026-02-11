@@ -98,3 +98,9 @@ export enum InterruptReason {
   SignalInterrupted = 6,
   CrawlPaused = 7,
 }
+
+export enum NotQueuedReason {
+  OutOfScope = "outOfScope",
+  PageLimit = "pageLimit",
+  RobotsTxt = "robotsTxt",
+}
