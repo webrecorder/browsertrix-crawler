@@ -797,7 +797,7 @@ export class Recorder extends EventEmitter {
         return false;
       }
 
-      streamingConsume = await this.fetchResponseBody(networkId, reqresp, cdp);
+      streamingConsume = await this.fetchResponseBody(requestId, reqresp, cdp);
 
       // if not consumed via takeStream, attempt async loading
       if (!streamingConsume) {
@@ -1483,14 +1483,14 @@ export class Recorder extends EventEmitter {
       const iter = this.takeStreamIter(reqresp, cdp, stream);
 
       if (!(await this.serializeToWARC(reqresp, iter))) {
-        return false;
+        return true;
       }
 
       this.removeReqResp(requestId);
     } catch (e) {
       logger.debug(
         "Fetch responseBodyAsStream failed, will retry async",
-        { url, error: e, ...this.logDetails },
+        { url, requestId, error: e, ...this.logDetails },
         "recorder",
       );
       return false;
