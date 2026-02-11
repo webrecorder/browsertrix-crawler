@@ -30,6 +30,7 @@ import {
 } from "./logger.js";
 import { SaveState } from "./state.js";
 import { loadProxyConfig } from "./proxy.js";
+import { setRemoveQueryParams } from "./normalize.js";
 
 // ============================================================================
 export type CrawlerArgs = ReturnType<typeof parseArgs> & {
@@ -738,6 +739,12 @@ class ArgParser {
           type: "boolean",
           default: true,
         },
+
+        normRemoveQuery: {
+          describe:
+            "If set, remove query arguments as part of URL normalization",
+          default: false,
+        },
       });
   }
 
@@ -899,6 +906,10 @@ class ArgParser {
     }
     if (argv.saveProfile) {
       logger.info("Updating profile on successful crawl");
+    }
+
+    if (argv.normRemoveQuery) {
+      setRemoveQueryParams();
     }
 
     return true;

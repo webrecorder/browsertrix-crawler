@@ -3,7 +3,7 @@ import { logger } from "./logger.js";
 
 // URL normalization options for consistent URL handling across the crawler
 // Query parameters are sorted alphabetically by the normalize-url library
-export const normalizeUrlOpts: Options = {
+export let normalizeUrlOpts: Options = {
   defaultProtocol: "https",
   stripAuthentication: false,
   stripTextFragment: false,
@@ -13,6 +13,7 @@ export const normalizeUrlOpts: Options = {
   removeSingleSlash: false,
   removeExplicitPort: false,
   sortQueryParameters: true,
+  removeQueryParameters: false,
   removePath: false,
 };
 
@@ -23,4 +24,8 @@ export function normalizeUrl(url: string) {
     logger.warn("normalizeUrl failed for url, using unmodified url", { url });
     return url;
   }
+}
+
+export function setRemoveQueryParams() {
+  normalizeUrlOpts = { ...normalizeUrlOpts, removeQueryParameters: true };
 }
