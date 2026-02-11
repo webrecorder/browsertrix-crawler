@@ -2144,6 +2144,10 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
+    if (this.params.listNotQueued) {
+      waczOpts.reportsDir = this.reportsDir;
+    }
+
     if (this.params.title) {
       waczOpts.title = this.params.title;
     }
