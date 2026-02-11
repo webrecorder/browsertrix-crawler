@@ -20,6 +20,7 @@ const SSH_WAIT_TIMEOUT = 30000;
 type ProxyEntry = {
   proxyUrl: string;
   dispatcher: Dispatcher;
+  decompressDispatcher: Dispatcher;
   redirectDispatcher: Dispatcher;
 };
 
@@ -41,11 +42,16 @@ const contentAgentOpts: Agent.Options = {
   },
 };
 
-// dispatcher for archival content without following redirects
-const contentDispatcher = addDecompressInterceptor(new Agent(contentAgentOpts));
+// dispatcher for archival content without following redirects or decompression
+const contentDispatcher = new Agent(contentAgentOpts);
 
-// dispatcher for archival content with following redirects
-const contentRedirectDispatcher = addRedirectInterceptor(contentDispatcher);
+// dispatcher for archival content with decompression
+const contentDecompressDispatcher = addDecompressInterceptor(contentDispatcher);
+
+// dispatcher for archival content with following redirects + decompression
+const contentRedirectDispatcher = addRedirectInterceptor(
+  contentDecompressDispatcher,
+);
 
 // dispatcher for following redirects, non-archival content, trust SSL
 const followRedirectDispatcher = addRedirectInterceptor(
@@ -238,11 +244,11 @@ export async function initSingleProxy(
     );
   }
 
-  const dispatcher = addDecompressInterceptor(
-    createDispatcher(proxyUrl, contentAgentOpts),
-  );
-  const redirectDispatcher = addRedirectInterceptor(dispatcher);
-  return { proxyUrl, dispatcher, redirectDispatcher };
+  const dispatcher = createDispatcher(proxyUrl, contentAgentOpts);
+  const decompressDispatcher = addDecompressInterceptor(dispatcher);
+
+  const redirectDispatcher = addRedirectInterceptor(decompressDispatcher);
+  return { proxyUrl, dispatcher, decompressDispatcher, redirectDispatcher };
 }
 
 export function addRedirectInterceptor(dispatcher: Dispatcher) {
@@ -257,11 +263,22 @@ export function addDecompressInterceptor(dispatcher: Dispatcher) {
   return dispatcher.compose(decompress);
 }
 
-export function getProxyDispatcher(url: string, withRedirect = true) {
+export function getProxyDispatcher(
+  url: string,
+  withRedirect = true,
+  withDecompression = true,
+) {
   // find url match by regex first
-  for (const [rx, { dispatcher, redirectDispatcher }] of proxyMap.entries()) {
+  for (const [
+    rx,
+    { dispatcher, redirectDispatcher, decompressDispatcher },
+  ] of proxyMap.entries()) {
     if (rx && url.match(rx)) {
-      return withRedirect ? redirectDispatcher : dispatcher;
+      return withRedirect
+        ? redirectDispatcher
+        : withDecompression
+        ? decompressDispatcher
+        : dispatcher;
     }
   }
 
@@ -271,7 +288,11 @@ export function getProxyDispatcher(url: string, withRedirect = true) {
       ? defaultProxyEntry.redirectDispatcher
       : defaultProxyEntry.dispatcher;
   } else {
-    return withRedirect ? contentRedirectDispatcher : contentDispatcher;
+    return withRedirect
+      ? contentRedirectDispatcher
+      : withDecompression
+      ? contentDecompressDispatcher
+      : contentDispatcher;
   }
 }
 
