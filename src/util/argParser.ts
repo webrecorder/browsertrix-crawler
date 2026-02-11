@@ -743,6 +743,7 @@ class ArgParser {
         normRemoveQuery: {
           describe:
             "If set, remove query arguments as part of URL normalization",
+          type: "boolean",
           default: false,
         },
       });
