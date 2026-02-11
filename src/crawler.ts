@@ -1390,7 +1390,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
         if (pageRateLimited) {
           if (
-            (await this.crawlState.incRateLimited()) &&
+            (await this.crawlState.incRateLimited(pageRateLimited)) &&
             this.params.restartsOnError
           ) {
             await this.serializeConfig();
