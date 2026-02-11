@@ -789,10 +789,6 @@ export class Recorder extends EventEmitter {
         return true;
       }
 
-      if (errorReason === "ConnectionRefused") {
-        this.markRateLimited();
-      }
-
       logger.debug("Setting page timestamp", {
         ts: reqresp.ts,
         url,
@@ -1007,8 +1003,8 @@ export class Recorder extends EventEmitter {
       }
     }
 
-    if (isRateLimitStatus(reqresp.status)) {
-      return "ConnectionRefused";
+    if (isRateLimitStatus(reqresp.status) || reqresp.status >= 500) {
+      this.markRateLimited(reqresp.status);
     }
   }
 
@@ -1050,10 +1046,10 @@ export class Recorder extends EventEmitter {
     this.mainFrameId = null;
   }
 
-  markRateLimited() {
+  markRateLimited(status: number) {
     this.skipRecordingPage = true;
     if (this.state) {
-      this.state.pageRateLimited = true;
+      this.state.pageRateLimited = status;
     }
   }
 
@@ -1249,7 +1245,7 @@ export class Recorder extends EventEmitter {
   }
 
   async rewriteResponse(reqresp: RequestResponseInfo, contentType: string) {
-    const { url, extraOpts, payload } = reqresp;
+    const { url, extraOpts, payload, status } = reqresp;
 
     // don't rewrite if payload is missing or too big
     if (!payload || !payload.length || payload.length > MAX_TEXT_REWRITE_SIZE) {
@@ -1283,7 +1279,7 @@ export class Recorder extends EventEmitter {
         string = payload.toString();
 
         if (string.indexOf(`src="/_Incapsula_Resource?`) > 0) {
-          this.markRateLimited();
+          this.markRateLimited(status || 200);
           return false;
         }
 
