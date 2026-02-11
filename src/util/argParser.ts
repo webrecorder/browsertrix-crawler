@@ -731,6 +731,13 @@ class ArgParser {
           type: "string",
           default: "Browsertrix/1.x",
         },
+
+        listNotQueued: {
+          describe:
+            "If set, write information about URLs not queued to reports/notQueued.jsonl",
+          type: "boolean",
+          default: false,
+        },
       });
   }
 
