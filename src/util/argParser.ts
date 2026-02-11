@@ -736,7 +736,7 @@ class ArgParser {
           describe:
             "If set, write information about URLs not queued to reports/notQueued.jsonl",
           type: "boolean",
-          default: false,
+          default: true,
         },
       });
   }
