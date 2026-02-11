@@ -95,7 +95,7 @@ export class PageState {
 
   skipBehaviors = false;
   pageSkipped = false;
-  pageRateLimited = false;
+  pageRateLimited = 0;
   noRetries = false;
 
   asyncLoading = false;
@@ -989,11 +989,17 @@ return inx;
     await this.redis.sadd(this.exKey, url);
   }
 
-  async incRateLimited() {
+  async incRateLimited(rateLimitStatus: number) {
     const key = this.key + ":rate";
     const RATE_LIMIT_TIME = 300;
-    const RATE_LIMIT_MAX = 5;
-    const res = await this.redis.incr(key);
+    const RATE_LIMIT_MAX = 3;
+
+    let incBy = 1;
+
+    if (rateLimitStatus === 429) {
+      incBy = RATE_LIMIT_MAX;
+    }
+    const res = await this.redis.incrby(key, incBy);
     await this.redis.expire(key, RATE_LIMIT_TIME);
     return res >= RATE_LIMIT_MAX;
   }
