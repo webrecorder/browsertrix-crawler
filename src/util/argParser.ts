@@ -445,6 +445,19 @@ class ArgParser {
           default: "redis://localhost:6379/0",
         },
 
+        redisDedupeUrl: {
+          describe:
+            "If set, url for remote redis server to store state. Otherwise, using local redis instance",
+          type: "string",
+        },
+
+        // minPageDedupeDepth: {
+        //   describe:
+        //     "If set >= 0, minimum depth at which duplicate pages can be skipped. -1 means never skip duplicate pages",
+        //   type: "number",
+        //   default: -1,
+        // },
+
         saveState: {
           describe:
             "If the crawl state should be serialized to the crawls/ directory. Defaults to 'partial', only saved when crawl is interrupted",

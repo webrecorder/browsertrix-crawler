@@ -1,5 +1,5 @@
 import path, { basename } from "node:path";
-import fs from "node:fs";
+import fs, { openAsBlob } from "node:fs";
 import fsp from "node:fs/promises";
 import { Writable, Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -17,6 +17,8 @@ import { logger, formatErr } from "./logger.js";
 import { streamFinish } from "./warcwriter.js";
 import { getDirSize } from "./storage.js";
 import { request } from "undici";
+import { createLoader, ZipRangeReader } from "@webrecorder/wabac";
+import { AsyncIterReader } from "warcio";
 
 const DATAPACKAGE_JSON = "datapackage.json";
 const DATAPACKAGE_DIGEST_JSON = "datapackage-digest.json";
@@ -44,6 +46,7 @@ export type WACZInitOpts = {
   signingToken?: string;
   title?: string;
   description?: string;
+  requires?: string[];
 };
 
 export type WACZResourceEntry = {
@@ -60,6 +63,7 @@ export type WACZDataPackage = {
   software: string;
   title?: string;
   description?: string;
+  relation?: { requires: string[] };
 };
 
 type WACZDigest = {
@@ -106,6 +110,7 @@ export class WACZ {
 
   private size = 0;
   private hash: string = "";
+  private localFilename = "";
 
   constructor(config: WACZInitOpts, collDir: string) {
     this.warcs = config.input;
@@ -128,6 +133,10 @@ export class WACZ {
     }
     if (config.description) {
       this.datapackage.description = config.description;
+    }
+
+    if (config.requires && config.requires.length) {
+      this.datapackage.relation = { requires: config.requires };
     }
 
     this.signingUrl = config.signingUrl || null;
@@ -193,7 +202,12 @@ export class WACZ {
     return this.size;
   }
 
+  getLocalFilename() {
+    return this.localFilename;
+  }
+
   async generateToFile(filename: string) {
+    this.localFilename = path.basename(filename);
     await pipeline(this.generate(), fs.createWriteStream(filename));
   }
 
@@ -389,7 +403,7 @@ export async function mergeCDXJ(
   const cdxFiles = addDirFiles(warcCdxDir);
 
   if (!cdxFiles.length) {
-    logger.info("No CDXJ files to merge");
+    logger.info("No CDXJ files to merge", {}, "wacz");
     return;
   }
 
@@ -426,5 +440,54 @@ export async function mergeCDXJ(
     await streamFinish(outputIdx);
 
     await removeIndexFile(INDEX_CDXJ);
+  }
+}
+
+// ============================================================================
+export class WACZLoader {
+  url: string;
+  zipreader: ZipRangeReader | null;
+
+  constructor(url: string) {
+    this.url = url;
+    this.zipreader = null;
+  }
+
+  async init() {
+    if (!this.url.startsWith("http://") && !this.url.startsWith("https://")) {
+      const blob = await openAsBlob(this.url);
+      this.url = URL.createObjectURL(blob);
+    }
+
+    const loader = await createLoader({ url: this.url });
+
+    this.zipreader = new ZipRangeReader(loader);
+  }
+
+  async loadFile(fileInZip: string) {
+    const { reader } = await this.zipreader!.loadFile(fileInZip);
+
+    if (!reader) {
+      return null;
+    }
+
+    if (!reader.iterLines) {
+      return new AsyncIterReader(reader);
+    }
+
+    return reader;
+  }
+
+  async *iterFiles(prefix: string) {
+    if (!this.zipreader) {
+      await this.init();
+    }
+    const entries = await this.zipreader!.load();
+
+    for (const [key, value] of Object.entries(entries)) {
+      if (key.startsWith(prefix)) {
+        yield value;
+      }
+    }
   }
 }
