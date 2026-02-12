@@ -20,6 +20,7 @@ const SSH_WAIT_TIMEOUT = 30000;
 type ProxyEntry = {
   proxyUrl: string;
   dispatcher: Dispatcher;
+  decompressRedirectDispatcher: Dispatcher;
   redirectDispatcher: Dispatcher;
 };
 
@@ -41,14 +42,12 @@ const contentAgentOpts: Agent.Options = {
   },
 };
 
-// dispatcher for archival content without following redirects
-const contentDispatcher = new Agent(contentAgentOpts);
-
-// dispatcher for archival content with following redirects
-const contentRedirectDispatcher = addRedirectInterceptor(contentDispatcher);
+const globalDispatchers = createDispatchers(new Agent(contentAgentOpts), "");
 
 // dispatcher for following redirects, non-archival content, trust SSL
-const followRedirectDispatcher = addRedirectInterceptor(new Agent(baseOpts));
+const followRedirectDispatcher = addRedirectInterceptor(
+  addDecompressInterceptor(new Agent(baseOpts)),
+);
 
 export type ProxyServerConfig = {
   matchHosts?: Record<string, string>;
@@ -236,9 +235,29 @@ export async function initSingleProxy(
     );
   }
 
-  const dispatcher = createDispatcher(proxyUrl, contentAgentOpts);
+  return createDispatchers(
+    createDispatcher(proxyUrl, contentAgentOpts),
+    proxyUrl,
+  );
+}
+
+function createDispatchers(
+  dispatcher: Dispatcher,
+  proxyUrl: string,
+): ProxyEntry {
+  // dispatcher for archival content with following redirects but no decompression
   const redirectDispatcher = addRedirectInterceptor(dispatcher);
-  return { proxyUrl, dispatcher, redirectDispatcher };
+
+  // dispatcher for archival content with decompression
+  const decompressRedirectDispatcher =
+    addDecompressInterceptor(redirectDispatcher);
+
+  return {
+    dispatcher,
+    redirectDispatcher,
+    decompressRedirectDispatcher,
+    proxyUrl,
+  };
 }
 
 export function addRedirectInterceptor(dispatcher: Dispatcher) {
@@ -248,21 +267,33 @@ export function addRedirectInterceptor(dispatcher: Dispatcher) {
   return dispatcher.compose(redirector);
 }
 
-export function getProxyDispatcher(url: string, withRedirect = true) {
+export function addDecompressInterceptor(dispatcher: Dispatcher) {
+  const decompress = interceptors.decompress();
+  return dispatcher.compose(decompress);
+}
+
+export function getProxyDispatcher(
+  url: string,
+  withRedirect = true,
+  withDecompression = true,
+) {
+  let proxyEntry: ProxyEntry | null = null;
+
   // find url match by regex first
-  for (const [rx, { dispatcher, redirectDispatcher }] of proxyMap.entries()) {
+  for (const [rx, entry] of proxyMap.entries()) {
     if (rx && url.match(rx)) {
-      return withRedirect ? redirectDispatcher : dispatcher;
+      proxyEntry = entry;
     }
   }
 
+  const { dispatcher, redirectDispatcher, decompressRedirectDispatcher } =
+    proxyEntry || defaultProxyEntry || globalDispatchers;
+
   // if default proxy set, return dispatcher from default proxy, otherwise a default dispatcher
-  if (defaultProxyEntry) {
-    return withRedirect
-      ? defaultProxyEntry.redirectDispatcher
-      : defaultProxyEntry.dispatcher;
+  if (withDecompression && withRedirect) {
+    return decompressRedirectDispatcher;
   } else {
-    return withRedirect ? contentRedirectDispatcher : contentDispatcher;
+    return withRedirect ? redirectDispatcher : dispatcher;
   }
 }
 
@@ -270,10 +301,7 @@ export function getFollowRedirectDispatcher() {
   return followRedirectDispatcher;
 }
 
-export function createDispatcher(
-  proxyUrl: string,
-  opts: Agent.Options,
-): Dispatcher {
+function createDispatcher(proxyUrl: string, opts: Agent.Options): Dispatcher {
   if (proxyUrl.startsWith("http://") || proxyUrl.startsWith("https://")) {
     // HTTP PROXY does not support auth, as it's not supported in the browser
     // so must drop username/password for consistency
