@@ -13,7 +13,6 @@ const CONTENT_LENGTH = "content-length";
 const CONTENT_RANGE = "content-range";
 const RANGE = "range";
 const CONTENT_TYPE = "content-type";
-const EXCLUDE_HEADERS = ["content-encoding", "transfer-encoding"];
 
 // max URL length for post/put payload-converted URLs
 export const MAX_URL_LENGTH = 4096;
@@ -42,6 +41,9 @@ export class RequestResponseInfo {
 
   postData?: string;
   hasPostData: boolean = false;
+
+  // content-encoding is preserved, eg. payload is still encoded
+  cePreserved = false;
 
   // response data
   status: number = 0;
@@ -214,6 +216,7 @@ export class RequestResponseInfo {
   fillFetchResponse(response: Dispatcher.ResponseData) {
     this.responseHeaders = response.headers as Record<string, string>;
     this.setStatus(response.statusCode);
+    this.cePreserved = true;
     // this.responseHeaders = Object.fromEntries(response.headers);
     // this.setStatus(response.status, response.statusText);
   }
@@ -258,7 +261,7 @@ export class RequestResponseInfo {
           continue;
         }
         if (
-          EXCLUDE_HEADERS.includes(headerName) ||
+          this.excludeHeader(headerName) ||
           (this.isRemoveRange &&
             (headerName === CONTENT_RANGE || headerName === RANGE))
         ) {
@@ -285,7 +288,7 @@ export class RequestResponseInfo {
       const value = this._encodeHeaderValue(headersDict[key]);
 
       if (
-        EXCLUDE_HEADERS.includes(keyLower) ||
+        this.excludeHeader(keyLower) ||
         (this.isRemoveRange &&
           (keyLower === CONTENT_RANGE || keyLower === RANGE))
       ) {
@@ -297,6 +300,18 @@ export class RequestResponseInfo {
     }
 
     return headersDict;
+  }
+
+  private excludeHeader(name: string) {
+    if (name === "transfer-encoding") {
+      return true;
+    }
+
+    if (!this.cePreserved && name === "content-encoding") {
+      return true;
+    }
+
+    return false;
   }
 
   getMimeType() {

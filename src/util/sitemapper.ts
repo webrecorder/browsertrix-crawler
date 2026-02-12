@@ -1,5 +1,4 @@
 import { Readable } from "stream";
-import zlib from "zlib";
 import EventEmitter from "events";
 
 import sax from "sax";
@@ -243,8 +242,6 @@ export class SitemapReader extends EventEmitter {
     resolve: () => void,
     reject: () => void,
   ) {
-    let stream: Readable;
-
     const { body } = resp;
     if (!body) {
       logger.warn("Sitemap missing response body", {}, "sitemap");
@@ -252,19 +249,12 @@ export class SitemapReader extends EventEmitter {
       return;
     }
 
-    // decompress .gz sitemaps
-    if (url.endsWith(".gz")) {
-      stream = body.pipe(zlib.createGunzip());
-    } else {
-      stream = body;
-    }
-
-    stream.on("error", (e: Error) => {
+    body.on("error", (e: Error) => {
       logger.warn("Error parsing sitemap", formatErr(e), "sitemap");
       reject();
     });
 
-    this.initSaxParser(url, stream, resolve, reject);
+    this.initSaxParser(url, body, resolve, reject);
   }
 
   private initSaxParser(

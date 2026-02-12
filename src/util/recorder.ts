@@ -1826,7 +1826,7 @@ class AsyncFetcher {
 
     const headers = reqresp.getRequestHeadersDict();
 
-    let dispatcher = getProxyDispatcher(url, !this.manualRedirect);
+    let dispatcher = getProxyDispatcher(url, !this.manualRedirect, false);
 
     dispatcher = dispatcher.compose((dispatch) => {
       return (opts, handler) => {
