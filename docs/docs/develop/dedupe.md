@@ -112,3 +112,46 @@ The removed crawls are removed from `allcrawls` and the `alldupes`, `allcounts` 
 the existing crawls, by rerunning the crawl 'commit' process for each existing crawl.
 
 The result is that all data related to removed crawls is purged, and the `removeCrawlSize` and `removeCrawls` counts are reset to 0.
+
+## Crawl Dependency Tracking in WACZ datapackage.json
+
+Deduplication adds an inherent dependency system, where a WACZ from one crawl (which contains `revisit` records) is now dependent on a WACZ from another crawl (which contains the original `response` records).
+For correct replay, both WACZ files must be present.
+
+The dedupe system also provides the ability to track these dependencies.
+The dependencies are tracked in the main per-crawl Redis, not the dedupe Redis, which may be different instances.
+
+When a `revisit` record is written, an entry is all made in the crawler Redis:
+1. the `crawlId` of the source crawl is added to `${thisCrawlId}:reqCrawls`
+2.  the string `$crawlId $waczIndex` is also added to the set `${uuid}:duperefs`
+
+The first entry allows tracking which crawls this current crawl is dependent on.
+The second entry allows for more granular tracking of which exact WACZ files in the other crawls are the dependencies
+for this crawl.
+
+The data from the second `${uuid}:duperefs` is used to populate the `relation.requires` entry for the current WACZ file with data from the other crawls `c:${crawlid}:wacz` to list the exact WACZ files and their hashes for the dependencies directly in the `datapackage.json`.
+
+For example, a WACZ file with dependencies on other WACZs from another crawl may look as follows:
+
+```json
+{
+  "resources": {
+    //resources in this WACZ file
+  },
+  ...
+  "relation": {
+    "requires": [
+      {
+        "filename": "<dependency WACZ name>",
+        "hash": "<dependency WACZ hash",
+        "size": <dependency WACZ size>,
+        "crawlId": "<dependency crawl ID>"
+      },
+      ...
+    ]
+  }
+}
+```
+
+If the WACZ files are signed, this helps ensure integrity of crawls with deduplication depenencies on other crawls, since
+all data in the `datapackage.json` will also be signed.
