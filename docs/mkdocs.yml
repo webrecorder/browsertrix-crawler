@@ -48,6 +48,7 @@ nav:
   - Develop:
     - develop/index.md
     - develop/docs.md
+    - develop/dedupe.md
   - User Guide:
     - user-guide/index.md
     - user-guide/outputs.md

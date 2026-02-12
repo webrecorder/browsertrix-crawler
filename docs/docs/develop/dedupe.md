@@ -14,19 +14,29 @@ The following Redis keys are used while a crawl is running:
 
 ### Crawl Dedupe Keys
 
-`h:${crawlid}`: `{[hash]`: `[dedupe data]}` - A Redis hash map for each unique hash crawled
+#### `h:${crawlid}`: `{[hash]`: `[dedupe data]}` - A Redis hash map for each unique hash crawled
+
 - `[hash]`: The hash, with prefix, same as `WARC-Payload-Digest`
+
 - `[dedupe data]`: A space delimited string consisting of `${waczIndex} ${date} ${url} ${size}` for the original response record URL that
 the hash represents. The `date` and `url` are used to `WARC-Refers-To-Target-URI` and `WARC-Refers-To-Date` fields.
 The `size` is used to determine size conserved. The `waczIndex` in `h:${crawlid}` respresents which exact WACZ this response will be stored in, defaults to `0` if no WACZ will be created/only one WACZ.
 
-`c:${crawlid}:wacz`: `[{filename, hash, size}]` - A Redis list of all WACZ files per crawl, stored as JSON entry. When crawling, a placeholder `{filename}`  is added to the list, the `waczIndex` in the per-hash data `h:${crawlid}` references this list, to save space. When the WACZ is finished, the `{filename}` is replaced with the full `{filename, hash, size}` for that index, or unchanged if no WACZ is actaully generated.
+#### `c:${crawlid}:wacz`: `[{filename, hash, size}]` - A Redis list of all WACZ files per crawl, stored as JSON entry.
+
+When crawling, a placeholder `{filename}`  is added to the list, the `waczIndex` in the per-hash data `h:${crawlid}` references this list, to save space. When the WACZ is finished, the `{filename}` is replaced with the full `{filename, hash, size}` for that index, or unchanged if no WACZ is actaully generated.
 
 
-`h:${crawlid}:counts`: Per Crawl Stats, including the following
+#### `h:${crawlid}:counts`: Per Crawl Stats
+
+The stats include the following:
+
 - `totalCrawlSize`: size of crawl, incremented with size of each WACZ in `c:${crawlid}:wacz`
+
 - `totalUrls`: total number of `response` and `revisit` records written for the crawl.
+
 - `dupeUrls`: number of `revisit` records written
+
 - `conservedSize`: estimated size saved by using dedupe, computed as the difference: `response record size - revisit record size`
 
 ### Crawl Tracking
@@ -69,12 +79,15 @@ json
 ```
 {
   "resources": [{
-    "name": <unique wacz name>
-    "path": <URL of WACZ>
-    "hash": <hash of WACZ>
-    "size": <size of WACZ>
-    "crawlId": <crawl id>
-}]}
+    "name": <unique wacz name>,
+    "path": <URL of WACZ>,
+    "hash": <hash of WACZ>,
+    "size": <size of WACZ>,
+    "crawlId": <crawl id>,
+  },
+  ... more WACZ files
+  ]
+}
 ```
 
 The indexer process will then read the CDX from each WACZ and populate the dedupe index keys listed above, both per crawl and merged keys listed above, based on this data.
