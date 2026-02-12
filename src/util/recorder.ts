@@ -93,7 +93,7 @@ export type AsyncFetchOptions = {
   maxFetchSize?: number;
   manualRedirect?: boolean;
   useBrowserNetwork?: boolean;
-  cdp?: CDPSession;
+  cdp: CDPSession | null;
 };
 
 // =================================================================
@@ -113,7 +113,11 @@ export class Recorder extends EventEmitter {
 
   crawlState: RedisCrawlState;
 
-  fetcherQ: PQueue;
+  // fetching using browser network, should be cleared before moving to new page
+  browserFetchQ: PQueue;
+
+  // fetching using node, does not need to be cleared before moving to new page
+  asyncFetchQ: PQueue;
 
   pendingRequests!: Map<string, RequestResponseInfo>;
   skipIds!: Set<string>;
@@ -172,7 +176,8 @@ export class Recorder extends EventEmitter {
 
     this.writer = writer;
 
-    this.fetcherQ = new PQueue({ concurrency: 1 });
+    this.browserFetchQ = new PQueue({ concurrency: 1 });
+    this.asyncFetchQ = new PQueue({ concurrency: 1 });
 
     this.frameIdToExecId = null;
   }
@@ -466,7 +471,12 @@ export class Recorder extends EventEmitter {
           reqresp.requestId = "0";
 
           const expectedSize = reqresp.expectedSize ? reqresp.expectedSize : -1;
-          this.addAsyncFetch({ reqresp, expectedSize, recorder: this });
+          this.addAsyncFetch({
+            reqresp,
+            expectedSize,
+            recorder: this,
+            cdp: null,
+          });
           return;
         }
         break;
@@ -673,6 +683,7 @@ export class Recorder extends EventEmitter {
             reqresp: reqrespNew,
             expectedSize: parseInt(range.split("/")[1]),
             recorder: this,
+            useBrowserNetwork: !isBrowserContext,
             cdp,
           });
         }
@@ -717,16 +728,12 @@ export class Recorder extends EventEmitter {
           this.addAsyncFetch({
             reqresp: reqrespNew,
             recorder: this,
+            useBrowserNetwork: !isBrowserContext,
             cdp,
           });
         }
         return false;
       }
-    }
-
-    // indicate that this is intercepted in the page context
-    if (!isBrowserContext) {
-      reqresp.inPageContext = true;
     }
 
     // Already being handled by a different handler
@@ -800,6 +807,7 @@ export class Recorder extends EventEmitter {
           reqresp,
           expectedSize: contentLen,
           recorder: this,
+          useBrowserNetwork: !isBrowserContext,
           cdp,
         };
 
@@ -905,8 +913,11 @@ export class Recorder extends EventEmitter {
 
   addAsyncFetch(opts: AsyncFetchOptions) {
     if (!this.stopping) {
+      const { cdp, useBrowserNetwork } = opts;
       const fetcher = new AsyncFetcher(opts);
-      void this.fetcherQ.add(() => fetcher.load());
+      const fetchQ =
+        !!cdp && useBrowserNetwork ? this.browserFetchQ : this.asyncFetchQ;
+      void fetchQ.add(() => fetcher.load());
     }
   }
 
@@ -1121,8 +1132,9 @@ export class Recorder extends EventEmitter {
     await this.crawlState.setStatus("pending-wait");
 
     const finishFetch = async () => {
-      logger.debug("Finishing Fetcher Queue", this.logDetails, "recorder");
-      await this.fetcherQ.onIdle();
+      logger.debug("Finishing Fetcher Queues", this.logDetails, "recorder");
+      await this.browserFetchQ.onIdle();
+      await this.asyncFetchQ.onIdle();
     };
 
     if (timeout > 0) {
@@ -1135,7 +1147,8 @@ export class Recorder extends EventEmitter {
       );
     }
 
-    this.fetcherQ.clear();
+    this.browserFetchQ.clear();
+    this.asyncFetchQ.clear();
 
     logger.debug("Finishing WARC writing", this.logDetails, "recorder");
 
@@ -1409,6 +1422,8 @@ export class Recorder extends EventEmitter {
     reqresp.method = "GET";
     reqresp.requestHeaders = headers;
     reqresp.ts = ts;
+    // if frameId is undefined, will not do browser network fetch
+    reqresp.frameId = this.mainFrameId || undefined;
 
     // ignore dupes: if previous URL was not a page, still load as page. if previous was page,
     // should not get here, as dupe pages tracked via seen list
@@ -1417,7 +1432,7 @@ export class Recorder extends EventEmitter {
       recorder: this,
       ignoreDupe: true,
       manualRedirect: true,
-      useBrowserNetwork: false,
+      cdp,
     });
 
     if (!(await fetcher.loadHeaders())) {
@@ -1432,7 +1447,7 @@ export class Recorder extends EventEmitter {
     }
     if (!this.stopping) {
       state.asyncLoading = true;
-      void this.fetcherQ.add(() => fetcher.loadDirectPage(state, crawler));
+      void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
     }
     return true;
   }
@@ -1518,15 +1533,19 @@ export class Recorder extends EventEmitter {
       );
       reqresp.truncated = "disconnect";
     } finally {
-      try {
-        await cdp.send("IO.close", { handle: stream });
-      } catch (e) {
-        logger.warn(
-          "takeStream close failed",
-          { url: reqresp.url, ...this.logDetails },
-          "recorder",
-        );
-      }
+      await this.closeIOStream(stream, cdp, reqresp.url);
+    }
+  }
+
+  async closeIOStream(stream: string, cdp: CDPSession, url: string) {
+    try {
+      await cdp.send("IO.close", { handle: stream });
+    } catch (e) {
+      logger.warn(
+        "takeStream close failed",
+        { url, ...this.logDetails },
+        "recorder",
+      );
     }
   }
 
@@ -1784,7 +1803,7 @@ class AsyncFetcher {
 
   cdp: CDPSession | null = null;
 
-  stream?: string;
+  stream: string | null = null;
   body?: Dispatcher.BodyMixin & Readable;
 
   maxFetchSize: number;
@@ -1803,6 +1822,7 @@ class AsyncFetcher {
     maxFetchSize = MAX_BROWSER_DEFAULT_FETCH_SIZE,
     manualRedirect = false,
     useBrowserNetwork = true,
+    cdp = null,
   }: AsyncFetchOptions) {
     this.reqresp = reqresp;
     this.reqresp.expectedSize = expectedSize;
@@ -1816,6 +1836,8 @@ class AsyncFetcher {
     this.maxFetchSize = maxFetchSize;
 
     this.manualRedirect = manualRedirect;
+
+    this.cdp = cdp;
   }
 
   async load() {
@@ -1835,11 +1857,11 @@ class AsyncFetcher {
     let success = false;
     try {
       if (this.useBrowserNetwork) {
-        const { method, expectedSize, inPageContext } = this.reqresp;
+        const { method, expectedSize, frameId } = this.reqresp;
         if (
           method !== "GET" ||
           expectedSize > MAX_NETWORK_LOAD_SIZE ||
-          !inPageContext
+          !frameId
         ) {
           this.useBrowserNetwork = false;
         }
@@ -1847,6 +1869,7 @@ class AsyncFetcher {
       if (this.useBrowserNetwork) {
         success = await this.loadHeadersNetwork();
       }
+
       if (!success) {
         this.useBrowserNetwork = false;
         success = await this.loadHeadersFetch();
@@ -1893,9 +1916,13 @@ class AsyncFetcher {
   }
 
   async doCancel() {
-    const { body } = this;
+    const { body, stream, cdp, reqresp } = this;
     if (body && !body.destroyed) {
       body.destroy();
+    }
+    if (stream && cdp) {
+      await this.recorder.closeIOStream(stream, cdp, reqresp.url);
+      this.stream = null;
     }
   }
 
