@@ -209,7 +209,7 @@ export class Crawler {
     | null = null;
 
   recording: boolean;
-  deduping = false;
+  isExternalDedupeStore = false;
 
   constructor() {
     const args = this.parseArgs();
@@ -357,7 +357,7 @@ export class Crawler {
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
     const dedupeRedisUrl = this.params.redisDedupeUrl || redisUrl;
 
-    this.deduping = dedupeRedisUrl !== redisUrl;
+    this.isExternalDedupeStore = dedupeRedisUrl !== redisUrl;
 
     if (!redisUrl.startsWith("redis://")) {
       logger.fatal(
@@ -1715,7 +1715,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async cleanupOnCancel() {
-    if (this.deduping) {
+    if (this.isExternalDedupeStore) {
       await this.crawlState.clearUncommitted();
     }
   }
@@ -1825,13 +1825,16 @@ self.__bx_behaviors.selectMainBehavior();
       this.storage = initStorage();
     }
 
-    if (this.params.generateWACZ && (this.storage || this.deduping)) {
+    if (
+      this.params.generateWACZ &&
+      (this.storage || this.isExternalDedupeStore)
+    ) {
       const filename = await this.crawlState.setWACZFilename();
-      if (this.deduping) {
+      if (this.isExternalDedupeStore) {
         await this.crawlState.addSourceWACZForDedupe(filename);
       }
     }
-    if (this.deduping) {
+    if (this.isExternalDedupeStore) {
       await this.crawlState.addUncommited();
     }
 
@@ -2054,7 +2057,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (wacz) {
         await this.crawlState.clearWACZFilename();
 
-        if (this.deduping) {
+        if (this.isExternalDedupeStore) {
           await this.crawlState.updateDedupeSourceWACZ(wacz);
         }
 
@@ -2078,7 +2081,7 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    if (this.deduping) {
+    if (this.isExternalDedupeStore) {
       // commit crawl data to main index
       logger.info("Committing dedupe index");
       await this.crawlState.commitDedupeDone();

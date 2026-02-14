@@ -187,6 +187,9 @@ Options:
                                             to store state. Otherwise, using loc
                                             al redis instance
                                   [string] [default: "redis://localhost:6379/0"]
+      --redisDedupeUrl                      If set, url for remote redis server
+                                            to store state. Otherwise, using loc
+                                            al redis instance           [string]
       --saveState                           If the crawl state should be seriali
                                             zed to the crawls/ directory. Defaul
                                             ts to 'partial', only saved when cra
