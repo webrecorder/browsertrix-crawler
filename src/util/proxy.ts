@@ -433,7 +433,7 @@ export async function runSSHD(
   try {
     await waitForSocksPort;
   } catch (e) {
-    logger.fatal(
+    logger.interrupt(
       "Unable to establish SSH connection for proxy",
       {
         error: e,

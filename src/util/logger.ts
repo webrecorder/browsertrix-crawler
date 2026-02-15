@@ -4,6 +4,8 @@
 import { Writable } from "node:stream";
 import { RedisCrawlState } from "./state.js";
 import { ExitCodes } from "./constants.js";
+import { streamFinish } from "./warcwriter.js";
+import fs from "node:fs";
 
 // RegExp.prototype.toJSON = RegExp.prototype.toString;
 Object.defineProperty(RegExp.prototype, "toJSON", {
@@ -63,7 +65,13 @@ export const LOG_CONTEXT_TYPES = [
 
 export type LogContext = (typeof LOG_CONTEXT_TYPES)[number];
 
-export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
+export type LogLevel =
+  | "debug"
+  | "info"
+  | "warn"
+  | "error"
+  | "interrupt"
+  | "fatal";
 
 export const DEFAULT_EXCLUDE_LOG_CONTEXTS: LogContext[] = [
   "recorderNetwork",
@@ -92,8 +100,8 @@ class Logger {
     this.fatalExitCode = exitCode;
   }
 
-  setExternalLogStream(logFH: Writable | null) {
-    this.logStream = logFH;
+  setOutputFile(filename: string) {
+    this.logStream = fs.createWriteStream(filename, { flags: "a" });
   }
 
   setDebugLogging(debugLog: boolean) {
@@ -168,7 +176,7 @@ class Logger {
       //
     }
 
-    const redisErrorLogLevels = ["error", "fatal"];
+    const redisErrorLogLevels = ["error", "interrupt", "fatal"];
     if (
       this.logErrorsToRedis &&
       this.crawlState &&
@@ -225,21 +233,56 @@ class Logger {
     }
   }
 
+  interrupt(
+    message: string,
+    data = {},
+    context: LogContext,
+    exitCode: ExitCodes,
+  ) {
+    this.logAsJSON(
+      `${message}. Interrupting, can restart`,
+      data,
+      context,
+      "interrupt",
+    );
+
+    void this.setStatusAndExit(exitCode, "interrupted");
+  }
+
   fatal(
     message: string,
     data = {},
     context: LogContext = this.defaultLogContext,
     exitCode = ExitCodes.Success,
   ) {
-    exitCode = exitCode || this.fatalExitCode;
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
 
-    if (this.crawlState) {
-      this.crawlState
-        .setStatus("failed")
-        .catch(() => {})
-        .finally(process.exit(exitCode));
-    } else {
+    void this.setStatusAndExit(exitCode || this.fatalExitCode, "interrupted");
+  }
+
+  async closeLog() {
+    if (this.logStream) {
+      const logFH = this.logStream;
+      this.logStream = null;
+      await streamFinish(logFH);
+    }
+  }
+
+  async setStatusAndExit(exitCode: ExitCodes, status: string): Promise<void> {
+    try {
+      await this.closeLog();
+
+      if (this.crawlState && status) {
+        await this.crawlState.setStatus(status);
+      }
+    } catch (e) {
+      this.logAsJSON(
+        "Error shutting down, exiting anyway",
+        e,
+        "general",
+        "error",
+      );
+    } finally {
       process.exit(exitCode);
     }
   }
