@@ -156,6 +156,10 @@ export class WARCWriter implements IndexerOffsetLength {
     responseSerializer: WARCSerializer | undefined = undefined,
     callback: ((length: number, offset: number) => void) | undefined,
   ) {
+    if (this.offset >= this.rolloverSize) {
+      this.fh = await this.initFH();
+    }
+
     const opts = this.useSHA1
       ? {
           gzip: this.gzip,
@@ -195,10 +199,6 @@ export class WARCWriter implements IndexerOffsetLength {
     );
 
     this._writeCDX(requestRecord);
-
-    if (this.offset >= this.rolloverSize) {
-      this.fh = await this.initFH();
-    }
   }
 
   private addToQueue(
@@ -227,6 +227,10 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   private async _writeSingleRecord(record: WARCRecord) {
+    if (this.offset >= this.rolloverSize) {
+      this.fh = await this.initFH();
+    }
+
     const opts = { gzip: this.gzip };
 
     const requestSerializer = new WARCSerializer(record, opts);
@@ -234,10 +238,6 @@ export class WARCWriter implements IndexerOffsetLength {
     this.recordLength = await this._writeRecord(record, requestSerializer);
 
     this._writeCDX(record);
-
-    if (this.offset >= this.rolloverSize) {
-      this.fh = await this.initFH();
-    }
   }
 
   writeNewResourceRecord(
