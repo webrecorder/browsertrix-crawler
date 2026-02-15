@@ -682,12 +682,9 @@ export class Crawler {
         exitCode = ExitCodes.Failed;
       }
     } catch (e) {
-      logger.error("Crawl failed", e);
-      exitCode = ExitCodes.Failed;
-      status = "failing";
-      if (await this.crawlState.incFailCount()) {
-        status = "failed";
-      }
+      logger.error("Unexpected error, interrupting", e);
+      exitCode = ExitCodes.GenericError;
+      status = "interrupted";
     } finally {
       await logger.setStatusAndExit(exitCode, status);
     }
