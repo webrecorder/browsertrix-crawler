@@ -107,6 +107,18 @@ export type DirectFetchRequest = {
 };
 
 // =================================================================
+enum SerializeRes {
+  // WARC record written
+  Success = 0,
+
+  // WARC record writing aborted due to incomplete, should retry
+  Aborted = 1,
+
+  // WARC record skipped (eg. dupe, cached) and should not be retried
+  Skipped = 2,
+}
+
+// =================================================================
 export class Recorder extends EventEmitter {
   workerid: WorkerId;
 
@@ -462,7 +474,9 @@ export class Recorder extends EventEmitter {
           reqresp.isValidBinary()
         ) {
           this.removeReqResp(requestId);
-          return this.serializeToWARC(reqresp);
+          return this.serializeToWARC(reqresp).catch((e) =>
+            logger.warn("Error Serializing to WARC", e, "recorder"),
+          );
         } else if (url && reqresp.requestHeaders && type === "Media") {
           this.removeReqResp(requestId);
           logger.warn(
@@ -492,7 +506,9 @@ export class Recorder extends EventEmitter {
           type,
           ...this.logDetails,
         });
-        return this.serializeToWARC(reqresp);
+        return this.serializeToWARC(reqresp).catch((e) =>
+          logger.warn("Error Serializing to WARC", e, "recorder"),
+        );
 
       default:
         this.lastErrorText = errorText;
@@ -800,12 +816,11 @@ export class Recorder extends EventEmitter {
         return false;
       }
 
-      streamingConsume = await this.fetchResponseBody(networkId, reqresp, cdp);
+      streamingConsume = await this.fetchResponseBody(requestId, reqresp, cdp);
 
       // if not consumed via takeStream, attempt async loading
       if (!streamingConsume) {
         this.removeReqResp(networkId);
-
         const opts: AsyncFetchOptions = {
           reqresp,
           expectedSize: contentLen,
@@ -1285,7 +1300,11 @@ export class Recorder extends EventEmitter {
   }
 
   isEssentialResource(resourceType: string, contentType: string) {
-    if (resourceType === "script" || resourceType === "stylesheet") {
+    if (
+      resourceType === "script" ||
+      resourceType === "stylesheet" ||
+      resourceType === "image"
+    ) {
       return true;
     }
 
@@ -1512,21 +1531,28 @@ export class Recorder extends EventEmitter {
 
       const iter = this.takeStreamIter(reqresp, cdp, stream);
 
-      if (!(await this.serializeToWARC(reqresp, iter))) {
+      try {
+        // if aborted, allow retrying
+        if (
+          (await this.serializeToWARC(reqresp, iter, true)) ===
+          SerializeRes.Aborted
+        ) {
+          return false;
+        }
+      } catch (e) {
+        logger.warn("Error Serializing to WARC", e, "recorder");
         return false;
       }
-
-      this.removeReqResp(requestId);
+      this.removeReqResp(reqresp.requestId);
+      return true;
     } catch (e) {
       logger.debug(
         "Fetch responseBodyAsStream failed, will retry async",
-        { url, error: e, ...this.logDetails },
+        { url, requestId, error: e, ...this.logDetails },
         "recorder",
       );
       return false;
     }
-
-    return true;
   }
 
   async *takeStreamIter(
@@ -1638,7 +1664,7 @@ export class Recorder extends EventEmitter {
       );
     } else {
       logger.warn(
-        "Async fetch: possible response size mismatch",
+        "Async fetch: skipping, possible response size mismatch",
         {
           type: this.constructor.name,
           size: reqresp.readSize,
@@ -1658,9 +1684,11 @@ export class Recorder extends EventEmitter {
   async serializeToWARC(
     reqresp: RequestResponseInfo,
     iter?: AsyncIterable<Uint8Array>,
-  ): Promise<boolean> {
+    canRetry = false,
+  ): Promise<SerializeRes> {
+
     if (this.skipRecordingPage) {
-      return false;
+      return SerializeRes.Skipped;
     }
 
     // always include in pageinfo record if going to serialize to WARC
@@ -1677,7 +1705,7 @@ export class Recorder extends EventEmitter {
         { url, status },
         "recorder",
       );
-      return false;
+      return SerializeRes.Skipped;
     } else if (!iter && reqresp.shouldSkipSave()) {
       logger.debug(
         "Skipping writing request/response",
@@ -1690,7 +1718,7 @@ export class Recorder extends EventEmitter {
         },
         "recorder",
       );
-      return false;
+      return SerializeRes.Skipped;
     }
 
     if (
@@ -1704,7 +1732,7 @@ export class Recorder extends EventEmitter {
         status,
         ...this.logDetails,
       });
-      return false;
+      return SerializeRes.Skipped;
     }
 
     let responseRecord = createResponse(reqresp, pageid, iter);
@@ -1717,12 +1745,12 @@ export class Recorder extends EventEmitter {
 
     if (iter) {
       if (
-        !(await this.checkStreamingRecordPayload(reqresp, serializer, false))
+        !(await this.checkStreamingRecordPayload(reqresp, serializer, canRetry))
       ) {
         serializer.externalBuffer?.purge();
         await this.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
         await this.crawlState.removeDupe(WRITE_DUPE_KEY, url, status);
-        return false;
+        return SerializeRes.Aborted;
       }
 
       const externalBuffer: TempFileBuffer =
@@ -1824,7 +1852,7 @@ export class Recorder extends EventEmitter {
 
     this.addPageRecord(reqresp);
 
-    return true;
+    return SerializeRes.Success;
   }
 }
 
@@ -1938,7 +1966,9 @@ class AsyncFetcher {
         throw new Error("resp body missing");
       }
 
-      if (!(await recorder.serializeToWARC(reqresp, iter))) {
+      if (
+        (await recorder.serializeToWARC(reqresp, iter)) === SerializeRes.Skipped
+      ) {
         await this.doCancel();
         return false;
       }
