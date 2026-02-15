@@ -1204,15 +1204,6 @@ return inx;
     });
   }
 
-  async incFailCount() {
-    const key = `${this.crawlId}:status:failcount:${this.uid}`;
-    const res = await this.redis.incr(key);
-
-    // consider failed if 3 failed retries in 60 secs
-    await this.redis.expire(key, 60);
-    return res >= 3;
-  }
-
   async addToQueue(
     {
       url,
