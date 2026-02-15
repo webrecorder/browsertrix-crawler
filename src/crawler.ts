@@ -65,12 +65,7 @@ import {
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed, parseSeeds } from "./util/seeds.js";
-import {
-  WARCWriter,
-  createWARCInfo,
-  setWARCInfo,
-  streamFinish,
-} from "./util/warcwriter.js";
+import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
@@ -125,7 +120,6 @@ export class Crawler {
   pagesFH?: WriteStream | null = null;
   extraPagesFH?: WriteStream | null = null;
   notQueuedFH?: WriteStream | null = null;
-  logFH: WriteStream | null = null;
 
   crawlId: string;
 
@@ -493,7 +487,7 @@ export class Crawler {
 
   async bootstrap() {
     if (await isDiskFull(this.params.cwd)) {
-      logger.fatal(
+      logger.interrupt(
         "Out of disk space, exiting",
         {},
         "general",
@@ -523,8 +517,7 @@ export class Crawler {
 
     await fsp.mkdir(this.downloadsDir, { recursive: true });
 
-    this.logFH = fs.createWriteStream(this.logFilename, { flags: "a" });
-    logger.setExternalLogStream(this.logFH);
+    logger.setOutputFile(this.logFilename);
 
     this.infoString = await getInfoString();
     setWARCInfo(this.infoString, this.params.warcInfo);
@@ -696,7 +689,7 @@ export class Crawler {
         status = "failed";
       }
     } finally {
-      await this.setStatusAndExit(exitCode, status);
+      await logger.setStatusAndExit(exitCode, status);
     }
   }
 
@@ -1729,7 +1722,7 @@ self.__bx_behaviors.selectMainBehavior();
   async checkCanceled() {
     if (this.crawlState && (await this.crawlState.isCrawlCanceled())) {
       await this.cleanupOnCancel();
-      await this.setStatusAndExit(ExitCodes.Success, "canceled");
+      await logger.setStatusAndExit(ExitCodes.Success, "canceled");
       return true;
     }
 
@@ -1740,17 +1733,6 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.isExternalDedupeStore) {
       await this.crawlState.clearUncommitted();
     }
-  }
-
-  async setStatusAndExit(exitCode: ExitCodes, status: string) {
-    logger.info(`Exiting, Crawl status: ${status}`);
-
-    await this.closeLog();
-
-    if (this.crawlState && status) {
-      await this.crawlState.setStatus(status);
-    }
-    process.exit(exitCode);
   }
 
   async serializeAndExit() {
@@ -1768,15 +1750,17 @@ self.__bx_behaviors.selectMainBehavior();
       await this.closeFiles();
 
       if (!this.done) {
-        await this.setStatusAndExit(
+        logger.interrupt(
+          "Forced interrupt by signal",
+          {},
+          "general",
           ExitCodes.SignalInterruptedForce,
-          "interrupted",
         );
         return true;
       }
     }
 
-    await this.setStatusAndExit(ExitCodes.Success, "done");
+    await logger.setStatusAndExit(ExitCodes.Success, "done");
     return true;
   }
 
@@ -2138,17 +2122,6 @@ self.__bx_behaviors.selectMainBehavior();
     this.browser.crashed = true;
   }
 
-  async closeLog(): Promise<void> {
-    // close file-based log
-    logger.setExternalLogStream(null);
-    if (!this.logFH) {
-      return;
-    }
-    const logFH = this.logFH;
-    this.logFH = null;
-    await streamFinish(logFH);
-  }
-
   async generateWACZ(): Promise<WACZ | null> {
     logger.info("Generating WACZ");
     await this.crawlState.setStatus("generate-wacz");
@@ -2169,7 +2142,7 @@ self.__bx_behaviors.selectMainBehavior();
       if ((await this.crawlState.numDone()) > 0) {
         return null;
       }
-      // fail crawl otherwise
+      // interrupt crawl otherwise
       logger.fatal("No WARC Files, assuming crawl failed");
     }
 
@@ -2185,7 +2158,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     logger.debug("End of log file in WACZ, storing logs to WACZ file");
 
-    await this.closeLog();
+    await logger.closeLog();
 
     const requires = await this.crawlState.getDupeDependentCrawls();
 
@@ -2234,12 +2207,12 @@ self.__bx_behaviors.selectMainBehavior();
       }
       return wacz;
     } catch (e) {
-      logger.error("Error creating WACZ", e);
-      if (!streaming) {
-        logger.fatal("Unable to write WACZ successfully");
-      } else if (this.params.restartsOnError) {
-        await this.setStatusAndExit(ExitCodes.UploadFailed, "interrupted");
-      }
+      logger.interrupt(
+        "Error creating / uploading WACZ",
+        formatErr(e),
+        "wacz",
+        ExitCodes.UploadFailed,
+      );
     }
 
     return null;
