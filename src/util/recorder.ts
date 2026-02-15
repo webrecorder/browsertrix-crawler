@@ -782,9 +782,6 @@ export class Recorder extends EventEmitter {
 
     const mimeType = this.getMimeType(responseHeaders) || "";
 
-    // response will be handled here, or skipped
-    this.removeReqResp(networkId);
-
     let streamingConsume = false;
 
     if (
@@ -796,21 +793,15 @@ export class Recorder extends EventEmitter {
       )
     ) {
       if (await this.isDupeFetch(reqresp)) {
+        this.removeReqResp(networkId);
         return false;
       }
-
-      console.log(
-        "SHOULD STREAM",
-        reqresp.resourceType,
-        contentLen,
-        url,
-        mimeType,
-      );
 
       streamingConsume = await this.fetchResponseBody(requestId, reqresp, cdp);
 
       // if not consumed via takeStream, attempt async loading
       if (!streamingConsume) {
+        this.removeReqResp(networkId);
         const opts: AsyncFetchOptions = {
           reqresp,
           expectedSize: contentLen,
@@ -888,6 +879,7 @@ export class Recorder extends EventEmitter {
           { url, ...this.logDetails },
           "recorder",
         );
+        this.removeReqResp(networkId);
       }
       return false;
     }
@@ -1492,6 +1484,7 @@ export class Recorder extends EventEmitter {
       });
 
       const iter = this.takeStreamIter(reqresp, cdp, stream);
+      this.removeReqResp(networkId);
 
       try {
         await this.serializeToWARC(reqresp, iter);
