@@ -1024,6 +1024,10 @@ return inx;
     return parseInt(res) >= RATE_LIMIT_MAX;
   }
 
+  async getRateLimitStats() {
+    return await this.redis.hgetall(`${this.crawlId}:rateStats`);
+  }
+
   recheckScope(data: QueueEntry, seeds: ScopedSeed[]) {
     const seed = seeds[data.seedId];
 

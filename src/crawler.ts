@@ -2050,6 +2050,9 @@ self.__bx_behaviors.selectMainBehavior();
     this.postCrawling = true;
     logger.info("Crawling done");
 
+    const rateStats = await this.crawlState.getRateLimitStats();
+    logger.info("Rate Limit Stats", rateStats);
+
     if (this.params.combineWARC && !this.params.dryRun) {
       await this.combineWARC();
     }
