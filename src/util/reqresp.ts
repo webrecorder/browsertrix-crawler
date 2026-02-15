@@ -72,8 +72,10 @@ export class RequestResponseInfo {
   extraOpts: ExtraOpts = {};
 
   // stats
-  readSize: number = 0;
-  expectedSize: number = 0;
+  readSize = 0;
+
+  // should default to -1 to indicate no expected size
+  expectedSize = -1;
 
   // set to true to indicate request intercepted via Fetch.requestPaused
   intercepting = false;
