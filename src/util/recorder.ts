@@ -1484,13 +1484,14 @@ export class Recorder extends EventEmitter {
       });
 
       const iter = this.takeStreamIter(reqresp, cdp, stream);
-      this.removeReqResp(networkId);
 
       try {
         await this.serializeToWARC(reqresp, iter);
       } catch (e) {
         logger.warn("Error Serializing to WARC", e, "recorder");
       }
+      this.removeReqResp(reqresp.requestId);
+      return true;
     } catch (e) {
       logger.debug(
         "Fetch responseBodyAsStream failed, will retry async",
@@ -1499,8 +1500,6 @@ export class Recorder extends EventEmitter {
       );
       return false;
     }
-
-    return true;
   }
 
   async *takeStreamIter(
