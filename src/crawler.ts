@@ -1119,9 +1119,21 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    let result = false;
+    const doDirectFetch = async () => {
+      if (!recorder) {
+        return false;
+      }
+      if (await this.crawlState.isRateLimited(true)) {
+        logger.warn(
+          "Direct fetch skipped, rate limited",
+          { url, ...logDetails },
+          "fetch",
+        );
+        return false;
+      }
 
-    if (recorder) {
+      let result = 0;
+
       try {
         const headers = auth
           ? { Authorization: auth, ...this.headers }
@@ -1139,6 +1151,8 @@ self.__bx_behaviors.selectMainBehavior();
           "Direct fetch of page URL timed out",
           logDetails,
           "fetch",
+          false,
+          true,
         );
       } catch (e) {
         logger.error(
@@ -1146,18 +1160,26 @@ self.__bx_behaviors.selectMainBehavior();
           { e, ...logDetails },
           "fetch",
         );
+        result = 999;
       }
 
-      if (!result) {
+      if (result != 200) {
         logger.debug(
           "Direct fetch response not accepted, continuing with browser fetch",
           logDetails,
           "fetch",
         );
+        await this.crawlState.incRateLimited(result, true);
+        return false;
       } else {
-        await this.awaitPageExtraDelay(opts);
-        return;
+        return true;
       }
+    };
+
+    if (recorder && (await doDirectFetch())) {
+      // return if direct fetch succeeds
+      await this.awaitPageExtraDelay(opts);
+      return;
     }
 
     opts.markPageUsed();
@@ -2360,6 +2382,15 @@ self.__bx_behaviors.selectMainBehavior();
               { msg },
               data,
             );
+          } else if (msg.startsWith("net::ERR_HTTP2_PROTOCOL_ERROR")) {
+            // treat as rate limit, page blocked
+            data.pageRateLimited = 999;
+            logger.warn(
+              "Page load interrupted, possibly rate limited",
+              { url, msg, ...logDetails },
+              "pageStatus",
+            );
+            throw new Error("logged");
           } else {
             return this.pageFailed("Page Load Failed", retry, {
               msg,
