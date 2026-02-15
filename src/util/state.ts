@@ -44,6 +44,11 @@ export function normalizeDedupeStatus(status: number): string {
 }
 
 // ============================================================================
+// Rate Limit Constants
+const RATE_LIMIT_TIME = 300;
+const RATE_LIMIT_MAX = 3;
+
+// ============================================================================
 export type WorkerId = number;
 
 // ============================================================================
@@ -749,7 +754,6 @@ export class RedisDedupeIndex {
 export class RedisCrawlState extends RedisDedupeIndex {
   redis: Redis;
   maxRetries: number;
-  rateLimit = 0;
 
   uid: string;
   maxPageTime: number;
@@ -1000,7 +1004,6 @@ return inx;
 
   async markFinished(url: string) {
     await this.redis.hdel(this.pkey, url);
-    await this.clearRateLimit();
 
     return await this.redis.incr(this.dkey);
   }
@@ -1022,10 +1025,17 @@ return inx;
     await this.redis.sadd(this.exKey, url);
   }
 
-  async incRateLimited(rateLimitStatus: number) {
-    const key = this.crawlId + ":rate";
-    const RATE_LIMIT_TIME = 300;
-    const RATE_LIMIT_MAX = 3;
+  async incRateLimited(rateLimitStatus: number, isDirectFetch = false) {
+    if (rateLimitStatus < 400 || rateLimitStatus === 404) {
+      return false;
+    }
+
+    const statVal = rateLimitStatus + (isDirectFetch ? " d" : "");
+
+    // track rate limit stats
+    await this.redis.hincrby(`${this.crawlId}:rateStats`, statVal, 1);
+
+    const key = this.crawlId + (isDirectFetch ? ":rateDirect" : ":rate");
 
     let incBy = 1;
 
@@ -1037,8 +1047,13 @@ return inx;
     return res >= RATE_LIMIT_MAX;
   }
 
-  async clearRateLimit() {
-    this.rateLimit = 0;
+  async isRateLimited(isDirectFetch = false) {
+    const key = this.crawlId + (isDirectFetch ? ":rateDirect" : ":rate");
+    const res = await this.redis.get(key);
+    if (!res) {
+      return false;
+    }
+    return parseInt(res) >= RATE_LIMIT_MAX;
   }
 
   recheckScope(data: QueueEntry, seeds: ScopedSeed[]) {
