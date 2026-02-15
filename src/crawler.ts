@@ -1409,7 +1409,7 @@ self.__bx_behaviors.selectMainBehavior();
             this.params.restartsOnError
           ) {
             await this.serializeConfig();
-            await this.setStatusAndExit(ExitCodes.RateLimited, "interrupted");
+            await logger.setStatusAndExit(ExitCodes.RateLimited, "interrupted");
           }
         }
 
