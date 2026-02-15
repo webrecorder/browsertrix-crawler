@@ -972,7 +972,6 @@ return inx;
 
   async markFinished(url: string) {
     await this.redis.hdel(this.pkey, url);
-    await this.clearRateLimit();
 
     return await this.redis.incr(this.dkey);
   }

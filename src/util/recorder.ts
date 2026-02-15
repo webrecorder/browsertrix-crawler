@@ -1686,7 +1686,6 @@ export class Recorder extends EventEmitter {
     iter?: AsyncIterable<Uint8Array>,
     canRetry = false,
   ): Promise<SerializeRes> {
-
     if (this.skipRecordingPage) {
       return SerializeRes.Skipped;
     }
