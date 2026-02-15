@@ -2204,6 +2204,10 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
+    if (this.params.listNotQueued) {
+      waczOpts.reportsDir = this.reportsDir;
+    }
+
     if (this.params.title) {
       waczOpts.title = this.params.title;
     }
@@ -2976,14 +2980,12 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    const ts = new Date();
+    const ts = new Date().toISOString;
 
     let seed = false;
     if (depth === 0) {
       seed = true;
     }
-
-    // todo: do we want to write to redis?
 
     const row = { url, seedUrl, depth, seed, reason, ts };
     const processedRow = JSON.stringify(row) + "\n";
