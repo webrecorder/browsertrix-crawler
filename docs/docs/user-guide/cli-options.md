@@ -95,8 +95,12 @@ Options:
                                             errors, debug
                                                     [array] [default: ["stats"]]
       --logLevel                            Comma-separated list of log levels t
-                                            o include in logs
-                                                           [array] [default: []]
+                                            o include in logs. By default all bu
+                                            t debug are included. To include deb
+                                            ug messages in logs, debug must also
+                                             be passed to logging option.
+  [array] [choices: "debug", "info", "warn", "error", "interrupt", "fatal"] [def
+                                                                       ault: []]
       --context, --logContext               Comma-separated list of contexts to
                                             include in logs
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"

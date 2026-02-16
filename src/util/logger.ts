@@ -65,13 +65,16 @@ export const LOG_CONTEXT_TYPES = [
 
 export type LogContext = (typeof LOG_CONTEXT_TYPES)[number];
 
-export type LogLevel =
-  | "debug"
-  | "info"
-  | "warn"
-  | "error"
-  | "interrupt"
-  | "fatal";
+export const LOG_LEVEL_TYPES = [
+  "debug",
+  "info",
+  "warn",
+  "error",
+  "interrupt",
+  "fatal",
+] as const;
+
+export type LogLevel = (typeof LOG_LEVEL_TYPES)[number];
 
 export const DEFAULT_EXCLUDE_LOG_CONTEXTS: LogContext[] = [
   "recorderNetwork",
@@ -85,7 +88,7 @@ class Logger {
   debugLogging = false;
   logErrorsToRedis = false;
   logBehaviorsToRedis = false;
-  logLevels: string[] = [];
+  logLevels: LogLevel[] = [];
   contexts: LogContext[] = [];
   excludeContexts: LogContext[] = [];
   defaultLogContext: LogContext = "general";
@@ -116,7 +119,7 @@ class Logger {
     this.logBehaviorsToRedis = logBehaviorsToRedis;
   }
 
-  setLogLevel(logLevels: string[]) {
+  setLogLevel(logLevels: LogLevel[]) {
     this.logLevels = logLevels;
   }
 
