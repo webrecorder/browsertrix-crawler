@@ -1,14 +1,14 @@
 import path, { basename } from "node:path";
 import fs, { openAsBlob } from "node:fs";
 import fsp from "node:fs/promises";
-import { Writable, Readable } from "node:stream";
+import { Writable, Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import readline from "node:readline";
 import child_process from "node:child_process";
 
-import { createHash, Hash } from "node:crypto";
+import { createHash, type Hash } from "node:crypto";
 
-import { gzip } from "node:zlib";
+import { createGzip } from "node:zlib";
 
 import { ReadableStream } from "node:stream/web";
 
@@ -29,7 +29,34 @@ const INDEX_CDX_GZ = "index.cdx.gz";
 
 const LINES_PER_BLOCK = 256;
 
+const MAX_CDX_BLOCK_SIZE = 10000000;
+
 const ZIP_CDX_MIN_SIZE = 50_000;
+
+// ============================================================================
+class Hasher {
+  hasher: Hash;
+  hashStream: Transform;
+  length = 0;
+
+  constructor() {
+    this.hasher = createHash("sha-256");
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const hasher = this;
+
+    this.hashStream = new Transform({
+      transform(chunk, encoding, callback) {
+        hasher.hasher.update(chunk);
+        hasher.length += chunk.length;
+        callback(null, chunk);
+      },
+    });
+  }
+
+  get digest(): string {
+    return "sha256:" + this.hasher.digest("hex");
+  }
+}
 
 // ============================================================================
 export type WACZInitOpts = {
@@ -332,20 +359,19 @@ export async function mergeCDXJ(
     }
   }
 
-  async function* generateCompressed(
+  async function writeCompressed(
     reader: AsyncGenerator<string>,
     idxFile: Writable,
+    outFile: Writable,
   ) {
     let offset = 0;
-
-    const encoder = new TextEncoder();
 
     const filename = INDEX_CDX_GZ;
 
     let cdxLines: string[] = [];
+    let cdxSize = 0;
 
     let key = "";
-    let count = 0;
 
     idxFile.write(
       `!meta 0 ${JSON.stringify({
@@ -354,18 +380,21 @@ export async function mergeCDXJ(
       })}\n`,
     );
 
-    const finishChunk = async () => {
-      const compressed = await new Promise<Uint8Array>((resolve) => {
-        gzip(encoder.encode(cdxLines.join("")), (_, result) => {
-          if (result) {
-            resolve(result);
-          }
-        });
-      });
+    const finishChunk = async (end: boolean) => {
+      const hasher = new Hasher();
 
-      const length = compressed.length;
-      const digest =
-        "sha256:" + createHash("sha256").update(compressed).digest("hex");
+      // pipe reader -> gzip -> hasher (+ length) -> outFile
+      // close out stream if last chunk (end is true)
+      await pipeline(
+        Readable.from(cdxLines, { encoding: "utf-8" }),
+        createGzip(),
+        hasher.hashStream,
+        outFile,
+        { end },
+      );
+
+      const length = hasher.length;
+      const digest = hasher.digest;
 
       const idx =
         key + " " + JSON.stringify({ offset, length, digest, filename });
@@ -374,11 +403,10 @@ export async function mergeCDXJ(
 
       offset += length;
 
-      count = 1;
-      key = "";
       cdxLines = [];
+      cdxSize = 0;
 
-      return compressed;
+      key = "";
     };
 
     for await (const cdx of reader) {
@@ -386,14 +414,20 @@ export async function mergeCDXJ(
         key = cdx.split(" {", 1)[0];
       }
 
-      if (++count === LINES_PER_BLOCK) {
-        yield await finishChunk();
+      if (
+        cdxLines.length === LINES_PER_BLOCK ||
+        cdxSize >= MAX_CDX_BLOCK_SIZE
+      ) {
+        await finishChunk(false);
       }
       cdxLines.push(cdx);
+      cdxSize += cdx.length;
     }
 
     if (key) {
-      yield await finishChunk();
+      await finishChunk(true);
+    } else {
+      await streamFinish(outFile);
     }
   }
 
@@ -439,10 +473,11 @@ export async function mergeCDXJ(
       encoding: "utf-8",
     });
 
-    await pipeline(
-      Readable.from(generateCompressed(readLinesFrom(proc.stdout), outputIdx)),
-      output,
-    );
+    // await pipeline(
+    //   Readable.from(generateCompressed(readLinesFrom(proc.stdout), outputIdx)),
+    //   output,
+    // );
+    await writeCompressed(readLinesFrom(proc.stdout), outputIdx, output);
 
     await streamFinish(outputIdx);
 
