@@ -379,7 +379,7 @@ export async function mergeCDXJ(
       // pipe reader -> gzip -> hasher (+ length) -> outFile
       // close out stream if last chunk (end is true)
       await pipeline(
-        Readable.from(cdxLines),
+        Readable.from(cdxLines, { encoding: "utf-8" }),
         createGzip(),
         hasher.hashStream,
         outFile,
