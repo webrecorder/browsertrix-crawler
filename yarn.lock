@@ -7159,10 +7159,9 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.4.7, warcio@^2.4.9:
-  version "2.4.9"
-  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.9.tgz#8f47bf1aca535ac2b3005d27220f9aa301ddec68"
-  integrity sha512-+Omi3ayMOwk1PlnnCu8EcEzRSFBtFYS8t2oD5/12M99fHEHQv80qkbltfrwJ1Qo2e2+4ieI5nGtes0TSTZrGmg==
+warcio@^2.4.7, "warcio@git+https://github.com/webrecorder/warcio.js#max-post-query-size":
+  version "2.4.10"
+  resolved "git+https://github.com/webrecorder/warcio.js#c1adda5a65250095703919cfa7e4f4705220cbf1"
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"
