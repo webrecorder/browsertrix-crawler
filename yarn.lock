@@ -7159,9 +7159,22 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.4.7, "warcio@git+https://github.com/webrecorder/warcio.js#max-post-query-size":
+warcio@^2.4.7:
   version "2.4.10"
   resolved "git+https://github.com/webrecorder/warcio.js#c1adda5a65250095703919cfa7e4f4705220cbf1"
+  dependencies:
+    "@types/pako" "^1.0.7"
+    "@types/stream-buffers" "^3.0.7"
+    base32-encode "^2.0.0"
+    hash-wasm "^4.9.0"
+    pako "^1.0.11"
+    tempy "^3.1.0"
+    uuid-random "^1.3.2"
+    yargs "^17.7.2"
+
+"warcio@git+https://github.com/webrecorder/warcio.js#max-post-query-size":
+  version "2.4.10"
+  resolved "git+https://github.com/webrecorder/warcio.js#3aa5ed86e10cbbe5bd31518fb6c8639ddc4d68b4"
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"
