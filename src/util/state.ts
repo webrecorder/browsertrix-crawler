@@ -737,10 +737,9 @@ export class RedisReportsIndex {
 
     const pipe = this.redis.pipeline();
 
-    // use sets to keep track of hosts, crawls, digests, and mime types
+    // use sets to keep track of hosts, crawls, and mime types
     pipe.sadd(`r:hosts`, host);
     pipe.sadd(`r:crawls`, crawl);
-    pipe.sadd(`r:digests`, record.digest);
     pipe.sadd(`r:mimes`, record.mime);
 
     // increment undifferentiated counts/sizes for host, crawls, and mime types
