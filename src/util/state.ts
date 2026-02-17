@@ -17,6 +17,7 @@ import { Frame } from "puppeteer-core";
 import { interpolateFilename, UploadResult } from "./storage.js";
 import { normalizeUrl } from "./normalize.js";
 import { WACZ } from "./wacz.js";
+import { CDXJRecord } from "../cdxj.js";
 
 // ============================================================================
 export enum LoadState {
@@ -708,6 +709,87 @@ export class RedisDedupeIndex {
       `c:${crawlId}:wacz`,
       `h:${crawlId}:counts`,
     );
+  }
+}
+
+// ============================================================================
+export class RedisReportsIndex {
+  redis: Redis;
+
+  constructor(redis: Redis) {
+    this.redis = redis;
+  }
+
+  recordStats(record: CDXJRecord | Record<string, never>, crawl: string) {
+    if (Object.keys(record).length === 0) {
+      logger.warn("Empty record provided to RedisReportsIndex.recordStats");
+      return;
+    }
+    const normalizedUrl = normalizeUrl(record.url);
+    const host = new URL(normalizedUrl).host;
+    const isRevisitRecord = record.mime === "warc/revisit";
+    const status = Number(record.status);
+    const length = Number(record.length);
+    const isSuccessful = status <= 299;
+    const isRedirect = status >= 300 && status <= 399;
+    const isClientError = status >= 400 && status <= 499;
+    const isServerError = status >= 500;
+
+    const pipe = this.redis.pipeline();
+
+    // use sets to keep track of hosts, crawls, digests, and mime types
+    pipe.sadd(`r:hosts`, host);
+    pipe.sadd(`r:crawls`, crawl);
+    pipe.sadd(`r:digests`, record.digest);
+    pipe.sadd(`r:mimes`, record.mime);
+
+    // increment undifferentiated counts/sizes for host, crawls, and mime types
+    pipe.incr(`r:count:host:${host}`);
+    pipe.incrby(`r:size:host:${host}`, length);
+    pipe.incr(`r:count:crawl:${crawl}`);
+    pipe.incrby(`r:size:crawl:${crawl}`, length);
+    pipe.incr(`r:count:mime:${record.mime}`);
+    pipe.incrby(`r:size:mime:${record.mime}`, length);
+
+    // increment counts/sizes for host, crawl, and mime based on whether it's a revisit or original record
+    if (isRevisitRecord) {
+      pipe.incrby(`r:size:host:${host}:type:revisit`, length);
+      pipe.incrby(`r:size:crawl:${crawl}:type:revisit`, length);
+      pipe.incr(`r:count:mime:${record.mime}:type:revisit`);
+      pipe.incrby(`r:size:mime:${record.mime}:type:revisit`, length);
+    } else {
+      pipe.incrby(`r:size:host:${host}:type:original`, length);
+      pipe.incrby(`r:size:crawl:${crawl}:type:original`, length);
+      pipe.incr(`r:count:mime:${record.mime}:type:original`);
+      pipe.incrby(`r:size:mime:${record.mime}:type:original`, length);
+    }
+
+    // record stats by status code category
+    if (isSuccessful) {
+      this.incrementStatus(pipe, "2xx", host, crawl, length);
+    } else if (isRedirect) {
+      this.incrementStatus(pipe, "3xx", host, crawl, length);
+    } else if (isClientError) {
+      this.incrementStatus(pipe, "4xx", host, crawl, length);
+    } else if (isServerError) {
+      this.incrementStatus(pipe, "5xx", host, crawl, length);
+    }
+
+    return pipe.exec();
+  }
+
+  incrementStatus(
+    pipe: ChainableCommander,
+    status: string,
+    host: string,
+    crawl: string,
+    length: number,
+  ) {
+    pipe.incrby(`r:size:host:${host}:status:${status}`, length);
+    pipe.incrby(`r:size:crawl:${crawl}:status:${status}`, length);
+    pipe.incr(`r:count:status:${status}`);
+    pipe.incr(`r:count:host:${host}:status:${status}`);
+    pipe.incr(`r:count:crawl:${crawl}:status:${status}`);
   }
 }
 

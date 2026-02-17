@@ -6,12 +6,13 @@ import { getFileOrUrlJson, getInfoString } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
 import { ExitCodes } from "./util/constants.js";
 import { initRedisWaitForSuccess } from "./util/redis.js";
-import { RedisDedupeIndex } from "./util/state.js";
+import { RedisDedupeIndex, RedisReportsIndex } from "./util/state.js";
 import { basename } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import readline from "node:readline";
 import { createGunzip } from "node:zlib";
+import { CDXJRecord } from "./cdxj.js";
 
 export type DedupeIndexEntry = {
   name: string;
@@ -76,6 +77,7 @@ export class CrawlIndexer {
 
     const redis = await initRedisWaitForSuccess(params.redisDedupeUrl);
     const dedupeIndex = new RedisDedupeIndex(redis, "");
+    const reportsIndex = new RedisReportsIndex(redis);
 
     for await (const entry of this.iterWACZ({
       url: params.sourceUrl,
@@ -142,6 +144,7 @@ export class CrawlIndexer {
 
         await this.ingestCDXJ(
           dedupeIndex,
+          reportsIndex,
           loader,
           filename,
           crawlIdReal,
@@ -174,6 +177,7 @@ export class CrawlIndexer {
 
   async ingestCDXJ(
     dedupeIndex: RedisDedupeIndex,
+    reportsIndex: RedisReportsIndex,
     loader: WACZLoader,
     filename: string,
     crawlId: string,
@@ -223,8 +227,7 @@ export class CrawlIndexer {
         logger.debug("Lines processed", { count });
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let cdx: Record<string, any> = {};
+      let cdx: Record<string, never> | CDXJRecord = {};
 
       try {
         cdx = JSON.parse(line.slice(inx));
@@ -237,6 +240,8 @@ export class CrawlIndexer {
       const url = cdx.url;
       const hash = cdx.digest;
       const size = Number(cdx.length);
+
+      promises.push(reportsIndex.recordStats(cdx, crawlId));
 
       if (url.startsWith("urn:")) {
         continue;
