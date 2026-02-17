@@ -1439,7 +1439,7 @@ export class Recorder extends EventEmitter {
     cdp,
     crawler,
     state,
-  }: DirectFetchRequest): Promise<boolean> {
+  }: DirectFetchRequest): Promise<number> {
     const reqresp = new RequestResponseInfo("0");
     const ts = new Date();
 
@@ -1466,20 +1466,23 @@ export class Recorder extends EventEmitter {
     });
 
     if (!(await fetcher.loadHeaders())) {
-      return false;
+      return 0;
     }
 
     const mime = reqresp.getMimeType() || "";
     // cancel if not 200 or mime is html
-    if (reqresp.status !== 200 || isHTMLMime(mime)) {
+    if (reqresp.status !== 200) {
       await fetcher.doCancel();
-      return false;
+      return reqresp.status;
+    }
+    if (isHTMLMime(mime)) {
+      return 600;
     }
     if (!this.stopping) {
       state.asyncLoading = true;
       void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
     }
-    return true;
+    return reqresp.status;
   }
 
   async getCookieString(cdp: CDPSession, url: string): Promise<string> {

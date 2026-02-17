@@ -1166,7 +1166,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (result != 200) {
         logger.debug(
           "Direct fetch response not accepted, continuing with browser fetch",
-          logDetails,
+          { status: result, ...logDetails },
           "fetch",
         );
         await this.crawlState.incRateLimited(result, true);
