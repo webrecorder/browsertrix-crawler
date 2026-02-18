@@ -2261,10 +2261,10 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@webrecorder/wabac@^2.25.3":
-  version "2.25.3"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.25.3.tgz#c60dce925d915b0e48de12cba2ea9af282080fb5"
-  integrity sha512-9VZW0NvPqvJN5tgR0hA8O49w1gXXhXBhp5oQhxtEZ5Ldulbl6q4cn5pRE3HItrYVmUOHoma5iPyYZRKaCbyOig==
+"@webrecorder/wabac@^2.25.4":
+  version "2.25.4"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.25.4.tgz#14faafee92f7fd31bfef3552515101c2589ebd1c"
+  integrity sha512-lb9233U52Oz99G4OwzJca2P+zWtTa6bfszAJ5uw03aJJjYEoLzhtsLSlVE7Tt43kTAHr83DED5XMD/uD77T9aA==
   dependencies:
     "@peculiar/asn1-ecc" "^2.3.4"
     "@peculiar/asn1-schema" "^2.3.3"
