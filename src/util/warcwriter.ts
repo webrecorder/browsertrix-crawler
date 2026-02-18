@@ -390,7 +390,7 @@ export async function createWARCInfo(filename: string) {
 export async function streamFinish(fh: Writable) {
   fh.end();
   try {
-    await finished(fh);
+    await finished(fh, { cleanup: true });
   } catch (e) {
     logger.error("Error finishing stream", e);
   }

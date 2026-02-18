@@ -378,13 +378,12 @@ export async function mergeCDXJ(
 
       // pipe reader -> gzip -> hasher (+ length) -> outFile
       // close out stream if last chunk (end is true)
-      await pipeline(
-        Readable.from(cdxLines, { encoding: "utf-8" }),
-        createGzip(),
-        hasher.hashStream,
-        outFile,
-        { end },
-      );
+      const stream = Readable.from(cdxLines, { encoding: "utf-8" })
+        .pipe(createGzip())
+        .pipe(hasher.hashStream)
+        .pipe(outFile, { end });
+
+      await streamFinish(stream);
 
       const length = hasher.length;
       const digest = hasher.digest;
