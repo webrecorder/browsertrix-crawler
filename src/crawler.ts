@@ -1681,7 +1681,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async cleanupOnCancel() {
-    if (this.isExternalDedupeStore) {
+    if (this.isExternalDedupeStore && !this.params.restartsOnError) {
       await this.crawlState.clearUncommitted();
     }
   }
@@ -2028,7 +2028,7 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    if (this.isExternalDedupeStore) {
+    if (this.isExternalDedupeStore && !this.params.restartsOnError) {
       // commit crawl data to main index
       logger.info("Committing dedupe index");
       await this.crawlState.commitDedupeDone();

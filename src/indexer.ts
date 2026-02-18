@@ -59,6 +59,17 @@ export class CrawlIndexer {
           required: false,
           default: false,
         },
+
+        commitCrawlId: {
+          describe:
+            "If provided, commit single uncommitted crawl to merged index and exit",
+          type: "string",
+        },
+
+        cancelCrawlId: {
+          describe: "If provided, delete data for uncommitted crawl and exit",
+          type: "string",
+        },
       })
       .parseSync();
   }
@@ -76,6 +87,22 @@ export class CrawlIndexer {
 
     const redis = await initRedisWaitForSuccess(params.redisDedupeUrl);
     const dedupeIndex = new RedisDedupeIndex(redis, "");
+
+    if (params.commitCrawlId) {
+      // Commit one crawl and exit
+      logger.info("Committing crawl to merged index", {
+        crawlId: params.commitCrawlId,
+      });
+      await dedupeIndex.commitDedupeDone(params.commitCrawlId);
+      return;
+    } else if (params.cancelCrawlId) {
+      // Cancel one crawl and exit
+      logger.info("Deleting data for cancelled uncommitted crawl", {
+        crawlId: params.cancelCrawlId,
+      });
+      await dedupeIndex.clearUncommitted(params.cancelCrawlId);
+      return;
+    }
 
     for await (const entry of this.iterWACZ({
       url: params.sourceUrl,

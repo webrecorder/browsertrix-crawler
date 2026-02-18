@@ -273,19 +273,30 @@ export class RedisDedupeIndex {
 
   // COMMIT DEDUPE TO SHARED INDEX
 
-  async commitDedupeDone(crawlId?: string) {
+  async commitDedupeDone(crawlId?: string, ucommitted_key = DUPE_UNCOMMITTED) {
     crawlId = crawlId || this.crawlId;
 
-    // set this first, as crawl is considered 'committed' as soon
-    // as data is partially merged in
-    await this.dedupeRedis.srem(DUPE_UNCOMMITTED, crawlId);
+    // check if already committed
+    if (!(await this.dedupeRedis.sismember(ucommitted_key, crawlId))) {
+      logger.warn("Crawl not found for committing, or already committted", {
+        crawlId,
+      });
+      return;
+    }
+
     await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
+
+    let totalHashes = 0;
+    let newHashes = 0;
 
     for await (const hashes of this.dedupeRedis.hscanStream(`h:${crawlId}`)) {
       let isValue = false;
       for (const hash of hashes) {
         if (!isValue) {
-          await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId);
+          if (await this.dedupeRedis.hsetnx(DUPE_ALL_HASH_KEY, hash, crawlId)) {
+            newHashes++;
+          }
+          totalHashes++;
         }
         isValue = !isValue;
       }
@@ -307,8 +318,25 @@ export class RedisDedupeIndex {
       }
     }
 
-    // add counts
-    await this.addCrawlCounts(crawlId);
+    // move to all crawls here
+    if (
+      !(await this.dedupeRedis.smove(ucommitted_key, DUPE_ALL_CRAWLS, crawlId))
+    ) {
+      // if already moved, return here to avoid duplicating counts
+      return;
+    }
+
+    const counts = await this.dedupeRedis.hgetall(`h:${crawlId}:counts`);
+    for (const [key, value] of Object.entries(counts)) {
+      await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, key, Number(value));
+    }
+
+    logger.info("Crawl committed to merged index!", {
+      crawlId,
+      totalHashes,
+      newHashes,
+      numWacz,
+    });
   }
 
   // ADD UNCOMITTED CRAWL
@@ -319,10 +347,11 @@ export class RedisDedupeIndex {
   }
 
   // CLEAR UNCOMMITTED
-  async clearUncommitted() {
-    if (this.crawlId) {
-      await this.dedupeRedis.srem(DUPE_UNCOMMITTED, this.crawlId);
-      await this.deleteCrawlDedupeKeys(this.crawlId);
+  async clearUncommitted(crawlId?: string) {
+    crawlId ||= this.crawlId;
+    if (crawlId) {
+      await this.dedupeRedis.srem(DUPE_UNCOMMITTED, crawlId);
+      await this.deleteCrawlDedupeKeys(crawlId);
     }
   }
 
@@ -411,13 +440,6 @@ export class RedisDedupeIndex {
 
   incrTotalSize(pipe: ChainableCommander, key: string, value: number) {
     pipe.hincrby(key, "totalCrawlSize", value);
-  }
-
-  async addCrawlCounts(crawlId: string) {
-    const counts = await this.dedupeRedis.hgetall(`h:${crawlId}:counts`);
-    for (const [key, value] of Object.entries(counts)) {
-      await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, key, Number(value));
-    }
   }
 
   // IMPORT
@@ -674,8 +696,7 @@ export class RedisDedupeIndex {
     // readd all crawls that should be kept
     for (const crawlId of readdCrawls) {
       await this.setUpdateProgress(0.5 + 0.5 * (count++ / numCrawls));
-      await this.commitDedupeDone(crawlId);
-      await this.dedupeRedis.srem(TO_REMOVE_CRAWLS, crawlId);
+      await this.commitDedupeDone(crawlId, TO_REMOVE_CRAWLS);
     }
 
     // clear data for remaining
