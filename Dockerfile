@@ -3,6 +3,11 @@ ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERS
 
 FROM ${BROWSER_IMAGE_BASE}
 
+LABEL org.opencontainers.image.vendor="Webrecorder <https://webrecorder.net/>"
+LABEL org.opencontainers.image.source="https://github.com/webrecorder/browsertrix-crawler"
+LABEL org.opencontainers.image.documentation="https://crawler.docs.browsertrix.com/"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later"
+
 # needed to add args to main build stage
 ARG BROWSER_VERSION
 
