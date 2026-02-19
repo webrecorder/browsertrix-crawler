@@ -49,7 +49,7 @@ to the merged index. The following key is used to track uncomitted crawls:
 
 If a crawl is canceled, these 3 keys should be removed and the crawl id should be removed from `uncommittedcrawls`
 
-The indexer entry point a dedicated `indexer --cancelCrawlId <crawlid>` to perform the cancelation operation.
+The indexer entrypoint includes a dedicated `indexer --cancelCrawlId <crawlid>` option to perform the cancellation operation.
 
 ### Committed Crawls / Merged Index Keys
 
@@ -134,9 +134,9 @@ The result is that all data related to removed crawls is purged, and the `remove
 ### Committing and Canceling
 
 The indexer entrypoint also includes options to commit or cancel a crawl, as explained above. These options,
-`--commitCrawlId <crawlid>` and `--cancelCrawlId <crawlid>` are useful when the crawler is controlled via k8s, eg. with --restartsOnError is set.
+`--commitCrawlId <crawlid>` and `--cancelCrawlId <crawlid>` are useful when the crawler is controlled via k8s, e.g. with `--restartsOnError` set.
 
-When this flag is set, it is expected that the commit/cancel operations will be run separately, otherwise, they are attempted as part of the crawl (after WACZ upload or upon cancellation).
+When the `--restartsOnError` flag is set, it is expected that the commit/cancel operations will be run separately, and so they are not run as part of the crawl. Otherwise, they are attempted as part of the crawl (after WACZ upload or upon cancellation).
 
 ## Crawl Dependency Tracking in WACZ datapackage.json
 
