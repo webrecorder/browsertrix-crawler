@@ -635,6 +635,13 @@ export class ReplayCrawler extends Crawler {
     resourceCounts.replayGood = replayGood;
     resourceCounts.replayBad = replayBad;
 
+    // If no resources replay, implies a 404 and set other matches to 0
+    if (replayGood === 0 && crawlGood + crawlBad > 0) {
+      logger.error("Replay Error, no resources replayed");
+      pageInfo.comparison.screenshotMatch = 0;
+      pageInfo.comparison.textMatch = 0;
+    }
+
     logger.info("Resource counts", { url, ...resourceCounts }, "replay");
   }
 
