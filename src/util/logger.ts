@@ -279,7 +279,7 @@ class Logger {
       this.logAsJSON(
         "Error shutting down, exiting anyway",
         e,
-        "general",
+        this.defaultLogContext,
         "error",
       );
     } finally {
