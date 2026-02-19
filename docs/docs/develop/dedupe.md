@@ -49,6 +49,8 @@ to the merged index. The following key is used to track uncomitted crawls:
 
 If a crawl is canceled, these 3 keys should be removed and the crawl id should be removed from `uncommittedcrawls`
 
+The indexer entrypoint includes a dedicated `indexer --cancelCrawlId <crawlid>` option to perform the cancellation operation.
+
 ### Committed Crawls / Merged Index Keys
 
 Once a crawl is finished, the merged index keys are updated as follows:
@@ -59,6 +61,9 @@ Once a crawl is finished, the merged index keys are updated as follows:
 - `allhashes`: `{[hash]: [crawlid]}` - The main merged index. For each hash in `h:${crawlid}`, an entry is added mapping `hash` to the `crawlid`, indicating the hash is found in this crawl. The full data from `h:${crawlid}` is not copied to save space.
 
 - `allcounts`: A sum of all the `h:${crawlid}:counts` for all crawlids in `allcrawls`. The `allcounts` fields are incremented by each new `h:${crawlid}:counts`
+
+Committing the crawl may take a long time, depending on the size of the crawl. For this reason, the indexer entrypoint
+includes a dedicated command to commit a single crawl, `indexer --commitCrawlId <crawlid>`.
 
 #### Dedupe Lookup
 
@@ -125,6 +130,13 @@ The removed crawls are removed from `allcrawls` and the `alldupes`, `allcounts` 
 the existing crawls, by rerunning the crawl 'commit' process for each existing crawl.
 
 The result is that all data related to removed crawls is purged, and the `removeCrawlSize` and `removeCrawls` counts are reset to 0.
+
+### Committing and Canceling
+
+The indexer entrypoint also includes options to commit or cancel a crawl, as explained above. These options,
+`--commitCrawlId <crawlid>` and `--cancelCrawlId <crawlid>` are useful when the crawler is controlled via k8s, e.g. with `--restartsOnError` set.
+
+When the `--restartsOnError` flag is set, it is expected that the commit/cancel operations will be run separately, and so they are not run as part of the crawl. Otherwise, they are attempted as part of the crawl (after WACZ upload or upon cancellation).
 
 ## Crawl Dependency Tracking in WACZ datapackage.json
 

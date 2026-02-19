@@ -44,7 +44,7 @@ export class CrawlIndexer {
         sourceUrl: {
           describe: "Source WACZ or Multi WACZ or Multi WACZ JSON to index",
           type: "string",
-          required: true,
+          required: false,
         },
 
         sourceCrawlId: {
@@ -59,12 +59,24 @@ export class CrawlIndexer {
           required: false,
           default: false,
         },
+
+        commitCrawlId: {
+          describe:
+            "If provided, commit single uncommitted crawl to merged index and exit",
+          type: "string",
+        },
+
+        cancelCrawlId: {
+          describe: "If provided, delete data for uncommitted crawl and exit",
+          type: "string",
+        },
       })
       .parseSync();
   }
 
   async run() {
     logger.setDebugLogging(true);
+    logger.setDefaultLogContext("dedupe");
 
     process.on("SIGINT", () => this.handleInterrupt("SIGINT"));
 
@@ -76,6 +88,27 @@ export class CrawlIndexer {
 
     const redis = await initRedisWaitForSuccess(params.redisDedupeUrl);
     const dedupeIndex = new RedisDedupeIndex(redis, "");
+
+    if (params.commitCrawlId) {
+      // Commit one crawl and exit
+      logger.info("Committing crawl to merged index", {
+        crawlId: params.commitCrawlId,
+      });
+      await dedupeIndex.commitDedupeDone(params.commitCrawlId);
+      process.exit(ExitCodes.Success);
+    } else if (params.cancelCrawlId) {
+      // Cancel one crawl and exit
+      logger.info("Deleting data for cancelled uncommitted crawl", {
+        crawlId: params.cancelCrawlId,
+      });
+      await dedupeIndex.clearUncommitted(params.cancelCrawlId);
+      process.exit(ExitCodes.Success);
+    } else if (!params.sourceUrl) {
+      logger.fatal(
+        "One of --commitCrawlId, --cancelCrawlId or --sourceUrl for import is required",
+      );
+      return;
+    }
 
     for await (const entry of this.iterWACZ({
       url: params.sourceUrl,
