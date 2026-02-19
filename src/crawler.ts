@@ -2030,7 +2030,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.isExternalDedupeStore && !this.params.restartsOnError) {
       // commit crawl data to main index
-      logger.info("Committing dedupe index");
+      logger.info("Committing dedupe index", {}, "dedupe");
       await this.crawlState.commitDedupeDone();
     }
 

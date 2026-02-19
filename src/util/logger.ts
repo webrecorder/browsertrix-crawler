@@ -58,6 +58,7 @@ export const LOG_CONTEXT_TYPES = [
   "proxy",
   "scope",
   "robots",
+  "dedupe",
 ] as const;
 
 export type LogContext = (typeof LOG_CONTEXT_TYPES)[number];

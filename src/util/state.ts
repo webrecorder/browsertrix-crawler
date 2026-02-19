@@ -278,9 +278,13 @@ export class RedisDedupeIndex {
 
     // check if already committed
     if (!(await this.dedupeRedis.sismember(uncommitted_key, crawlId))) {
-      logger.warn("Crawl not found for committing, or already committed", {
-        crawlId,
-      });
+      logger.warn(
+        "Crawl not found for committing, or already committed",
+        {
+          crawlId,
+        },
+        "dedupe",
+      );
       return;
     }
 
@@ -316,19 +320,27 @@ export class RedisDedupeIndex {
       }
     }
 
-    logger.info("Crawl committed to merged index!", {
-      crawlId,
-      totalHashes,
-      newHashes,
-      numWacz,
-    });
+    logger.info(
+      "Crawl committed to merged index!",
+      {
+        crawlId,
+        totalHashes,
+        newHashes,
+        numWacz,
+      },
+      "dedupe",
+    );
 
     // move to all crawls here
     if (
       !(await this.dedupeRedis.smove(uncommitted_key, DUPE_ALL_CRAWLS, crawlId))
     ) {
       // if already moved, return here to avoid duplicating counts
-      logger.info("Crawl counts not updated, already added to allcounts");
+      logger.warn(
+        "Crawl counts not updated, already added to allcounts",
+        {},
+        "dedupe",
+      );
       return;
     }
 
@@ -337,7 +349,7 @@ export class RedisDedupeIndex {
       await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, key, Number(value));
     }
 
-    logger.info("Crawl counts added to allcounts");
+    logger.debug("Crawl counts added to allcounts", {}, "dedupe");
   }
 
   // ADD UNCOMITTED CRAWL
