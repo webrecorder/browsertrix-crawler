@@ -80,8 +80,13 @@ class Logger {
   logLevels: string[] = [];
   contexts: LogContext[] = [];
   excludeContexts: LogContext[] = [];
+  defaultLogContext: LogContext = "general";
   crawlState?: RedisCrawlState | null = null;
   fatalExitCode: ExitCodes = ExitCodes.Fatal;
+
+  setDefaultLogContext(value: LogContext) {
+    this.defaultLogContext = value;
+  }
 
   setDefaultFatalExitCode(exitCode: number) {
     this.fatalExitCode = exitCode;
@@ -186,19 +191,35 @@ class Logger {
     }
   }
 
-  info(message: string, data: unknown = {}, context: LogContext = "general") {
+  info(
+    message: string,
+    data: unknown = {},
+    context: LogContext = this.defaultLogContext,
+  ) {
     this.logAsJSON(message, data, context, "info");
   }
 
-  error(message: string, data: unknown = {}, context: LogContext = "general") {
+  error(
+    message: string,
+    data: unknown = {},
+    context: LogContext = this.defaultLogContext,
+  ) {
     this.logAsJSON(message, data, context, "error");
   }
 
-  warn(message: string, data: unknown = {}, context: LogContext = "general") {
+  warn(
+    message: string,
+    data: unknown = {},
+    context: LogContext = this.defaultLogContext,
+  ) {
     this.logAsJSON(message, data, context, "warn");
   }
 
-  debug(message: string, data: unknown = {}, context: LogContext = "general") {
+  debug(
+    message: string,
+    data: unknown = {},
+    context: LogContext = this.defaultLogContext,
+  ) {
     if (this.debugLogging) {
       this.logAsJSON(message, data, context, "debug");
     }
@@ -207,7 +228,7 @@ class Logger {
   fatal(
     message: string,
     data = {},
-    context: LogContext = "general",
+    context: LogContext = this.defaultLogContext,
     exitCode = ExitCodes.Success,
   ) {
     exitCode = exitCode || this.fatalExitCode;

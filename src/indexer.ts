@@ -76,6 +76,7 @@ export class CrawlIndexer {
 
   async run() {
     logger.setDebugLogging(true);
+    logger.setDefaultLogContext("dedupe");
 
     process.on("SIGINT", () => this.handleInterrupt("SIGINT"));
 
@@ -84,7 +85,6 @@ export class CrawlIndexer {
     logger.info(await getInfoString());
 
     const params = this.initArgs();
-    logger.info("Running with Args", params);
 
     const redis = await initRedisWaitForSuccess(params.redisDedupeUrl);
     const dedupeIndex = new RedisDedupeIndex(redis, "");
