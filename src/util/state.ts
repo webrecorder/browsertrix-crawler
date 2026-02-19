@@ -273,18 +273,16 @@ export class RedisDedupeIndex {
 
   // COMMIT DEDUPE TO SHARED INDEX
 
-  async commitDedupeDone(crawlId?: string, ucommitted_key = DUPE_UNCOMMITTED) {
+  async commitDedupeDone(crawlId?: string, uncommitted_key = DUPE_UNCOMMITTED) {
     crawlId = crawlId || this.crawlId;
 
     // check if already committed
-    if (!(await this.dedupeRedis.sismember(ucommitted_key, crawlId))) {
-      logger.warn("Crawl not found for committing, or already committted", {
+    if (!(await this.dedupeRedis.sismember(uncommitted_key, crawlId))) {
+      logger.warn("Crawl not found for committing, or already committed", {
         crawlId,
       });
       return;
     }
-
-    await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, crawlId);
 
     let totalHashes = 0;
     let newHashes = 0;
@@ -318,11 +316,19 @@ export class RedisDedupeIndex {
       }
     }
 
+    logger.info("Crawl committed to merged index!", {
+      crawlId,
+      totalHashes,
+      newHashes,
+      numWacz,
+    });
+
     // move to all crawls here
     if (
-      !(await this.dedupeRedis.smove(ucommitted_key, DUPE_ALL_CRAWLS, crawlId))
+      !(await this.dedupeRedis.smove(uncommitted_key, DUPE_ALL_CRAWLS, crawlId))
     ) {
       // if already moved, return here to avoid duplicating counts
+      logger.info("Crawl counts not updated, already added to allcounts");
       return;
     }
 
@@ -331,12 +337,7 @@ export class RedisDedupeIndex {
       await this.dedupeRedis.hincrby(DUPE_ALL_COUNTS, key, Number(value));
     }
 
-    logger.info("Crawl committed to merged index!", {
-      crawlId,
-      totalHashes,
-      newHashes,
-      numWacz,
-    });
+    logger.info("Crawl counts added to allcounts");
   }
 
   // ADD UNCOMITTED CRAWL

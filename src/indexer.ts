@@ -44,7 +44,7 @@ export class CrawlIndexer {
         sourceUrl: {
           describe: "Source WACZ or Multi WACZ or Multi WACZ JSON to index",
           type: "string",
-          required: true,
+          required: false,
         },
 
         sourceCrawlId: {
@@ -84,6 +84,7 @@ export class CrawlIndexer {
     logger.info(await getInfoString());
 
     const params = this.initArgs();
+    logger.info("Running with Args", params);
 
     const redis = await initRedisWaitForSuccess(params.redisDedupeUrl);
     const dedupeIndex = new RedisDedupeIndex(redis, "");
@@ -94,13 +95,18 @@ export class CrawlIndexer {
         crawlId: params.commitCrawlId,
       });
       await dedupeIndex.commitDedupeDone(params.commitCrawlId);
-      return;
+      process.exit(ExitCodes.Success);
     } else if (params.cancelCrawlId) {
       // Cancel one crawl and exit
       logger.info("Deleting data for cancelled uncommitted crawl", {
         crawlId: params.cancelCrawlId,
       });
       await dedupeIndex.clearUncommitted(params.cancelCrawlId);
+      process.exit(ExitCodes.Success);
+    } else if (!params.sourceUrl) {
+      logger.fatal(
+        "One of --commitCrawlId, --cancelCrawlId or --sourceUrl for import is required",
+      );
       return;
     }
 
