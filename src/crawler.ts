@@ -1275,9 +1275,6 @@ self.__bx_behaviors.selectMainBehavior();
           true,
         );
 
-        // in case runBehaviors() times out, remove all listeners here
-        page.removeAllListeners("framenavigated");
-
         data.contentCheckAllowed = false;
 
         await this.netIdle(page, logDetails);
