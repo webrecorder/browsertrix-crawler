@@ -1275,6 +1275,9 @@ self.__bx_behaviors.selectMainBehavior();
           true,
         );
 
+        // in case runBehaviors() times out, remove all listeners here
+        page.removeAllListeners("framenavigated");
+
         data.contentCheckAllowed = false;
 
         await this.netIdle(page, logDetails);
@@ -1493,13 +1496,17 @@ self.__bx_behaviors.selectMainBehavior();
 
       const newFrames: Promise<boolean>[] = [];
 
-      page.on("framenavigated", (frame) => {
+      const attachIframe = (frame: Frame) => {
         newFrames.push(this.runBehaviorsInFrame(frame, logDetails));
-      });
+      };
+
+      page.on("framenavigated", attachIframe);
 
       let results = await Promise.allSettled(
         frames.map((frame) => this.runBehaviorsInFrame(frame, logDetails)),
       );
+
+      page.off("framenavigated", attachIframe);
 
       if (newFrames.length) {
         results = [...results, ...(await Promise.allSettled(newFrames))];
