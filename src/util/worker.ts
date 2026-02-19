@@ -138,6 +138,8 @@ export class PageWorker {
         { reuseCount: this.reuseCount, ...this.logDetails },
         "worker",
       );
+      // remove any frame listeners added in behaviors and page timed out and didn't remove them before
+      this.page!.removeAllListeners("framenavigated");
       this.opts!.data = pagestate;
       return this.opts!;
     } else if (this.page) {
