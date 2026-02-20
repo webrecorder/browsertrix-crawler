@@ -25,7 +25,9 @@ import { screenshotTypes } from "./screenshots.js";
 import {
   DEFAULT_EXCLUDE_LOG_CONTEXTS,
   LOG_CONTEXT_TYPES,
+  LOG_LEVEL_TYPES,
   LogContext,
+  LogLevel,
   logger,
 } from "./logger.js";
 import { SaveState } from "./state.js";
@@ -33,6 +35,7 @@ import { loadProxyConfig } from "./proxy.js";
 
 // ============================================================================
 export type CrawlerArgs = ReturnType<typeof parseArgs> & {
+  logLevel: LogLevel[];
   logContext: LogContext[];
   logExcludeContext: LogContext[];
   text: string[];
@@ -277,9 +280,11 @@ class ArgParser {
         },
 
         logLevel: {
-          describe: "Comma-separated list of log levels to include in logs",
+          describe:
+            "Comma-separated list of log levels to include in logs. By default all but debug are included. To include debug messages in logs, debug must also be passed to logging option.",
           type: "array",
           default: [],
+          choices: LOG_LEVEL_TYPES,
           coerce,
         },
 
