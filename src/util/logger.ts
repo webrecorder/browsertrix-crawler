@@ -279,12 +279,7 @@ class Logger {
         await this.crawlState.setStatus(status);
       }
     } catch (e) {
-      this.logAsJSON(
-        "Error shutting down, exiting anyway",
-        e,
-        this.defaultLogContext,
-        "error",
-      );
+      this.error("Error shutting down, exiting anyway", e);
     } finally {
       process.exit(exitCode);
     }
