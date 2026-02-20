@@ -815,9 +815,12 @@ export class Recorder extends EventEmitter {
 
       streamingConsume = await this.fetchResponseBody(requestId, reqresp, cdp);
 
+      // reqresp object should no longer be used for network events:
+      // either will be consumed (true) or will be tried async (false)
+      this.removeReqResp(networkId);
+
       // if not consumed via takeStream, attempt async loading
       if (!streamingConsume) {
-        this.removeReqResp(networkId);
         const opts: AsyncFetchOptions = {
           reqresp,
           expectedSize: contentLen,
@@ -1509,7 +1512,6 @@ export class Recorder extends EventEmitter {
         logger.warn("Error Serializing to WARC", e, "recorder");
         return false;
       }
-      this.removeReqResp(reqresp.requestId);
       return true;
     } catch (e) {
       logger.debug(
