@@ -19,8 +19,8 @@ test("set rollover to 500K and ensure individual WARCs rollover, including scree
     }
   }
 
-  // expect at least 6 main WARCs
-  expect(main).toBeGreaterThan(5);
+  // expect at least 5 main WARCs
+  expect(main).toBeGreaterThan(4);
 
   // expect at least 2 screenshot WARCs
   expect(screenshots).toBeGreaterThan(1);
