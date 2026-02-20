@@ -654,7 +654,7 @@ export class Recorder extends EventEmitter {
       responseHeaders,
     } = params;
 
-    const networkId = params.networkId || requestId;
+    const networkId = params.networkId || "";
 
     const reqresp = this.pendingReqResp(networkId);
 
@@ -1270,11 +1270,7 @@ export class Recorder extends EventEmitter {
   }
 
   isEssentialResource(resourceType: string, contentType: string) {
-    if (
-      resourceType === "script" ||
-      resourceType === "stylesheet" ||
-      resourceType === "image"
-    ) {
+    if (resourceType === "script" || resourceType === "stylesheet") {
       return true;
     }
 
