@@ -404,7 +404,6 @@ export class RedisDedupeIndex {
   }
 
   getHashValue(hash: string, url: string, date: string, size: number) {
-    url = normalizeUrl(url);
     date = date.replace(/[^\d]/g, "");
     const key = hash.split(":").at(-1)!;
     const val = `${this.dedupeKeyIndex} ${date} ${url} ${size}`;
@@ -1249,9 +1248,11 @@ return inx;
     }: QueueEntry,
     limit = 0,
   ) {
-    url = normalizeUrl(url);
     const added = this._timestamp();
     const data: QueueEntry = { added, url, seedId, depth, extraHops };
+    // add original url to actual queue
+    // normalize url for seen list
+    url = normalizeUrl(url);
 
     if (ts) {
       data.ts = ts;
