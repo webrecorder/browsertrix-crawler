@@ -8,6 +8,7 @@ import { logger, formatErr, LogDetails, LogContext } from "./logger.js";
 import type { IndexerOffsetLength } from "warcio";
 import { timestampNow } from "./timing.js";
 import PQueue from "p-queue";
+import { finished } from "stream/promises";
 
 const DEFAULT_ROLLOVER_SIZE = 1_000_000_000;
 
@@ -386,10 +387,11 @@ export async function createWARCInfo(filename: string) {
 }
 
 // =================================================================
-export function streamFinish(fh: Writable) {
-  const p = new Promise<void>((resolve) => {
-    fh.once("finish", () => resolve());
-  });
+export async function streamFinish(fh: Writable) {
   fh.end();
-  return p;
+  try {
+    await finished(fh, { cleanup: true });
+  } catch (e) {
+    logger.error("Error finishing stream", e);
+  }
 }
