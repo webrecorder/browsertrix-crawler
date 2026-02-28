@@ -358,3 +358,28 @@ seeds:
   expect(result2).not.toBe(false);
   expect(result2.isOOS).toBe(false);
 });
+
+test("scopeType page should match URLs with double-encoded query parameters", async () => {
+  const doubleEncodedUrl = "https://example.com/page?foo=%252fbar";
+  const seeds = await getSeeds(`
+seeds:
+  - url: ${doubleEncodedUrl}
+    scopeType: page
+`);
+
+  expect(seeds.length).toEqual(1);
+  expect(seeds[0].scopeType).toEqual("page");
+  expect(seeds[0].include).toEqual([]);
+  expect(seeds[0].maxDepth).toEqual(0);
+  expect(seeds[0].maxExtraHops).toEqual(0);
+
+  // Test with the same URL (should match)
+  const result1 = seeds[0].isIncluded(doubleEncodedUrl, 0, 0);
+  expect(result1).not.toBe(false);
+  expect(result1.isOOS).toBe(false);
+
+  // Test with self (should match)
+  const result2 = seeds[0].isIncluded(seeds[0].url, 0, 0);
+  expect(result2).not.toBe(false);
+  expect(result2.isOOS).toBe(false);
+});
