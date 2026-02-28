@@ -1586,20 +1586,16 @@ return inx;
   }
 
   async addIfNoDupe(key: string, url: string, status: number) {
-    url = normalizeUrl(url);
-    return (
-      (await this.redis.sadd(
-        key,
-        normalizeDedupeStatus(status) + "|" + url,
-      )) === 1
-    );
+    const value = normalizeDedupeStatus(status) + "|" + normalizeUrl(url);
+    return (await this.redis.sadd(key, value)) === 1;
   }
 
-  async removeDupe(key: string, url: string, status: number) {
-    return await this.redis.srem(
-      key,
-      normalizeDedupeStatus(status) + "|" + url,
-    );
+  async removeDupe(keys: string[], url: string, status: number) {
+    const value = normalizeDedupeStatus(status) + "|" + normalizeUrl(url);
+
+    for (const key of keys) {
+      await this.redis.srem(key, value);
+    }
   }
 
   async isInUserSet(value: string) {
