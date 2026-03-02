@@ -30,7 +30,10 @@ console.error = function (...args) {
 };
 
 export async function initRedis(url: string) {
-  const redis = new Redis(url, { lazyConnect: true });
+  const redis = new Redis(url, {
+    lazyConnect: true,
+    maxRetriesPerRequest: null,
+  });
   await redis.connect();
   return redis;
 }
