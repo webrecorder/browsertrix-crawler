@@ -5,7 +5,7 @@ import { formatErr, logger } from "./util/logger.js";
 import { getFileOrUrlJson, getInfoString } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
 import { ExitCodes } from "./util/constants.js";
-import { initRedisWaitForSuccess } from "./util/redis.js";
+import { initRedisWaitForSuccess, setExitOnRedisError } from "./util/redis.js";
 import { RedisDedupeIndex } from "./util/state.js";
 import { basename } from "node:path";
 import { Readable } from "node:stream";
@@ -352,6 +352,8 @@ export class CrawlIndexer {
   handleInterrupt(signame: string) {
     logger.info(`Got signal ${signame}, interrupting after this file`);
     this.interrupted = true;
+    // if redis no longer available, interrupt immediately as well
+    setExitOnRedisError();
   }
 }
 
