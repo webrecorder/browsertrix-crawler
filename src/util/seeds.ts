@@ -17,6 +17,7 @@ type ScopeType =
 
 export class ScopedSeed {
   url: string;
+  normUrl: string;
   scopeType: ScopeType;
   include: RegExp[];
   exclude: RegExp[];
@@ -64,8 +65,10 @@ export class ScopedSeed {
     parsedUrl.username = "";
     parsedUrl.password = "";
 
+    this.url = parsedUrl.href;
+
     // Normalize URL with sorted query parameters for consistent matching
-    this.url = normalizeUrl(parsedUrl.href);
+    this.normUrl = normalizeUrl(parsedUrl.href);
     this.include = parseRx(include);
     this.exclude = parseRx(exclude);
 
@@ -252,10 +255,12 @@ export class ScopedSeed {
       urlParsed.hash = "";
     }
 
-    // Normalize URL with sorted query parameters for consistent matching
-    url = normalizeUrl(urlParsed.href);
+    url = urlParsed.href;
 
-    if (url === this.url) {
+    // Normalize URL with sorted query parameters for consistent matching
+    const normUrl = normalizeUrl(urlParsed.href);
+
+    if (normUrl === this.normUrl) {
       return { url, isOOS: false };
     }
 
@@ -269,7 +274,7 @@ export class ScopedSeed {
     // if depth exceeds, than always out of scope
     if (depth <= this.maxDepth) {
       for (const s of this.include) {
-        if (s.test(url)) {
+        if (s.test(normUrl)) {
           inScope = true;
           break;
         }
@@ -287,7 +292,7 @@ export class ScopedSeed {
       }
     }
 
-    if (this.isExcluded(url)) {
+    if (this.isExcluded(normUrl)) {
       return false;
     }
 

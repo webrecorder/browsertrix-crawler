@@ -1711,8 +1711,11 @@ export class Recorder extends EventEmitter {
         !(await this.checkStreamingRecordPayload(reqresp, serializer, canRetry))
       ) {
         serializer.externalBuffer?.purge();
-        await this.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url, status);
-        await this.crawlState.removeDupe(WRITE_DUPE_KEY, url, status);
+        await this.crawlState.removeDupe(
+          [ASYNC_FETCH_DUPE_KEY, WRITE_DUPE_KEY],
+          url,
+          status,
+        );
         return SerializeRes.Aborted;
       }
 
@@ -2041,7 +2044,6 @@ class AsyncFetcher {
       result.resource;
 
     if (!success || !stream) {
-      //await this.recorder.crawlState.removeDupe(ASYNC_FETCH_DUPE_KEY, url);
       logger.debug(
         "Network.loadNetworkResource failed, attempting node fetch",
         {

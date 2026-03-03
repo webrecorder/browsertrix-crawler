@@ -27,13 +27,17 @@ async function waitContainer(containerId) {
   }
 }
 
+let startPort = 36701;
+
 async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessThan=0, extra="") {
-  const command = `docker run -d -p 36381:6379 -e CRAWL_ID=test webrecorder/browsertrix-crawler crawl --url ${url} --sitemap ${sitemap} --limit ${limit} --context sitemap --logging debug --debugAccessRedis ${extra}`;
+  const port = startPort++;
+
+  const command = `docker run --rm -d -p ${port}:6379 -e CRAWL_ID=test webrecorder/browsertrix-crawler crawl --url ${url} --sitemap ${sitemap} --limit ${limit} --context sitemap --logging debug --debugAccessRedis ${extra}`;
   const containerId = child_process.execSync(command, {encoding: "utf-8"});
 
   await sleep(3000);
 
-  const redis = new Redis("redis://127.0.0.1:36381/0", { lazyConnect: true, retryStrategy: () => null });
+  const redis = new Redis(`redis://127.0.0.1:${port}/0`, { lazyConnect: true, retryStrategy: () => null });
 
   let finished = 0;
 
@@ -80,8 +84,8 @@ test("test sitemap with limit, specific URL", async () => {
 
 test("test sitemap with application/xml content-type", async () => {
   await runCrawl(10, "https://bitarchivist.net/", "", 0);
-});
+}, 180000);
 
 test("test sitemap with narrow scope, extraHops, to ensure out-of-scope sitemap URLs do not count as extraHops", async () => {
   await runCrawl(0, "https://www.mozilla.org/", "", 2000, 100, "--extraHops 1 --scopeType page");
-});
+}, 180000);
