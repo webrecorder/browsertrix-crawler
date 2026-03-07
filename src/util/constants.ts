@@ -103,4 +103,5 @@ export enum InterruptReason {
   BrowserCrashed = 5,
   SignalInterrupted = 6,
   CrawlPaused = 7,
+  RateLimited = 8,
 }
