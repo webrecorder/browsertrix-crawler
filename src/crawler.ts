@@ -662,6 +662,9 @@ export class Crawler {
             case InterruptReason.TimeLimit:
               exitCode = ExitCodes.TimeLimit;
               break;
+            case InterruptReason.RateLimited:
+              exitCode = ExitCodes.RateLimited;
+              break;
           }
         }
       }
