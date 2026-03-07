@@ -65,11 +65,7 @@ import {
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed, parseSeeds } from "./util/seeds.js";
-import {
-  WARCWriter,
-  createWARCInfo,
-  setWARCInfo,
-} from "./util/warcwriter.js";
+import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
@@ -1391,13 +1387,7 @@ self.__bx_behaviors.selectMainBehavior();
           this.healthChecker.incError();
         }
         if (pageRateLimited) {
-          if (
-            (await this.crawlState.incRateLimited(pageRateLimited)) &&
-            this.params.restartsOnError
-          ) {
-            await this.serializeConfig();
-            await this.setStatusAndExit(ExitCodes.RateLimited, "interrupted");
-          }
+          await this.crawlState.incRateLimited(pageRateLimited);
         }
 
         if (retry < 0) {
@@ -1691,6 +1681,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (await this.crawlState.isCrawlPaused()) {
       interrupt = InterruptReason.CrawlPaused;
+    } else if (await this.crawlState.isRateLimited()) {
+      interrupt = InterruptReason.RateLimited;
     }
 
     if (interrupt) {
