@@ -1,4 +1,4 @@
-ARG BROWSER_VERSION=1.86.146
+ARG BROWSER_VERSION=1.87.192
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
 FROM ${BROWSER_IMAGE_BASE}
@@ -44,7 +44,7 @@ ADD config/ /app/
 
 ADD html/ /app/html/
 
-ARG RWP_VERSION=2.4.2
+ARG RWP_VERSION=2.4.3
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/ui.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/sw.js /app/html/rwp/
 ADD https://cdn.jsdelivr.net/npm/replaywebpage@${RWP_VERSION}/adblock/adblock.gz /app/html/rwp/adblock.gz
