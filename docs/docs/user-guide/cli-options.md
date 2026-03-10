@@ -380,3 +380,22 @@ Options:
   --sshProxyKnownHostsFile  path to SSH known hosts file for SOCKS5 over SSH pro
                             xy connection                               [string]
 ```
+## indexer
+
+```
+
+Options:
+  --help            Show help                                          [boolean]
+  --version         Show version number                                [boolean]
+  --redisDedupeUrl  URL for remote redis instance to index into
+                                                             [string] [required]
+  --sourceUrl       Source WACZ or Multi WACZ or Multi WACZ JSON to index
+                                                                        [string]
+  --sourceCrawlId   If single WACZ, use this id as source id            [string]
+  --removing        If set, also remove unused crawls/hashes from index
+                                                      [boolean] [default: false]
+  --commitCrawlId   If provided, commit single uncommitted crawl to merged index
+                     and exit                                           [string]
+  --cancelCrawlId   If provided, delete data for uncommitted crawl and exit
+                                                                        [string]
+```

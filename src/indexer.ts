@@ -54,7 +54,7 @@ export class CrawlIndexer {
         },
 
         removing: {
-          describe: "If set, also remove unsued crawls/hashes from index",
+          describe: "If set, also remove unused crawls/hashes from index",
           type: "boolean",
           required: false,
           default: false,
