@@ -5,7 +5,7 @@ import Redis from "ioredis";
 import { WARCParser } from "warcio";
 import { sleep } from "./utils";
 
-let redisId: NonSharedBuffer;
+let redisId: Uint8Array;
 let numResponses = 0;
 
 let sizeSaved = 0;
