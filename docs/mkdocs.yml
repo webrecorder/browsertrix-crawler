@@ -45,10 +45,6 @@ theme:
 
 nav:
   - index.md
-  - Develop:
-    - develop/index.md
-    - develop/docs.md
-    - develop/dedupe.md
   - User Guide:
     - user-guide/index.md
     - user-guide/outputs.md
@@ -62,6 +58,10 @@ nav:
     - user-guide/behaviors.md
     - user-guide/qa.md
     - user-guide/cli-options.md
+  - Develop:
+    - develop/index.md
+    - develop/docs.md
+    - develop/dedupe.md
 
 markdown_extensions:
   - toc:
