@@ -81,7 +81,6 @@ By default, the `indexer` operation is additive only, meaning that crawl data is
 To remove all crawls that aren't part of `--sourceUrl` (either single WACZ or a JSON specifying multiple WACZs),
 also add the `--remove` flag. This will purge all data that is not being added.
 
-
 For a complete list of indexer CLI flags, see [indexer CLI flags](cli-options/#indexer).
 
 
