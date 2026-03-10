@@ -29,7 +29,7 @@ been archived, it will not be saved again, instead a [`revisit` record will be c
 When multiple crawls are running at the same time, the resources from one crawl are not yet available to the other crawls.
 This is to account for crawls that may be cancelled or fail.
 
-Once a crawl is complete, its data is fully 'committed' to the index and available to be deduplicated against by future crawls. This happens automatically when running the crawler via comamnd line but can also be triggered [via a special indexer command](#committing-finished-crawls-to-the-index).
+Once a crawl is complete, its data is fully 'committed' to the index and available to be deduplicated against by future crawls. This happens automatically when running the crawler via command line but can also be triggered [via a special indexer command](#committing-finished-crawls-to-the-index).
 
 ### Example: Running crawls with deduplication
 
