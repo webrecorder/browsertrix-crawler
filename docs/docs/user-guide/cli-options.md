@@ -392,7 +392,7 @@ Options:
   --sourceUrl       Source WACZ or Multi WACZ or Multi WACZ JSON to index
                                                                         [string]
   --sourceCrawlId   If single WACZ, use this id as source id            [string]
-  --removing        If set, also remove unsued crawls/hashes from index
+  --removing        If set, also remove unused crawls/hashes from index
                                                       [boolean] [default: false]
   --commitCrawlId   If provided, commit single uncommitted crawl to merged index
                      and exit                                           [string]
