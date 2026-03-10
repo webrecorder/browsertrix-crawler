@@ -6,6 +6,7 @@ echo "# All Command-Line Options" > $out
 echo "" >> $out
 echo "The Browsertrix Crawler Docker image currently accepts the following parameters, broken down by entrypoint:" >> $out
 echo "" >> $out
+
 echo "## crawler" >> $out
 echo "" >> $out
 echo '```' >> $out
@@ -13,8 +14,16 @@ echo '```' >> $out
 docker run webrecorder/browsertrix-crawler crawl --help | tail -n +3 >> $out
 echo '```' >> $out
 echo "" >> $out
+
 echo "## create-login-profile" >> $out
 echo "" >> $out
 echo '```' >> $out
 docker run webrecorder/browsertrix-crawler create-login-profile --help | tail -n +3 >> $out
+echo '```' >> $out
+
+
+echo "## indexer" >> $out
+echo "" >> $out
+echo '```' >> $out
+docker run webrecorder/browsertrix-crawler indexer --help | tail -n +3 >> $out
 echo '```' >> $out

@@ -108,7 +108,7 @@ Options:
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
    atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope",
-                                                         "robots"] [default: []]
+                                               "robots", "dedupe"] [default: []]
       --logExcludeContext                   Comma-separated list of contexts to
                                             NOT include in logs
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
@@ -116,7 +116,7 @@ Options:
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
    atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope",
-                 "robots"] [default: ["recorderNetwork","jsError","screencast"]]
+       "robots", "dedupe"] [default: ["recorderNetwork","jsError","screencast"]]
       --text                                Extract initial (default) or final t
                                             ext to pages.jsonl or WARC resource
                                             record(s)
@@ -379,4 +379,23 @@ Options:
                             nnection                                    [string]
   --sshProxyKnownHostsFile  path to SSH known hosts file for SOCKS5 over SSH pro
                             xy connection                               [string]
+```
+## indexer
+
+```
+
+Options:
+  --help            Show help                                          [boolean]
+  --version         Show version number                                [boolean]
+  --redisDedupeUrl  URL for remote redis instance to index into
+                                                             [string] [required]
+  --sourceUrl       Source WACZ or Multi WACZ or Multi WACZ JSON to index
+                                                                        [string]
+  --sourceCrawlId   If single WACZ, use this id as source id            [string]
+  --removing        If set, also remove unsued crawls/hashes from index
+                                                      [boolean] [default: false]
+  --commitCrawlId   If provided, commit single uncommitted crawl to merged index
+                     and exit                                           [string]
+  --cancelCrawlId   If provided, delete data for uncommitted crawl and exit
+                                                                        [string]
 ```
