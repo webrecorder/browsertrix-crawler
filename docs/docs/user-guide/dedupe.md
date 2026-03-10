@@ -29,7 +29,7 @@ been archived, it will not be saved again, instead a [`revisit` record will be c
 When multiple crawls are running at the same time, the resources from one crawl are not yet available to the other crawls.
 This is to account for crawls that may be cancelled or fail.
 
-Once a crawl is complete, its data is fully committed to the index and available to be deduplicated against by future crawls.
+Once a crawl is complete, its data is fully 'committed' to the index and available to be deduplicated against by future crawls. This happens automatically when running the crawler via comamnd line but can also be triggered [via a special indexer command](#committing-finished-crawls-to-the-index).
 
 ### Example: Running crawls with deduplication
 
@@ -83,9 +83,36 @@ also add the `--remove` flag. This will purge all data that is not being added.
 
 For a complete list of indexer CLI flags, see [indexer CLI flags](cli-options/#indexer).
 
+### Committing finished crawls to the index
 
-## Deduplication architecture
-See the [developer docs for dedupe](../develop/dedupe.md) for more advanced information of the architecture of the dedupe system.
+By default, the crawler will automatically commit finished crawls to the dedupe index.
+However, when running in Kubernetes (usually using the `--restartsOnError` flag), the dedupe index
+must be committed manually, since the crawl may be running in multiple instances or may be interrupted
+and restarted (or cancelled later).
+
+To commit a finished crawl, run:
+
+```sh
+docker run -it webrecorder/browsertrix-crawler indexer --commitCrawlId <crawl-id> --redisDedupeUrl ...
+```
+
+The commit process may take a long time if it was a large crawl, but generally should finish quickly.
+
+### Handling interrupted or canceled crawls
+
+If a crawler is interrupted, eg. with SIGINT, the dedupe data stored for that crawl will not yet committed.
+Since the crawl has not finished, the user may or may not want to include the data in the dedupe index.
+
+To include the partially finished crawl, run the above command with `--commitCrawlId`.
+
+To instead clean up the partially finished / interrupted crawls dedupe data, you can also run:
+
+```sh
+docker run -it webrecorder/browsertrix-crawler indexer --cancelCrawlId <crawl-id> --redisDedupeUrl ...
+```
+
+This operational is not required - the data from the interrupted crawl will not be used in further dedupe, it will
+simply free up the data on the Redis.
 
 
 ## Deduplication outputs
@@ -107,3 +134,6 @@ When using deduplication, the crawler also stores dependency information between
 file(s) contain the WARCs with `response` records for each `revisit` record that is written.
 This allows for tracking which WACZ files are required by other WACZ files to get the full archived content.
 See the [WACZ dependency section of the developer documentation](../develop/dedupe.md#crawl-dependency-tracking-in-wacz-datapackagejson) for more details on the architecture of this dependency system.
+
+## Deduplication system architecture
+See the [developer docs for dedupe](../develop/dedupe.md) for more advanced information of the architecture of the dedupe system.
