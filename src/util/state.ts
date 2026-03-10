@@ -86,6 +86,8 @@ export class PageState {
   mime?: string;
   ts?: Date;
 
+  origDate?: string;
+
   callbacks: PageCallbacks = {};
 
   isHTMLPage = true;

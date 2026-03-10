@@ -138,6 +138,7 @@ export class Recorder extends EventEmitter {
   mainFrameId: string | null = null;
   skipRangeUrls!: Map<string, number>;
   skipPageInfo = false;
+  state: PageState | null = null;
 
   swTargetId?: string | null;
   swFrameIds = new Set<string>();
@@ -991,7 +992,15 @@ export class Recorder extends EventEmitter {
     }
   }
 
-  startPage({ pageid, url }: { pageid: string; url: string }) {
+  startPage({
+    pageid,
+    url,
+    state,
+  }: {
+    pageid: string;
+    url: string;
+    state: PageState;
+  }) {
     this.pageid = pageid;
     this.pageUrl = url;
     this.finalPageUrl = this.pageUrl;
@@ -1009,6 +1018,7 @@ export class Recorder extends EventEmitter {
     this.skipRangeUrls = new Map<string, number>();
     this.skipPageInfo = false;
     this.pageFinished = false;
+    this.state = state;
     this.pageInfo = {
       pageid,
       urls: {},
