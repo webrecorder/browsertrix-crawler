@@ -386,10 +386,10 @@ export class Crawler {
     }
 
     // if automatically restarts on error exit code,
-    // exit with 0 from fatal by default, to avoid unnecessary restart
-    // otherwise, exit with default fatal exit code
+    // exit with 0 from fatal always, to avoid unnecessary restart
+    // otherwise, exit with provided fatal exit code
     if (this.params.restartsOnError) {
-      logger.setDefaultFatalExitCode(0);
+      logger.setOverrideFatalExitCode(0);
     }
 
     return this.crawlState;
@@ -986,12 +986,12 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.params.failOnContentCheck) {
       await page.exposeFunction(
         BxFunctionBindings.ContentCheckFailed,
-        (reason: string) => {
+        async (reason: string) => {
           // if called outside of awaitPageLoad(), ignore
           if (!opts.data.contentCheckAllowed) {
             return;
           }
-          void this.crawlState.setFailReason(reason);
+          await this.crawlState.setFailReason(reason);
           logger.fatal(
             "Content check failed, failing crawl",
             { reason },

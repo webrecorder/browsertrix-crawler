@@ -93,14 +93,14 @@ class Logger {
   excludeContexts: LogContext[] = [];
   defaultLogContext: LogContext = "general";
   crawlState?: RedisCrawlState | null = null;
-  fatalExitCode: ExitCodes = ExitCodes.Fatal;
+  overrideFatalExitCode: ExitCodes | null = null;
 
   setDefaultLogContext(value: LogContext) {
     this.defaultLogContext = value;
   }
 
-  setDefaultFatalExitCode(exitCode: number) {
-    this.fatalExitCode = exitCode;
+  setOverrideFatalExitCode(exitCode: number) {
+    this.overrideFatalExitCode = exitCode;
   }
 
   setOutputFile(filename: string) {
@@ -256,11 +256,14 @@ class Logger {
     message: string,
     data = {},
     context: LogContext = this.defaultLogContext,
-    exitCode = ExitCodes.Success,
+    exitCode = ExitCodes.Fatal,
   ) {
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
 
-    void this.setStatusAndExit(exitCode || this.fatalExitCode, "interrupted");
+    void this.setStatusAndExit(
+      this.overrideFatalExitCode ?? exitCode,
+      "failed",
+    );
   }
 
   async closeLog() {
