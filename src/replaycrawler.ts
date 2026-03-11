@@ -758,10 +758,11 @@ export class ReplayCrawler extends Crawler {
       }
 
       if (state) {
-        const { comparison } = pageInfo;
+        const { comparison, csrClues } = pageInfo;
 
-        // add comparison to page state
+        // add comparison & csr clues to page state
         (state as ComparisonPageState).comparison = comparison;
+        (state as ComparisonPageState).csrClues = csrClues;
       }
 
       this.infoWriter?.writeNewResourceRecord(
@@ -890,11 +891,6 @@ export class ReplayCrawler extends Crawler {
   ) {
     entry.comparison = state.comparison;
     if (state.csrClues) entry.csrClues = state.csrClues;
-    logger.info("generating page entry for redis", {
-      csrClues: state.csrClues,
-      keys: Object.keys(state),
-    });
-    console.trace(state);
     return entry;
   }
 
