@@ -104,7 +104,7 @@ export class CrawlIndexer {
       await dedupeIndex.clearUncommitted(params.cancelCrawlId);
       process.exit(ExitCodes.Success);
     } else if (!params.sourceUrl) {
-      logger.fatal(
+      await logger.fatal(
         "One of --commitCrawlId, --cancelCrawlId or --sourceUrl for import is required",
       );
       return;

@@ -11,6 +11,7 @@ import {
   DUPE_ALL_CRAWLS,
   DUPE_ALL_COUNTS,
   DUPE_UNCOMMITTED,
+  CrawlStatus,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -1068,7 +1069,7 @@ return inx;
     await this.redis.set(`${this.crawlId}:failReason`, reason);
   }
 
-  async setStatus(status_: string) {
+  async setStatus(status_: CrawlStatus) {
     await this.redis.hset(`${this.crawlId}:status`, this.uid, status_);
   }
 
@@ -1661,7 +1662,7 @@ return inx;
     newUrl: string,
   ) {
     if (!seeds[origSeedId]) {
-      logger.fatal(
+      await logger.fatal(
         "State load, original seed missing",
         { origSeedId },
         "state",

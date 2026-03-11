@@ -47,7 +47,7 @@ class BlockRule {
     }
 
     if (!RULE_TYPES.includes(this.type)) {
-      logger.fatal('Rule "type" must be: ' + RULE_TYPES.join(", "));
+      void logger.fatal('Rule "type" must be: ' + RULE_TYPES.join(", "));
     }
   }
 

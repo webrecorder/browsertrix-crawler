@@ -46,7 +46,7 @@ export async function replaceDir(sourceDir: string, destDir: string) {
     //await exec(`mv ${sourceDir} ${destDir}`);
     await fsp.rename(sourceDir, destDir);
   } catch (e) {
-    logger.fatal("Error moving/renaming directories, should not happen", {
+    await logger.fatal("Error moving/renaming directories, should not happen", {
       ...formatErr(e),
     });
   }
@@ -124,7 +124,7 @@ export async function collectOnlineSeedFile(
     logger.info("Seed file downloaded", { url, path: filepath });
     return filepath;
   } catch (e) {
-    logger.fatal("Error downloading seed file from URL", {
+    await logger.fatal("Error downloading seed file from URL", {
       url,
       ...formatErr(e),
     });
@@ -203,7 +203,7 @@ async function collectGitBehaviors(
     );
   } catch (e) {
     if (!exists) {
-      logger.fatal(
+      await logger.fatal(
         "Error downloading custom behaviors from Git repo",
         { url: urlStripped, ...formatErr(e) },
         "behavior",
@@ -247,7 +247,7 @@ async function collectOnlineBehavior(
     );
     return await collectLocalPathBehaviors(behaviorFilepath, 0, url);
   } catch (e) {
-    logger.fatal(
+    await logger.fatal(
       "Error downloading custom behavior from URL",
       { url, ...formatErr(e) },
       "behavior",
@@ -286,7 +286,7 @@ async function collectLocalPathBehaviors(
         try {
           contents = parseRecorderFlowJson(contents, source);
         } catch (e) {
-          logger.fatal(
+          await logger.fatal(
             "Unable to parse recorder flow JSON, ignored",
             formatErr(e),
             "behavior",
@@ -329,7 +329,7 @@ async function collectLocalPathBehaviors(
       }
     }
   } catch (e) {
-    logger.fatal(
+    await logger.fatal(
       "Error fetching local custom behaviors",
       { path: resolvedPath, ...formatErr(e) },
       "behavior",
@@ -337,7 +337,7 @@ async function collectLocalPathBehaviors(
   }
 
   if (!behaviors && depth === 0) {
-    logger.fatal(
+    await logger.fatal(
       "No custom behaviors found at specified path",
       { path: resolvedPath },
       "behavior",

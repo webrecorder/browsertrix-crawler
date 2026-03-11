@@ -794,7 +794,7 @@ class ArgParser {
 
     // Check that the collection name is valid.
     if (argv.collection.search(/^[\w][\w-]*$/) === -1) {
-      logger.fatal(
+      void logger.fatal(
         `\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`,
       );
     }
@@ -806,7 +806,7 @@ class ArgParser {
         try {
           parser(argv.clickSelector);
         } catch (e) {
-          logger.fatal("Invalid Autoclick CSS Selector", {
+          void logger.fatal("Invalid Autoclick CSS Selector", {
             selector: argv.clickSelector,
           });
         }
@@ -839,7 +839,7 @@ class ArgParser {
         argv.mobileDevice.replace("-", " ")
       ];
       if (!argv.emulateDevice) {
-        logger.fatal("Unknown device: " + argv.mobileDevice);
+        void logger.fatal("Unknown device: " + argv.mobileDevice);
       }
     } else {
       argv.emulateDevice = { viewport: null };
@@ -849,7 +849,9 @@ class ArgParser {
 
     if (argv.lang) {
       if (!ISO6391.validate(argv.lang)) {
-        logger.fatal("Invalid ISO-639-1 country code for --lang: " + argv.lang);
+        void logger.fatal(
+          "Invalid ISO-639-1 country code for --lang: " + argv.lang,
+        );
       }
     }
 
@@ -865,7 +867,9 @@ class ArgParser {
         try {
           parser(selector);
         } catch (e) {
-          logger.fatal("Invalid Link Extraction CSS Selector", { selector });
+          void logger.fatal("Invalid Link Extraction CSS Selector", {
+            selector,
+          });
         }
         return { selector, extract, isAttribute };
       });
@@ -876,7 +880,7 @@ class ArgParser {
     argv.selectLinks = selectLinks;
 
     if (isQA && !argv.qaSource) {
-      logger.fatal("--qaSource required for QA mode");
+      void logger.fatal("--qaSource required for QA mode");
     }
 
     // Resolve statsFilename
