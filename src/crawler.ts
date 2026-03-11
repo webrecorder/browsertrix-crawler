@@ -20,7 +20,10 @@ import yaml from "js-yaml";
 import { WACZ, WACZInitOpts, mergeCDXJ } from "./util/wacz.js";
 
 import { HealthChecker } from "./util/healthcheck.js";
-import { TextExtractViaSnapshot } from "./util/textextract.js";
+import {
+  TextExtractViaResponse,
+  TextExtractViaSnapshot,
+} from "./util/textextract.js";
 import {
   initStorage,
   getFileSize,
@@ -1366,11 +1369,55 @@ self.__bx_behaviors.selectMainBehavior();
       recorder.pageSeedDepth = depth;
     }
 
+    // Enable Network domain to track document request for raw text extraction
+    let documentRequestId: string | null = null;
+    let trackDocumentRequest:
+      | ((params: Protocol.Network.ResponseReceivedEvent) => void)
+      | null = null;
+
+    if (this.params.text.includes("to-warc-from-raw")) {
+      await cdp.send("Network.enable");
+      trackDocumentRequest = (
+        params: Protocol.Network.ResponseReceivedEvent,
+      ) => {
+        if (params.type === "Document" && !documentRequestId) {
+          documentRequestId = params.requestId;
+          logger.debug(
+            "Captured document request ID",
+            { requestId: documentRequestId, url: params.response.url },
+            "text",
+          );
+        }
+      };
+      cdp.on("Network.responseReceived", trackDocumentRequest);
+    }
+
     // run custom driver here, if any
-    if (this.driver) {
-      await this.driver({ page, data, crawler: this, seed, cdp: opts.cdp });
-    } else {
-      await this.loadPage(page, data, seed, opts.cdp);
+    try {
+      if (this.driver) {
+        await this.driver({ page, data, crawler: this, seed, cdp: opts.cdp });
+      } else {
+        await this.loadPage(page, data, seed, opts.cdp);
+      }
+    } finally {
+      // Store document request ID and clean up listener
+      if (documentRequestId) {
+        data.documentRequestId = documentRequestId;
+        logger.info(
+          "Stored document request ID for raw text extraction",
+          { url: data.url, requestId: documentRequestId },
+          "text",
+        );
+      } else if (trackDocumentRequest) {
+        logger.warn(
+          "No document request ID captured",
+          { url: data.url },
+          "text",
+        );
+      }
+      if (trackDocumentRequest) {
+        cdp.off("Network.responseReceived", trackDocumentRequest);
+      }
     }
 
     data.title = await timedRun(
@@ -1423,22 +1470,60 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    let textextract = null;
+    let textExtract = null;
 
     if (this.textWriter) {
-      textextract = new TextExtractViaSnapshot(cdp, {
+      textExtract = new TextExtractViaSnapshot(cdp, {
         writer: this.textWriter,
         url,
         skipDocs: this.skipTextDocs,
       });
-      const { text } = await textextract.extractAndStoreText(
+      const { text } = await textExtract.extractAndStoreText(
         "text",
         false,
         this.params.text.includes("to-warc"),
+        data.originalWarcRecordId,
       );
 
       if (text !== null && (this.textInPages || saveOutput)) {
         data.text = text;
+      }
+
+      if (this.params.text.includes("to-warc-from-raw")) {
+        logger.info(
+          "Extracting text from raw response",
+          {
+            url,
+            hasRequestId: !!data.documentRequestId,
+            refersTo: String(data.originalWarcRecordId),
+          },
+          "text",
+        );
+        textExtract = new TextExtractViaResponse(cdp, {
+          writer: this.textWriter,
+          url,
+          skipDocs: this.skipTextDocs,
+          requestId: data.documentRequestId,
+        });
+        const { text: textFromResponse } =
+          await textExtract.extractAndStoreText(
+            "text-from-response",
+            false,
+            this.params.text.includes("to-warc-from-raw"),
+            data.originalWarcRecordId,
+          );
+        logger.info(
+          "Extracted text from raw response result",
+          {
+            url,
+            hasText: textFromResponse !== null,
+            refersTo: String(data.originalWarcRecordId),
+          },
+          "text",
+        );
+        if (textFromResponse !== null && (this.textInPages || saveOutput)) {
+          data.textFromResponse = textFromResponse;
+        }
       }
     }
 
@@ -1470,8 +1555,13 @@ self.__bx_behaviors.selectMainBehavior();
           data.loadState = LoadState.BEHAVIORS_DONE;
         }
 
-        if (textextract && this.params.text.includes("final-to-warc")) {
-          await textextract.extractAndStoreText("textFinal", true, true);
+        if (textExtract && this.params.text.includes("final-to-warc")) {
+          await textExtract.extractAndStoreText(
+            "textFinal",
+            true,
+            true,
+            data.originalWarcRecordId,
+          );
         }
 
         if (
@@ -2998,6 +3088,7 @@ self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
     ts = 0,
     pageid = undefined,
     ignoreScope = false,
+    originalWarcRecordId = undefined,
   }: {
     seedId: number;
     url: string;
@@ -3007,6 +3098,7 @@ self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
     ts?: number;
     pageid?: string;
     ignoreScope?: boolean;
+    originalWarcRecordId?: string;
   }) {
     if (this.limitHit) {
       logger.debug(
@@ -3032,7 +3124,16 @@ self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
     }
 
     const result = await this.crawlState.addToQueue(
-      { url, seedId, depth, extraHops, ts, pageid, ignoreScope },
+      {
+        url,
+        seedId,
+        depth,
+        extraHops,
+        ts,
+        pageid,
+        ignoreScope,
+        originalWarcRecordId,
+      },
       this.queuePageLimit,
     );
 

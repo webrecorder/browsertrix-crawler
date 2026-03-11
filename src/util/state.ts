@@ -62,6 +62,7 @@ export type QueueEntry = {
   pageid?: string;
   retry?: number;
   ignoreScope?: boolean;
+  originalWarcRecordId?: string;
 };
 
 // ============================================================================
@@ -97,8 +98,13 @@ export class PageState {
 
   isHTMLPage = true;
   text?: string;
+  originalText?: string;
+  doRawTextCompare?: boolean;
+  textFromResponse?: string;
+  documentRequestId?: string;
   screenshotView?: Buffer;
   favicon?: string;
+  originalWarcRecordId?: string;
 
   skipBehaviors = false;
   pageSkipped = false;
@@ -132,6 +138,16 @@ export class PageState {
     if (redisData.ignoreScope) {
       this.ignoreScope = redisData.ignoreScope;
     }
+    this.originalWarcRecordId = redisData.originalWarcRecordId;
+    logger.debug(
+      "PageState created",
+      {
+        url: this.url,
+        pageid: this.pageid,
+        originalWarcRecordId: String(this.originalWarcRecordId),
+      },
+      "state",
+    );
   }
 }
 
@@ -1511,6 +1527,7 @@ return inx;
       ts = 0,
       pageid = undefined,
       ignoreScope = undefined,
+      originalWarcRecordId = undefined,
     }: QueueEntry,
     limit = 0,
   ) {
@@ -1528,6 +1545,9 @@ return inx;
     }
     if (ignoreScope) {
       data.ignoreScope = ignoreScope;
+    }
+    if (originalWarcRecordId) {
+      data.originalWarcRecordId = originalWarcRecordId;
     }
 
     // return codes

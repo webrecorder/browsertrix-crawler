@@ -19,6 +19,7 @@ export type ResourceRecordData = {
   contentType: string;
   url: string;
   date?: Date;
+  refersTo?: string;
 };
 
 // =================================================================
@@ -275,12 +276,22 @@ export class WARCWriter implements IndexerOffsetLength {
   }
 
   private async _writeNewResourceRecord(
-    { buffer, resourceType, contentType, url, date }: ResourceRecordData,
+    {
+      buffer,
+      resourceType,
+      contentType,
+      url,
+      date,
+      refersTo,
+    }: ResourceRecordData,
     callback: ((length: number, offset: number) => void) | undefined,
   ) {
     const warcVersion = "WARC/1.1";
     const warcRecordType = "resource";
-    const warcHeaders = { "Content-Type": contentType };
+    const warcHeaders: Record<string, string> = { "Content-Type": contentType };
+    if (refersTo) {
+      warcHeaders["WARC-Refers-To"] = `<url:uuid:${refersTo}>`;
+    }
     async function* content() {
       yield buffer;
     }
