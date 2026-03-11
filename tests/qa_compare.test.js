@@ -123,6 +123,18 @@ test("run QA comparison with CSR detection, with write pages to redis", async ()
 
   let count = 0;
 
+  const expectedCSRCluesValues = [
+    {
+      clues: { dom_manipulation: 4 },
+      categories: { dom_manipulation: 4 },
+    },
+    {
+      clues: { defer_script: 1 },
+      categories: { modern_script_loading: 1 },
+    },
+    { clues: {}, categories: {} },
+  ];
+
   while (count < 3) {
     const res = await redis.lpop("test-with-csr-detection:pages");
     if (!res) {
@@ -153,13 +165,13 @@ test("run QA comparison with CSR detection, with write pages to redis", async ()
     expect(json.comparison.resourceCounts).toHaveProperty("replayGood");
     expect(json.comparison.resourceCounts).toHaveProperty("replayBad");
 
-    console.log(json);
-
     expect(json).toHaveProperty("csrClues");
     expect(json.csrClues).toHaveProperty("clues");
     expect(json.csrClues.clues).toBeInstanceOf(Object);
     expect(json.csrClues).toHaveProperty("categories");
     expect(json.csrClues.categories).toBeInstanceOf(Object);
+
+    expect(json.csrClues).toEqual(expectedCSRCluesValues[count]);
 
     count++;
   }
