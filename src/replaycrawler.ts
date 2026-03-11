@@ -790,7 +790,7 @@ export class ReplayCrawler extends Crawler {
     }
 
     if (!state?.isHTMLPage) {
-      logger.debug(
+      logger.info(
         "Skipping CSR clues - not an HTML page",
         { url: pageInfo.url },
         "replay",
@@ -868,11 +868,11 @@ export class ReplayCrawler extends Crawler {
     }
 
     // add clue counts to pageInfo
+    pageInfo["csrClues"] = {
+      clues: clueCounts,
+      categories: categoryCounts,
+    };
     if (Object.keys(clueCounts).length > 0) {
-      pageInfo["csrClues"] = {
-        clues: clueCounts,
-        categories: categoryCounts,
-      };
       logger.info(
         "CSR clues detected",
         {
@@ -883,15 +883,21 @@ export class ReplayCrawler extends Crawler {
         "replay",
       );
     } else {
-      logger.debug("No CSR clues detected", { url: pageInfo.url }, "replay");
+      logger.info("No CSR clues detected", { url: pageInfo.url }, "replay");
     }
   }
 
   protected pageEntryForRedis(
     entry: Record<string, string | number | boolean | object>,
-    state: PageState,
+    state: ComparisonPageState,
   ) {
-    entry.comparison = (state as ComparisonPageState).comparison;
+    entry.comparison = state.comparison;
+    if (state.csrClues) entry.csrClues = state.csrClues;
+    logger.info("generating page entry for redis", {
+      csrClues: state.csrClues,
+      keys: Object.keys(state),
+    });
+    console.trace(state);
     return entry;
   }
 
