@@ -260,7 +260,7 @@ class Logger {
   ) {
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
 
-    void this.setStatusAndExit(exitCode || this.fatalExitCode, "interrupted");
+    void this.setStatusAndExit(exitCode || this.fatalExitCode, "failed");
   }
 
   async closeLog() {
