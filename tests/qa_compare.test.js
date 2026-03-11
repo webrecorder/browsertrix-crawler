@@ -123,17 +123,17 @@ test("run QA comparison with CSR detection, with write pages to redis", async ()
 
   let count = 0;
 
-  const expectedCSRCluesValues = [
-    {
+  const expectedCSRCluesValues = {
+    "https://old.webrecorder.net/": {
       clues: { dom_manipulation: 4 },
       categories: { dom_manipulation: 4 },
     },
-    {
+    "https://archiveweb.page/": {
       clues: { defer_script: 1 },
       categories: { modern_script_loading: 1 },
     },
-    { clues: {}, categories: {} },
-  ];
+    "https://old.webrecorder.net/about": { clues: {}, categories: {} },
+  };
 
   while (count < 3) {
     const res = await redis.lpop("test-with-csr-detection:pages");
@@ -171,7 +171,7 @@ test("run QA comparison with CSR detection, with write pages to redis", async ()
     expect(json.csrClues).toHaveProperty("categories");
     expect(json.csrClues.categories).toBeInstanceOf(Object);
 
-    expect(json.csrClues).toEqual(expectedCSRCluesValues[count]);
+    expect(json.csrClues).toEqual(expectedCSRCluesValues[json.url]);
 
     count++;
   }
