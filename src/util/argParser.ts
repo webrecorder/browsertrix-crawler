@@ -704,6 +704,12 @@ class ArgParser {
           type: "boolean",
         },
 
+        qaDetectClientSideRendering: {
+          describe:
+            "use heuristics to detect when a page might use client-side rendering (CSR)",
+          type: "boolean",
+        },
+
         sshProxyPrivateKeyFile: {
           describe:
             "path to SSH private key for SOCKS5 over SSH proxy connection",
