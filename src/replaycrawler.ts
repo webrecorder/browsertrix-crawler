@@ -21,6 +21,7 @@ import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
 import { getFileOrUrlJson } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
+import { CSR_CLUES } from "./util/clientSideRenderingClues.js";
 
 // RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
@@ -49,6 +50,10 @@ type ComparisonData = {
       replayGood?: number;
       replayBad?: number;
     };
+  };
+  csrClues?: {
+    clues: Record<string, number>;
+    categories: Record<string, number>;
   };
 };
 
@@ -409,7 +414,7 @@ export class ReplayCrawler extends Crawler {
       comparison: { resourceCounts: {} },
       counts: { jsErrors: 0 },
       tsStatus: 999,
-    };
+    } satisfies ReplayPageInfoRecord;
     this.pageInfos.set(page, pageInfo);
 
     let replayFrame;
@@ -466,6 +471,9 @@ export class ReplayCrawler extends Crawler {
     await this.compareText(page, data, url, date);
 
     await this.compareResources(page, data, url, date);
+
+    if (this.params.qaDetectClientSideRendering)
+      await this.processCSRClues(page, data);
 
     await this.processPageInfo(page, data);
   }
@@ -771,6 +779,111 @@ export class ReplayCrawler extends Crawler {
       );
 
       this.pageInfos.delete(page);
+    }
+  }
+
+  async processCSRClues(page: Page, state?: PageState) {
+    const pageInfo = this.pageInfos.get(page);
+    if (!pageInfo) {
+      logger.warn("No pageInfo found for CSR clues processing", {}, "replay");
+      return;
+    }
+
+    if (!state?.isHTMLPage) {
+      logger.debug(
+        "Skipping CSR clues - not an HTML page",
+        { url: pageInfo.url },
+        "replay",
+      );
+      return;
+    }
+
+    if (!pageInfo.ts) {
+      logger.warn("Missing page timestamp, skipping", { pageInfo });
+      return;
+    }
+
+    const timestamp = new Date(pageInfo.ts)
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[T:-]/g, "");
+    const replayUrl = REPLAY_PREFIX + `${timestamp}mp_/${pageInfo.url}`;
+
+    const frame = page.frames()[1];
+    if (!frame) {
+      logger.warn(
+        "Replay frame missing for CSR clues",
+        { url: pageInfo.url },
+        "replay",
+      );
+      return;
+    }
+
+    const htmlContent = await frame.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (response.status !== 200) {
+        logger.warn("Got non-200 status code, proceeding", { url });
+      }
+      return await response.text();
+    }, replayUrl);
+
+    if (!htmlContent) {
+      logger.warn(
+        "Could not fetch HTML content for CSR clues",
+        { url: pageInfo.url },
+        "replay",
+      );
+      return;
+    }
+
+    const clueCounts: Record<string, number> = {};
+    const categoryCounts: Record<string, number> = {};
+
+    for (const clue of CSR_CLUES) {
+      const regex = new RegExp(clue.pattern, "gi");
+      const matches = htmlContent.match(regex);
+
+      if (matches && matches.length > 0) {
+        // count by clue name
+        clueCounts[clue.name] = matches.length;
+
+        // count by category (sum of all patterns in category)
+        categoryCounts[clue.category] =
+          (categoryCounts[clue.category] || 0) + matches.length;
+
+        logger.debug(
+          "CSR clue detected",
+          {
+            pattern: clue.name,
+            category: clue.category,
+            url: pageInfo.url,
+            count: matches.length,
+          },
+          "replay",
+        );
+      }
+    }
+
+    // add clue counts to pageInfo
+    if (Object.keys(clueCounts).length > 0) {
+      pageInfo["csrClues"] = {
+        clues: clueCounts,
+        categories: categoryCounts,
+      };
+      logger.info(
+        "CSR clues detected",
+        {
+          url: pageInfo.url,
+          categories: categoryCounts,
+          clues: clueCounts,
+        },
+        "replay",
+      );
+    } else {
+      logger.debug("No CSR clues detected", { url: pageInfo.url }, "replay");
     }
   }
 
