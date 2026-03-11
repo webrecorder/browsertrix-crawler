@@ -386,10 +386,10 @@ export class Crawler {
     }
 
     // if automatically restarts on error exit code,
-    // exit with 0 from fatal by default, to avoid unnecessary restart
-    // otherwise, exit with default fatal exit code
+    // exit with 0 from fatal always, to avoid unnecessary restart
+    // otherwise, exit with provided fatal exit code
     if (this.params.restartsOnError) {
-      logger.setDefaultFatalExitCode(0);
+      logger.setOverrideFatalExitCode(0);
     }
 
     return this.crawlState;

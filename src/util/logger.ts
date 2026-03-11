@@ -99,7 +99,7 @@ class Logger {
     this.defaultLogContext = value;
   }
 
-  setDefaultFatalExitCode(exitCode: number) {
+  setOverrideFatalExitCode(exitCode: number) {
     this.overrideFatalExitCode = exitCode;
   }
 
