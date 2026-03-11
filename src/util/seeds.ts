@@ -226,7 +226,7 @@ export class ScopedSeed {
         break;
 
       default:
-        logger.fatal(
+        void logger.fatal(
           `Invalid scope type "${scopeType}" specified, valid types are: page, page-spa, prefix, host, domain, any`,
         );
     }
@@ -365,7 +365,7 @@ export async function parseSeeds(
         ...newSeed,
       });
       if (params.failOnFailedSeed) {
-        logger.fatal(
+        await logger.fatal(
           "Invalid seed specified, aborting crawl",
           { url: newSeed.url },
           "general",
@@ -376,7 +376,7 @@ export async function parseSeeds(
   }
 
   if (!params.qaSource && !scopedSeeds.length) {
-    logger.fatal("No valid seeds specified, aborting crawl");
+    await logger.fatal("No valid seeds specified, aborting crawl");
   }
 
   return scopedSeeds;

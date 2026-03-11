@@ -193,7 +193,9 @@ export async function initProxy(
     const entry = nameToProxy.get(name);
 
     if (!entry) {
-      logger.fatal("Proxy specified but not found in proxies list: " + name);
+      await logger.fatal(
+        "Proxy specified but not found in proxies list: " + name,
+      );
       return {};
     }
 
@@ -433,7 +435,7 @@ export async function runSSHD(
   try {
     await waitForSocksPort;
   } catch (e) {
-    logger.interrupt(
+    await logger.interrupt(
       "Unable to establish SSH connection for proxy",
       {
         error: e,

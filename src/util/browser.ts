@@ -231,7 +231,7 @@ export class Browser {
       } else {
         // remove the temp profile dir, likely empty
         await fsp.rm(tmpProfileDir, { recursive: true });
-        logger.fatal("Profile setup failed", formatErr(e), "browser");
+        await logger.fatal("Profile setup failed", formatErr(e), "browser");
       }
     }
     this.customProfile = true;
@@ -508,7 +508,7 @@ export class Browser {
       expression: script,
     });
     if (exceptionDetails) {
-      logger.fatal(
+      await logger.fatal(
         "Custom behavior load error, aborting",
         { filename, ...exceptionDetails },
         "behavior",

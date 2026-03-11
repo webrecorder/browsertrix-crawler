@@ -48,6 +48,7 @@ import {
   InterruptReason,
   BxFunctionBindings,
   MAX_JS_DIALOG_PER_PAGE,
+  CrawlStatus,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -343,7 +344,7 @@ export class Crawler {
     this.isExternalDedupeStore = dedupeRedisUrl !== redisUrl;
 
     if (!redisUrl.startsWith("redis://")) {
-      logger.fatal(
+      await logger.fatal(
         "stateStoreUrl must start with redis:// -- Only redis-based store currently supported",
       );
     }
@@ -381,9 +382,7 @@ export class Crawler {
       logger.setLogBehaviorsToRedis(true);
     }
 
-    if (this.params.logErrorsToRedis || this.params.logBehaviorsToRedis) {
-      logger.setCrawlState(this.crawlState);
-    }
+    logger.setCrawlState(this.crawlState);
 
     // if automatically restarts on error exit code,
     // exit with 0 from fatal always, to avoid unnecessary restart
@@ -476,7 +475,7 @@ export class Crawler {
 
   async bootstrap() {
     if (await isDiskFull(this.params.cwd)) {
-      logger.interrupt(
+      await logger.interrupt(
         "Out of disk space, exiting",
         {},
         "general",
@@ -626,7 +625,7 @@ export class Crawler {
   async run() {
     await this.bootstrap();
 
-    let status = "done";
+    let status: CrawlStatus = "done";
     let exitCode = ExitCodes.Success;
 
     try {
@@ -992,7 +991,7 @@ self.__bx_behaviors.selectMainBehavior();
             return;
           }
           await this.crawlState.setFailReason(reason);
-          logger.fatal(
+          await logger.fatal(
             "Content check failed, failing crawl",
             { reason },
             "behavior",
@@ -1377,7 +1376,7 @@ self.__bx_behaviors.selectMainBehavior();
                 }
                 break;
             }
-            logger.fatal(
+            await logger.fatal(
               "Seed Page Load Failed, failing crawl",
               {},
               "general",
@@ -1634,7 +1633,7 @@ self.__bx_behaviors.selectMainBehavior();
       const numFailed = await this.crawlState.numFailed();
       const failedLimit = this.params.failOnFailedLimit;
       if (numFailed >= failedLimit) {
-        logger.fatal(
+        await logger.fatal(
           `Failed threshold reached ${numFailed} >= ${failedLimit}, failing crawl`,
           {},
           "general",
@@ -1695,7 +1694,7 @@ self.__bx_behaviors.selectMainBehavior();
       await this.closeFiles();
 
       if (!this.done) {
-        logger.interrupt(
+        await logger.interrupt(
           "Forced interrupt by signal",
           {},
           "general",
@@ -2066,7 +2065,8 @@ self.__bx_behaviors.selectMainBehavior();
         return null;
       }
       // interrupt crawl otherwise
-      logger.fatal("No WARC Files, assuming crawl failed");
+      await logger.fatal("No WARC Files, assuming crawl failed");
+      return null;
     }
 
     const waczPath = path.join(this.collDir, this.params.collection + ".wacz");
@@ -2126,7 +2126,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
       return wacz;
     } catch (e) {
-      logger.interrupt(
+      await logger.interrupt(
         "Error creating / uploading WACZ",
         formatErr(e),
         "wacz",

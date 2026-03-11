@@ -3,7 +3,7 @@
 
 import { Writable } from "node:stream";
 import { RedisCrawlState } from "./state.js";
-import { ExitCodes } from "./constants.js";
+import { CrawlStatus, ExitCodes } from "./constants.js";
 import { streamFinish } from "./warcwriter.js";
 import fs from "node:fs";
 
@@ -236,7 +236,7 @@ class Logger {
     }
   }
 
-  interrupt(
+  async interrupt(
     message: string,
     data = {},
     context: LogContext,
@@ -249,10 +249,10 @@ class Logger {
       "interrupt",
     );
 
-    void this.setStatusAndExit(exitCode, "interrupted");
+    await this.setStatusAndExit(exitCode, "interrupted");
   }
 
-  fatal(
+  async fatal(
     message: string,
     data = {},
     context: LogContext = this.defaultLogContext,
@@ -260,7 +260,7 @@ class Logger {
   ) {
     this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
 
-    void this.setStatusAndExit(
+    await this.setStatusAndExit(
       this.overrideFatalExitCode ?? exitCode,
       "failed",
     );
@@ -274,7 +274,10 @@ class Logger {
     }
   }
 
-  async setStatusAndExit(exitCode: ExitCodes, status: string): Promise<void> {
+  async setStatusAndExit(
+    exitCode: ExitCodes,
+    status: CrawlStatus,
+  ): Promise<void> {
     try {
       await this.closeLog();
 

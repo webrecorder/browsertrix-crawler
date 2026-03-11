@@ -217,7 +217,7 @@ export class S3StorageSync {
       } else if (this.webhookUrl.startsWith("redis://")) {
         const parts = this.webhookUrl.split("/");
         if (parts.length !== 5) {
-          logger.fatal(
+          await logger.fatal(
             "redis webhook url must be in format: redis://<host>:<port>/<db>/<key>",
             {},
             "redis",

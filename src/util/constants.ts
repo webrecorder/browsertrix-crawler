@@ -103,3 +103,15 @@ export enum InterruptReason {
   SignalInterrupted = 6,
   CrawlPaused = 7,
 }
+
+export type CrawlStatus =
+  | "running"
+  | "generate-wacz"
+  | "uploading-wacz"
+  | "generate-cdx"
+  | "generate-warc"
+  | "pending-wait"
+  | "done"
+  | "interrupted"
+  | "failed"
+  | "canceled";
