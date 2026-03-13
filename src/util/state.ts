@@ -465,7 +465,9 @@ export class RedisDedupeIndex {
     if (!(await this.dedupeRedis.sadd(this.sourceQSet, id))) {
       return;
     }
-    await this.dedupeRedis.lpush(this.sourceQ, data);
+    // using rpush to reverse list
+    // this allows for newer crawls to be processed first
+    await this.dedupeRedis.rpush(this.sourceQ, data);
   }
 
   async addImportedHashNew(
