@@ -1319,16 +1319,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async pageFinished(
-    data: PageState,
-    lastErrorText = "",
-    fromDirectFetch = false,
-  ) {
-    // allow only direct fetched, or only regular pages depending on where
-    // this is called from
-    if (fromDirectFetch !== data.directFetch) {
-      return;
-    }
+  async pageFinished(data: PageState, lastErrorText = "") {
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
     const { loadState, logDetails, depth, url, pageSkipped, noRetries } = data;

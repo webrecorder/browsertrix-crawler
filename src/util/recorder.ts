@@ -1464,7 +1464,7 @@ export class Recorder extends EventEmitter {
       return false;
     }
     if (!this.stopping) {
-      state.directFetch = true;
+      state.isDirectFetched = true;
       void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
     }
     return true;
@@ -2122,7 +2122,7 @@ class AsyncFetcher {
         "fetch",
       );
     }
-    await crawler.pageFinished(state, undefined, true);
+    await crawler.pageFinished(state);
   }
 }
 
