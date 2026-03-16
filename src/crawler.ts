@@ -1319,9 +1319,14 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async pageFinished(data: PageState, lastErrorText = "") {
-    // not yet finished
-    if (data.asyncLoading) {
+  async pageFinished(
+    data: PageState,
+    lastErrorText = "",
+    fromDirectFetch = false,
+  ) {
+    // allow only direct fetched, or only regular pages depending on where
+    // this is called from
+    if (fromDirectFetch !== data.directFetch) {
       return;
     }
     // if page loaded, considered page finished successfully

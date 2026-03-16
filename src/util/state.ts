@@ -98,7 +98,7 @@ export class PageState {
   pageSkipped = false;
   noRetries = false;
 
-  asyncLoading = false;
+  directFetch = false;
   filteredFrames: Frame[] = [];
   loadState: LoadState = LoadState.FAILED;
   contentCheckAllowed = false;
