@@ -808,7 +808,8 @@ export class ReplayCrawler extends Crawler {
       .toISOString()
       .slice(0, 19)
       .replace(/[T:-]/g, "");
-    const replayUrl = REPLAY_PREFIX + `${timestamp}mp_/${pageInfo.url}`;
+    // `if_` suffix to timestamp ensures wabac.js serves the unaltered source
+    const replayUrl = REPLAY_PREFIX + `${timestamp}if_/${pageInfo.url}`;
 
     const frame = page.frames()[1];
     if (!frame) {

@@ -1,13 +1,20 @@
 import { logger } from "./logger.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { WARCWriter } from "./warcwriter.js";
+import type { Page } from "puppeteer";
+import { JSDOM } from "jsdom";
 
 // ============================================================================
 type TextExtractOpts = {
   url: string;
   writer: WARCWriter;
   skipDocs: number;
+  ts?: Date;
+  page?: Page;
 };
+
+// RWP Replay Prefix
+const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
 
 // ============================================================================
 export abstract class BaseTextExtract {
@@ -17,12 +24,19 @@ export abstract class BaseTextExtract {
   skipDocs: number = 0;
   writer: WARCWriter;
   url: string;
+  ts?: Date;
+  page?: Page;
 
-  constructor(cdp: CDPSession, { writer, skipDocs, url }: TextExtractOpts) {
+  constructor(
+    cdp: CDPSession,
+    { writer, skipDocs, url, ts, page }: TextExtractOpts,
+  ) {
     this.writer = writer;
     this.cdp = cdp;
     this.url = url;
     this.skipDocs = skipDocs || 0;
+    this.ts = ts;
+    this.page = page;
   }
 
   async extractAndStoreText(
@@ -132,26 +146,67 @@ export class TextExtractViaSnapshot extends BaseTextExtract {
 }
 
 // ============================================================================
-export class TextExtractViaDocument extends BaseTextExtract {
+export class TextExtractViaResponse extends BaseTextExtract {
   async doGetText(): Promise<string> {
-    const result = await this.cdp.send("DOM.getDocument", {
-      depth: -1,
-      pierce: true,
-    });
-    return this.parseTextFromDOM(result);
+    if (!this.ts) {
+      logger.warn(
+        "Missing page timestamp, skipping",
+        { url: this.url },
+        "text",
+      );
+      throw new Error("Missing page timestamp");
+    }
+    if (!this.page) {
+      logger.error(
+        "Missing Page object, unable to continue",
+        { url: this.url },
+        "text",
+      );
+      throw new Error("Missing Page object");
+    }
+    const timestamp = new Date(this.ts)
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[T:-]/g, "");
+    // `if_` suffix to timestamp ensures wabac.js serves the unaltered source
+    const replayUrl = REPLAY_PREFIX + `${timestamp}if_/${this.url}`;
+
+    const frame = this.page.frames()[1];
+    if (!frame) {
+      logger.warn(
+        "Replay frame missing for CSR clues",
+        { url: this.url },
+        "text",
+      );
+      throw new Error("Replay frame missing for CSR clues");
+    }
+
+    const result = await frame.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (response.status !== 200) {
+        logger.warn("Got non-200 status code, proceeding", { url }, "text");
+      }
+      return await response.text();
+    }, replayUrl);
+
+    const dom = new JSDOM(result);
+    return this.parseTextFromDOM(dom.window.document);
   }
 
-  parseTextFromDOM(dom: Protocol.DOM.GetDocumentResponse): string {
+  parseTextFromDOM(dom: typeof document): string {
     const accum: string[] = [];
     const metadata = {};
 
-    this.parseText(dom.root, metadata, accum);
+    this.parseText(dom, metadata, accum);
 
     return accum.join("\n");
   }
 
-  parseText(
-    node: Protocol.DOM.Node,
+  parseText<T extends Element | Document>(
+    node: T,
     metadata: Record<string, string> | null,
     accum: string[],
   ) {
@@ -164,7 +219,7 @@ export class TextExtractViaDocument extends BaseTextExtract {
       "banner-div",
       "noscript",
     ];
-    const EMPTY_LIST: Protocol.DOM.Node[] = [];
+    const EMPTY_LIST: Element[] = [];
     const TEXT = "#text";
     const TITLE = "title";
 
@@ -198,8 +253,15 @@ export class TextExtractViaDocument extends BaseTextExtract {
         this.parseText(child, metadata, accum);
       }
 
-      if (node.contentDocument) {
-        this.parseText(node.contentDocument, null, accum);
+      if (
+        "contentDocument" in node &&
+        (node as HTMLIFrameElement).contentDocument
+      ) {
+        this.parseText(
+          (node as HTMLIFrameElement).contentDocument!,
+          null,
+          accum,
+        );
       }
     }
   }
