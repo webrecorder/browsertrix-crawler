@@ -474,6 +474,16 @@ export class Crawler {
   }
 
   async bootstrap() {
+    // check first before disk space check, in case this clears up disk space
+    if (this.params.overwrite) {
+      logger.debug(`Clearing ${this.collDir} before starting`);
+      try {
+        fs.rmSync(this.collDir, { recursive: true, force: true });
+      } catch (e) {
+        logger.error(`Unable to clear ${this.collDir}`, e);
+      }
+    }
+
     if (await isDiskFull(this.params.cwd)) {
       await logger.interrupt(
         "Out of disk space, exiting",
@@ -530,15 +540,6 @@ export class Crawler {
 
     if (this.params.profile) {
       logger.info("With Browser Profile", { url: this.params.profile });
-    }
-
-    if (this.params.overwrite) {
-      logger.debug(`Clearing ${this.collDir} before starting`);
-      try {
-        fs.rmSync(this.collDir, { recursive: true, force: true });
-      } catch (e) {
-        logger.error(`Unable to clear ${this.collDir}`, e);
-      }
     }
 
     if (this.params.customBehaviors) {
