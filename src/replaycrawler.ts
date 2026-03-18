@@ -70,6 +70,13 @@ export class ReplayCrawler extends Crawler {
 
   includeRx: RegExp[];
   excludeRx: RegExp[];
+  
+  // QA policies
+  qaPageCount: number = 0;
+  qaMaxUrls: number = Number.MAX_SAFE_INTEGER;;
+  qaPolicy: string = "";
+  qaRegex: RegExp = new RegExp("^https?:\\/\\/\\S+$");
+  qaProbability: number = 0.3;
 
   // for qaDebugImageDiff incremental file output
   counter: number = 0;
@@ -105,6 +112,20 @@ export class ReplayCrawler extends Crawler {
 
     this.includeRx = parseRx(this.params.scopeIncludeRx);
     this.excludeRx = parseRx(this.params.scopeExcludeRx);
+    
+    // Set the QA policies
+    if (this.params.qaMaxUrls) {
+    	this.qaMaxUrls = this.params.qaMaxUrls;
+	}
+	if (this.params.qaPolicy) {
+    	this.qaPolicy = this.params.qaPolicy;
+	}
+	if (this.params.qaRegex) {
+    	this.qaRegex = new RegExp(this.params.qaRegex);
+	}
+	if (this.params.qaProbability) {
+    	this.qaProbability = this.params.qaProbability;
+	}
   }
 
   async bootstrap(): Promise<void> {
@@ -249,7 +270,40 @@ export class ReplayCrawler extends Crawler {
       }
     }
 
-    await this.queueUrl(0, url, depth, 0, {}, ts, id);
+	// Apply the chosen auto-QA policy
+    // Have we reached the maximum amount of pages allowed?
+	let shouldQueue = false;
+
+	switch (this.qaPolicy) {
+	  case "linear":
+	    shouldQueue = true;
+	    break;
+	
+	  case "regex":
+	    shouldQueue = this.qaRegex.test(url);
+	    break;
+	
+	  case "random":
+	    shouldQueue = Math.random() < this.qaProbability;
+	    break;
+	
+	  default:
+	    // Default is identical to "linear"
+	    shouldQueue = true;
+	    break;
+	}
+
+    if (shouldQueue) {
+	  if (this.qaPageCount >= this.qaMaxUrls) {
+	    return;
+	  }
+	
+	  // Reserve the slot first to prevent races
+	  this.qaPageCount++;
+	
+	  // Queue it!
+	  await this.queueUrl(0, url, depth, 0, {}, ts, id);
+	}
   }
 
   async loadPagesDirect(pages: ReplayPage[]) {
