@@ -1320,10 +1320,6 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async pageFinished(data: PageState, lastErrorText = "") {
-    // not yet finished
-    if (data.asyncLoading) {
-      return;
-    }
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
     const { loadState, logDetails, depth, url, pageSkipped, noRetries } = data;
