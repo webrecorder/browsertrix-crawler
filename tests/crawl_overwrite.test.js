@@ -1,7 +1,7 @@
 import child_process from "child_process";
 import fs from "fs";
 
-test("ensure --overwrite with existing collection results in a successful crawl", async () => {
+test("ensure --overwrite with existing collection results in a successful crawl", () => {
   child_process.execSync(
     "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://www.example.com/ --generateWACZ  --collection overwrite",
   );
@@ -25,7 +25,7 @@ test("check that the WACZ file exists in the collection", () => {
 
 //-----------
 
-test("ensure --overwrite results in a successful crawl even if collection didn't exist", async () => {
+test("ensure --overwrite results in a successful crawl even if collection didn't exist", () => {
   child_process.execSync(
     "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://www.example.com/ --generateWACZ  --collection overwrite-nothing --overwrite",
   );
