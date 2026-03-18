@@ -19,7 +19,10 @@ import yaml from "js-yaml";
 import { WACZ, WACZInitOpts, mergeCDXJ } from "./util/wacz.js";
 
 import { HealthChecker } from "./util/healthcheck.js";
-import { TextExtractViaSnapshot } from "./util/textextract.js";
+import {
+  TextExtractViaResponse,
+  TextExtractViaSnapshot,
+} from "./util/textextract.js";
 import {
   initStorage,
   getFileSize,
@@ -1171,11 +1174,55 @@ self.__bx_behaviors.selectMainBehavior();
       recorder.pageSeedDepth = depth;
     }
 
+    // Enable Network domain to track document request for raw text extraction
+    let documentRequestId: string | null = null;
+    let trackDocumentRequest:
+      | ((params: Protocol.Network.ResponseReceivedEvent) => void)
+      | null = null;
+
+    if (this.params.text.includes("to-warc-from-raw")) {
+      await cdp.send("Network.enable");
+      trackDocumentRequest = (
+        params: Protocol.Network.ResponseReceivedEvent,
+      ) => {
+        if (params.type === "Document" && !documentRequestId) {
+          documentRequestId = params.requestId;
+          logger.debug(
+            "Captured document request ID",
+            { requestId: documentRequestId, url: params.response.url },
+            "text",
+          );
+        }
+      };
+      cdp.on("Network.responseReceived", trackDocumentRequest);
+    }
+
     // run custom driver here, if any
-    if (this.driver) {
-      await this.driver({ page, data, crawler: this, seed });
-    } else {
-      await this.loadPage(page, data, seed);
+    try {
+      if (this.driver) {
+        await this.driver({ page, data, crawler: this, seed });
+      } else {
+        await this.loadPage(page, data, seed);
+      }
+    } finally {
+      // Store document request ID and clean up listener
+      if (documentRequestId) {
+        data.documentRequestId = documentRequestId;
+        logger.info(
+          "Stored document request ID for raw text extraction",
+          { url: data.url, requestId: documentRequestId },
+          "text",
+        );
+      } else if (trackDocumentRequest) {
+        logger.warn(
+          "No document request ID captured",
+          { url: data.url },
+          "text",
+        );
+      }
+      if (trackDocumentRequest) {
+        cdp.off("Network.responseReceived", trackDocumentRequest);
+      }
     }
 
     data.title = await timedRun(
@@ -1244,6 +1291,34 @@ self.__bx_behaviors.selectMainBehavior();
 
       if (text !== null && (this.textInPages || saveOutput)) {
         data.text = text;
+      }
+
+      if (this.params.text.includes("to-warc-from-raw")) {
+        logger.info(
+          "Extracting text from raw response",
+          { url, hasRequestId: !!data.documentRequestId },
+          "text",
+        );
+        textextract = new TextExtractViaResponse(cdp, {
+          writer: this.textWriter,
+          url,
+          skipDocs: this.skipTextDocs,
+          requestId: data.documentRequestId,
+        });
+        const { text: textFromResponse } =
+          await textextract.extractAndStoreText(
+            "text-from-response",
+            false,
+            this.params.text.includes("to-warc-from-raw"),
+          );
+        logger.info(
+          "Extracted text from raw response result",
+          { url, hasText: textFromResponse !== null },
+          "text",
+        );
+        if (textFromResponse !== null && (this.textInPages || saveOutput)) {
+          data.textFromResponse = textFromResponse;
+        }
       }
     }
 

@@ -20,7 +20,13 @@ export type ServiceWorkerOpt = (typeof SERVICE_WORKER_OPTS)[number];
 
 export const DETECT_SITEMAP = "<detect>";
 
-export const EXTRACT_TEXT_TYPES = ["to-pages", "to-warc", "final-to-warc"];
+export const EXTRACT_TEXT_TYPES = [
+  "to-pages",
+  "to-warc",
+  "final-to-warc",
+  "to-warc-from-raw",
+] as const;
+export type ExtractTextType = (typeof EXTRACT_TEXT_TYPES)[number];
 
 export const DUPE_ALL_HASH_KEY = "alldupes";
 export const DUPE_ALL_CRAWLS = "allcrawls";
