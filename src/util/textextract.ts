@@ -1,42 +1,32 @@
 import { logger } from "./logger.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { WARCWriter } from "./warcwriter.js";
-import type { Page } from "puppeteer";
 import { JSDOM } from "jsdom";
 
 // ============================================================================
-type TextExtractOpts = {
+interface TextExtractOptsBase {
   url: string;
   writer: WARCWriter;
   skipDocs: number;
-  ts?: Date;
-  page?: Page;
-};
+}
 
-// RWP Replay Prefix
-const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
+interface TextExtractViaResponseOpts extends TextExtractOptsBase {
+  requestId?: string;
+}
 
 // ============================================================================
 export abstract class BaseTextExtract {
-  cdp: CDPSession;
-  lastText: string | null = null;
-  text: string | null = null;
-  skipDocs: number = 0;
-  writer: WARCWriter;
-  url: string;
-  ts?: Date;
-  page?: Page;
+  protected cdp: CDPSession;
+  protected lastText: string | null = null;
+  protected skipDocs: number = 0;
+  protected writer: WARCWriter;
+  protected url: string;
 
-  constructor(
-    cdp: CDPSession,
-    { writer, skipDocs, url, ts, page }: TextExtractOpts,
-  ) {
+  constructor(cdp: CDPSession, { writer, skipDocs, url }: TextExtractOptsBase) {
     this.writer = writer;
     this.cdp = cdp;
     this.url = url;
     this.skipDocs = skipDocs || 0;
-    this.ts = ts;
-    this.page = page;
   }
 
   async extractAndStoreText(
@@ -48,7 +38,7 @@ export abstract class BaseTextExtract {
       const text = await this.doGetText();
 
       if (ignoreIfMatchesLast && text === this.lastText) {
-        this.lastText = this.text;
+        this.lastText = text;
         logger.debug(
           "Skipping, extracted text unchanged from last extraction",
           { url: this.url },
@@ -147,122 +137,145 @@ export class TextExtractViaSnapshot extends BaseTextExtract {
 
 // ============================================================================
 export class TextExtractViaResponse extends BaseTextExtract {
-  async doGetText(): Promise<string> {
-    if (!this.ts) {
-      logger.warn(
-        "Missing page timestamp, skipping",
-        { url: this.url },
-        "text",
-      );
-      throw new Error("Missing page timestamp");
-    }
-    if (!this.page) {
-      logger.error(
-        "Missing Page object, unable to continue",
-        { url: this.url },
-        "text",
-      );
-      throw new Error("Missing Page object");
-    }
-    const timestamp = new Date(this.ts)
-      .toISOString()
-      .slice(0, 19)
-      .replace(/[T:-]/g, "");
-    // `if_` suffix to timestamp ensures wabac.js serves the unaltered source
-    const replayUrl = REPLAY_PREFIX + `${timestamp}if_/${this.url}`;
+  protected requestId: string | undefined;
 
-    const frame = this.page.frames()[1];
-    if (!frame) {
-      logger.warn(
-        "Replay frame missing for CSR clues",
-        { url: this.url },
-        "text",
-      );
-      throw new Error("Replay frame missing for CSR clues");
-    }
-
-    const result = await frame.evaluate(async (url) => {
-      const response = await fetch(url, {
-        method: "GET",
-        credentials: "include",
-      });
-      if (response.status !== 200) {
-        logger.warn("Got non-200 status code, proceeding", { url }, "text");
-      }
-      return await response.text();
-    }, replayUrl);
-
-    const dom = new JSDOM(result);
-    return this.parseTextFromDOM(dom.window.document);
+  constructor(cdp: CDPSession, opts: TextExtractViaResponseOpts) {
+    super(cdp, opts);
+    this.requestId = opts.requestId;
   }
 
-  parseTextFromDOM(dom: typeof document): string {
-    const accum: string[] = [];
-    const metadata = {};
+  async doGetText(): Promise<string> {
+    if (!this.requestId) {
+      logger.warn(
+        "Missing document request ID, skipping",
+        { url: this.url },
+        "text",
+      );
+      throw new Error("Missing document request ID");
+    }
 
-    this.parseText(dom, metadata, accum);
+    logger.info(
+      "Fetching raw response body via CDP",
+      { url: this.url, requestId: this.requestId },
+      "text",
+    );
+
+    try {
+      const { body, base64Encoded } = await this.cdp.send(
+        "Network.getResponseBody",
+        {
+          requestId: this.requestId,
+        },
+      );
+
+      const text = base64Encoded
+        ? Buffer.from(body, "base64").toString()
+        : body;
+
+      logger.info(
+        "Got raw response body",
+        { url: this.url, size: text.length },
+        "text",
+      );
+
+      const dom = new JSDOM(text, {
+        runScripts: undefined,
+        resources: undefined,
+      });
+      try {
+        const extracted = this.parseTextFromDOM(dom.window.document);
+        logger.info(
+          "Extracted text from raw response",
+          { url: this.url, textLength: extracted.length },
+          "text",
+        );
+        return extracted;
+      } finally {
+        dom.window.close();
+      }
+    } catch (e) {
+      logger.error(
+        "Failed to get response body",
+        { url: this.url, requestId: this.requestId, error: String(e) },
+        "text",
+      );
+      throw e;
+    }
+  }
+
+  parseTextFromDOM(dom: Document): string {
+    const TEXT_NODE = 3;
+    const ELEMENT_NODE = 1;
+
+    const SKIPPED_NODES = [
+      "SCRIPT",
+      "STYLE",
+      "HEADER",
+      "FOOTER",
+      "BANNER-DIV",
+      "NOSCRIPT",
+      "TITLE",
+    ];
+
+    // Build flat arrays similar to DOMSnapshot format
+    const nodeValues: string[] = [];
+    const nodeNames: string[] = [];
+    const nodeTypes: number[] = [];
+    const parentIndex: number[] = [];
+    const nodeToIndex = new Map<Node, number>();
+
+    // Use window.NodeFilter from the document's window (required for JSDOM)
+    const window = dom.defaultView!;
+    const walker = dom.createTreeWalker(
+      dom,
+      window.NodeFilter.SHOW_ELEMENT | window.NodeFilter.SHOW_TEXT,
+      null,
+    );
+
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      nodeToIndex.set(node, nodeValues.length);
+      nodeTypes.push(node.nodeType);
+
+      if (node.nodeType === TEXT_NODE) {
+        nodeValues.push(node.textContent || "");
+        nodeNames.push("");
+      } else {
+        nodeValues.push("");
+        nodeNames.push((node as Element).tagName);
+      }
+
+      const parent = node.parentNode;
+      if (parent && nodeToIndex.has(parent)) {
+        parentIndex.push(nodeToIndex.get(parent)!);
+      } else {
+        parentIndex.push(-1);
+      }
+    }
+
+    // Extract text using same logic as snapshot
+    const accum: string[] = [];
+
+    for (let i = 0; i < nodeValues.length; i++) {
+      if (nodeValues[i] === "") {
+        continue;
+      }
+
+      if (nodeTypes[i] === TEXT_NODE) {
+        const pi = parentIndex[i];
+        if (pi >= 0 && nodeTypes[pi] === ELEMENT_NODE) {
+          const name = nodeNames[pi];
+
+          if (!SKIPPED_NODES.includes(name)) {
+            const value = nodeValues[i].trim();
+            if (value) {
+              accum.push(value);
+            }
+          }
+        }
+      }
+    }
 
     return accum.join("\n");
-  }
-
-  parseText<T extends Element | Document>(
-    node: T,
-    metadata: Record<string, string> | null,
-    accum: string[],
-  ) {
-    const SKIPPED_NODES = [
-      "head",
-      "script",
-      "style",
-      "header",
-      "footer",
-      "banner-div",
-      "noscript",
-    ];
-    const EMPTY_LIST: Element[] = [];
-    const TEXT = "#text";
-    const TITLE = "title";
-
-    const name = node.nodeName.toLowerCase();
-
-    if (SKIPPED_NODES.includes(name)) {
-      return;
-    }
-
-    const children = node.children || EMPTY_LIST;
-
-    if (name === TEXT) {
-      const value = node.nodeValue ? node.nodeValue.trim() : "";
-      if (value) {
-        accum.push(value);
-      }
-    } else if (name === TITLE) {
-      const title: string[] = [];
-
-      for (const child of children) {
-        this.parseText(child, null, title);
-      }
-
-      if (metadata) {
-        metadata.title = title.join(" ");
-      } else {
-        accum.push(title.join(" "));
-      }
-    } else {
-      for (const child of children) {
-        this.parseText(child, metadata, accum);
-      }
-
-      if (
-        "contentDocument" in node &&
-        (node as HTMLIFrameElement).contentDocument
-      ) {
-        this.parseText(
-          (node as HTMLIFrameElement).contentDocument!,
-          null,
-          accum,
-        );
-      }
-    }
   }
 }
