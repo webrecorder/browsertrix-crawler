@@ -148,14 +148,14 @@ export const CSR_CLUES: CSRClue[] = [
     description: "Web components",
   },
   {
-    name: "element_definition",
+    name: "custom_elements_api",
     category: "web_components",
     pattern:
       "customElements\\.(?:define|get|getName|upgrade|initialize|whenDefined)",
     description: "Web components",
   },
   {
-    name: "element_definition",
+    name: "custom_element_registry",
     category: "web_components",
     pattern: "customElementRegistry",
     description: "Web components",
