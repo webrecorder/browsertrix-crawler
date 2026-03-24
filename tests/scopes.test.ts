@@ -1,4 +1,4 @@
-import { parseArgs } from "../src/util/argParser.js";
+import { CrawlerArgs, parseArgs } from "../src/util/argParser.js";
 import { parseSeeds } from "../src/util/seeds.js";
 
 import fs from "fs";
@@ -14,7 +14,12 @@ async function getSeeds(config: string) {
     return orig(name, ...args);
   };
 
-  const params = parseArgs(["node", "crawler", "--config", "stdinconfig"]);
+  const params = parseArgs([
+    "node",
+    "crawler",
+    "--config",
+    "stdinconfig",
+  ]) as CrawlerArgs;
   return await parseSeeds("", params);
 }
 

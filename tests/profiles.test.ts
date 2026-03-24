@@ -1,56 +1,56 @@
-import { exec as execCallback, type SpawnSyncReturns } from "child_process";
+import { exec as execCallback, type ExecException } from "child_process";
 import fs from "node:fs";
 import { promisify } from "node:util";
 
 const exec = promisify(execCallback);
 
 test("run with invalid profile, fail", async () => {
-  let status: number | null = 0;
+  let status: number | undefined = 0;
   try {
     await exec(
       "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection profile-0 --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --limit 1 --profile /tests/fixtures/invalid.tar.gz",
     );
   } catch (error) {
-    status = (error as SpawnSyncReturns<string>).status;
+    status = (error as ExecException).code;
   }
 
   expect(status).toBe(17);
 });
 
 test("start with no profile", async () => {
-  let status: number | null = 0;
+  let status: number | undefined = 0;
   try {
     await exec(
       "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection profile-1 --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --limit 1",
     );
   } catch (error) {
-    status = (error as SpawnSyncReturns<string>).status;
+    status = (error as ExecException).code;
   }
 
   expect(status).toBe(0);
 });
 
 test("resume same crawl, but with invalid profile, not valid as no previous valid profile", async () => {
-  let status: number | null = 0;
+  let status: number | undefined = 0;
   try {
     await exec(
       "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection profile-1 --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --limit 1 --profile /tests/fixtures/invalid.tar.gz",
     );
   } catch (error) {
-    status = (error as SpawnSyncReturns<string>).status;
+    status = (error as ExecException).code;
   }
 
   expect(status).toBe(17);
 });
 
 test("start with valid profile", async () => {
-  let status: number | null = 0;
+  let status: number | undefined = 0;
   try {
     await exec(
       "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection profile-2 --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --limit 1 --scopeType page --profile /tests/fixtures/sample-profile.tar.gz",
     );
   } catch (error) {
-    status = (error as SpawnSyncReturns<string>).status;
+    status = (error as ExecException).code;
   }
 
   expect(status).toBe(0);
@@ -65,13 +65,13 @@ test("start with valid profile", async () => {
 });
 
 test("resume same crawl, ignore invalid profile, use existing, finish crawl", async () => {
-  let status: number | null = 0;
+  let status: number | undefined = 0;
   try {
     await exec(
       "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection profile-2 --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --scopeType page --profile /tests/fixtures/invalid.tar.gz",
     );
   } catch (error) {
-    status = (error as SpawnSyncReturns<string>).status;
+    status = (error as ExecException).code;
   }
 
   expect(status).toBe(0);
