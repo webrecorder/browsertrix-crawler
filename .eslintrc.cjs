@@ -30,7 +30,7 @@ module.exports = {
       },
     ],
     "@typescript-eslint/no-floating-promises": "error",
-    "@typescript-eslint/await-thenable": "error"
+    "@typescript-eslint/await-thenable": "error",
   },
   reportUnusedDisableDirectives: true,
 };
