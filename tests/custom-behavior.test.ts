@@ -1,4 +1,4 @@
-import child_process, { type ChildProcess } from "child_process";
+import child_process, { ExecException, type ChildProcess } from "child_process";
 import Redis from "ioredis";
 import { ErrorWithStatus, sleep } from "./utils";
 
@@ -21,12 +21,22 @@ afterAll(() => {
   }
 });
 
+const spawnWithLoggingOnError = (cmd: string) => {
+  try {
+    return child_process.execSync(cmd);
+  } catch (e) {
+    // Show log lines
+    console.error((e as ExecException).stdout?.toString());
+    throw e;
+  }
+};
+
 test("test custom behaviors from local filepath", async () => {
-  const res = child_process.execSync(
+  const res = spawnWithLoggingOnError(
     "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://example-com.webrecorder.net/page --url https://old.webrecorder.net/ --customBehaviors /custom-behaviors/ --scopeType page",
   );
 
-  const log = res.toString();
+  const log = res!.toString();
 
   // custom behavior ran for specs.webrecorder.net
   expect(
@@ -51,7 +61,7 @@ test("test custom behaviors from local filepath", async () => {
 });
 
 test("test custom behavior from URL", async () => {
-  const res = child_process.execSync(
+  const res = spawnWithLoggingOnError(
     `docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --customBehaviors ${TEST_HOST}/custom-2.js --scopeType page`,
   );
 
@@ -67,7 +77,7 @@ test("test custom behavior from URL", async () => {
 });
 
 test("test mixed custom behavior sources", async () => {
-  const res = child_process.execSync(
+  const res = spawnWithLoggingOnError(
     `docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/custom-behaviors/:/custom-behaviors/ webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://old.webrecorder.net/ --customBehaviors ${TEST_HOST}/custom-2.js --customBehaviors /custom-behaviors/custom.js --scopeType page`,
   );
 
@@ -91,7 +101,7 @@ test("test mixed custom behavior sources", async () => {
 });
 
 test("test custom behaviors from git repo", async () => {
-  const res = child_process.execSync(
+  const res = spawnWithLoggingOnError(
     'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://specs.webrecorder.net/ --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --customBehaviors "git+https://github.com/webrecorder/browsertrix-crawler.git?branch=main&path=tests/custom-behaviors" --scopeType page',
   );
 
@@ -180,9 +190,9 @@ test("test crawl exits if not custom behaviors collected from local path", async
 });
 
 test("test pushing behavior logs to redis", async () => {
-  child_process.execSync("docker network create crawl");
+  spawnWithLoggingOnError("docker network create crawl");
 
-  const redisId = child_process.execSync(
+  const redisId = spawnWithLoggingOnError(
     "docker run --rm --network=crawl -p 36399:6379 --name redis -d redis",
   );
 
