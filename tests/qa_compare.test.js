@@ -77,9 +77,11 @@ test("run QA comparison without CSR detection, with write pages to redis", async
 
     expect(json.comparison).toHaveProperty("screenshotMatch");
     expect(json.comparison).toHaveProperty("textMatch");
+    expect(json.comparison).toHaveProperty("rawTextMatch");
     expect(json.comparison).toHaveProperty("resourceCounts");
     expect(json.comparison.screenshotMatch).toBe(1);
     expect(json.comparison.textMatch).toBe(1);
+    expect(typeof json.comparison.rawTextMatch).toBe("number");
 
     expect(json.comparison.resourceCounts).toHaveProperty("crawlGood");
     expect(json.comparison.resourceCounts).toHaveProperty("crawlBad");
@@ -156,9 +158,11 @@ test("run QA comparison with CSR detection, with write pages to redis", async ()
 
     expect(json.comparison).toHaveProperty("screenshotMatch");
     expect(json.comparison).toHaveProperty("textMatch");
+    expect(json.comparison).toHaveProperty("rawTextMatch");
     expect(json.comparison).toHaveProperty("resourceCounts");
     expect(json.comparison.screenshotMatch).toBe(1);
     expect(json.comparison.textMatch).toBe(1);
+    expect(typeof json.comparison.rawTextMatch).toBe("number");
 
     expect(json.comparison.resourceCounts).toHaveProperty("crawlGood");
     expect(json.comparison.resourceCounts).toHaveProperty("crawlBad");
