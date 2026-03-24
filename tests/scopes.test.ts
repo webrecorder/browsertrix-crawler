@@ -1,5 +1,5 @@
-import { parseArgs } from "../dist/util/argParser.js";
-import { parseSeeds } from "../dist/util/seeds.js";
+import { parseArgs } from "../src/util/argParser.js";
+import { parseSeeds } from "../src/util/seeds.js";
 
 import fs from "fs";
 
