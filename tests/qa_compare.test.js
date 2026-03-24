@@ -165,13 +165,13 @@ test("run QA comparison with CSR detection, with write pages to redis", async ()
     expect(json.comparison.resourceCounts).toHaveProperty("replayGood");
     expect(json.comparison.resourceCounts).toHaveProperty("replayBad");
 
-    expect(json).toHaveProperty("csrClues");
-    expect(json.csrClues).toHaveProperty("clues");
-    expect(json.csrClues.clues).toBeInstanceOf(Object);
-    expect(json.csrClues).toHaveProperty("categories");
-    expect(json.csrClues.categories).toBeInstanceOf(Object);
+    expect(json.comparison).toHaveProperty("csrClues");
+    expect(json.comparison.csrClues).toHaveProperty("clues");
+    expect(json.comparison.csrClues.clues).toBeInstanceOf(Object);
+    expect(json.comparison.csrClues).toHaveProperty("categories");
+    expect(json.comparison.csrClues.categories).toBeInstanceOf(Object);
 
-    expect(json.csrClues).toEqual(expectedCSRCluesValues[json.url]);
+    expect(json.comparison.csrClues).toEqual(expectedCSRCluesValues[json.url]);
 
     count++;
   }
