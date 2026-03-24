@@ -73,10 +73,6 @@
     "type-fest": "^5.5.0",
     "typescript": "^5.5.4"
   },
-  "jest": {
-    "transform": {},
-    "testTimeout": 90000
-  },
   "resolutions": {
     "wrap-ansi": "7.0.0",
     "warcio": "^2.4.9",
