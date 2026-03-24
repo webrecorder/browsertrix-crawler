@@ -19,6 +19,7 @@ import {
   DEFAULT_MAX_RETRIES,
   BxFunctionBindings,
   DEFAULT_CRAWL_ID_TEMPLATE,
+  type ExtractTextType,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -38,7 +39,7 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   logLevel: LogLevel[];
   logContext: LogContext[];
   logExcludeContext: LogContext[];
-  text: string[];
+  text: ExtractTextType[];
 
   customBehaviors: string[];
 
@@ -701,6 +702,12 @@ class ArgParser {
         qaDebugImageDiff: {
           describe:
             "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
+          type: "boolean",
+        },
+
+        qaDetectClientSideRendering: {
+          describe:
+            "use heuristics to detect when a page might use client-side rendering (CSR)",
           type: "boolean",
         },
 

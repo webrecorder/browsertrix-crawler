@@ -21,6 +21,8 @@ import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
 import { getFileOrUrlJson } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
+import { CSR_CLUES } from "./util/clientSideRenderingClues.js";
+import { extractTextFromDOM } from "./util/textextract.js";
 
 // RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
@@ -43,11 +45,16 @@ type ComparisonData = {
   comparison: {
     screenshotMatch?: number;
     textMatch?: number;
+    rawTextMatch?: number;
     resourceCounts: {
       crawlGood?: number;
       crawlBad?: number;
       replayGood?: number;
       replayBad?: number;
+    };
+    csrClues?: {
+      clues: Record<string, number>;
+      categories: Record<string, number>;
     };
   };
 };
@@ -406,7 +413,7 @@ export class ReplayCrawler extends Crawler {
       comparison: { resourceCounts: {} },
       counts: { jsErrors: 0 },
       tsStatus: 999,
-    };
+    } satisfies ReplayPageInfoRecord;
     this.pageInfos.set(page, pageInfo);
 
     let replayFrame;
@@ -462,7 +469,12 @@ export class ReplayCrawler extends Crawler {
 
     await this.compareText(page, data, url, date);
 
+    await this.compareRawText(page, data, url, date);
+
     await this.compareResources(page, data, url, date);
+
+    if (this.params.qaDetectClientSideRendering)
+      await this.processCSRClues(page, data);
 
     await this.processPageInfo(page, data);
   }
@@ -585,6 +597,112 @@ export class ReplayCrawler extends Crawler {
     const pageInfo = this.pageInfos.get(page);
     if (pageInfo) {
       pageInfo.comparison.textMatch = matchPercent;
+    }
+  }
+
+  async compareRawText(page: Page, state: PageState, url: string, date: Date) {
+    // Try to fetch the stored crawl-time raw response text
+    let rawText = await this.fetchOrigText(
+      page,
+      "text-from-response",
+      url,
+      date.toISOString().replace(/[^\d]/g, ""),
+    );
+
+    // If not stored (older archive), extract it from the archived raw response on-the-fly
+    if (rawText === undefined) {
+      logger.info(
+        "Stored raw text not found, extracting from archived response",
+        { url },
+        "replay",
+      );
+      rawText = await this.extractRawTextFromArchive(page, url, date);
+    }
+
+    // Get the replay-time rendered text (extracted from browser after JS runs)
+    const renderedText = state.text;
+
+    if (rawText === undefined || renderedText === undefined) {
+      logger.warn(
+        "Text missing for raw vs rendered comparison",
+        {
+          url,
+          rawTextLen: rawText?.length,
+          renderedTextLen: renderedText?.length,
+        },
+        "replay",
+      );
+      return;
+    }
+
+    const dist = levenshtein(rawText, renderedText);
+    const maxLen = Math.max(rawText.length, renderedText.length);
+
+    let matchPercent = 1.0;
+    if (maxLen > 0) {
+      matchPercent = (maxLen - dist) / maxLen;
+    }
+    logger.info("Raw vs Rendered Text Levenshtein Dist", {
+      url,
+      dist,
+      matchPercent,
+      maxLen,
+      rawTextLen: rawText.length,
+      renderedTextLen: renderedText.length,
+    });
+
+    const pageInfo = this.pageInfos.get(page);
+    if (pageInfo) {
+      pageInfo.comparison.rawTextMatch = matchPercent;
+    }
+  }
+
+  async extractRawTextFromArchive(
+    page: Page,
+    url: string,
+    date: Date,
+  ): Promise<string | undefined> {
+    const timestamp = date.toISOString().slice(0, 19).replace(/[T:-]/g, "");
+    // `if_` suffix ensures wabac.js serves the unaltered source
+    const replayUrl = REPLAY_PREFIX + `${timestamp}if_/${url}`;
+
+    const frame = page.frames()[1];
+    if (!frame) {
+      logger.warn(
+        "Replay frame missing for raw text extraction",
+        { url },
+        "replay",
+      );
+      return undefined;
+    }
+
+    const htmlContent = await frame.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (response.status !== 200) {
+        return undefined;
+      }
+      return await response.text();
+    }, replayUrl);
+
+    if (!htmlContent) {
+      logger.warn(
+        "Could not fetch HTML content for raw text extraction",
+        { url },
+        "replay",
+      );
+      return undefined;
+    }
+
+    // Extract text from the raw HTML using the shared extraction logic
+    const { JSDOM } = await import("jsdom");
+    const dom = new JSDOM(htmlContent);
+    try {
+      return extractTextFromDOM(dom.window.document);
+    } finally {
+      dom.window.close();
     }
   }
 
@@ -752,7 +870,7 @@ export class ReplayCrawler extends Crawler {
       if (state) {
         const { comparison } = pageInfo;
 
-        // add comparison to page state
+        // add comparison & csr clues to page state
         (state as ComparisonPageState).comparison = comparison;
       }
 
@@ -771,11 +889,117 @@ export class ReplayCrawler extends Crawler {
     }
   }
 
+  async processCSRClues(page: Page, state?: PageState) {
+    const pageInfo = this.pageInfos.get(page);
+    if (!pageInfo) {
+      logger.warn("No pageInfo found for CSR clues processing", {}, "replay");
+      return;
+    }
+
+    if (!state?.isHTMLPage) {
+      logger.info(
+        "Skipping CSR clues - not an HTML page",
+        { url: pageInfo.url },
+        "replay",
+      );
+      return;
+    }
+
+    if (!pageInfo.ts) {
+      logger.warn("Missing page timestamp, skipping", { pageInfo });
+      return;
+    }
+
+    const timestamp = new Date(pageInfo.ts)
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[T:-]/g, "");
+    // `if_` suffix to timestamp ensures wabac.js serves the unaltered source
+    const replayUrl = REPLAY_PREFIX + `${timestamp}if_/${pageInfo.url}`;
+
+    const frame = page.frames()[1];
+    if (!frame) {
+      logger.warn(
+        "Replay frame missing for CSR clues",
+        { url: pageInfo.url },
+        "replay",
+      );
+      return;
+    }
+
+    const htmlContent = await frame.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (response.status !== 200) {
+        logger.warn("Got non-200 status code, proceeding", { url });
+      }
+      return await response.text();
+    }, replayUrl);
+
+    if (!htmlContent) {
+      logger.warn(
+        "Could not fetch HTML content for CSR clues",
+        { url: pageInfo.url },
+        "replay",
+      );
+      return;
+    }
+
+    const clueCounts: Record<string, number> = {};
+    const categoryCounts: Record<string, number> = {};
+
+    for (const clue of CSR_CLUES) {
+      const regex = new RegExp(clue.pattern, "gi");
+      const matches = htmlContent.match(regex);
+
+      if (matches && matches.length > 0) {
+        // count by clue name
+        clueCounts[clue.name] = matches.length;
+
+        // count by category (sum of all patterns in category)
+        categoryCounts[clue.category] =
+          (categoryCounts[clue.category] || 0) + matches.length;
+
+        logger.debug(
+          "CSR clue detected",
+          {
+            pattern: clue.name,
+            category: clue.category,
+            url: pageInfo.url,
+            count: matches.length,
+          },
+          "replay",
+        );
+      }
+    }
+
+    // add clue counts to pageInfo
+    pageInfo.comparison["csrClues"] = {
+      clues: clueCounts,
+      categories: categoryCounts,
+    };
+    if (Object.keys(clueCounts).length > 0) {
+      logger.info(
+        "CSR clues detected",
+        {
+          url: pageInfo.url,
+          categories: categoryCounts,
+          clues: clueCounts,
+        },
+        "replay",
+      );
+    } else {
+      logger.info("No CSR clues detected", { url: pageInfo.url }, "replay");
+    }
+  }
+
   protected pageEntryForRedis(
     entry: Record<string, string | number | boolean | object>,
-    state: PageState,
+    state: ComparisonPageState,
   ) {
-    entry.comparison = (state as ComparisonPageState).comparison;
+    entry.comparison = state.comparison;
     return entry;
   }
 
