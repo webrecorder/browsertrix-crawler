@@ -1,6 +1,6 @@
 import { execSync } from "child_process";
 
-import { getSafeProxyString } from "../dist/util/proxy.js";
+import { getSafeProxyString } from "../src/util/proxy.js";
 import { ErrorWithStatus, sleep } from "./utils.js";
 
 const PROXY_IMAGE = "tarampampam/3proxy:1.9.1";
