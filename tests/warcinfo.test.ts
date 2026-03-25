@@ -9,11 +9,9 @@ test("run crawl", async () => {
   try {
     const configYaml = fs.readFileSync("tests/fixtures/crawl-2.yaml", "utf8");
 
-    // @ts-expect-error TODO
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const proc = child_process.execSync(
+    child_process.execSync(
       "docker run -i -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin --limit 1 --collection warcinfo --combineWARC",
-      { input: configYaml, stdin: "inherit", encoding: "utf8" },
+      { input: configYaml, stdio: "inherit", encoding: "utf8" },
     );
 
     //console.log(proc);

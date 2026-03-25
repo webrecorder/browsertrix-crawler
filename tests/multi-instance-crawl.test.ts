@@ -81,10 +81,8 @@ test("run crawlers with external redis", async () => {
 
 test("finish crawls successfully", async () => {
   const res = await Promise.allSettled([crawler1, crawler2]);
-  // @ts-expect-error TODO
-  expect(res[0].value).toBe(0);
-  // @ts-expect-error TODO
-  expect(res[1].value).toBe(0);
+  expect(res[0].status === "fulfilled" ? res[0].value : null).toBe(0);
+  expect(res[1].status === "fulfilled" ? res[1].value : null).toBe(0);
 }, 180000);
 
 test("ensure correct number of pages", () => {

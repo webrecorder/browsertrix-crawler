@@ -8,11 +8,9 @@ test("pass config file via stdin", async () => {
   const config = yaml.load(configYaml) as CrawlerArgs;
 
   try {
-    // @ts-expect-error TODO
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const proc = child_process.execSync(
+    child_process.execSync(
       "docker run -i -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin --scopeExcludeRx webrecorder.net/202",
-      { input: configYaml, stdin: "inherit", encoding: "utf8" },
+      { input: configYaml, stdio: "inherit", encoding: "utf8" },
     );
 
     //console.log(proc);

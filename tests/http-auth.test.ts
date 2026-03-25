@@ -83,10 +83,9 @@ test("run crawl with auth config.yaml", () => {
 
   let status = 0;
   try {
-    // @ts-expect-error TODO
     execSync(
       "docker run -i --rm -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin",
-      { input: configYaml, stdin: "inherit", encoding: "utf8" },
+      { input: configYaml, stdio: "inherit", encoding: "utf8" },
     );
   } catch (e) {
     console.log(e);

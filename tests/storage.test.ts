@@ -2,6 +2,7 @@ import {
   calculatePercentageUsed,
   checkDiskUtilization,
 } from "../src/util/storage.js";
+import type { CrawlerArgs } from "../src/util/argParser.js";
 
 test("ensure calculatePercentageUsed returns expected values", () => {
   expect(calculatePercentageUsed(30, 100)).toEqual(30);
@@ -30,8 +31,7 @@ grpcfuse       1000000      285000    715000  28% /crawls`;
   // does not exceed 90% threshold
   const returnValue = await checkDiskUtilization(
     "/crawls",
-    // @ts-expect-error TODO
-    params,
+    params as CrawlerArgs,
     5000 * 1024,
     mockDfOutput,
     false,
@@ -59,8 +59,7 @@ grpcfuse       100000    85000     15000  85% /crawls`;
   // exceeds 90% threshold
   const returnValue = await checkDiskUtilization(
     "/crawls",
-    // @ts-expect-error TODO
-    params,
+    params as CrawlerArgs,
     3000 * 1024,
     mockDfOutput,
     false,
