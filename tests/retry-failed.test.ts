@@ -53,8 +53,7 @@ test("run crawl with retries for no response", async () => {
     while (true) {
       const res = await redis.lrange("test:f", 0, -1);
       if (res.length) {
-        // @ts-expect-error TODO
-        const data = JSON.parse(res);
+        const data = JSON.parse(res[0]);
         if (data.retry) {
           numRetries = data.retry;
           break;

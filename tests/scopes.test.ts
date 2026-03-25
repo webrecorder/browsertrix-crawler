@@ -6,9 +6,9 @@ import fs from "fs";
 async function getSeeds(config: string) {
   const orig = fs.readFileSync;
 
-  // @ts-expect-error TODO
-  fs.readFileSync = (name, ...args) => {
-    if ((name as string).endsWith("/stdinconfig")) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (fs as any).readFileSync = (name: string, ...args: any[]) => {
+    if (name.endsWith("/stdinconfig")) {
       return config;
     }
     return orig(name, ...args);

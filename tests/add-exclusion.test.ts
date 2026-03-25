@@ -1,31 +1,35 @@
-import { exec } from "child_process";
+import { exec, ExecException } from "child_process";
 import Redis from "ioredis";
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { sleep } from "./utils";
 
 test("dynamically add exclusion while crawl is running", async () => {
   let callback:
-    | ((error: string | null, stdout: string, stderr: string) => void)
+    | ((
+        error: ExecException | null,
+        stdout: NonSharedBuffer,
+        stderr: NonSharedBuffer,
+      ) => void)
     | null = null;
 
   const p = new Promise<{
-    error: string | null;
-    stdout: string;
-    stderr: string;
+    error: ExecException | null;
+    stdout: NonSharedBuffer;
+    stderr: NonSharedBuffer;
   }>((resolve) => {
-    callback = (error: string | null, stdout: string, stderr: string) => {
+    callback = (
+      error: ExecException | null,
+      stdout: NonSharedBuffer,
+      stderr: NonSharedBuffer,
+    ) => {
       resolve({ error, stdout, stderr } as const);
     };
   });
 
   try {
-    // @ts-expect-error TODO
     exec(
       "docker run -p 36382:6379 -e CRAWL_ID=test -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection add-exclusion --url https://old.webrecorder.net/ --scopeType prefix --limit 20 --logging debug --debugAccessRedis",
-      { shell: "/bin/bash" },
-      callback,
+      { shell: "/bin/bash", encoding: "buffer" },
+      callback!,
     );
   } catch (error) {
     console.log(error);

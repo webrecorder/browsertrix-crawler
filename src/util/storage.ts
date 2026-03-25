@@ -276,7 +276,7 @@ export async function checkDiskUtilization(
   collDir: string,
   params: CrawlerArgs,
   archiveDirSize: number,
-  dfOutput = null,
+  dfOutput: string | null = null,
   doLog = true,
 ) {
   const diskUsage: Record<string, string> = await getDiskUsage(
@@ -350,7 +350,10 @@ export async function getDFOutput(path: string) {
   return res.stdout;
 }
 
-export async function getDiskUsage(path = "/crawls", dfOutput = null) {
+export async function getDiskUsage(
+  path = "/crawls",
+  dfOutput: string | null = null,
+) {
   const result = dfOutput || (await getDFOutput(path));
   const lines = result.split("\n");
   const keys = lines[0].split(/\s+/gi);
