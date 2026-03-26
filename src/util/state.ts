@@ -195,6 +195,7 @@ declare module "ioredis" {
 
 // ============================================================================
 export type SaveState = {
+  id: string;
   done?: number | string[];
   finished: string[];
   queued: string[];
@@ -1321,6 +1322,7 @@ return inx;
     const excluded = [...excludedSet.values()];
 
     return {
+      id: this.crawlId,
       extraSeeds,
       finished,
       queued,
@@ -1408,6 +1410,10 @@ return inx;
   }
 
   async load(state: SaveState, seeds: ScopedSeed[], checkScope: boolean) {
+    if (state.id) {
+      this.crawlId = state.id;
+    }
+
     // need to delete existing keys, if exist to fully reset state
     await this.redis.del(this.qkey);
     await this.redis.del(this.pkey);
@@ -1742,12 +1748,12 @@ return inx;
   }
 
   // Requires crawling with WACZ to match dependencies
-  async getDupeDependentCrawls() {
+  async getDupeDependentCrawls(includedCrawls: Set<string>) {
     const dependRefs = await this.redis.smembers(`${this.uid}:duperef`);
     const crawlIds = [];
     for (const value of dependRefs) {
       const [crawlId, index] = value.split(" ");
-      if (crawlId && crawlId !== this.crawlId) {
+      if (crawlId && crawlId !== this.crawlId && !includedCrawls.has(crawlId)) {
         const source = await this.dedupeRedis.lindex(
           `c:${crawlId}:wacz`,
           Number(index),

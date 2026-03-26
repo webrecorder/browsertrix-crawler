@@ -145,6 +145,17 @@ test("check revisit records written on duplicate crawl, same collection, no wacz
 });
 
 
+test("dedupe same collection, with wacz, no external waczs referenced", async () => {
+
+  const collName = "dedupe-test-same-coll";
+
+  expect(await runCrawl(collName, {limit: 1, wacz: true})).toBe(0);
+
+  const related = loadDataPackageRelated(collName);
+
+  expect(related).toBe(undefined);
+});
+
 
 
 test("check revisit records written on duplicate crawl, different collections, with wacz", async () => {

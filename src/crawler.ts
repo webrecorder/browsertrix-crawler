@@ -153,6 +153,9 @@ export class Crawler {
   warcCdxDir: string;
   indexesDir: string;
 
+  crawlsDir: string;
+  includedCrawls: Set<string> = new Set<string>();
+
   downloadsDir: string;
 
   screenshotWriter: WARCWriter | null;
@@ -288,6 +291,9 @@ export class Crawler {
     // indexes dirs
     this.warcCdxDir = path.join(this.collDir, "warc-cdx");
     this.indexesDir = path.join(this.collDir, "indexes");
+
+    // crawls dir
+    this.crawlsDir = path.join(this.collDir, "crawls");
 
     // download dirs
     this.downloadsDir = path.join(this.collDir, "downloads");
@@ -511,6 +517,7 @@ export class Crawler {
     if (!this.params.dryRun) {
       await fsp.mkdir(this.archivesDir, { recursive: true });
       await fsp.mkdir(this.warcCdxDir, { recursive: true });
+      await fsp.mkdir(this.crawlsDir, { recursive: true });
     }
 
     await fsp.mkdir(this.downloadsDir, { recursive: true });
@@ -1810,6 +1817,8 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.crawlState.setStatus("running");
 
+    await this.addCrawlId();
+
     this.pagesFH = await this.initPages(this.seedPagesFile, "Seed Pages");
     this.extraPagesFH = await this.initPages(
       this.otherPagesFile,
@@ -2080,7 +2089,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     await logger.closeLog();
 
-    const requires = await this.crawlState.getDupeDependentCrawls();
+    const requires = await this.crawlState.getDupeDependentCrawls(
+      this.includedCrawls,
+    );
 
     const waczOpts: WACZInitOpts = {
       input: warcFileList.map((x) => path.join(this.archivesDir, x)),
@@ -2686,6 +2697,18 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
+  async addCrawlId() {
+    const filename = path.join(this.crawlsDir, "ids.txt");
+    const fh = await fsp.open(filename, "a+");
+    for await (const line of fh.readLines({ autoClose: false })) {
+      this.includedCrawls.add(line.trim());
+    }
+    if (!this.includedCrawls.has(this.crawlId)) {
+      await fh.appendFile(this.crawlId + "\n");
+    }
+    await fh.close();
+  }
+
   async initPages(filename: string, title: string) {
     let fh = null;
 
@@ -3034,13 +3057,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     this.lastSaveTime = now.getTime();
 
-    const crawlDir = path.join(this.collDir, "crawls");
-
-    await fsp.mkdir(crawlDir, { recursive: true });
-
     const filenameOnly = `${interpolateFilename("@ts-@id", this.crawlId)}.yaml`;
 
-    const filename = path.join(crawlDir, filenameOnly);
+    const filename = path.join(this.crawlsDir, filenameOnly);
 
     const state = await this.crawlState.serialize();
 
