@@ -2698,6 +2698,10 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async loadAndAddIncludedCrawlIds() {
+    if (this.params.dryRun) {
+      return;
+    }
+
     // load list of included crawl ids from ids.txt
     // add current id to the list
     const filename = path.join(this.crawlsDir, "ids.txt");
