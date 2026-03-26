@@ -153,6 +153,8 @@ export class Crawler {
   warcCdxDir: string;
   indexesDir: string;
 
+  crawlIdsDir: string;
+
   downloadsDir: string;
 
   screenshotWriter: WARCWriter | null;
@@ -288,6 +290,9 @@ export class Crawler {
     // indexes dirs
     this.warcCdxDir = path.join(this.collDir, "warc-cdx");
     this.indexesDir = path.join(this.collDir, "indexes");
+
+    // crawl ids dir
+    this.crawlIdsDir = path.join(this.collDir, "crawlIds");
 
     // download dirs
     this.downloadsDir = path.join(this.collDir, "downloads");
@@ -511,6 +516,8 @@ export class Crawler {
     if (!this.params.dryRun) {
       await fsp.mkdir(this.archivesDir, { recursive: true });
       await fsp.mkdir(this.warcCdxDir, { recursive: true });
+      await fsp.mkdir(this.crawlIdsDir, { recursive: true });
+      await this.crawlState.loadAndAddIncludedCrawlIds(this.crawlIdsDir);
     }
 
     await fsp.mkdir(this.downloadsDir, { recursive: true });
