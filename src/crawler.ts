@@ -153,7 +153,7 @@ export class Crawler {
   warcCdxDir: string;
   indexesDir: string;
 
-  crawlsDir: string;
+  crawlIdsDir: string;
 
   downloadsDir: string;
 
@@ -291,8 +291,8 @@ export class Crawler {
     this.warcCdxDir = path.join(this.collDir, "warc-cdx");
     this.indexesDir = path.join(this.collDir, "indexes");
 
-    // crawls dir
-    this.crawlsDir = path.join(this.collDir, "crawls");
+    // crawl ids dir
+    this.crawlIdsDir = path.join(this.collDir, "crawlIds");
 
     // download dirs
     this.downloadsDir = path.join(this.collDir, "downloads");
@@ -516,8 +516,8 @@ export class Crawler {
     if (!this.params.dryRun) {
       await fsp.mkdir(this.archivesDir, { recursive: true });
       await fsp.mkdir(this.warcCdxDir, { recursive: true });
-      await fsp.mkdir(this.crawlsDir, { recursive: true });
-      await this.crawlState.loadAndAddIncludedCrawlIds(this.crawlsDir);
+      await fsp.mkdir(this.crawlIdsDir, { recursive: true });
+      await this.crawlState.loadAndAddIncludedCrawlIds(this.crawlIdsDir);
     }
 
     await fsp.mkdir(this.downloadsDir, { recursive: true });
@@ -3041,9 +3041,13 @@ self.__bx_behaviors.selectMainBehavior();
 
     this.lastSaveTime = now.getTime();
 
+    const crawlDir = path.join(this.collDir, "crawls");
+
+    await fsp.mkdir(crawlDir, { recursive: true });
+
     const filenameOnly = `${interpolateFilename("@ts-@id", this.crawlId)}.yaml`;
 
-    const filename = path.join(this.crawlsDir, filenameOnly);
+    const filename = path.join(crawlDir, filenameOnly);
 
     const state = await this.crawlState.serialize();
 
