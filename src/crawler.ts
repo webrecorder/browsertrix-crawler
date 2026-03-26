@@ -379,10 +379,6 @@ export class Crawler {
       dedupeRedis,
     );
 
-    if (!this.params.dryRun) {
-      await this.crawlState.loadAndAddIncludedCrawlIds(this.crawlsDir);
-    }
-
     if (this.params.logErrorsToRedis) {
       logger.setLogErrorsToRedis(true);
     }
@@ -521,6 +517,7 @@ export class Crawler {
       await fsp.mkdir(this.archivesDir, { recursive: true });
       await fsp.mkdir(this.warcCdxDir, { recursive: true });
       await fsp.mkdir(this.crawlsDir, { recursive: true });
+      await this.crawlState.loadAndAddIncludedCrawlIds(this.crawlsDir);
     }
 
     await fsp.mkdir(this.downloadsDir, { recursive: true });
