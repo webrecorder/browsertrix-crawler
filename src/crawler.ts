@@ -154,7 +154,6 @@ export class Crawler {
   indexesDir: string;
 
   crawlsDir: string;
-  includedCrawls: Set<string> = new Set<string>();
 
   downloadsDir: string;
 
@@ -379,6 +378,10 @@ export class Crawler {
       this.params.maxPageRetries,
       dedupeRedis,
     );
+
+    if (!this.params.dryRun) {
+      await this.crawlState.loadAndAddIncludedCrawlIds(this.crawlsDir);
+    }
 
     if (this.params.logErrorsToRedis) {
       logger.setLogErrorsToRedis(true);
@@ -1815,8 +1818,6 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    await this.loadAndAddIncludedCrawlIds();
-
     await this.crawlState.setStatus("running");
 
     this.pagesFH = await this.initPages(this.seedPagesFile, "Seed Pages");
@@ -2089,9 +2090,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await logger.closeLog();
 
-    const requires = await this.crawlState.getDupeDependentCrawls(
-      this.includedCrawls,
-    );
+    const requires = await this.crawlState.getDupeDependentCrawls();
 
     const waczOpts: WACZInitOpts = {
       input: warcFileList.map((x) => path.join(this.archivesDir, x)),
@@ -2695,24 +2694,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     return false;
-  }
-
-  async loadAndAddIncludedCrawlIds() {
-    if (this.params.dryRun) {
-      return;
-    }
-
-    // load list of included crawl ids from ids.txt
-    // add current id to the list
-    const filename = path.join(this.crawlsDir, "ids.txt");
-    const fh = await fsp.open(filename, "a+");
-    for await (const line of fh.readLines({ autoClose: false })) {
-      this.includedCrawls.add(line.trim());
-    }
-    if (!this.includedCrawls.has(this.crawlId)) {
-      await fh.appendFile(this.crawlId + "\n");
-    }
-    await fh.close();
   }
 
   async initPages(filename: string, title: string) {

@@ -18,6 +18,8 @@ import { Frame } from "puppeteer-core";
 import { interpolateFilename, UploadResult } from "./storage.js";
 import { normalizeUrl } from "./normalize.js";
 import { WACZ } from "./wacz.js";
+import path from "path";
+import fsp from "fs/promises";
 
 // ============================================================================
 export enum LoadState {
@@ -775,6 +777,8 @@ export class RedisCrawlState extends RedisDedupeIndex {
 
   waczFilename: string | null = null;
 
+  includedCrawls: Set<string> = new Set<string>();
+
   constructor(
     redis: Redis,
     key: string,
@@ -1409,6 +1413,20 @@ return inx;
     return results;
   }
 
+  async loadAndAddIncludedCrawlIds(crawlsDir: string) {
+    // load list of included crawl ids from ids.txt
+    // add current id to the list
+    const filename = path.join(crawlsDir, "ids.txt");
+    const fh = await fsp.open(filename, "a+");
+    for await (const line of fh.readLines({ autoClose: false })) {
+      this.includedCrawls.add(line.trim());
+    }
+    if (!this.includedCrawls.has(this.crawlId)) {
+      await fh.appendFile(this.crawlId + "\n");
+    }
+    await fh.close();
+  }
+
   async load(state: SaveState, seeds: ScopedSeed[], checkScope: boolean) {
     if (state.id) {
       this.crawlId = state.id;
@@ -1747,13 +1765,17 @@ return inx;
     }
   }
 
+  isExternalCrawl(crawlId: string) {
+    return crawlId !== this.crawlId && !this.includedCrawls.has(crawlId);
+  }
+
   // Requires crawling with WACZ to match dependencies
-  async getDupeDependentCrawls(includedCrawls: Set<string>) {
+  async getDupeDependentCrawls() {
     const dependRefs = await this.redis.smembers(`${this.uid}:duperef`);
     const crawlIds = [];
     for (const value of dependRefs) {
       const [crawlId, index] = value.split(" ");
-      if (crawlId && crawlId !== this.crawlId && !includedCrawls.has(crawlId)) {
+      if (crawlId && this.isExternalCrawl(crawlId)) {
         const source = await this.dedupeRedis.lindex(
           `c:${crawlId}:wacz`,
           Number(index),
