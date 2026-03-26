@@ -1815,9 +1815,9 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    await this.crawlState.setStatus("running");
+    await this.loadAndAddIncludedCrawlIds();
 
-    await this.addCrawlId();
+    await this.crawlState.setStatus("running");
 
     this.pagesFH = await this.initPages(this.seedPagesFile, "Seed Pages");
     this.extraPagesFH = await this.initPages(
@@ -2697,7 +2697,9 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async addCrawlId() {
+  async loadAndAddIncludedCrawlIds() {
+    // load list of included crawl ids from ids.txt
+    // add current id to the list
     const filename = path.join(this.crawlsDir, "ids.txt");
     const fh = await fsp.open(filename, "a+");
     for await (const line of fh.readLines({ autoClose: false })) {
