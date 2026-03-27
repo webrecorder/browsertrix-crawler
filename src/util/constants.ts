@@ -115,3 +115,5 @@ export type CrawlStatus =
   | "interrupted"
   | "failed"
   | "canceled";
+
+export const WARC_ORIG_SOURCE_HEADER = "WARC-Refers-To-Source-Location";

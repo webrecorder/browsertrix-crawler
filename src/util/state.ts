@@ -276,6 +276,24 @@ export class RedisDedupeIndex {
     await pipe.exec();
   }
 
+  // LOOKUP WACZ FILENAME
+
+  async lookupWACZFilename(crawlId: string, index: number): Promise<string> {
+    try {
+      const waczdata = await this.dedupeRedis.lindex(
+        `c:${crawlId}:wacz`,
+        index,
+      );
+      if (!waczdata) {
+        return "";
+      }
+      const { filename } = JSON.parse(waczdata);
+      return filename;
+    } catch (_) {
+      return "";
+    }
+  }
+
   // COMMIT DEDUPE TO SHARED INDEX
 
   async commitDedupeDone(crawlId?: string, uncommitted_key = DUPE_UNCOMMITTED) {
@@ -313,12 +331,11 @@ export class RedisDedupeIndex {
     const numWacz = await this.dedupeRedis.llen(`c:${crawlId}:wacz`);
 
     for (let i = 0; i < numWacz; i++) {
-      const waczdata = await this.dedupeRedis.lindex(`c:${crawlId}:wacz`, i);
-      if (!waczdata) {
+      const filename = await this.lookupWACZFilename(crawlId, i);
+      if (!filename) {
         continue;
       }
       try {
-        const { filename } = JSON.parse(waczdata);
         await this.dedupeRedis.sadd(this.sourceDone, filename);
       } catch (e) {
         // ignore
@@ -1122,6 +1139,8 @@ return inx;
   async clearWACZFilename(): Promise<void> {
     await this.redis.hdel(`${this.crawlId}:nextWacz`, this.uid);
     this.waczFilename = null;
+
+    await this.redis.del(`${this.uid}:duperef`, `${this.uid}:revSeen`);
   }
 
   async setArchiveSize(size: number) {

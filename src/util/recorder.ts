@@ -27,7 +27,7 @@ import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
 import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
-import { DEFAULT_MAX_RETRIES } from "./constants.js";
+import { DEFAULT_MAX_RETRIES, WARC_ORIG_SOURCE_HEADER } from "./constants.js";
 import { Readable } from "stream";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
@@ -1762,6 +1762,17 @@ export class Recorder extends EventEmitter {
         const { origUrl, origDate, crawlId, index, size } = res;
         origRecSize = size;
         const date = tsToDate(origDate).toISOString();
+
+        let externalWACZ = "";
+
+        // is external crawl
+        if (this.crawlState.isExternalCrawl(crawlId)) {
+          externalWACZ = await this.crawlState.lookupWACZFilename(
+            crawlId,
+            Number(index),
+          );
+        }
+
         // always write revisit here
         // duplicate URLs in same crawl filtered out separately
         serializer.externalBuffer?.purge();
@@ -1770,6 +1781,7 @@ export class Recorder extends EventEmitter {
           serializer,
           origUrl,
           date,
+          externalWACZ,
         ));
         await this.crawlState.addDupeCrawlDependency(crawlId, index);
       } else {
@@ -2200,6 +2212,7 @@ async function createRevisitForResponse(
   serializer: WARCSerializer,
   refersToUrl: string,
   refersToDate: string,
+  externalWACZ: string,
 ) {
   const payloadDigestForRevisit = responseRecord.warcPayloadDigest || "";
 
@@ -2213,6 +2226,10 @@ async function createRevisitForResponse(
     }
   }
 
+  if (externalWACZ) {
+    warcHeaders[WARC_ORIG_SOURCE_HEADER] = `file://${externalWACZ}`;
+  }
+
   const revisitRecord = WARCRecord.create({
     url: responseRecord.warcTargetURI!,
     date: responseRecord.warcDate!,
@@ -2222,6 +2239,7 @@ async function createRevisitForResponse(
     refersToUrl,
     refersToDate,
   });
+
   revisitRecord.httpHeaders = responseRecord.httpHeaders;
 
   serializer = new WARCSerializer(revisitRecord, {
