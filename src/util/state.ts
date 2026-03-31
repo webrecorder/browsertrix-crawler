@@ -93,6 +93,7 @@ export class PageState {
 
   isHTMLPage = true;
   text?: string;
+  originalText?: string;
   textFromResponse?: string;
   documentRequestId?: string;
   screenshotView?: Buffer;

@@ -573,6 +573,7 @@ export class ReplayCrawler extends Crawler {
       url,
       date.toISOString().replace(/[^\d]/g, ""),
     );
+    state.originalText = origText;
     const replayText = state.text;
 
     if (origText === undefined || replayText === undefined) {
@@ -604,42 +605,34 @@ export class ReplayCrawler extends Crawler {
   }
 
   async compareRawText(page: Page, state: PageState, url: string, date: Date) {
-    // Try to fetch the stored crawl-time raw response text
-    let rawText = await this.fetchOrigText(
-      page,
-      "text-from-response",
-      url,
-      date.toISOString().replace(/[^\d]/g, ""),
+    // In the future, we could use the existing `text-from-response` data in the
+    // original archived data if it exists, but for now we're running on data we
+    // know doesn't include it
+    logger.info(
+      "Extracting raw text from archived response",
+      { url },
+      "replay",
     );
+    const rawText = await this.extractRawTextFromArchive(page, url, date);
 
-    // If not stored (older archive), extract it from the archived raw response on-the-fly
-    if (rawText === undefined) {
-      logger.info(
-        "Stored raw text not found, extracting from archived response",
-        { url },
-        "replay",
-      );
-      rawText = await this.extractRawTextFromArchive(page, url, date);
-    }
+    // Get the crawl-time rendered text (extracted from browser after JS runs)
+    const origText = state.originalText;
 
-    // Get the replay-time rendered text (extracted from browser after JS runs)
-    const renderedText = state.text;
-
-    if (rawText === undefined || renderedText === undefined) {
+    if (rawText === undefined || origText === undefined) {
       logger.warn(
         "Text missing for raw vs rendered comparison",
         {
           url,
           rawTextLen: rawText?.length,
-          renderedTextLen: renderedText?.length,
+          renderedTextLen: origText?.length,
         },
         "replay",
       );
       return;
     }
 
-    const dist = levenshtein(rawText, renderedText);
-    const maxLen = Math.max(rawText.length, renderedText.length);
+    const dist = levenshtein(rawText, origText);
+    const maxLen = Math.max(rawText.length, origText.length);
 
     let matchPercent = 1.0;
     if (maxLen > 0) {
@@ -651,7 +644,7 @@ export class ReplayCrawler extends Crawler {
       matchPercent,
       maxLen,
       rawTextLen: rawText.length,
-      renderedTextLen: renderedText.length,
+      renderedTextLen: origText.length,
     });
 
     const pageInfo = this.pageInfos.get(page);
