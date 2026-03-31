@@ -666,8 +666,8 @@ export class ReplayCrawler extends Crawler {
     date: Date,
   ): Promise<string | undefined> {
     const timestamp = date.toISOString().slice(0, 19).replace(/[T:-]/g, "");
-    // `if_` suffix ensures wabac.js serves the unaltered source
-    const replayUrl = REPLAY_PREFIX + `${timestamp}if_/${url}`;
+    // `id_` suffix ensures wabac.js serves the unaltered source
+    const replayUrl = REPLAY_PREFIX + `${timestamp}id_/${url}`;
 
     const frame = page.frames()[1];
     if (!frame) {
@@ -917,8 +917,8 @@ export class ReplayCrawler extends Crawler {
       .toISOString()
       .slice(0, 19)
       .replace(/[T:-]/g, "");
-    // `if_` suffix to timestamp ensures wabac.js serves the unaltered source
-    const replayUrl = REPLAY_PREFIX + `${timestamp}if_/${pageInfo.url}`;
+    // `id_` suffix to timestamp ensures wabac.js serves the unaltered source
+    const replayUrl = REPLAY_PREFIX + `${timestamp}id_/${pageInfo.url}`;
 
     const frame = page.frames()[1];
     if (!frame) {
