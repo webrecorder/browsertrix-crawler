@@ -98,7 +98,7 @@ export class ScopedSeed {
       parsedUrl.hash = "";
     }
 
-    // Normalize URL with sorted query parameters for consistent matching
+    // normalize URL with sorted query parameters for consistent matching
     this.normUrl = normalizeUrl(parsedUrl.href);
 
     this.sitemap = this.resolveSiteMap(sitemap);
