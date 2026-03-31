@@ -102,7 +102,7 @@ export class ReplayCrawler extends Crawler {
     this.skipTextDocs = SKIP_FRAMES;
 
     this.params.screenshot = ["view"];
-    this.params.text = ["to-warc"];
+    this.params.text = ["to-warc", "to-warc-from-raw"];
 
     this.params.serviceWorker = "enabled";
 
