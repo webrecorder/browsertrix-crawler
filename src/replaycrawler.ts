@@ -72,6 +72,7 @@ export class ReplayCrawler extends Crawler {
 
   pageInfos: Map<Page, ReplayPageInfoRecord>;
   infoWriter: WARCWriter | null;
+  htmlWriter: WARCWriter | null;
 
   reloadTimeouts: WeakMap<Page, NodeJS.Timeout>;
 
@@ -109,6 +110,7 @@ export class ReplayCrawler extends Crawler {
     this.reloadTimeouts = new WeakMap<Page, NodeJS.Timeout>();
 
     this.infoWriter = null;
+    this.htmlWriter = null;
 
     this.includeRx = parseRx(this.params.scopeIncludeRx);
     this.excludeRx = parseRx(this.params.scopeExcludeRx);
@@ -118,6 +120,7 @@ export class ReplayCrawler extends Crawler {
     await super.bootstrap();
 
     this.infoWriter = this.createExtraResourceWarcWriter("info");
+    this.htmlWriter = this.createExtraResourceWarcWriter("html");
   }
 
   protected parseArgs() {
@@ -474,6 +477,8 @@ export class ReplayCrawler extends Crawler {
 
     await this.compareRawText(page, data, url, date);
 
+    await this.writeHtmlToWarc(page, url, date);
+
     await this.compareResources(page, data, url, date);
 
     if (this.params.qaDetectClientSideRendering)
@@ -615,6 +620,26 @@ export class ReplayCrawler extends Crawler {
     );
     const rawText = await this.extractRawTextFromArchive(page, url, date);
 
+    // Write raw text to WARC if textWriter is available
+    if (rawText && this.textWriter) {
+      this.textWriter.writeNewResourceRecord(
+        {
+          buffer: new TextEncoder().encode(rawText),
+          resourceType: "text-from-response",
+          contentType: "text/plain",
+          url: url,
+          date: date,
+        },
+        { type: "text-from-response", url: url },
+        "replay",
+      );
+      logger.info(
+        "Wrote raw text to WARC",
+        { url, length: rawText.length },
+        "replay",
+      );
+    }
+
     // Get the crawl-time rendered text (extracted from browser after JS runs)
     const origText = state.originalText;
 
@@ -699,6 +724,57 @@ export class ReplayCrawler extends Crawler {
       return extractTextFromDOM(dom.window.document);
     } finally {
       dom.window.close();
+    }
+  }
+
+  async writeHtmlToWarc(page: Page, url: string, date: Date) {
+    const timestamp = date.toISOString().slice(0, 19).replace(/[T:-]/g, "");
+    // `id_` suffix ensures wabac.js serves the unaltered source
+    const replayUrl = REPLAY_PREFIX + `${timestamp}id_/${url}`;
+
+    const frame = page.frames()[1];
+    if (!frame) {
+      logger.warn(
+        "Replay frame missing for HTML extraction",
+        { url },
+        "replay",
+      );
+      return;
+    }
+
+    const htmlContent = await frame.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (response.status !== 200) {
+        return undefined;
+      }
+      return await response.text();
+    }, replayUrl);
+
+    if (!htmlContent) {
+      logger.warn("Could not fetch HTML content for WARC", { url }, "replay");
+      return;
+    }
+
+    if (this.htmlWriter) {
+      this.htmlWriter.writeNewResourceRecord(
+        {
+          buffer: new TextEncoder().encode(htmlContent),
+          resourceType: "html-response",
+          contentType: "text/html",
+          url: url,
+          date: date,
+        },
+        { type: "html-response", url: url },
+        "replay",
+      );
+      logger.info(
+        "Wrote HTML to WARC",
+        { url, length: htmlContent.length },
+        "replay",
+      );
     }
   }
 
@@ -849,6 +925,9 @@ export class ReplayCrawler extends Crawler {
 
     if (this.infoWriter) {
       await this.infoWriter.flush();
+    }
+    if (this.htmlWriter) {
+      await this.htmlWriter.flush();
     }
   }
 
