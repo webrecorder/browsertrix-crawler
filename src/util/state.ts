@@ -1041,8 +1041,12 @@ return inx;
       (await this.numDone()) === 0 &&
       (await this.queueSize()) === 0 &&
       (await this.numPending()) === 0 &&
-      (await this.numFailed()) > 0
+      ((await this.numExcluded()) > 0 || (await this.numFailed()) > 0)
     );
+  }
+
+  async numExcluded() {
+    return await this.redis.scard(this.exKey);
   }
 
   async numFound() {

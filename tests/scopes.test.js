@@ -383,3 +383,19 @@ seeds:
   expect(result2).not.toBe(false);
   expect(result2.isOOS).toBe(false);
 });
+
+test("scopeType page includes single pages with hashtag", async () => {
+  const seeds = await getSeeds(`
+seeds:
+  - url: https://example.com/#hashtag
+
+scopeType: page
+`);
+
+  expect(seeds[0].scopeType).toEqual("page");
+
+  // Test with self (should match)
+  const result = seeds[0].isIncluded("https://example.com/#hashtag", 0, 0);
+  expect(result).not.toBe(false);
+  expect(result.isOOS).toBe(false);
+});
