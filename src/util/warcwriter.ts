@@ -8,7 +8,6 @@ import { logger, formatErr, LogDetails, LogContext } from "./logger.js";
 import type { IndexerOffsetLength } from "warcio";
 import { timestampNow } from "./timing.js";
 import PQueue from "p-queue";
-import { WARC_ORIG_SOURCE_HEADER } from "./constants.js";
 
 const DEFAULT_ROLLOVER_SIZE = 1_000_000_000;
 
@@ -21,25 +20,6 @@ export type ResourceRecordData = {
   url: string;
   date?: Date;
 };
-
-// =================================================================
-class CDXIndexerWithOrigSource extends CDXIndexer {
-  override setField(
-    field: string,
-    record: WARCRecord,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    result: Record<string, any>,
-  ): void {
-    if (field === WARC_ORIG_SOURCE_HEADER) {
-      const value = this.getField(field, record);
-      if (typeof value === "string" && value.startsWith("file://")) {
-        result["origSource"] = value.slice("file://".length);
-      }
-    } else {
-      super.setField(field, record, result);
-    }
-  }
-}
 
 // =================================================================
 export class WARCWriter implements IndexerOffsetLength {
@@ -59,8 +39,8 @@ export class WARCWriter implements IndexerOffsetLength {
 
   indexer?: CDXIndexer;
 
-  fh: Writable | null = null;
-  cdxFH: Writable | null = null;
+  fh: Writable | null;
+  cdxFH: Writable | null;
 
   warcQ = new PQueue({ concurrency: 1 });
 
@@ -89,6 +69,8 @@ export class WARCWriter implements IndexerOffsetLength {
     this.rolloverSize = rolloverSize;
 
     this.filenameTemplate = filenameTemplate;
+    this.cdxFH = null;
+    this.fh = null;
   }
 
   private _initNewFile() {
@@ -98,14 +80,9 @@ export class WARCWriter implements IndexerOffsetLength {
     this.recordLength = 0;
 
     if (this.warcCdxDir) {
-      this.indexer = new CDXIndexerWithOrigSource({
+      this.indexer = new CDXIndexer({
         format: "cdxj",
-        fields: [
-          ...DEFAULT_CDX_FIELDS,
-          "req.http:cookie",
-          "referrer",
-          WARC_ORIG_SOURCE_HEADER,
-        ],
+        fields: [...DEFAULT_CDX_FIELDS, "req.http:cookie", "referrer"],
       });
     }
 

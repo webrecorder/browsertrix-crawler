@@ -1140,7 +1140,7 @@ return inx;
     await this.redis.hdel(`${this.crawlId}:nextWacz`, this.uid);
     this.waczFilename = null;
 
-    await this.redis.del(`${this.uid}:duperef`, `${this.uid}:revSeen`);
+    await this.redis.del(`${this.uid}:duperef`);
   }
 
   async setArchiveSize(size: number) {
