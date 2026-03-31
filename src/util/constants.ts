@@ -116,4 +116,4 @@ export type CrawlStatus =
   | "failed"
   | "canceled";
 
-export const WARC_ORIG_SOURCE_HEADER = "WARC-Refers-To-Container";
+export const WARC_REFERS_TO_CONTAINER = "WARC-Refers-To-Container";

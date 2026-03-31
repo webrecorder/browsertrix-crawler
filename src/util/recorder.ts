@@ -27,7 +27,7 @@ import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
 import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
-import { DEFAULT_MAX_RETRIES, WARC_ORIG_SOURCE_HEADER } from "./constants.js";
+import { DEFAULT_MAX_RETRIES, WARC_REFERS_TO_CONTAINER } from "./constants.js";
 import { Readable } from "stream";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
@@ -2227,7 +2227,7 @@ async function createRevisitForResponse(
   }
 
   if (externalWACZ) {
-    warcHeaders[WARC_ORIG_SOURCE_HEADER] = `file://${externalWACZ}`;
+    warcHeaders[WARC_REFERS_TO_CONTAINER] = `file://${externalWACZ}`;
   }
 
   const revisitRecord = WARCRecord.create({
