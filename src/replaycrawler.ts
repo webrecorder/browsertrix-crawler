@@ -183,6 +183,9 @@ export class ReplayCrawler extends Crawler {
       } else {
         // otherwise, parse pages from WACZ files
         for (const entry of json.resources) {
+          if (entry.fromDependency) {
+            continue;
+          }
           if (entry.path) {
             await this.loadPages(entry.path);
           }
