@@ -67,8 +67,6 @@ export class ScopedSeed {
 
     this.url = parsedUrl.href;
 
-    // Normalize URL with sorted query parameters for consistent matching
-    this.normUrl = normalizeUrl(parsedUrl.href);
     this.include = parseRx(include);
     this.exclude = parseRx(exclude);
 
@@ -94,6 +92,14 @@ export class ScopedSeed {
     if (this.scopeType === "page") {
       depth = extraHops;
     }
+
+    // normalize hash out if not distinguishing between hashes
+    if (!allowHash) {
+      parsedUrl.hash = "";
+    }
+
+    // Normalize URL with sorted query parameters for consistent matching
+    this.normUrl = normalizeUrl(parsedUrl.href);
 
     this.sitemap = this.resolveSiteMap(sitemap);
     this.allowHash = allowHash;
