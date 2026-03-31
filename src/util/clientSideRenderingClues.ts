@@ -14,8 +14,15 @@ export const CSR_CLUES: CSRClue[] = [
     name: "empty_div",
     category: "empty_container",
     pattern:
-      "<div\\s+id=[\"'](?:app|root|mount|application|main|__next|react-root|vue-app|gatsby-focus-wrapper)[\"']\\s*>\\s*</div>",
+      "<div\\s+id=[\"'](?:app|root|mount|application|main|__next|__nuxt|react-root|vue-app|gatsby-focus-wrapper)[\"']\\s*>\\s*</div>",
     description: "Empty container divs typical of SPA/CSR",
+  },
+  {
+    name: "empty_div_self_closing",
+    category: "empty_container",
+    pattern:
+      "<div\\s+id=[\"'](?:app|root|mount|application|main|__next|__nuxt|react-root|vue-app|gatsby-focus-wrapper)[\"']\\s*/>",
+    description: "Empty container divs typical of SPA/CSR (self-closing)",
   },
   // Framework meta tags
   {
@@ -81,7 +88,7 @@ export const CSR_CLUES: CSRClue[] = [
   {
     name: "nuxt_hydration",
     category: "hydration_data",
-    pattern: "<script[^>]*id=[\"']__NUXT__[\"']",
+    pattern: "<script[^>]*id=[\"']__NUXT(?:_DATA)?__[\"']",
     description: "Nuxt hydration data",
   },
   {
@@ -145,20 +152,22 @@ export const CSR_CLUES: CSRClue[] = [
     name: "multi_part_element_name",
     category: "web_components",
     pattern: "<\\w+(?:-\\w+)+\\b",
-    description: "Web components",
+    description:
+      "Multi-part element name (custom elements must have a dash in the name)",
   },
   {
     name: "custom_elements_api",
     category: "web_components",
     pattern:
       "customElements\\.(?:define|get|getName|upgrade|initialize|whenDefined)",
-    description: "Web components",
+    description:
+      "Defining/registering a custom element using the Custom Elements API",
   },
   {
     name: "custom_element_registry",
     category: "web_components",
     pattern: "customElementRegistry",
-    description: "Web components",
+    description: "Custom element registry",
   },
   // Direct DOM manipulation
   {
@@ -167,5 +176,38 @@ export const CSR_CLUES: CSRClue[] = [
     pattern:
       "[\\w\\d_]+(?:[\"'`]?\\])?\\.(?:createElement|createElementNS|createTextNode|appendChild|append|appendNode|replaceChild|replaceChildren|replaceWith|insertBefore|insertAdjacentElement|insertAdjacentHTML|insertAdjacentText|removeChild|remove|moveBefore|innerHTML|innerText)",
     description: "Create/add/move/remove a node/element/text to/from the DOM",
+  },
+  {
+    name: "output_element",
+    category: "dom_manipulation",
+    pattern: "<output[^>]*>",
+    description:
+      "Output element (often used for outputs of calculations or form results)",
+  },
+  {
+    name: "template_element",
+    category: "dom_manipulation",
+    pattern: "<template[^>]*>",
+    description:
+      "Template element (used for defining reusable HTML structures that can be cloned and inserted into the DOM with JS)",
+  },
+  // Frames and embeds (e.g. iframes)
+  {
+    name: "iframe",
+    category: "frames_and_embeds",
+    pattern: "<iframe[^>]*>",
+    description: "Iframe element",
+  },
+  {
+    name: "object",
+    category: "frames_and_embeds",
+    pattern: "<object[^>]*>",
+    description: "Object element",
+  },
+  {
+    name: "embed",
+    category: "frames_and_embeds",
+    pattern: "<embed[^>]*>",
+    description: "Embed element",
   },
 ];
