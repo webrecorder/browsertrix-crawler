@@ -59,6 +59,7 @@ export type QueueEntry = {
   ts?: number;
   pageid?: string;
   retry?: number;
+  originalWarcRecordId?: string;
 };
 
 // ============================================================================
@@ -98,6 +99,7 @@ export class PageState {
   documentRequestId?: string;
   screenshotView?: Buffer;
   favicon?: string;
+  originalWarcRecordId?: string;
 
   skipBehaviors = false;
   pageSkipped = false;
@@ -122,6 +124,7 @@ export class PageState {
     this.pageid = redisData.pageid || uuidv4();
     this.status = 0;
     this.retry = redisData.retry || 0;
+    this.originalWarcRecordId = redisData.originalWarcRecordId;
   }
 }
 

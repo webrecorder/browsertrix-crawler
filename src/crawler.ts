@@ -1282,15 +1282,15 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    let textextract = null;
+    let textExtract = null;
 
     if (this.textWriter) {
-      textextract = new TextExtractViaSnapshot(cdp, {
+      textExtract = new TextExtractViaSnapshot(cdp, {
         writer: this.textWriter,
         url,
         skipDocs: this.skipTextDocs,
       });
-      const { text } = await textextract.extractAndStoreText(
+      const { text } = await textExtract.extractAndStoreText(
         "text",
         false,
         this.params.text.includes("to-warc"),
@@ -1306,14 +1306,14 @@ self.__bx_behaviors.selectMainBehavior();
           { url, hasRequestId: !!data.documentRequestId },
           "text",
         );
-        textextract = new TextExtractViaResponse(cdp, {
+        textExtract = new TextExtractViaResponse(cdp, {
           writer: this.textWriter,
           url,
           skipDocs: this.skipTextDocs,
           requestId: data.documentRequestId,
         });
         const { text: textFromResponse } =
-          await textextract.extractAndStoreText(
+          await textExtract.extractAndStoreText(
             "text-from-response",
             false,
             this.params.text.includes("to-warc-from-raw"),
@@ -1355,8 +1355,8 @@ self.__bx_behaviors.selectMainBehavior();
           data.loadState = LoadState.BEHAVIORS_DONE;
         }
 
-        if (textextract && this.params.text.includes("final-to-warc")) {
-          await textextract.extractAndStoreText("textFinal", true, true);
+        if (textExtract && this.params.text.includes("final-to-warc")) {
+          await textExtract.extractAndStoreText("textFinal", true, true);
         }
 
         if (
@@ -2715,6 +2715,7 @@ self.__bx_behaviors.selectMainBehavior();
     logDetails: LogDetails = {},
     ts = 0,
     pageid?: string,
+    originalWarcRecordId?: string,
   ) {
     if (this.limitHit) {
       return false;
@@ -2733,7 +2734,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const result = await this.crawlState.addToQueue(
-      { url, seedId, depth, extraHops, ts, pageid },
+      { url, seedId, depth, extraHops, ts, pageid, originalWarcRecordId },
       this.pageLimit,
     );
 

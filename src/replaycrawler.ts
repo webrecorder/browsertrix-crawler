@@ -262,7 +262,7 @@ export class ReplayCrawler extends Crawler {
       }
     }
 
-    await this.queueUrl(0, url, depth, 0, {}, ts, id);
+    await this.queueUrl(0, url, depth, 0, {}, ts, id, id);
   }
 
   async loadPagesDirect(pages: ReplayPage[]) {
@@ -477,7 +477,7 @@ export class ReplayCrawler extends Crawler {
 
     await this.compareRawText(page, data, url, date);
 
-    await this.writeHtmlToWarc(page, url, date);
+    await this.writeHtmlToWarc(page, url, date, data.originalWarcRecordId);
 
     await this.compareResources(page, data, url, date);
 
@@ -629,13 +629,14 @@ export class ReplayCrawler extends Crawler {
           contentType: "text/plain",
           url: url,
           date: date,
+          refersTo: state.originalWarcRecordId,
         },
         { type: "text-from-response", url: url },
         "replay",
       );
       logger.info(
         "Wrote raw text to WARC",
-        { url, length: rawText.length },
+        { url, length: rawText.length, refersTo: state.originalWarcRecordId },
         "replay",
       );
     }
@@ -727,7 +728,12 @@ export class ReplayCrawler extends Crawler {
     }
   }
 
-  async writeHtmlToWarc(page: Page, url: string, date: Date) {
+  async writeHtmlToWarc(
+    page: Page,
+    url: string,
+    date: Date,
+    originalWarcRecordId?: string,
+  ) {
     const timestamp = date.toISOString().slice(0, 19).replace(/[T:-]/g, "");
     // `id_` suffix ensures wabac.js serves the unaltered source
     const replayUrl = REPLAY_PREFIX + `${timestamp}id_/${url}`;
@@ -766,6 +772,7 @@ export class ReplayCrawler extends Crawler {
           contentType: "text/html",
           url: url,
           date: date,
+          refersTo: originalWarcRecordId,
         },
         { type: "html-response", url: url },
         "replay",
@@ -955,6 +962,7 @@ export class ReplayCrawler extends Crawler {
           resourceType: "pageinfo",
           contentType: "application/json",
           url: pageInfo.url,
+          refersTo: state?.originalWarcRecordId,
         },
         { type: "pageinfo", url: pageInfo.url },
         "replay",
