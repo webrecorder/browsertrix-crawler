@@ -115,3 +115,5 @@ export type CrawlStatus =
   | "interrupted"
   | "failed"
   | "canceled";
+
+export const WARC_REFERS_TO_CONTAINER = "WARC-Refers-To-Container";
