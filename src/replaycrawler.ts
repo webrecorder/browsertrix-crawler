@@ -236,6 +236,7 @@ export class ReplayCrawler extends Crawler {
   }
 
   async _addPageIfInScope({ url, ts, id, mime }: ReplayPage, depth: number) {
+    logger.debug("Adding page to queue", { url, id, hasId: !!id }, "replay");
     if (mime && mime !== "text/html") {
       logger.info("Skipping non-HTML page", { url, mime }, "replay");
       return;
@@ -779,7 +780,7 @@ export class ReplayCrawler extends Crawler {
       );
       logger.info(
         "Wrote HTML to WARC",
-        { url, length: htmlContent.length },
+        { url, length: htmlContent.length, refersTo: originalWarcRecordId },
         "replay",
       );
     }
@@ -965,6 +966,11 @@ export class ReplayCrawler extends Crawler {
           refersTo: state?.originalWarcRecordId,
         },
         { type: "pageinfo", url: pageInfo.url },
+        "replay",
+      );
+      logger.debug(
+        "Wrote pageinfo to WARC",
+        { url: pageInfo.url, refersTo: state?.originalWarcRecordId },
         "replay",
       );
 

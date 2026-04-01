@@ -33,6 +33,7 @@ export abstract class BaseTextExtract {
     resourceType: string,
     ignoreIfMatchesLast = false,
     saveToWarc = false,
+    refersTo?: string,
   ) {
     try {
       const text = await this.doGetText();
@@ -53,6 +54,7 @@ export abstract class BaseTextExtract {
             resourceType,
             contentType: "text/plain",
             url: this.url,
+            refersTo,
           },
           {
             resource: "text",

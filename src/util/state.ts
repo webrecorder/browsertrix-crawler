@@ -125,6 +125,15 @@ export class PageState {
     this.status = 0;
     this.retry = redisData.retry || 0;
     this.originalWarcRecordId = redisData.originalWarcRecordId;
+    logger.debug(
+      "PageState created",
+      {
+        url: this.url,
+        pageid: this.pageid,
+        originalWarcRecordId: String(this.originalWarcRecordId),
+      },
+      "state",
+    );
   }
 }
 
@@ -1295,6 +1304,9 @@ return inx;
     }
     if (pageid) {
       data.pageid = pageid;
+    }
+    if (originalWarcRecordId) {
+      data.originalWarcRecordId = originalWarcRecordId;
     }
 
     // return codes

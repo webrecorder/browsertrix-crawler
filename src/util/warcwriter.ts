@@ -265,7 +265,7 @@ export class WARCWriter implements IndexerOffsetLength {
     const warcRecordType = "resource";
     const warcHeaders: Record<string, string> = { "Content-Type": contentType };
     if (refersTo) {
-      warcHeaders["WARC-Refers-To"] = refersTo;
+      warcHeaders["WARC-Refers-To"] = `<url:uuid:${refersTo}>`;
     }
     async function* content() {
       yield buffer;
