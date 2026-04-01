@@ -524,11 +524,13 @@ export class ReplayCrawler extends Crawler {
 
     await this.compareText(page, data, url, date);
 
-    await this.compareRawText(page, data, url, date);
-
-    await this.writeHtmlToWarc(page, url, date, data.originalWarcRecordId);
-
     await this.compareResources(page, data, url, date);
+
+    if (data.doRawTextCompare) {
+      await this.compareRawText(page, data, url, date);
+
+      await this.writeHtmlToWarc(page, url, date, data.originalWarcRecordId);
+    }
 
     if (this.params.qaDetectClientSideRendering)
       await this.processCSRClues(page, data);
@@ -869,6 +871,14 @@ export class ReplayCrawler extends Crawler {
 
     if (origResData.ts) {
       pageInfo.ts = origResData.ts;
+    }
+
+    logger.info("Page Resource Status", {
+      status: origResData.urls[origResData.url]?.status,
+    });
+
+    if (origResData.url && origResData.urls[origResData.url].status === 200) {
+      state.doRawTextCompare = true;
     }
 
     const { resourceCounts } = pageInfo.comparison;

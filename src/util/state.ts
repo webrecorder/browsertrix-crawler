@@ -95,6 +95,7 @@ export class PageState {
   isHTMLPage = true;
   text?: string;
   originalText?: string;
+  doRawTextCompare?: boolean;
   textFromResponse?: string;
   documentRequestId?: string;
   screenshotView?: Buffer;
