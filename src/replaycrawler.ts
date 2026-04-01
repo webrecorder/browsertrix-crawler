@@ -873,11 +873,11 @@ export class ReplayCrawler extends Crawler {
       pageInfo.ts = origResData.ts;
     }
 
-    logger.info("Page Resource Status", {
-      status: origResData.urls[origResData.url]?.status,
-    });
+    const status = origResData.urls[origResData.url]?.status;
 
-    if (origResData.url && origResData.urls[origResData.url].status === 200) {
+    logger.info("Page Resource Status", { status });
+
+    if (origResData.url && status === 200) {
       state.doRawTextCompare = true;
     }
 
