@@ -395,7 +395,7 @@ export class ReplayCrawler extends Crawler {
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
-    const { page, data, workerid } = opts;
+    const { page, data, workerid, cdp } = opts;
     const { url, ts, pageid } = data;
 
     if (!ts) {
@@ -433,6 +433,28 @@ export class ReplayCrawler extends Crawler {
       replayFrame = page.frames()[SKIP_FRAMES];
     }
 
+    // Capture document request ID for raw text extraction if enabled
+    let documentRequestId: string | null = null;
+    let trackDocumentRequest:
+      | ((params: Protocol.Network.ResponseReceivedEvent) => void)
+      | null = null;
+
+    if (this.params.text.includes("to-warc-from-raw")) {
+      trackDocumentRequest = (
+        params: Protocol.Network.ResponseReceivedEvent,
+      ) => {
+        if (params.type === "Document" && !documentRequestId) {
+          documentRequestId = params.requestId;
+          logger.debug(
+            "Captured document request ID",
+            { requestId: documentRequestId, url: params.response.url },
+            "text",
+          );
+        }
+      };
+      cdp.on("Network.responseReceived", trackDocumentRequest);
+    }
+
     try {
       await replayFrame.goto(
         `${REPLAY_PREFIX}${timestamp}mp_/${url}`,
@@ -444,6 +466,32 @@ export class ReplayCrawler extends Crawler {
         { ...logDetails, ...formatErr(e) },
         "replay",
       );
+    } finally {
+      // Store document request ID and clean up listener
+      if (documentRequestId) {
+        data.documentRequestId = documentRequestId;
+        logger.info(
+          "Stored document request ID for raw text extraction",
+          {
+            url: data.url,
+            requestId: documentRequestId,
+            originalWarcRecordId: String(data.originalWarcRecordId),
+          },
+          "text",
+        );
+      } else if (trackDocumentRequest) {
+        logger.warn(
+          "No document request ID captured",
+          {
+            url: data.url,
+            originalWarcRecordId: String(data.originalWarcRecordId),
+          },
+          "text",
+        );
+      }
+      if (trackDocumentRequest) {
+        cdp.off("Network.responseReceived", trackDocumentRequest);
+      }
     }
 
     while (replayFrame.url().indexOf("about:blank") >= 0) {

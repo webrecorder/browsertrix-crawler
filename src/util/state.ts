@@ -1290,6 +1290,7 @@ return inx;
       extraHops = 0,
       ts = 0,
       pageid = undefined,
+      originalWarcRecordId = undefined,
     }: QueueEntry,
     limit = 0,
   ) {
