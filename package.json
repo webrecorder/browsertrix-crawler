@@ -69,7 +69,7 @@
     "md5": "^2.3.0",
     "prettier": "3.0.3",
     "puppeteer": "^24.4.0",
-    "ts-jest": "^29.4.6",
+    "ts-jest": "^29.4.9",
     "type-fest": "^5.5.0",
     "typescript": "^5.5.4"
   },
