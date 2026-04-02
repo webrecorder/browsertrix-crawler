@@ -13,7 +13,7 @@ function runCrawl(name: string, config: TestConfig, commandExtra = "") {
   try {
     child_process.execSync(
       `docker run -i -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin ${commandExtra}`,
-      { input: configYaml, stdio: "inherit", encoding: "utf8" },
+      { input: configYaml, stdio: ["pipe", "ignore", "ignore"], encoding: "utf8" },
     );
 
     //console.log(proc);
