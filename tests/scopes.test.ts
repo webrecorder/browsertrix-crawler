@@ -403,5 +403,5 @@ scopeType: page
   // Test with self (should match)
   const result = seeds[0].isIncluded("https://example.com/#hashtag", 0, 0);
   expect(result).not.toBe(false);
-  expect(result.isOOS).toBe(false);
+  expect((result as Exclude<typeof result, false>).isOOS).toBe(false);
 });
