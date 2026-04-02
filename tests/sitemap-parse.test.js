@@ -46,15 +46,9 @@ async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessTh
       maxRetriesPerRequest: 100,
     });
 
-    while (true) {
+    for (let i = 0; i < 30; i++) {
       finished = await redis.zcard("test:q");
 
-      if (await redis.get("test:sitemapDone")) {
-        await sleep(1000);
-        finished = await redis.zcard("test:q");
-        console.log("finished now", finished, url);
-        break;
-      }
       if (finished >= numExpected) {
         break;
       }
@@ -86,7 +80,7 @@ test("test sitemap with limit, specific URL", async () => {
 });
 
 test("test sitemap with application/xml content-type", async () => {
-  await runCrawl(10, "https://bitarchivist.net/", "", 0);
+  await runCrawl(10, "https://bitarchivist.net/", "https://www.bitarchivist.net/sitemap.xml", 0);
 }, 180000);
 
 test("test sitemap with narrow scope, extraHops, to ensure out-of-scope sitemap URLs do not count as extraHops", async () => {
