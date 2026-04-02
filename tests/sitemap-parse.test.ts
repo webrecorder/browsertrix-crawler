@@ -52,12 +52,9 @@ async function runCrawl(
     redis.options.maxRetriesPerRequest = 100;
     await redis.connect();
 
-    while (true) {
+    for (let i = 0; i < 30; i++) {
       finished = await redis.zcard("test:q");
 
-      if (await redis.get("test:sitemapDone")) {
-        break;
-      }
       if (finished >= numExpected) {
         break;
       }
