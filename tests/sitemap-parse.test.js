@@ -86,7 +86,7 @@ test("test sitemap with limit, specific URL", async () => {
 });
 
 test("test sitemap with application/xml content-type", async () => {
-  await runCrawl(10, "https://bitarchivist.net/", "https://www.bitarchivist.net/sitemap.xml", 0);
+  await runCrawl(10, "https://bitarchivist.net/", "", 0);
 }, 180000);
 
 test("test sitemap with narrow scope, extraHops, to ensure out-of-scope sitemap URLs do not count as extraHops", async () => {
