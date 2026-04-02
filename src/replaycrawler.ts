@@ -21,6 +21,8 @@ import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
 import { getFileOrUrlJson } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
+import { CSR_CLUES } from "./util/clientSideRenderingClues.js";
+import { extractTextFromDOM } from "./util/textextract.js";
 
 // RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
@@ -43,11 +45,16 @@ type ComparisonData = {
   comparison: {
     screenshotMatch?: number;
     textMatch?: number;
+    rawTextMatch?: number;
     resourceCounts: {
       crawlGood?: number;
       crawlBad?: number;
       replayGood?: number;
       replayBad?: number;
+    };
+    csrClues?: {
+      clues: Record<string, number>;
+      categories: Record<string, number>;
     };
   };
 };
@@ -65,6 +72,7 @@ export class ReplayCrawler extends Crawler {
 
   pageInfos: Map<Page, ReplayPageInfoRecord>;
   infoWriter: WARCWriter | null;
+  htmlWriter: WARCWriter | null;
 
   reloadTimeouts: WeakMap<Page, NodeJS.Timeout>;
 
@@ -95,13 +103,14 @@ export class ReplayCrawler extends Crawler {
     this.skipTextDocs = SKIP_FRAMES;
 
     this.params.screenshot = ["view"];
-    this.params.text = ["to-warc"];
+    this.params.text = ["to-warc", "to-warc-from-raw"];
 
     this.params.serviceWorker = "enabled";
 
     this.reloadTimeouts = new WeakMap<Page, NodeJS.Timeout>();
 
     this.infoWriter = null;
+    this.htmlWriter = null;
 
     this.includeRx = parseRx(this.params.scopeIncludeRx);
     this.excludeRx = parseRx(this.params.scopeExcludeRx);
@@ -111,6 +120,7 @@ export class ReplayCrawler extends Crawler {
     await super.bootstrap();
 
     this.infoWriter = this.createExtraResourceWarcWriter("info");
+    this.htmlWriter = this.createExtraResourceWarcWriter("html");
   }
 
   protected parseArgs() {
@@ -226,6 +236,7 @@ export class ReplayCrawler extends Crawler {
   }
 
   async _addPageIfInScope({ url, ts, id, mime }: ReplayPage, depth: number) {
+    logger.debug("Adding page to queue", { url, id, hasId: !!id }, "replay");
     if (mime && mime !== "text/html") {
       logger.info("Skipping non-HTML page", { url, mime }, "replay");
       return;
@@ -252,7 +263,7 @@ export class ReplayCrawler extends Crawler {
       }
     }
 
-    await this.queueUrl(0, url, depth, 0, {}, ts, id);
+    await this.queueUrl(0, url, depth, 0, {}, ts, id, id);
   }
 
   async loadPagesDirect(pages: ReplayPage[]) {
@@ -384,7 +395,7 @@ export class ReplayCrawler extends Crawler {
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
-    const { page, data, workerid } = opts;
+    const { page, data, workerid, cdp } = opts;
     const { url, ts, pageid } = data;
 
     if (!ts) {
@@ -409,7 +420,7 @@ export class ReplayCrawler extends Crawler {
       comparison: { resourceCounts: {} },
       counts: { jsErrors: 0 },
       tsStatus: 999,
-    };
+    } satisfies ReplayPageInfoRecord;
     this.pageInfos.set(page, pageInfo);
 
     let replayFrame;
@@ -422,22 +433,121 @@ export class ReplayCrawler extends Crawler {
       replayFrame = page.frames()[SKIP_FRAMES];
     }
 
+    // Capture document request ID for raw text extraction if enabled
+    let documentRequestId: string | null = null;
+    let trackDocumentRequest:
+      | ((params: Protocol.Network.ResponseReceivedEvent) => void)
+      | null = null;
+
+    if (this.params.text.includes("to-warc-from-raw")) {
+      trackDocumentRequest = (
+        params: Protocol.Network.ResponseReceivedEvent,
+      ) => {
+        if (params.type === "Document" && !documentRequestId) {
+          documentRequestId = params.requestId;
+          logger.debug(
+            "Captured document request ID",
+            { requestId: documentRequestId, url: params.response.url },
+            "text",
+          );
+        }
+      };
+      cdp.on("Network.responseReceived", trackDocumentRequest);
+    }
+
+    let navigationSuccess = false;
     try {
-      await replayFrame.goto(
+      const response = await replayFrame.goto(
         `${REPLAY_PREFIX}${timestamp}mp_/${url}`,
         this.gotoOpts,
       );
+      navigationSuccess = true;
+      if (response) {
+        const status = response.status();
+        logger.info(
+          "Replay navigation completed",
+          { url, status, replayUrl: `${REPLAY_PREFIX}${timestamp}mp_/${url}` },
+          "replay",
+        );
+        if (status >= 400) {
+          logger.warn(
+            "Replay returned error status",
+            { url, status },
+            "replay",
+          );
+        }
+      } else {
+        logger.warn(
+          "Replay navigation returned null response",
+          { url },
+          "replay",
+        );
+      }
     } catch (e) {
       logger.warn(
-        "Loading replay timed out",
+        "Loading replay timed out or failed",
         { ...logDetails, ...formatErr(e) },
         "replay",
       );
+    } finally {
+      // Store document request ID and clean up listener
+      if (documentRequestId) {
+        data.documentRequestId = documentRequestId;
+        logger.info(
+          "Stored document request ID for raw text extraction",
+          {
+            url: data.url,
+            requestId: documentRequestId,
+            originalWarcRecordId: String(data.originalWarcRecordId),
+          },
+          "text",
+        );
+      } else if (trackDocumentRequest) {
+        logger.warn(
+          "No document request ID captured",
+          {
+            url: data.url,
+            originalWarcRecordId: String(data.originalWarcRecordId),
+          },
+          "text",
+        );
+      }
+      if (trackDocumentRequest) {
+        cdp.off("Network.responseReceived", trackDocumentRequest);
+      }
     }
 
-    while (replayFrame.url().indexOf("about:blank") >= 0) {
-      logger.debug("Waiting for replay frame to update");
-      await sleep(2);
+    // Only wait for frame to update if navigation succeeded
+    if (navigationSuccess) {
+      let frameWaitIterations = 0;
+      const maxFrameWaitIterations = 150; // 150 * 2 seconds = 5 min timeout
+      while (replayFrame.url().indexOf("about:blank") >= 0) {
+        if (frameWaitIterations >= maxFrameWaitIterations) {
+          logger.warn(
+            "Replay frame failed to update from about:blank",
+            {
+              url,
+              frameUrl: replayFrame.url(),
+              iterations: frameWaitIterations,
+            },
+            "replay",
+          );
+          break;
+        }
+        logger.debug(
+          "Waiting for replay frame to update",
+          {
+            url,
+            frameUrl: replayFrame.url(),
+            iterations: frameWaitIterations,
+          },
+          "replay",
+        );
+        await sleep(2);
+        frameWaitIterations++;
+      }
+    } else {
+      logger.warn("Skipping frame wait - navigation failed", { url }, "replay");
     }
 
     // optionally reload (todo: reevaluate if this is needed)
@@ -466,6 +576,15 @@ export class ReplayCrawler extends Crawler {
     await this.compareText(page, data, url, date);
 
     await this.compareResources(page, data, url, date);
+
+    if (data.doRawTextCompare) {
+      await this.compareRawText(page, data, url, date);
+
+      await this.writeHtmlToWarc(page, url, date, data.originalWarcRecordId);
+    }
+
+    if (this.params.qaDetectClientSideRendering)
+      await this.processCSRClues(page, data);
 
     await this.processPageInfo(page, data);
   }
@@ -561,6 +680,7 @@ export class ReplayCrawler extends Crawler {
       url,
       date.toISOString().replace(/[^\d]/g, ""),
     );
+    state.originalText = origText;
     const replayText = state.text;
 
     if (origText === undefined || replayText === undefined) {
@@ -588,6 +708,182 @@ export class ReplayCrawler extends Crawler {
     const pageInfo = this.pageInfos.get(page);
     if (pageInfo) {
       pageInfo.comparison.textMatch = matchPercent;
+    }
+  }
+
+  async compareRawText(page: Page, state: PageState, url: string, date: Date) {
+    // In the future, we could use the existing `text-from-response` data in the
+    // original archived data if it exists, but for now we're running on data we
+    // know doesn't include it
+    logger.info(
+      "Extracting raw text from archived response",
+      { url },
+      "replay",
+    );
+    const rawText = await this.extractRawTextFromArchive(page, url, date);
+
+    // Write raw text to WARC if textWriter is available
+    if (rawText && this.textWriter) {
+      this.textWriter.writeNewResourceRecord(
+        {
+          buffer: new TextEncoder().encode(rawText),
+          resourceType: "text-from-response",
+          contentType: "text/plain",
+          url: url,
+          date: date,
+          refersTo: state.originalWarcRecordId,
+        },
+        { type: "text-from-response", url: url },
+        "replay",
+      );
+      logger.info(
+        "Wrote raw text to WARC",
+        { url, length: rawText.length, refersTo: state.originalWarcRecordId },
+        "replay",
+      );
+    }
+
+    // Get the crawl-time rendered text (extracted from browser after JS runs)
+    const origText = state.originalText;
+
+    if (rawText === undefined || origText === undefined) {
+      logger.warn(
+        "Text missing for raw vs rendered comparison",
+        {
+          url,
+          rawTextLen: rawText?.length,
+          renderedTextLen: origText?.length,
+        },
+        "replay",
+      );
+      return;
+    }
+
+    const dist = levenshtein(rawText, origText);
+    const maxLen = Math.max(rawText.length, origText.length);
+
+    let matchPercent = 1.0;
+    if (maxLen > 0) {
+      matchPercent = (maxLen - dist) / maxLen;
+    }
+    logger.info("Raw vs Rendered Text Levenshtein Dist", {
+      url,
+      dist,
+      matchPercent,
+      maxLen,
+      rawTextLen: rawText.length,
+      renderedTextLen: origText.length,
+    });
+
+    const pageInfo = this.pageInfos.get(page);
+    if (pageInfo) {
+      pageInfo.comparison.rawTextMatch = matchPercent;
+    }
+  }
+
+  async extractRawTextFromArchive(
+    page: Page,
+    url: string,
+    date: Date,
+  ): Promise<string | undefined> {
+    const timestamp = date.toISOString().slice(0, 19).replace(/[T:-]/g, "");
+    // `id_` suffix ensures wabac.js serves the unaltered source
+    const replayUrl = REPLAY_PREFIX + `${timestamp}id_/${url}`;
+
+    const frame = page.frames()[1];
+    if (!frame) {
+      logger.warn(
+        "Replay frame missing for raw text extraction",
+        { url },
+        "replay",
+      );
+      return undefined;
+    }
+
+    const htmlContent = await frame.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (response.status !== 200) {
+        return undefined;
+      }
+      return await response.text();
+    }, replayUrl);
+
+    if (!htmlContent) {
+      logger.warn(
+        "Could not fetch HTML content for raw text extraction",
+        { url },
+        "replay",
+      );
+      return undefined;
+    }
+
+    // Extract text from the raw HTML using the shared extraction logic
+    const { JSDOM } = await import("jsdom");
+    const dom = new JSDOM(htmlContent);
+    try {
+      return extractTextFromDOM(dom.window.document);
+    } finally {
+      dom.window.close();
+    }
+  }
+
+  async writeHtmlToWarc(
+    page: Page,
+    url: string,
+    date: Date,
+    originalWarcRecordId?: string,
+  ) {
+    const timestamp = date.toISOString().slice(0, 19).replace(/[T:-]/g, "");
+    // `id_` suffix ensures wabac.js serves the unaltered source
+    const replayUrl = REPLAY_PREFIX + `${timestamp}id_/${url}`;
+
+    const frame = page.frames()[1];
+    if (!frame) {
+      logger.warn(
+        "Replay frame missing for HTML extraction",
+        { url },
+        "replay",
+      );
+      return;
+    }
+
+    const htmlContent = await frame.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (response.status !== 200) {
+        return undefined;
+      }
+      return await response.text();
+    }, replayUrl);
+
+    if (!htmlContent) {
+      logger.warn("Could not fetch HTML content for WARC", { url }, "replay");
+      return;
+    }
+
+    if (this.htmlWriter) {
+      this.htmlWriter.writeNewResourceRecord(
+        {
+          buffer: new TextEncoder().encode(htmlContent),
+          resourceType: "html-response",
+          contentType: "text/html",
+          url: url,
+          date: date,
+          refersTo: originalWarcRecordId,
+        },
+        { type: "html-response", url: url },
+        "replay",
+      );
+      logger.info(
+        "Wrote HTML to WARC",
+        { url, length: htmlContent.length, refersTo: originalWarcRecordId },
+        "replay",
+      );
     }
   }
 
@@ -626,6 +922,14 @@ export class ReplayCrawler extends Crawler {
 
     if (origResData.ts) {
       pageInfo.ts = origResData.ts;
+    }
+
+    const status = origResData.urls[origResData.url]?.status;
+
+    logger.info("Page Resource Status", { status });
+
+    if (origResData.url && status === 200) {
+      state.doRawTextCompare = true;
     }
 
     const { resourceCounts } = pageInfo.comparison;
@@ -739,6 +1043,9 @@ export class ReplayCrawler extends Crawler {
     if (this.infoWriter) {
       await this.infoWriter.flush();
     }
+    if (this.htmlWriter) {
+      await this.htmlWriter.flush();
+    }
   }
 
   async processPageInfo(page: Page, state?: PageState) {
@@ -755,7 +1062,7 @@ export class ReplayCrawler extends Crawler {
       if (state) {
         const { comparison } = pageInfo;
 
-        // add comparison to page state
+        // add comparison & csr clues to page state
         (state as ComparisonPageState).comparison = comparison;
       }
 
@@ -765,8 +1072,14 @@ export class ReplayCrawler extends Crawler {
           resourceType: "pageinfo",
           contentType: "application/json",
           url: pageInfo.url,
+          refersTo: state?.originalWarcRecordId,
         },
         { type: "pageinfo", url: pageInfo.url },
+        "replay",
+      );
+      logger.debug(
+        "Wrote pageinfo to WARC",
+        { url: pageInfo.url, refersTo: state?.originalWarcRecordId },
         "replay",
       );
 
@@ -774,11 +1087,117 @@ export class ReplayCrawler extends Crawler {
     }
   }
 
+  async processCSRClues(page: Page, state?: PageState) {
+    const pageInfo = this.pageInfos.get(page);
+    if (!pageInfo) {
+      logger.warn("No pageInfo found for CSR clues processing", {}, "replay");
+      return;
+    }
+
+    if (!state?.isHTMLPage) {
+      logger.info(
+        "Skipping CSR clues - not an HTML page",
+        { url: pageInfo.url },
+        "replay",
+      );
+      return;
+    }
+
+    if (!pageInfo.ts) {
+      logger.warn("Missing page timestamp, skipping", { pageInfo });
+      return;
+    }
+
+    const timestamp = new Date(pageInfo.ts)
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[T:-]/g, "");
+    // `id_` suffix to timestamp ensures wabac.js serves the unaltered source
+    const replayUrl = REPLAY_PREFIX + `${timestamp}id_/${pageInfo.url}`;
+
+    const frame = page.frames()[1];
+    if (!frame) {
+      logger.warn(
+        "Replay frame missing for CSR clues",
+        { url: pageInfo.url },
+        "replay",
+      );
+      return;
+    }
+
+    const htmlContent = await frame.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (response.status !== 200) {
+        logger.warn("Got non-200 status code, proceeding", { url });
+      }
+      return await response.text();
+    }, replayUrl);
+
+    if (!htmlContent) {
+      logger.warn(
+        "Could not fetch HTML content for CSR clues",
+        { url: pageInfo.url },
+        "replay",
+      );
+      return;
+    }
+
+    const clueCounts: Record<string, number> = {};
+    const categoryCounts: Record<string, number> = {};
+
+    for (const clue of CSR_CLUES) {
+      const regex = new RegExp(clue.pattern, "gi");
+      const matches = htmlContent.match(regex);
+
+      if (matches && matches.length > 0) {
+        // count by clue name
+        clueCounts[clue.name] = matches.length;
+
+        // count by category (sum of all patterns in category)
+        categoryCounts[clue.category] =
+          (categoryCounts[clue.category] || 0) + matches.length;
+
+        logger.debug(
+          "CSR clue detected",
+          {
+            pattern: clue.name,
+            category: clue.category,
+            url: pageInfo.url,
+            count: matches.length,
+          },
+          "replay",
+        );
+      }
+    }
+
+    // add clue counts to pageInfo
+    pageInfo.comparison["csrClues"] = {
+      clues: clueCounts,
+      categories: categoryCounts,
+    };
+    if (Object.keys(clueCounts).length > 0) {
+      logger.info(
+        "CSR clues detected",
+        {
+          url: pageInfo.url,
+          categories: categoryCounts,
+          clues: clueCounts,
+        },
+        "replay",
+      );
+    } else {
+      logger.info("No CSR clues detected", { url: pageInfo.url }, "replay");
+    }
+  }
+
   protected pageEntryForRedis(
     entry: Record<string, string | number | boolean | object>,
-    state: PageState,
+    state: ComparisonPageState,
   ) {
-    entry.comparison = (state as ComparisonPageState).comparison;
+    entry.comparison = state.comparison;
     return entry;
   }
 
