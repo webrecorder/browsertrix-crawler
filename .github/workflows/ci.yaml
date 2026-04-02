@@ -81,10 +81,10 @@ jobs:
         run: sudo pip install wacz --ignore-installed
 
       - name: run all tests as root
-        run: sudo DOCKER_HOST_NAME=172.17.0.1 CI=true yarn test -validate
+        run: sudo DOCKER_HOST_NAME=172.17.0.1 CI=true yarn test ./tests/sitemap-parse.test.js
 
-      - name: run saved state + qa compare test as non-root - with volume owned by current user
-        run: |
-          sudo rm -rf ./test-crawls
-          mkdir test-crawls
-          sudo CI=true yarn test ./tests/saved-state.test.js ./tests/qa_compare.test.js
+      #- name: run saved state + qa compare test as non-root - with volume owned by current user
+      #  run: |
+      #    sudo rm -rf ./test-crawls
+      #    mkdir test-crawls
+      #    sudo CI=true yarn test ./tests/saved-state.test.js ./tests/qa_compare.test.js

@@ -32,7 +32,7 @@ let startPort = 36701;
 async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessThan=0, extra="") {
   const port = startPort++;
 
-  const command = `docker run --rm -d -p ${port}:6379 -e CRAWL_ID=test webrecorder/browsertrix-crawler crawl --url ${url} --sitemap ${sitemap} --limit ${limit} --context sitemap --logging debug --debugAccessRedis ${extra}`;
+  const command = `docker run -d -p ${port}:6379 -e CRAWL_ID=test webrecorder/browsertrix-crawler crawl --url ${url} --sitemap ${sitemap} --limit ${limit} --context sitemap --logging debug --debugAccessRedis ${extra}`;
   const containerId = child_process.execSync(command, {encoding: "utf-8"});
 
   await sleep(3000);
@@ -50,6 +50,9 @@ async function runCrawl(numExpected, url, sitemap="", limit=0, numExpectedLessTh
       finished = await redis.zcard("test:q");
 
       if (await redis.get("test:sitemapDone")) {
+        await sleep(1000);
+        finished = await redis.zcard("test:q");
+        console.log("finished now", finished, url);
         break;
       }
       if (finished >= numExpected) {
@@ -83,7 +86,7 @@ test("test sitemap with limit, specific URL", async () => {
 });
 
 test("test sitemap with application/xml content-type", async () => {
-  await runCrawl(10, "https://bitarchivist.net/", "", 0);
+  await runCrawl(10, "https://bitarchivist.net/", "https://cors-proxy.webrecorder.net/proxy/https://www.bitarchivist.net/sitemap.xml", 0);
 }, 180000);
 
 test("test sitemap with narrow scope, extraHops, to ensure out-of-scope sitemap URLs do not count as extraHops", async () => {
