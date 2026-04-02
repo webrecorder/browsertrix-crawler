@@ -455,14 +455,37 @@ export class ReplayCrawler extends Crawler {
       cdp.on("Network.responseReceived", trackDocumentRequest);
     }
 
+    let navigationSuccess = false;
     try {
-      await replayFrame.goto(
+      const response = await replayFrame.goto(
         `${REPLAY_PREFIX}${timestamp}mp_/${url}`,
         this.gotoOpts,
       );
+      navigationSuccess = true;
+      if (response) {
+        const status = response.status();
+        logger.info(
+          "Replay navigation completed",
+          { url, status, replayUrl: `${REPLAY_PREFIX}${timestamp}mp_/${url}` },
+          "replay",
+        );
+        if (status >= 400) {
+          logger.warn(
+            "Replay returned error status",
+            { url, status },
+            "replay",
+          );
+        }
+      } else {
+        logger.warn(
+          "Replay navigation returned null response",
+          { url },
+          "replay",
+        );
+      }
     } catch (e) {
       logger.warn(
-        "Loading replay timed out",
+        "Loading replay timed out or failed",
         { ...logDetails, ...formatErr(e) },
         "replay",
       );
@@ -494,9 +517,37 @@ export class ReplayCrawler extends Crawler {
       }
     }
 
-    while (replayFrame.url().indexOf("about:blank") >= 0) {
-      logger.debug("Waiting for replay frame to update");
-      await sleep(2);
+    // Only wait for frame to update if navigation succeeded
+    if (navigationSuccess) {
+      let frameWaitIterations = 0;
+      const maxFrameWaitIterations = 150; // 150 * 2 seconds = 5 min timeout
+      while (replayFrame.url().indexOf("about:blank") >= 0) {
+        if (frameWaitIterations >= maxFrameWaitIterations) {
+          logger.warn(
+            "Replay frame failed to update from about:blank",
+            {
+              url,
+              frameUrl: replayFrame.url(),
+              iterations: frameWaitIterations,
+            },
+            "replay",
+          );
+          break;
+        }
+        logger.debug(
+          "Waiting for replay frame to update",
+          {
+            url,
+            frameUrl: replayFrame.url(),
+            iterations: frameWaitIterations,
+          },
+          "replay",
+        );
+        await sleep(2);
+        frameWaitIterations++;
+      }
+    } else {
+      logger.warn("Skipping frame wait - navigation failed", { url }, "replay");
     }
 
     // optionally reload (todo: reevaluate if this is needed)
