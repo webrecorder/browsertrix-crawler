@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": [
+    "tests/custom-behaviors/**/*",
+    "tests/fixtures/**/*",
+    "tests/invalid-behaviors/**/*"
+  ]
+}
