@@ -3,7 +3,7 @@ import fs from "fs";
 import md5 from "md5";
 
 const doValidate = process.argv.filter((x) => x.startsWith('-validate'))[0];
-const testIf = (condition, ...args) => condition ? test(...args) : test.skip(...args);
+const testIf = (condition: string, ...args: Parameters<typeof test>) => condition ? test(...args) : test.skip(...args);
 
 test("ensure basic crawl run with docker run passes with listNotQueued option", async () => {
   child_process.execSync(
