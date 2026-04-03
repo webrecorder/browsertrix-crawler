@@ -1131,7 +1131,7 @@ export class ReplayCrawler extends Crawler {
         credentials: "include",
       });
       if (response.status !== 200) {
-        logger.warn("Got non-200 status code, proceeding", { url });
+        console.log("Got non-200 status code, proceeding", { url });
       }
       return await response.text();
     }, replayUrl);
