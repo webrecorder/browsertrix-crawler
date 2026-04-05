@@ -4,6 +4,7 @@ import {
   ExtraOpts,
 } from "@webrecorder/wabac";
 
+import fs from "fs";
 import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
 import { HTML_TYPES } from "./constants.js";
@@ -19,6 +20,15 @@ export const MAX_URL_LENGTH = 4096;
 
 // max length for single query arg for post/put converted URLs
 const MAX_ARG_LEN = 512;
+
+// ===========================================================================
+export type WSData = {
+  ts: number;
+  type: "send" | "recv";
+  opcode: number;
+  mask: boolean;
+  payloadData: string;
+};
 
 // ===========================================================================
 export class RequestResponseInfo {
@@ -68,6 +78,12 @@ export class RequestResponseInfo {
   frameId?: string;
 
   resourceType?: string;
+
+  isWS = false;
+  wsStart = 0;
+  wsOut: fs.WriteStream | null = null;
+  wsOutFilename = "";
+  wsOutDone = false;
 
   extraOpts: ExtraOpts = {};
 
@@ -178,6 +194,55 @@ export class RequestResponseInfo {
           : "0";
       this.extraOpts.cert = { issuer, ctc };
     }
+  }
+
+  fillWSRequest(request: Protocol.Network.WebSocketRequest, timestamp: number) {
+    this.isWS = true;
+    this.requestHeaders = request.headers;
+    this.wsStart = timestamp;
+    this.method = "GET";
+  }
+
+  fillWSResponse(
+    response: Protocol.Network.WebSocketResponse,
+    timestamp: number,
+    wsOutFilename: string,
+  ) {
+    this.isWS = true;
+    this.setStatus(response.status, response.statusText);
+    this.resourceType = "websocket";
+
+    if (response.requestHeaders) {
+      this.requestHeaders = response.requestHeaders;
+    }
+    if (response.requestHeadersText) {
+      this.requestHeadersText = response.requestHeadersText;
+    }
+
+    this.responseHeaders = response.headers;
+
+    if (response.headersText) {
+      this.responseHeadersText = response.headersText;
+    }
+    this.wsStart = timestamp;
+    this.wsOutFilename = wsOutFilename;
+    this.wsOut = fs.createWriteStream(wsOutFilename, { flags: "a" });
+    this.wsOutDone = false;
+  }
+
+  addWSData(
+    ts: number,
+    type: "send" | "recv",
+    frame: Protocol.Network.WebSocketFrame,
+  ) {
+    if (!this.wsOut || this.wsOutDone) {
+      return false;
+    }
+
+    const entry: WSData = { ts: ts - this.wsStart, type, ...frame };
+
+    this.wsOut.write(JSON.stringify(entry) + "\n");
+    return true;
   }
 
   isRedirectStatus() {

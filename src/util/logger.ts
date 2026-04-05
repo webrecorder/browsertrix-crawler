@@ -34,6 +34,7 @@ export const LOG_CONTEXT_TYPES = [
   "recorder",
   "recorderNetwork",
   "writer",
+  "websocket",
   "state",
   "redis",
   "storage",

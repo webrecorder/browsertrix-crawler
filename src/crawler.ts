@@ -160,6 +160,8 @@ export class Crawler {
 
   crawlIdsDir: string;
 
+  wsDir: string;
+
   downloadsDir: string;
 
   screenshotWriter: WARCWriter | null;
@@ -301,6 +303,9 @@ export class Crawler {
     // indexes dirs
     this.warcCdxDir = path.join(this.collDir, "warc-cdx");
     this.indexesDir = path.join(this.collDir, "indexes");
+
+    // ws data directory
+    this.wsDir = path.join(this.collDir, "ws-data");
 
     // crawl ids dir
     this.crawlIdsDir = path.join(this.collDir, "crawlIds");
