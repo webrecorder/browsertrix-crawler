@@ -1031,6 +1031,8 @@ return inx;
   async markFinished(url: string) {
     await this.redis.hdel(this.pkey, url);
 
+    await this.redis.del(`${this.crawlId}:rateLimited`);
+
     return await this.redis.incr(this.dkey);
   }
 
@@ -1070,16 +1072,19 @@ return inx;
     }
     const res = await this.redis.incrby(key, incBy);
     await this.redis.expire(key, RATE_LIMIT_TIME);
-    return res >= RATE_LIMIT_MAX;
+
+    const isLimited = res >= RATE_LIMIT_MAX;
+
+    if (!isDirectFetch) {
+      await this.redis.set(`${this.crawlId}:rateLimited`, isLimited ? "1" : "");
+      await this.redis.expire(`${this.crawlId}:rateLimited`, RATE_LIMIT_TIME);
+    }
   }
 
   async isRateLimited(isDirectFetch = false) {
     const key = this.crawlId + (isDirectFetch ? ":rateDirect" : ":rate");
     const res = await this.redis.get(key);
-    if (!res) {
-      return false;
-    }
-    return parseInt(res) >= RATE_LIMIT_MAX;
+    return res && parseInt(res) >= RATE_LIMIT_MAX;
   }
 
   recheckScope(data: QueueEntry, seeds: ScopedSeed[]) {

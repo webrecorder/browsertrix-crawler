@@ -1473,7 +1473,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
 
-      await this.checkLimits();
+      await this.checkLimits(true);
     }
   }
 
@@ -1680,7 +1680,7 @@ self.__bx_behaviors.selectMainBehavior();
     return size;
   }
 
-  async checkLimits() {
+  async checkLimits(checkRateLimit = false) {
     let interrupt: InterruptReason | null = null;
 
     const size = await this.updateCurrSize();
@@ -1731,7 +1731,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (await this.crawlState.isCrawlPaused()) {
       interrupt = InterruptReason.CrawlPaused;
-    } else if (await this.crawlState.isRateLimited()) {
+    }
+
+    if (checkRateLimit && (await this.crawlState.isRateLimited())) {
       interrupt = InterruptReason.RateLimited;
     }
 
