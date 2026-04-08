@@ -119,3 +119,6 @@ export type CrawlStatus =
   | "canceled";
 
 export const WARC_REFERS_TO_CONTAINER = "WARC-Refers-To-Container";
+
+// default text matches to consider rate limit on 200
+export const RATE_LIMIT_MATCH_200 = [`src="/_Incapsula_Resource?`];

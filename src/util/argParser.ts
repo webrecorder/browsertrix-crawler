@@ -19,6 +19,7 @@ import {
   DEFAULT_MAX_RETRIES,
   BxFunctionBindings,
   DEFAULT_CRAWL_ID_TEMPLATE,
+  RATE_LIMIT_MATCH_200,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -57,6 +58,8 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   state?: SaveState;
 
   warcInfo?: Record<string, string>;
+
+  rateLimitOn200MatchText: string[];
 };
 
 // ============================================================================
@@ -735,6 +738,13 @@ class ArgParser {
           describe: "Agent to check in addition to '*' for robots rules",
           type: "string",
           default: "Browsertrix/1.x",
+        },
+
+        rateLimitOn200MatchText: {
+          describe:
+            "Consider page rate limited given the following matches by status code and text",
+          type: "array",
+          default: RATE_LIMIT_MATCH_200,
         },
       });
   }
