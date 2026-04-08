@@ -11,25 +11,25 @@ test("ensure basic crawl run with docker run passes with reportSkipped option", 
   );
 
   child_process.execSync(
-    "unzip test-crawls/collections/wr-not-queued/wr-skipped-pages.wacz -d test-crawls/collections/wr-not-queued/wacz",
+    "unzip test-crawls/collections/wr-skipped-pages/wr-skipped-pages.wacz -d test-crawls/collections/wr-skipped-pages/wacz",
   );
 });
 
 testIf(doValidate, "validate wacz with skippedPages.jsonl", () => {
   child_process.execSync(
-    "wacz validate --file ./test-crawls/collections/wr-not-queued/wr-skipped-pages.wacz",
+    "wacz validate --file ./test-crawls/collections/wr-skipped-pages/wr-skipped-pages.wacz",
   );
 });
 
 test("ensure skippedPages.jsonl was written as expected", () => {
-  const notQueued = fs.readFileSync(
-    "test-crawls/collections/wr-not-queued/reports/skippedPages.jsonl",
+  const skippedPages = fs.readFileSync(
+    "test-crawls/collections/wr-skipped-pages/reports/skippedPages.jsonl",
     "utf8",
   );
 
   let pageCount = 0
 
-  for (const line of notQueued.trim().split("\n")) {
+  for (const line of skippedPages.trim().split("\n")) {
     const data = JSON.parse(line);
     if (data.format) {
       continue;
@@ -54,13 +54,13 @@ test("ensure skippedPages.jsonl was written as expected", () => {
 test("ensure skippedPages.jsonl was written to wacz", () => {
   const crawlHash = md5(
     fs.readFileSync(
-        "test-crawls/collections/wr-not-queued/reports/skippedPages.jsonl",
+        "test-crawls/collections/wr-skipped-pages/reports/skippedPages.jsonl",
         "utf8",
       )
   );
   const waczHash = md5(
     fs.readFileSync(
-        "test-crawls/collections/wr-not-queued/wacz/reports/skippedPages.jsonl",
+        "test-crawls/collections/wr-skipped-pages/wacz/reports/skippedPages.jsonl",
         "utf8",
       ) 
   );
@@ -70,11 +70,11 @@ test("ensure skippedPages.jsonl was written to wacz", () => {
 
 test("check that skippedPages.jsonl file made it into WACZ datapackage.json", () => {
   expect(
-    fs.existsSync("test-crawls/collections/wr-not-queued/wacz/datapackage.json"),
+    fs.existsSync("test-crawls/collections/wr-skipped-pages/wacz/datapackage.json"),
   ).toBe(true);
 
   const data = fs.readFileSync(
-    "test-crawls/collections/wr-not-queued/wacz/datapackage.json",
+    "test-crawls/collections/wr-skipped-pages/wacz/datapackage.json",
     "utf8",
   );
 
