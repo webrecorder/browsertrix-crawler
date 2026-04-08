@@ -176,6 +176,8 @@ export class Recorder extends EventEmitter {
 
   stopping = false;
 
+  rateLimitOn200MatchText: string[] = [];
+
   constructor({
     workerid,
     writer,
@@ -189,6 +191,7 @@ export class Recorder extends EventEmitter {
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
+    this.rateLimitOn200IfMatched = crawler.params.rateLimitOn200IfMatched;
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
 
@@ -1278,9 +1281,13 @@ export class Recorder extends EventEmitter {
 
         string = payload.toString();
 
-        if (string.indexOf(`src="/_Incapsula_Resource?`) > 0) {
-          this.markRateLimited(status || 200);
-          return false;
+        if (status === 200) {
+          for (const match of this.rateLimitOn200MatchText) {
+            if (string.indexOf(match) > 0) {
+              this.markRateLimited(status);
+              return false;
+            }
+          }
         }
 
         if (rw) {
