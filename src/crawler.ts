@@ -2880,14 +2880,14 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    const ts = new Date().toISOString;
+    const ts = new Date();
 
     let seed = false;
     if (depth === 0) {
       seed = true;
     }
 
-    const row = { url, seedUrl, depth, seed, reason, ts };
+    const row = { url, seedUrl, depth, seed, reason, ts: ts.toISOString() };
     const processedRow = JSON.stringify(row) + "\n";
 
     if (!this.skippedPagesFH) {
