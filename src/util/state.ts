@@ -104,6 +104,7 @@ export class PageState {
   skipBehaviors = false;
   pageSkipped = false;
   pageRateLimited = 0;
+  pageRateLimitedRetryAfter = 0;
   noRetries = false;
 
   isDirectFetched = false;
@@ -1051,7 +1052,11 @@ return inx;
     await this.redis.sadd(this.exKey, url);
   }
 
-  async incRateLimited(rateLimitStatus: number, isDirectFetch = false) {
+  async incRateLimited(
+    rateLimitStatus: number,
+    retryAfter = 0,
+    isDirectFetch = false,
+  ) {
     if (rateLimitStatus < 400 || rateLimitStatus === 404) {
       return false;
     }
@@ -1068,14 +1073,19 @@ return inx;
     if (rateLimitStatus === 429) {
       incBy = RATE_LIMIT_MAX;
     }
+    if (retryAfter > 0) {
+      logger.debug("Rate limited with custom Retry-After", { retryAfter });
+    } else {
+      retryAfter = RATE_LIMIT_TIME;
+    }
     const res = await this.redis.incrby(key, incBy);
-    await this.redis.expire(key, RATE_LIMIT_TIME);
+    await this.redis.expire(key, retryAfter);
 
     const isLimited = res >= RATE_LIMIT_MAX;
 
     if (!isDirectFetch) {
       await this.redis.set(`${this.crawlId}:rateLimited`, isLimited ? "1" : "");
-      await this.redis.expire(`${this.crawlId}:rateLimited`, RATE_LIMIT_TIME);
+      await this.redis.expire(`${this.crawlId}:rateLimited`, retryAfter);
     }
   }
 
