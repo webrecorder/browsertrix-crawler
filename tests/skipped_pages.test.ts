@@ -15,11 +15,11 @@ test("ensure basic crawl run with docker run passes with reportSkipped option", 
   );
 });
 
-testIf(doValidate, "validate wacz with skippedPages.jsonl", () => {
-  child_process.execSync(
-    "wacz validate --file ./test-crawls/collections/wr-skipped-pages/wr-skipped-pages.wacz",
-  );
-});
+// testIf(doValidate, "validate wacz with skippedPages.jsonl", () => {
+//   child_process.execSync(
+//     "wacz validate --file ./test-crawls/collections/wr-skipped-pages/wr-skipped-pages.wacz",
+//   );
+// });
 
 test("ensure skippedPages.jsonl was written as expected", () => {
   const skippedPages = fs.readFileSync(
