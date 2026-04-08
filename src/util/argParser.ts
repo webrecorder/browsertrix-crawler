@@ -737,9 +737,9 @@ class ArgParser {
           default: "Browsertrix/1.x",
         },
 
-        listNotQueued: {
+        reportSkipped: {
           describe:
-            "If set, write information about URLs not queued to reports/notQueued.jsonl",
+            "If set, write information about URLs encountered but not queued to reports/skippedPages.jsonl",
           type: "boolean",
           default: false,
         },

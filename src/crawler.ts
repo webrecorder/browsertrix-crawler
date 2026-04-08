@@ -46,7 +46,7 @@ import {
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
   ExitCodes,
   InterruptReason,
-  NotQueuedReason,
+  SkippedReason,
   BxFunctionBindings,
   MAX_JS_DIALOG_PER_PAGE,
   CrawlStatus,
@@ -120,7 +120,7 @@ export class Crawler {
 
   pagesFH?: WriteStream | null = null;
   extraPagesFH?: WriteStream | null = null;
-  notQueuedFH?: WriteStream | null = null;
+  skippedPagesFH?: WriteStream | null = null;
   logFH: WriteStream | null = null;
 
   crawlId: string;
@@ -153,7 +153,7 @@ export class Crawler {
   otherPagesFile: string;
 
   reportsDir: string;
-  notQueuedFile: string;
+  skippedPagesFile: string;
 
   archivesDir: string;
   warcCdxDir: string;
@@ -294,7 +294,7 @@ export class Crawler {
     this.reportsDir = path.join(this.collDir, "reports");
 
     // reports files
-    this.notQueuedFile = path.join(this.reportsDir, "notQueued.jsonl");
+    this.skippedPagesFile = path.join(this.reportsDir, "skippedPages.jsonl");
 
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
@@ -802,7 +802,7 @@ export class Crawler {
     const res = seed.isIncluded(url, depth, extraHops, logDetails);
 
     if (!res) {
-      this.writePageNotQueued(url, seed.url, depth, NotQueuedReason.OutOfScope);
+      this.writeSkippedPage(url, seed.url, depth, SkippedReason.OutOfScope);
     }
 
     return !!res;
@@ -1840,10 +1840,10 @@ self.__bx_behaviors.selectMainBehavior();
       this.otherPagesFile,
       "Non-Seed Pages",
     );
-    if (this.params.listNotQueued) {
-      this.notQueuedFH = await this.initPages(
-        this.notQueuedFile,
-        "Pages Not Queued",
+    if (this.params.reportSkipped) {
+      this.skippedPagesFH = await this.initPages(
+        this.skippedPagesFile,
+        "Skipped Pages",
         true,
       );
     }
@@ -1953,15 +1953,15 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.notQueuedFH) {
+    if (this.skippedPagesFH) {
       try {
         await new Promise<void>((resolve) =>
-          this.notQueuedFH!.close(() => resolve()),
+          this.skippedPagesFH!.close(() => resolve()),
         );
       } catch (e) {
         // ignore
       } finally {
-        this.notQueuedFH = null;
+        this.skippedPagesFH = null;
       }
     }
   }
@@ -2144,7 +2144,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.listNotQueued) {
+    if (this.params.reportSkipped) {
       waczOpts.reportsDir = this.reportsDir;
     }
 
@@ -2629,11 +2629,11 @@ self.__bx_behaviors.selectMainBehavior();
 
         if (!res) {
           const seedUrl = this.seeds[seedId].url || "";
-          this.writePageNotQueued(
+          this.writeSkippedPage(
             possibleUrl,
             seedUrl,
             depth,
-            NotQueuedReason.OutOfScope,
+            SkippedReason.OutOfScope,
           );
           continue;
         }
@@ -2697,7 +2697,7 @@ self.__bx_behaviors.selectMainBehavior();
         { url, ...logDetails },
         "links",
       );
-      this.writePageNotQueued(url, seedUrl, depth, NotQueuedReason.PageLimit);
+      this.writeSkippedPage(url, seedUrl, depth, SkippedReason.PageLimit);
       return false;
     }
 
@@ -2710,7 +2710,7 @@ self.__bx_behaviors.selectMainBehavior();
         { url, ...logDetails },
         "links",
       );
-      this.writePageNotQueued(url, seedUrl, depth, NotQueuedReason.RobotsTxt);
+      this.writeSkippedPage(url, seedUrl, depth, SkippedReason.RobotsTxt);
       return false;
     }
 
@@ -2736,7 +2736,7 @@ self.__bx_behaviors.selectMainBehavior();
           );
         }
         this.limitHit = true;
-        this.writePageNotQueued(url, seedUrl, depth, NotQueuedReason.PageLimit);
+        this.writeSkippedPage(url, seedUrl, depth, SkippedReason.PageLimit);
         return false;
 
       case QueueState.DUPE_URL:
@@ -2870,13 +2870,13 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  writePageNotQueued(
+  writeSkippedPage(
     url: string,
     seedUrl: string,
     depth: number,
-    reason: NotQueuedReason,
+    reason: SkippedReason,
   ) {
-    if (!this.params.listNotQueued) {
+    if (!this.params.reportSkipped) {
       return;
     }
 
@@ -2890,9 +2890,9 @@ self.__bx_behaviors.selectMainBehavior();
     const row = { url, seedUrl, depth, seed, reason, ts };
     const processedRow = JSON.stringify(row) + "\n";
 
-    if (!this.notQueuedFH) {
+    if (!this.skippedPagesFH) {
       logger.error(
-        "Can't write pages not queued, missing stream",
+        "Can't write skipped pages, missing stream",
         {},
         "pageStatus",
       );
@@ -2900,11 +2900,11 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     try {
-      this.notQueuedFH.write(processedRow);
+      this.skippedPagesFH.write(processedRow);
     } catch (err) {
       logger.warn(
         "Page append failed",
-        { pagesFile: this.notQueuedFile },
+        { pagesFile: this.skippedPagesFile },
         "pageStatus",
       );
     }
