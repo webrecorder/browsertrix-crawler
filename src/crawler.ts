@@ -1362,6 +1362,7 @@ self.__bx_behaviors.selectMainBehavior();
       url,
       pageSkipped,
       pageRateLimited,
+      pageRateLimitedRetryAfter,
       noRetries,
     } = data;
 
@@ -1390,7 +1391,10 @@ self.__bx_behaviors.selectMainBehavior();
           this.healthChecker.incError();
         }
         if (pageRateLimited) {
-          await this.crawlState.incRateLimited(pageRateLimited);
+          await this.crawlState.incRateLimited(
+            pageRateLimited,
+            pageRateLimitedRetryAfter,
+          );
         }
 
         if (retry < 0) {

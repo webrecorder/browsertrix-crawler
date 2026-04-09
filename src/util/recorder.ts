@@ -186,7 +186,7 @@ export class Recorder extends EventEmitter {
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
-    this.rateLimitOn200IfMatched = crawler.params.rateLimitOn200IfMatched;
+    this.rateLimitOn200MatchText = crawler.params.rateLimitOn200MatchText;
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
 
@@ -1000,7 +1000,7 @@ export class Recorder extends EventEmitter {
     }
 
     if (isRateLimitStatus(reqresp.status) || reqresp.status >= 500) {
-      this.markRateLimited(reqresp.status);
+      this.markRateLimited(reqresp.status, reqresp.getHeader("Retry-After"));
     }
   }
 
@@ -1042,10 +1042,13 @@ export class Recorder extends EventEmitter {
     this.mainFrameId = null;
   }
 
-  markRateLimited(status: number) {
+  markRateLimited(status: number, retryAfterHeader: string | null) {
     this.skipRecordingPage = true;
     if (this.state) {
       this.state.pageRateLimited = status;
+      if (retryAfterHeader) {
+        this.state.pageRateLimitedRetryAfter = parseInt(retryAfterHeader) || 0;
+      }
     }
   }
 
@@ -1277,7 +1280,7 @@ export class Recorder extends EventEmitter {
         if (status === 200) {
           for (const match of this.rateLimitOn200MatchText) {
             if (string.indexOf(match) > 0) {
-              this.markRateLimited(status);
+              this.markRateLimited(status, reqresp.getHeader("Retry-After"));
               return false;
             }
           }
