@@ -736,6 +736,13 @@ class ArgParser {
           type: "string",
           default: "Browsertrix/1.x",
         },
+
+        reportSkipped: {
+          describe:
+            "If set, write information about URLs encountered but not queued to reports/skippedPages.jsonl",
+          type: "boolean",
+          default: false,
+        },
       });
   }
 

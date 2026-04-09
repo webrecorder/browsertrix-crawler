@@ -337,6 +337,10 @@ Options:
       --robotsAgent                         Agent to check in addition to '*' fo
                                             r robots rules
                                            [string] [default: "Browsertrix/1.x"]
+      --reportSkipped                       If set, write information about URLs
+                                             encountered but not queued to repor
+                                            ts/skippedPages.jsonl
+                                                      [boolean] [default: false]
       --config                              Path to YAML config file
 ```
 

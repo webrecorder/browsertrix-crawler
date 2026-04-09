@@ -33,4 +33,12 @@ module.exports = {
     "@typescript-eslint/await-thenable": "error",
   },
   reportUnusedDisableDirectives: true,
+  overrides: [
+    {
+      "files": ["tests/*.ts"],
+      "rules": {
+        "@typescript-eslint/no-floating-promises": "off"
+      }
+    }
+  ]
 };
