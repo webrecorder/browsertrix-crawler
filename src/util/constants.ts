@@ -122,5 +122,5 @@ export enum SkippedReason {
   OutOfScope = "outOfScope",
   PageLimit = "pageLimit",
   RobotsTxt = "robotsTxt",
-  RedirectOutOfScope = "redirectOutOfScope",
+  RedirectToExcluded = "redirectToExcluded",
 }

@@ -1371,7 +1371,7 @@ self.__bx_behaviors.selectMainBehavior();
           url,
           data.seedId,
           depth,
-          SkippedReason.RedirectOutOfScope,
+          SkippedReason.RedirectToExcluded,
         );
         this.limitHit = false;
       } else {
