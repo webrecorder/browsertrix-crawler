@@ -83,9 +83,9 @@ test("check crawl interrupted + saved state written", async () => {
 
   await killContainer(containerId!);
 
-  const savedStates = fs.readdirSync(
-    "test-crawls/collections/int-state-test/crawls",
-  ).filter(x => x.endsWith(".yaml"));
+  const savedStates = fs
+    .readdirSync("test-crawls/collections/int-state-test/crawls")
+    .filter((x) => x.endsWith(".yaml"));
   expect(savedStates.length > 0).toEqual(true);
 
   savedStateFile = savedStates[savedStates.length - 1];

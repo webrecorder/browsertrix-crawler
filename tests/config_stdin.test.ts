@@ -10,7 +10,11 @@ test("pass config file via stdin", async () => {
   try {
     child_process.execSync(
       "docker run -i -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin --scopeExcludeRx webrecorder.net/202",
-      { input: configYaml, stdio: ["pipe", "ignore", "ignore"], encoding: "utf8" },
+      {
+        input: configYaml,
+        stdio: ["pipe", "ignore", "ignore"],
+        encoding: "utf8",
+      },
     );
 
     //console.log(proc);
