@@ -30,9 +30,7 @@ test(
     );
     const crawledExtraPagesArray = crawledExtraPages.trim().split("\n");
 
-    const expectedPages = [
-      "https://old.webrecorder.net/",
-    ];
+    const expectedPages = ["https://old.webrecorder.net/"];
 
     const expectedExtraPages = [
       "https://old.webrecorder.net/blog",
@@ -43,7 +41,9 @@ test(
 
     // first line is the header, not page, so adding -1
     expect(crawledPagesArray.length - 1).toEqual(expectedPages.length);
-    expect(crawledExtraPagesArray.length - 1).toEqual(expectedExtraPages.length);
+    expect(crawledExtraPagesArray.length - 1).toEqual(
+      expectedExtraPages.length,
+    );
 
     for (const page of crawledPagesArray) {
       const parsedPage = JSON.parse(page);
@@ -70,22 +70,20 @@ test(
   extraHopsTimeout,
 );
 
-
 test("extra hops applies beyond depth limit", () => {
-    try {
-      execSync(
-        "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-depth-0 --extraHops 1 --url https://old.webrecorder.net/ --limit 2 --depth 0 --timeout 10 --exclude community --exclude tools",
-      );
-    } catch (error) {
-      console.log(error);
-    }
-
-    const crawledExtraPages = fs.readFileSync(
-      "test-crawls/collections/extra-hops-depth-0/pages/extraPages.jsonl",
-      "utf8",
+  try {
+    execSync(
+      "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection extra-hops-depth-0 --extraHops 1 --url https://old.webrecorder.net/ --limit 2 --depth 0 --timeout 10 --exclude community --exclude tools",
     );
-    const crawledExtraPagesArray = crawledExtraPages.trim().split("\n");
+  } catch (error) {
+    console.log(error);
+  }
 
-    expect(crawledExtraPagesArray.length - 1).toEqual(1);
+  const crawledExtraPages = fs.readFileSync(
+    "test-crawls/collections/extra-hops-depth-0/pages/extraPages.jsonl",
+    "utf8",
+  );
+  const crawledExtraPagesArray = crawledExtraPages.trim().split("\n");
+
+  expect(crawledExtraPagesArray.length - 1).toEqual(1);
 });
-

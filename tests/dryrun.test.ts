@@ -13,8 +13,3 @@ test("ensure dryRun crawl only writes pages and logs", async () => {
   expect(files[2]).toBe("pages");
   expect(files[3]).toBe("profile");
 });
-
-
-
-
-

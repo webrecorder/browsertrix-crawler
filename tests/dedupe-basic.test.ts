@@ -166,16 +166,14 @@ test("check revisit records written on duplicate crawl, same collection, no wacz
 });
 
 test("dedupe same collection, with wacz, no external waczs referenced", async () => {
-
   const collName = "dedupe-test-same-coll";
 
-  expect(await runCrawl(collName, {limit: 1, wacz: true})).toBe(0);
+  expect(await runCrawl(collName, { limit: 1, wacz: true })).toBe(0);
 
   const related = loadDataPackageRelated(collName);
 
   expect(related).toBe(undefined);
 });
-
 
 test("check revisit records written on duplicate crawl, different collections, with wacz", async () => {
   expect(await runCrawl("dedupe-test-orig", { db: 1 })).toBe(0);
@@ -208,7 +206,9 @@ test("check revisit records written on duplicate crawl, different collections, w
 
     if (record.warcType === "revisit") {
       revisit++;
-      expect(record.warcHeader("WARC-Refers-To-Container")).toBe("file://dedupe-test-orig.wacz");
+      expect(record.warcHeader("WARC-Refers-To-Container")).toBe(
+        "file://dedupe-test-orig.wacz",
+      );
     }
   }
 
@@ -251,7 +251,9 @@ test("verify new crawl against imported dupe index has same dupes as dedupe agai
 
     if (record.warcType === "revisit") {
       revisit++;
-      expect(record.warcHeader("WARC-Refers-To-Container")).toBe("file://dedupe-test-orig.wacz");
+      expect(record.warcHeader("WARC-Refers-To-Container")).toBe(
+        "file://dedupe-test-orig.wacz",
+      );
     }
   }
 

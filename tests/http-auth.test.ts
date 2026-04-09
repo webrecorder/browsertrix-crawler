@@ -85,7 +85,11 @@ test("run crawl with auth config.yaml", () => {
   try {
     execSync(
       "docker run -i --rm -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --config stdin",
-      { input: configYaml, stdio: ["pipe", "ignore", "ignore"], encoding: "utf8" },
+      {
+        input: configYaml,
+        stdio: ["pipe", "ignore", "ignore"],
+        encoding: "utf8",
+      },
     );
   } catch (e) {
     console.log(e);
