@@ -186,8 +186,7 @@ export class RequestResponseInfo {
 
   getRedirectUrl() {
     try {
-      const headers = new Headers(this.getResponseHeadersDict());
-      const location = headers.get("location") || "";
+      const location = this.getHeader("location") || "";
       return new URL(location, this.url).href;
     } catch (e) {
       return "";
@@ -313,13 +312,16 @@ export class RequestResponseInfo {
     return false;
   }
 
+  getHeader(name: string) {
+    const headers = new Headers(this.getResponseHeadersDict());
+    return headers.get(name);
+  }
+
   getMimeType() {
     if (this.mimeType) {
       return this.mimeType;
     }
-
-    const headers = new Headers(this.getResponseHeadersDict());
-    const contentType = headers.get(CONTENT_TYPE);
+    const contentType = this.getHeader(CONTENT_TYPE);
 
     if (!contentType) {
       return;
@@ -442,4 +444,8 @@ export function isHTMLMime(mime: string) {
 
 export function isRedirectStatus(status: number) {
   return status >= 300 && status < 400 && status !== 304;
+}
+
+export function isRateLimitStatus(status: number) {
+  return [403, 429, 503].includes(status);
 }

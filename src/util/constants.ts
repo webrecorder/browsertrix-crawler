@@ -40,7 +40,7 @@ export enum BxFunctionBindings {
 }
 
 export const MAX_DEPTH = 1000000;
-export const DEFAULT_MAX_RETRIES = 2;
+export const DEFAULT_MAX_RETRIES = 10;
 
 export const FETCH_HEADERS_TIMEOUT_SECS = 30;
 export const PAGE_OP_TIMEOUT_SECS = 5;
@@ -90,6 +90,7 @@ export enum ExitCodes {
   TimeLimit = 15,
   DiskUtilization = 16,
   Fatal = 17,
+  RateLimited = 18,
   ProxyError = 21,
   UploadFailed = 22,
 }
@@ -102,6 +103,7 @@ export enum InterruptReason {
   BrowserCrashed = 5,
   SignalInterrupted = 6,
   CrawlPaused = 7,
+  RateLimited = 8,
 }
 
 export type CrawlStatus =
@@ -117,3 +119,6 @@ export type CrawlStatus =
   | "canceled";
 
 export const WARC_REFERS_TO_CONTAINER = "WARC-Refers-To-Container";
+
+// default text matches to consider rate limit on 200
+export const RATE_LIMIT_MATCH_200 = [`src="/_Incapsula_Resource?`];

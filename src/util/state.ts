@@ -47,6 +47,11 @@ export function normalizeDedupeStatus(status: number): string {
 }
 
 // ============================================================================
+// Rate Limit Constants
+const RATE_LIMIT_TIME = 300;
+const RATE_LIMIT_MAX = 3;
+
+// ============================================================================
 export type WorkerId = number;
 
 // ============================================================================
@@ -98,6 +103,8 @@ export class PageState {
 
   skipBehaviors = false;
   pageSkipped = false;
+  pageRateLimited = 0;
+  pageRateLimitedRetryAfter = 0;
   noRetries = false;
 
   isDirectFetched = false;
@@ -1023,6 +1030,8 @@ return inx;
   async markFinished(url: string) {
     await this.redis.hdel(this.pkey, url);
 
+    await this.redis.del(`${this.crawlId}:rateLimited`);
+
     return await this.redis.incr(this.dkey);
   }
 
@@ -1041,6 +1050,49 @@ return inx;
     await this.redis.hdel(this.pkey, url);
 
     await this.redis.sadd(this.exKey, url);
+  }
+
+  async incRateLimited(
+    rateLimitStatus: number,
+    retryAfter = 0,
+    isDirectFetch = false,
+  ) {
+    if (rateLimitStatus < 400 || rateLimitStatus === 404) {
+      return false;
+    }
+
+    const statVal = rateLimitStatus + (isDirectFetch ? " d" : "");
+
+    // track rate limit stats
+    await this.redis.hincrby(`${this.crawlId}:rateStats`, statVal, 1);
+
+    const key = this.crawlId + (isDirectFetch ? ":rateDirect" : ":rate");
+
+    let incBy = 1;
+
+    if (rateLimitStatus === 429) {
+      incBy = RATE_LIMIT_MAX;
+    }
+    if (retryAfter > 0) {
+      logger.debug("Rate limited with custom Retry-After", { retryAfter });
+    } else {
+      retryAfter = RATE_LIMIT_TIME;
+    }
+    const res = await this.redis.incrby(key, incBy);
+    await this.redis.expire(key, retryAfter);
+
+    const isLimited = res >= RATE_LIMIT_MAX;
+
+    if (!isDirectFetch) {
+      await this.redis.set(`${this.crawlId}:rateLimited`, isLimited ? "1" : "");
+      await this.redis.expire(`${this.crawlId}:rateLimited`, retryAfter);
+    }
+  }
+
+  async isRateLimited(isDirectFetch = false) {
+    const key = this.crawlId + (isDirectFetch ? ":rateDirect" : ":rate");
+    const res = await this.redis.get(key);
+    return res && parseInt(res) >= RATE_LIMIT_MAX;
   }
 
   recheckScope(data: QueueEntry, seeds: ScopedSeed[]) {
