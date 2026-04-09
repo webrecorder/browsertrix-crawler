@@ -2689,7 +2689,7 @@ self.__bx_behaviors.selectMainBehavior();
     ts = 0,
     pageid?: string,
   ) {
-    const seedUrl = this.seeds[seedId].url || "";
+    const seedUrl = this.seeds[seedId]?.url || "";
 
     if (this.limitHit) {
       logger.debug(
