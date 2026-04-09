@@ -7,7 +7,7 @@ import md5 from "md5";
 
 test("ensure basic crawl run with docker run passes with reportSkipped option, out of scope pages", async () => {
   child_process.execSync(
-    'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example-com.webrecorder.net/ --generateWACZ  --collection skipped-pages --workers 2 --reportSkipped --limit 5',
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example-com.webrecorder.net/ --generateWACZ  --collection skipped-pages --workers 2 --reportSkipped --limit 5",
   );
 
   child_process.execSync(
@@ -27,7 +27,7 @@ test("ensure skippedPages.jsonl was written as expected, contains outOfScope pag
     "utf8",
   );
 
-  let pageCount = 0
+  let pageCount = 0;
 
   for (const line of skippedPages.trim().split("\n")) {
     const data = JSON.parse(line);
@@ -46,21 +46,20 @@ test("ensure skippedPages.jsonl was written as expected, contains outOfScope pag
   }
 
   expect(pageCount > 0).toBe(true);
-
 });
 
 test("ensure skippedPages.jsonl was written to wacz", () => {
   const crawlHash = md5(
     fs.readFileSync(
-        "test-crawls/collections/skipped-pages/reports/skippedPages.jsonl",
-        "utf8",
-      )
+      "test-crawls/collections/skipped-pages/reports/skippedPages.jsonl",
+      "utf8",
+    ),
   );
   const waczHash = md5(
     fs.readFileSync(
-        "test-crawls/collections/skipped-pages/wacz/reports/skippedPages.jsonl",
-        "utf8",
-      ) 
+      "test-crawls/collections/skipped-pages/wacz/reports/skippedPages.jsonl",
+      "utf8",
+    ),
   );
 
   expect(crawlHash).toEqual(waczHash);
@@ -68,7 +67,9 @@ test("ensure skippedPages.jsonl was written to wacz", () => {
 
 test("check that skippedPages.jsonl file made it into WACZ datapackage.json", () => {
   expect(
-    fs.existsSync("test-crawls/collections/skipped-pages/wacz/datapackage.json"),
+    fs.existsSync(
+      "test-crawls/collections/skipped-pages/wacz/datapackage.json",
+    ),
   ).toBe(true);
 
   const data = fs.readFileSync(
@@ -93,7 +94,7 @@ test("check that skippedPages.jsonl file made it into WACZ datapackage.json", ()
 
 test("ensure basic crawl run with docker run passes with reportSkipped option, pageLimit report", async () => {
   child_process.execSync(
-    'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example-com.webrecorder.net/ --extraHops 1 --reportSkipped --collection skipped-pages-2 --limit 1',
+    "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://example-com.webrecorder.net/ --extraHops 1 --reportSkipped --collection skipped-pages-2 --limit 1",
   );
 });
 
@@ -103,7 +104,7 @@ test("ensure skippedPages.jsonl was written as expected, contains pageLimit page
     "utf8",
   );
 
-  let pageCount = 0
+  let pageCount = 0;
 
   for (const line of skippedPages.trim().split("\n")) {
     const data = JSON.parse(line);
@@ -122,14 +123,13 @@ test("ensure skippedPages.jsonl was written as expected, contains pageLimit page
   }
 
   expect(pageCount > 0).toBe(true);
-
 });
 
 test("redirect to excluded page, crawl fails as no seeds crawled", () => {
   let failed = false;
   try {
     child_process.execSync(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://old.webrecorder.net/ --exclude https://old.webrecorder.net/ --reportSkipped --collection skipped-pages-3"
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url http://old.webrecorder.net/ --exclude https://old.webrecorder.net/ --reportSkipped --collection skipped-pages-3",
     );
   } catch (e) {
     failed = true;
@@ -144,7 +144,7 @@ test("ensure skippedPages.jsonl was written as expected, contains redirectToExcl
     "utf8",
   );
 
-  let pageCount = 0
+  let pageCount = 0;
 
   for (const line of skippedPages.trim().split("\n")) {
     const data = JSON.parse(line);
@@ -163,5 +163,4 @@ test("ensure skippedPages.jsonl was written as expected, contains redirectToExcl
   }
 
   expect(pageCount > 0).toBe(true);
-
 });
