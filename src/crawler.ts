@@ -121,7 +121,6 @@ export class Crawler {
   pagesFH?: WriteStream | null = null;
   extraPagesFH?: WriteStream | null = null;
   skippedPagesFH?: WriteStream | null = null;
-  logFH: WriteStream | null = null;
 
   crawlId: string;
 
