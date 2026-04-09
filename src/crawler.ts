@@ -801,7 +801,7 @@ export class Crawler {
     const res = seed.isIncluded(url, depth, extraHops, logDetails);
 
     if (!res) {
-      this.writeSkippedPage(url, seed.url, depth, SkippedReason.OutOfScope);
+      this.writeSkippedPage(url, seedId, depth, SkippedReason.OutOfScope);
     }
 
     return !!res;
@@ -1366,6 +1366,13 @@ self.__bx_behaviors.selectMainBehavior();
     } else {
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
+
+        this.writeSkippedPage(
+          url,
+          data.seedId,
+          depth,
+          SkippedReason.RedirectOutOfScope,
+        );
         this.limitHit = false;
       } else {
         const retry = await this.crawlState.markFailed(url, noRetries);
@@ -2627,10 +2634,9 @@ self.__bx_behaviors.selectMainBehavior();
         );
 
         if (!res) {
-          const seedUrl = this.seeds[seedId].url || "";
           this.writeSkippedPage(
             possibleUrl,
-            seedUrl,
+            seedId,
             depth,
             SkippedReason.OutOfScope,
           );
@@ -2688,15 +2694,13 @@ self.__bx_behaviors.selectMainBehavior();
     ts = 0,
     pageid?: string,
   ) {
-    const seedUrl = this.seeds[seedId]?.url || "";
-
     if (this.limitHit) {
       logger.debug(
         "Page URL not queued, at page limit",
         { url, ...logDetails },
         "links",
       );
-      this.writeSkippedPage(url, seedUrl, depth, SkippedReason.PageLimit);
+      this.writeSkippedPage(url, seedId, depth, SkippedReason.PageLimit);
       return false;
     }
 
@@ -2709,7 +2713,7 @@ self.__bx_behaviors.selectMainBehavior();
         { url, ...logDetails },
         "links",
       );
-      this.writeSkippedPage(url, seedUrl, depth, SkippedReason.RobotsTxt);
+      this.writeSkippedPage(url, seedId, depth, SkippedReason.RobotsTxt);
       return false;
     }
 
@@ -2735,7 +2739,7 @@ self.__bx_behaviors.selectMainBehavior();
           );
         }
         this.limitHit = true;
-        this.writeSkippedPage(url, seedUrl, depth, SkippedReason.PageLimit);
+        this.writeSkippedPage(url, seedId, depth, SkippedReason.PageLimit);
         return false;
 
       case QueueState.DUPE_URL:
@@ -2871,13 +2875,15 @@ self.__bx_behaviors.selectMainBehavior();
 
   writeSkippedPage(
     url: string,
-    seedUrl: string,
+    seedId: number,
     depth: number,
     reason: SkippedReason,
   ) {
     if (!this.params.reportSkipped) {
       return;
     }
+
+    const seedUrl = this.seeds[seedId]?.url || "";
 
     const ts = new Date();
 
