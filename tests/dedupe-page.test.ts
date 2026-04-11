@@ -62,6 +62,7 @@ function loadPages(
 }
 
 let firstPageUrls: string[] = [];
+let secondPageUrls: string[] = [];
 
 test("first crawl, initial 3 pages", async () => {
   const collName = "dedupe-pages-1";
@@ -70,18 +71,18 @@ test("first crawl, initial 3 pages", async () => {
 
   firstPageUrls = loadPages(collName);
 
-  // initial seed page is in pages.jsonl + 2 remaining pages
+  // initial seed page is in pages.jsonl + 2 more pages
   expect(firstPageUrls).toHaveLength(2);
 });
 
-test("first crawl, next 3 pages", async () => {
+test("second crawl, next 3 pages", async () => {
   const collName = "dedupe-pages-2";
 
   expect(await runCrawl(collName)).toBe(0);
 
-  const secondPageUrls = loadPages(collName);
+  secondPageUrls = loadPages(collName);
 
-  // initial seed page is in pages.jsonl + 2 remaining pages
+  // initial seed page is in pages.jsonl + 2 more pages
   expect(secondPageUrls).toHaveLength(2);
 
   // ensure pages are not in first set, totally new pages
@@ -97,6 +98,41 @@ test("first crawl, next 3 pages", async () => {
 
   // ensure first pages are in the skipped pages list
   for (const pageUrl of firstPageUrls) {
+    expect(skippedPages).toContain(pageUrl);
+  }
+});
+
+test("third crawl, next 3 pages", async () => {
+  const collName = "dedupe-pages-3";
+
+  expect(await runCrawl(collName)).toBe(0);
+
+  const thirdPageUrls = loadPages(collName);
+
+  // initial seed page is in pages.jsonl + 2 more pages
+  expect(thirdPageUrls).toHaveLength(2);
+
+  // ensure pages are not in first or second set, totally new pages
+  for (const pageUrl of firstPageUrls) {
+    expect(thirdPageUrls).not.toContain(pageUrl);
+  }
+
+  for (const pageUrl of secondPageUrls) {
+    expect(thirdPageUrls).not.toContain(pageUrl);
+  }
+
+  const skippedPages = loadPages(
+    collName,
+    "reports/skippedPages.jsonl",
+    (entry) => entry.reason === "duplicate",
+  );
+
+  // ensure first and second set of pages are in the skipped pages list
+  for (const pageUrl of firstPageUrls) {
+    expect(skippedPages).toContain(pageUrl);
+  }
+
+  for (const pageUrl of secondPageUrls) {
     expect(skippedPages).toContain(pageUrl);
   }
 });
