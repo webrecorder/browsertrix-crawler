@@ -194,6 +194,10 @@ Options:
       --redisDedupeUrl                      If set, url for remote redis server
                                             to store state. Otherwise, using loc
                                             al redis instance           [string]
+      --dedupePagesMinDepth                 If set >= 0, minimum depth at which
+                                            duplicate pages can be skipped. -1 m
+                                            eans never skip duplicate pages
+                                                          [number] [default: -1]
       --saveState                           If the crawl state should be seriali
                                             zed to the crawls/ directory. Defaul
                                             ts to 'partial', only saved when cra

@@ -12,6 +12,7 @@ import {
   DUPE_ALL_COUNTS,
   DUPE_UNCOMMITTED,
   CrawlStatus,
+  SkippedReason,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -98,6 +99,7 @@ export class PageState {
 
   skipBehaviors = false;
   pageSkipped = false;
+  pageSkipReason: SkippedReason | null = null;
   noRetries = false;
 
   isDirectFetched = false;

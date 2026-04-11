@@ -9,9 +9,15 @@ Browsertrix Crawler crawl outputs are organized into collections, which can be f
 Each collection is a directory which contains at minimum:
 
 - `archive/`: A directory containing gzipped [WARC](https://www.iso.org/standard/68004.html) files containing the web traffic recorded during crawling.
+- `downloads` directory, containing any downloads needed for the crawl (for example, downloading browser profiles, or behaviors)
 - `logs/`: A directory containing one or more crawler log files in [JSON-Lines](https://jsonlines.org/) format.
 - `pages/`: A directory containing one or more "Page" files in [JSON-Lines](https://jsonlines.org/) format. At minimum, this directory will contain a `pages.jsonl` file with information about the seed URLs provided to the crawler. If additional pages were discovered and in scope during crawling, information about those non-seed pages is written to `extraPages.jsonl`. For more information about the contents of Page files, see the [WACZ specification](https://specs.webrecorder.net/wacz/1.1.1/#pages-jsonl).
-- `warc-cdx/`: A directory containing one or more [CDXJ](https://specs.webrecorder.net/cdxj/0.1.0/) index files created while recording traffic to WARC files. These index files are 
+- `profile`: Contains the current browser profile, either new or loaded from a saved profile.
+- `reports`: Contains various reports generated during the crawl. See [Reports](reports) for more info.
+- `crawlIds`: A contains `crawlIds.txt` which lists all crawls include in this collection.
+- `warc-cdx/`: A directory containing one or more [CDXJ](https://specs.webrecorder.net/cdxj/0.1.0/) index files created while recording traffic to WARC files. These index files contain entries for every WARC record written and are updated
+at the same time as the WARCs.
+
 
 Additionally, the collection may include:
 

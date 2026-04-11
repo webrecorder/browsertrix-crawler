@@ -128,6 +128,7 @@ export class Crawler {
 
   limitHit = false;
   pageLimit: number;
+  queuePageLimit: number;
 
   saveStateFiles: string[] = [];
   lastSaveTime: number;
@@ -258,6 +259,11 @@ export class Crawler {
       this.pageLimit = this.pageLimit
         ? Math.min(this.pageLimit, this.params.maxPageLimit)
         : this.params.maxPageLimit;
+    }
+
+    this.queuePageLimit = this.pageLimit;
+    if (this.params.dedupePagesMinDepth >= 0) {
+      this.pageLimit = 0;
     }
 
     this.saveStateFiles = [];
@@ -1367,12 +1373,9 @@ self.__bx_behaviors.selectMainBehavior();
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
 
-        this.writeSkippedPage(
-          url,
-          data.seedId,
-          depth,
-          SkippedReason.RedirectToExcluded,
-        );
+        if (data.pageSkipReason) {
+          this.writeSkippedPage(url, data.seedId, depth, data.pageSkipReason);
+        }
         this.limitHit = false;
       } else {
         const retry = await this.crawlState.markFailed(url, noRetries);
