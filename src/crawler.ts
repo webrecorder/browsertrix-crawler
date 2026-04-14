@@ -1169,7 +1169,7 @@ self.__bx_behaviors.selectMainBehavior();
           { status: result, ...logDetails },
           "fetch",
         );
-        await this.crawlState.incRateLimited(result, true);
+        await this.crawlState.incRateLimited(result, 0, true);
         return false;
       } else {
         return true;
