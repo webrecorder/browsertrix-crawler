@@ -20,7 +20,7 @@ import {
 
 import { WARCRecord, multiValueHeader } from "warcio";
 import { TempFileBuffer, WARCSerializer } from "warcio/node";
-import { WARCWriter } from "./warcwriter.js";
+import { streamFinish, WARCWriter } from "./warcwriter.js";
 import { LoadState, PageState, RedisCrawlState, WorkerId } from "./state.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { Crawler } from "../crawler.js";
@@ -29,6 +29,9 @@ import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
 import { DEFAULT_MAX_RETRIES, WARC_REFERS_TO_CONTAINER } from "./constants.js";
 import { Readable } from "stream";
+import path from "path";
+import fs from "fs";
+import fsp from "fs/promises";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -281,6 +284,94 @@ export class Recorder extends EventEmitter {
     });
 
     await cdp.send("Console.enable");
+
+    // WEBSOCKET
+    cdp.on("Network.webSocketCreated", (params) => {
+      const { requestId, url } = params;
+      const reqresp = this.pendingReqResp(requestId);
+      if (reqresp) {
+        reqresp.isWS = true;
+        reqresp.url = url;
+        logger.debug(
+          "Archiving websocket data",
+          { url, requestId, ...this.logDetails },
+          "websocket",
+        );
+      }
+    });
+
+    cdp.on("Network.webSocketWillSendHandshakeRequest", (params) => {
+      const { requestId, timestamp, request } = params;
+      const reqresp = this.pendingReqResp(requestId);
+      if (reqresp) {
+        reqresp.fillWSRequest(request, timestamp);
+      }
+    });
+
+    cdp.on("Network.webSocketHandshakeResponseReceived", (params) => {
+      const { requestId, timestamp, response } = params;
+      const reqresp = this.pendingReqResp(requestId);
+
+      fs.mkdirSync(this.crawler.wsDir, { recursive: true });
+
+      const filename = path.join(this.crawler.wsDir, `ws-${requestId}.jsonl`);
+
+      if (reqresp) {
+        reqresp.fillWSResponse(response, timestamp, filename);
+      }
+    });
+
+    cdp.on("Network.webSocketFrameSent", (params) =>
+      this.wsFrame(params, "send"),
+    );
+
+    cdp.on("Network.webSocketFrameReceived", (params) =>
+      this.wsFrame(params, "recv"),
+    );
+
+    cdp.on("Network.webSocketClosed", async (params) => {
+      const { requestId } = params;
+      const reqresp = this.pendingReqResp(requestId, true);
+      if (reqresp) {
+        logger.debug(
+          "Websocket Closed",
+          { url: reqresp.url, requestId, ...this.logDetails },
+          "websocket",
+        );
+        await this.serializeWebsocketToWARC(reqresp);
+      }
+    });
+
+    cdp.on("Network.webSocketFrameError", (params) => {
+      const { requestId, errorMessage } = params;
+      logger.warn(
+        "Websocket Frame error, data not recorded",
+        { requestId, errorMessage, ...this.logDetails },
+        "websocket",
+      );
+    });
+  }
+
+  wsFrame(
+    params: Protocol.Network.WebSocketFrameSentEvent,
+    type: "recv" | "send",
+  ) {
+    const { requestId, timestamp, response } = params;
+
+    const reqresp = this.pendingReqResp(requestId);
+    if (reqresp && reqresp.addWSData(timestamp, type, response)) {
+      logger.debug(
+        "Websocket frame saved",
+        { url: reqresp.url, type, requestId, ...this.logDetails },
+        "websocket",
+      );
+    } else {
+      logger.warn(
+        "Not writing additional WS data, likely already closed",
+        { requestId, ...this.logDetails },
+        "websocket",
+      );
+    }
   }
 
   hasFrame(frameId: string) {
@@ -1070,6 +1161,9 @@ export class Recorder extends EventEmitter {
       if (reqresp.payload && !reqresp.asyncLoading) {
         this.removeReqResp(requestId);
         await this.serializeToWARC(reqresp);
+        // finish WS stream here
+      } else if (reqresp.isWS) {
+        await this.serializeWebsocketToWARC(reqresp);
         // if no url, and not fetch intercept or async loading,
         // drop this request, as it was not being loaded
       } else if (
@@ -1192,7 +1286,7 @@ export class Recorder extends EventEmitter {
       return true;
     }
 
-    if (["EventSource", "WebSocket", "Ping"].includes(resourceType || "")) {
+    if (["EventSource", "Ping"].includes(resourceType || "")) {
       return true;
     }
 
@@ -1380,7 +1474,13 @@ export class Recorder extends EventEmitter {
   }
 
   isValidUrl(url?: string) {
-    return url && (url.startsWith("https:") || url.startsWith("http:"));
+    return (
+      url &&
+      (url.startsWith("https:") ||
+        url.startsWith("http:") ||
+        url.startsWith("ws:") ||
+        url.startsWith("wss:"))
+    );
   }
 
   pendingReqResp(requestId: string, reuseOnly = false) {
@@ -1647,6 +1747,80 @@ export class Recorder extends EventEmitter {
     }
 
     return true;
+  }
+
+  async serializeWebsocketToWARC(reqresp: RequestResponseInfo) {
+    this.removeReqResp(reqresp.requestId);
+    let size = 0;
+    reqresp.wsOutDone = true;
+
+    const { url, wsOut, wsOutFilename } = reqresp;
+
+    if (wsOut) {
+      await streamFinish(wsOut);
+      size = wsOut.bytesWritten;
+      reqresp.wsOut = null;
+    } else if (!wsOut || !wsOutFilename) {
+      logger.warn(
+        "WS stream missing",
+        { requestId: reqresp.requestId, url, ...this.logDetails },
+        "websocket",
+      );
+      return;
+    }
+
+    const resourceWARCHeaders = {
+      "Content-Type": 'application/jsonl; format="cdp"',
+      "Content-Length": size + "",
+      "WARC-Resource": "websocket",
+      "WARC-Page-ID": this.pageid,
+    };
+
+    const resource = WARCRecord.create(
+      {
+        url,
+        date: new Date().toISOString(),
+        type: "resource",
+        warcVersion: "WARC/1.1",
+        warcHeaders: resourceWARCHeaders,
+      },
+      fs.createReadStream(reqresp.wsOutFilename),
+    );
+
+    const resID = resource.warcHeader("WARC-Record-ID");
+
+    this.writer.writeSingleRecord(resource);
+
+    const removeFile = async () => {
+      try {
+        await fsp.unlink(reqresp.wsOutFilename);
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    reqresp.truncated = "payloadNotAvailable";
+    // set URL back to http/https for response/request records
+    reqresp.url = reqresp.url.replace(/^ws/, "http");
+
+    const responseRecord = createResponse(reqresp, this.pageid);
+    const requestRecord = createRequest(reqresp, responseRecord, this.pageid);
+
+    const respHeaders = responseRecord.warcHeaders.headers;
+    const reqHeaders = requestRecord.warcHeaders.headers;
+    respHeaders.set("WARC-Truncated", reqresp.truncated);
+    reqHeaders.set("WARC-Truncated", reqresp.truncated);
+    if (resID) {
+      respHeaders.append("WARC-Concurrent-To", resID);
+      reqHeaders.append("WARC-Concurrent-To", resID);
+    }
+
+    this.writer.writeRecordPair(
+      responseRecord,
+      requestRecord,
+      undefined,
+      removeFile,
+    );
   }
 
   async serializeToWARC(
