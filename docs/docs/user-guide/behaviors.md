@@ -89,6 +89,7 @@ docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --u
 ## Creating Custom Behaviors
 
 A custom behavior file can be in one of the following supported formats:
+
 - JSON User Flow
 - JavaScript / Typescript (compiled to JavaScript)
 
