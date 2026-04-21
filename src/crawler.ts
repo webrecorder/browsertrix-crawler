@@ -72,6 +72,7 @@ import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
+import { getRegistrableDomain } from "./util/domain.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -137,6 +138,8 @@ export class Crawler {
 
   seeds: ScopedSeed[] = [];
   numOriginalSeeds = 0;
+  originalSeedDomains: Set<string> = new Set<string>();
+  seedAttributedDomains: Map<number, string> = new Map<number, string>();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   emulateDevice: any = {};
@@ -444,7 +447,8 @@ export class Crawler {
 
     for (const { origSeedId, newUrl } of extraSeeds) {
       const seed = this.seeds[origSeedId];
-      this.seeds.push(seed.newScopedSeed(newUrl));
+      const newSeedId = this.seeds.push(seed.newScopedSeed(newUrl)) - 1;
+      this.registerAttributedDomainForRedirectSeed(newSeedId, origSeedId);
     }
   }
 
@@ -553,6 +557,18 @@ export class Crawler {
 
     this.seeds = await parseSeeds(this.downloadsDir, this.params);
     this.numOriginalSeeds = this.seeds.length;
+    this.originalSeedDomains = new Set(
+      this.seeds
+        .slice(0, this.numOriginalSeeds)
+        .map((seed) => getRegistrableDomain(seed.url))
+        .filter((domain): domain is string => !!domain),
+    );
+    this.seedAttributedDomains = new Map(
+      this.seeds
+        .slice(0, this.numOriginalSeeds)
+        .map((seed, seedId) => [seedId, getRegistrableDomain(seed.url)])
+        .filter((entry): entry is [number, string] => !!entry[1]),
+    );
 
     logger.info("Seeds", this.seeds);
 
@@ -1219,6 +1235,7 @@ self.__bx_behaviors.selectMainBehavior();
     if (recorder) {
       recorder.pageSeed = seed;
       recorder.pageSeedDepth = depth;
+      recorder.pageSeedId = seedId;
     }
 
     // run custom driver here, if any
@@ -2228,7 +2245,15 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async writeStats() {
-    if (!this.params.logging.includes("stats")) {
+    const shouldLogStats = this.params.logging.includes("stats");
+    const shouldWriteStatsFile = !!this.params.statsFilename;
+    const shouldWriteDomainStatsFile = !!this.params.writeDomainStats;
+
+    if (
+      !shouldLogStats &&
+      !shouldWriteStatsFile &&
+      !shouldWriteDomainStatsFile
+    ) {
       return;
     }
 
@@ -2247,19 +2272,60 @@ self.__bx_behaviors.selectMainBehavior();
       pendingPages,
     };
 
-    logger.info("Crawl statistics", stats, "crawlStatus");
-    this.logMemory();
+    if (shouldLogStats) {
+      logger.info("Crawl statistics", stats, "crawlStatus");
+      this.logMemory();
+    }
 
-    if (this.params.statsFilename) {
+    if (shouldWriteStatsFile) {
+      const statsFilename = this.params.statsFilename!;
       try {
-        await fsp.writeFile(
-          this.params.statsFilename,
-          JSON.stringify(stats, null, 2),
-        );
+        await fsp.writeFile(statsFilename, JSON.stringify(stats, null, 2));
       } catch (err) {
         logger.warn("Stats output failed", err);
       }
     }
+
+    if (shouldWriteDomainStatsFile) {
+      const domainStatsPath = path.join(this.reportsDir, "domainStats.json");
+      try {
+        await fsp.mkdir(this.reportsDir, { recursive: true });
+        const domainStats = await this.crawlState.getDomainStats();
+        await fsp.writeFile(
+          domainStatsPath,
+          JSON.stringify(domainStats, null, 2),
+        );
+      } catch (err) {
+        logger.warn("Domain stats output failed", err);
+      }
+    }
+  }
+
+  async shouldSkipForDomainLimit(data: {
+    url: string;
+    seedId: number;
+    depth: number;
+  }) {
+    const domain = await this.getReachedAttributedDomainLimit(
+      data.url,
+      data.seedId,
+    );
+    if (!domain) {
+      return false;
+    }
+
+    logger.debug(
+      "Skipping queued page URL, domain limit already reached",
+      { url: data.url, domain },
+      "links",
+    );
+    this.writeSkippedPage(
+      data.url,
+      data.seedId,
+      data.depth,
+      SkippedReason.DomainLimit,
+    );
+    return true;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2410,12 +2476,14 @@ self.__bx_behaviors.selectMainBehavior();
       respUrl + "/" !== url &&
       !downloadResponse
     ) {
+      const origSeedId = data.seedId;
       data.seedId = await this.crawlState.addExtraSeed(
         this.seeds,
         this.numOriginalSeeds,
-        data.seedId,
+        origSeedId,
         respUrl,
       );
+      this.registerAttributedDomainForRedirectSeed(data.seedId, origSeedId);
       logger.info("Seed page redirected, adding redirected seed", {
         origUrl: url,
         newUrl: respUrl,
@@ -2726,6 +2794,17 @@ self.__bx_behaviors.selectMainBehavior();
     ts = 0,
     pageid?: string,
   ) {
+    const domain = await this.getReachedAttributedDomainLimit(url, seedId);
+    if (domain) {
+      logger.debug(
+        "Page URL not queued, domain limit reached",
+        { url, domain, ...logDetails },
+        "links",
+      );
+      this.writeSkippedPage(url, seedId, depth, SkippedReason.DomainLimit);
+      return false;
+    }
+
     if (this.limitHit) {
       logger.debug(
         "Page URL not queued, at page limit",
@@ -2784,6 +2863,59 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     return false;
+  }
+
+  async getReachedAttributedDomainLimit(url: string, seedId: number) {
+    const domain = this.getAttributedDomain(url, seedId);
+    if (!domain) {
+      return null;
+    }
+
+    if (!(await this.crawlState.isDomainLimitReached(domain))) {
+      return null;
+    }
+
+    return domain;
+  }
+
+  registerAttributedDomainForRedirectSeed(
+    newSeedId: number,
+    origSeedId: number,
+  ) {
+    let domain: string | null | undefined =
+      this.seedAttributedDomains.get(origSeedId);
+
+    if (!domain) {
+      let seedUrl = "";
+      const seed = this.seeds[origSeedId];
+      if (seed) {
+        if (seed.url) {
+          seedUrl = seed.url;
+        }
+      }
+      domain = getRegistrableDomain(seedUrl);
+    }
+
+    if (domain !== null && domain !== undefined) {
+      this.seedAttributedDomains.set(newSeedId, domain);
+    }
+  }
+
+  getAttributedDomain(url: string, seedId: number): string | null {
+    const actualDomain = getRegistrableDomain(url);
+
+    if (actualDomain) {
+      if (this.originalSeedDomains.has(actualDomain)) {
+        return actualDomain;
+      }
+    }
+
+    const attributedDomain = this.seedAttributedDomains.get(seedId);
+    if (attributedDomain !== null && attributedDomain !== undefined) {
+      return attributedDomain;
+    }
+
+    return null;
   }
 
   async initPages(filename: string, title: string, isReport: boolean = false) {

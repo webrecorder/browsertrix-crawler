@@ -194,6 +194,16 @@ declare module "ioredis" {
       url: string,
       seedData: string,
     ): Result<number, Context>;
+
+    incrdomainstats(
+      bytesKey: string,
+      objectsKey: string,
+      limitReachedKey: string,
+      domain: string,
+      bytes: number,
+      maxBytes: number,
+      maxObjects: number,
+    ): Result<[number, number, number, number], Context>;
   }
 }
 
@@ -218,6 +228,20 @@ export type DedupeEntry = {
   index: string;
   crawlId: string;
   size: number;
+};
+
+export type DomainStatsEntry = {
+  domain: string;
+  bytes: number;
+  objects: number;
+  limitReached: boolean;
+};
+
+export type DomainStatsUpdate = {
+  bytes: number;
+  objects: number;
+  limitReached: boolean;
+  newlyLimitReached: boolean;
 };
 
 // ============================================================================
@@ -786,6 +810,9 @@ export class RedisCrawlState extends RedisDedupeIndex {
   rkey: string;
   lkey: string;
   pageskey: string;
+  domainBytesKey: string;
+  domainObjectsKey: string;
+  domainLimitReachedKey: string;
 
   esKey: string;
   esMap: string;
@@ -830,6 +857,9 @@ export class RedisCrawlState extends RedisDedupeIndex {
     this.lkey = this.crawlId + ":l";
     // pages
     this.pageskey = this.crawlId + ":pages";
+    this.domainBytesKey = this.crawlId + ":domain:bytes";
+    this.domainObjectsKey = this.crawlId + ":domain:objects";
+    this.domainLimitReachedKey = this.crawlId + ":domain:limit_reached";
 
     this.esKey = this.crawlId + ":extraSeeds";
     this.esMap = this.crawlId + ":esMap";
@@ -999,6 +1029,31 @@ redis.call('sadd', KEYS[3], ARGV[2]);
 return inx;
 `,
     });
+
+    redis.defineCommand("incrdomainstats", {
+      numberOfKeys: 3,
+      lua: `
+local bytes = redis.call('hincrby', KEYS[1], ARGV[1], tonumber(ARGV[2]));
+local objects = redis.call('hincrby', KEYS[2], ARGV[1], 1);
+local maxBytes = tonumber(ARGV[3]);
+local maxObjects = tonumber(ARGV[4]);
+local limitReached = 0;
+local wasLimitReached = redis.call('hexists', KEYS[3], ARGV[1]);
+local newlyLimitReached = 0;
+
+if (maxBytes >= 0 and bytes >= maxBytes) or (maxObjects >= 0 and objects >= maxObjects) then
+  redis.call('hset', KEYS[3], ARGV[1], '1');
+  limitReached = 1;
+  if wasLimitReached == 0 then
+    newlyLimitReached = 1;
+  end
+elseif wasLimitReached == 1 then
+  limitReached = 1;
+end
+
+return {bytes, objects, limitReached, newlyLimitReached};
+`,
+    });
   }
 
   async _getNext() {
@@ -1151,6 +1206,58 @@ return inx;
 
   async setArchiveSize(size: number) {
     return await this.redis.hset(`${this.crawlId}:size`, this.uid, size);
+  }
+
+  async isDomainLimitReached(domain: string) {
+    return (await this.redis.hexists(this.domainLimitReachedKey, domain)) === 1;
+  }
+
+  async addDomainStats(
+    domain: string,
+    bytes: number,
+    maxBytes: number,
+    maxObjects: number,
+  ): Promise<DomainStatsUpdate> {
+    const [totalBytes, totalObjects, limitReached, newlyLimitReached] =
+      await this.redis.incrdomainstats(
+        this.domainBytesKey,
+        this.domainObjectsKey,
+        this.domainLimitReachedKey,
+        domain,
+        Math.max(0, bytes),
+        maxBytes,
+        maxObjects,
+      );
+
+    return {
+      bytes: Number(totalBytes),
+      objects: Number(totalObjects),
+      limitReached: Number(limitReached) === 1,
+      newlyLimitReached: Number(newlyLimitReached) === 1,
+    };
+  }
+
+  async getDomainStats(): Promise<DomainStatsEntry[]> {
+    const [bytesMap, objectsMap, limitReachedMap] = await Promise.all([
+      this.redis.hgetall(this.domainBytesKey),
+      this.redis.hgetall(this.domainObjectsKey),
+      this.redis.hgetall(this.domainLimitReachedKey),
+    ]);
+
+    const domains = new Set([
+      ...Object.keys(bytesMap),
+      ...Object.keys(objectsMap),
+      ...Object.keys(limitReachedMap),
+    ]);
+
+    return Array.from(domains)
+      .sort()
+      .map((domain) => ({
+        domain,
+        bytes: Number(bytesMap[domain] || 0),
+        objects: Number(objectsMap[domain] || 0),
+        limitReached: limitReachedMap[domain] === "1",
+      }));
   }
 
   async isCrawlStopped() {

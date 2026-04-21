@@ -123,5 +123,9 @@ export enum SkippedReason {
   PageLimit = "pageLimit",
   RobotsTxt = "robotsTxt",
   RedirectToExcluded = "redirectToExcluded",
+<<<<<<< HEAD
   Duplicate = "duplicate",
+=======
+  DomainLimit = "domainLimit",
+>>>>>>> 88da8e3 (Add attributed per-domain crawl budgets and stats)
 }
