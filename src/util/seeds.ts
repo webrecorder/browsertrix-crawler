@@ -6,7 +6,7 @@ import { logger } from "./logger.js";
 import { type CrawlerArgs } from "./argParser.js";
 import { normalizeUrl } from "./normalize.js";
 
-type ScopeType =
+export type ScopeType =
   | "prefix"
   | "host"
   | "domain"
@@ -14,6 +14,18 @@ type ScopeType =
   | "page-spa"
   | "any"
   | "custom";
+
+export type ScopeSeedInitOpts = {
+  url: string;
+  scopeType: ScopeType | undefined;
+  include: string[];
+  exclude: string[];
+  allowHash?: boolean;
+  depth?: number;
+  sitemap?: string | boolean | null;
+  extraHops?: number;
+  auth?: string | null;
+};
 
 export class ScopedSeed {
   url: string;
@@ -43,17 +55,7 @@ export class ScopedSeed {
     sitemap = false,
     extraHops = 0,
     auth = null,
-  }: {
-    url: string;
-    scopeType: ScopeType | undefined;
-    include: string[];
-    exclude: string[];
-    allowHash?: boolean;
-    depth?: number;
-    sitemap?: string | boolean | null;
-    extraHops?: number;
-    auth?: string | null;
-  }) {
+  }: ScopeSeedInitOpts) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");
@@ -84,7 +86,7 @@ export class ScopedSeed {
         parsedUrl,
       );
       this.include = [...includeNew, ...this.include];
-      allowHash = allowHashNew;
+      allowHash ||= allowHashNew;
     }
 
     // for page scope, the depth is set to extraHops, as no other
@@ -349,13 +351,14 @@ export async function parseSeeds(
     }
   }
 
-  const scopeOpts = {
+  const scopeOpts: Omit<ScopeSeedInitOpts, "url"> = {
     scopeType: params.scopeType as ScopeType | undefined,
     sitemap: params.sitemap,
     include: params.include,
     exclude: params.exclude,
     depth: params.depth,
     extraHops: params.extraHops,
+    allowHash: params.allowHashUrls,
   };
 
   for (const seed of seeds) {
