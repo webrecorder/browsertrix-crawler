@@ -15,7 +15,7 @@ export type ScopeType =
   | "any"
   | "custom";
 
-export type ScopeSeedInitOpts = {
+export type ScopedSeedInitOpts = {
   url: string;
   scopeType: ScopeType | undefined;
   include: string[];
@@ -55,7 +55,7 @@ export class ScopedSeed {
     sitemap = false,
     extraHops = 0,
     auth = null,
-  }: ScopeSeedInitOpts) {
+  }: ScopedSeedInitOpts) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");
@@ -351,7 +351,7 @@ export async function parseSeeds(
     }
   }
 
-  const scopeOpts: Omit<ScopeSeedInitOpts, "url"> = {
+  const scopeOpts: Omit<ScopedSeedInitOpts, "url"> = {
     scopeType: params.scopeType as ScopeType | undefined,
     sitemap: params.sitemap,
     include: params.include,
