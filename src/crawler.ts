@@ -765,12 +765,14 @@ export class Crawler {
       depth,
       extraHops,
       noOOS,
+      pageUrl,
     }: {
       seedId: number;
       url: string;
       depth: number;
       extraHops: number;
       noOOS: boolean;
+      pageUrl?: string;
     },
     logDetails = {},
   ) {
@@ -780,6 +782,7 @@ export class Crawler {
       extraHops,
       logDetails,
       noOOS,
+      pageUrl,
     );
   }
 
@@ -788,8 +791,15 @@ export class Crawler {
       seedId,
       url,
       depth,
+      pageUrl,
       extraHops,
-    }: { seedId: number; url: string; depth: number; extraHops: number },
+    }: {
+      seedId: number;
+      url: string;
+      depth: number;
+      extraHops: number;
+      pageUrl?: string;
+    },
     logDetails = {},
   ): Promise<boolean> {
     const seed = await this.crawlState.getSeedAt(
@@ -798,7 +808,14 @@ export class Crawler {
       seedId,
     );
 
-    const res = seed.isIncluded(url, depth, extraHops, logDetails);
+    const res = seed.isIncluded(
+      url,
+      depth,
+      extraHops,
+      logDetails,
+      false,
+      pageUrl,
+    );
 
     if (!res) {
       this.writeSkippedPage(url, seedId, depth, SkippedReason.OutOfScope);
@@ -982,6 +999,7 @@ self.__bx_behaviors.selectMainBehavior();
             depth,
             extraHops,
             false,
+            url,
             logDetails,
           );
         });
@@ -2575,6 +2593,7 @@ self.__bx_behaviors.selectMainBehavior();
         depth,
         extraHops,
         false,
+        page.url(),
         logDetails,
       );
     };
@@ -2619,6 +2638,7 @@ self.__bx_behaviors.selectMainBehavior();
     depth: number,
     extraHops = 0,
     noOOS = false,
+    pageUrl?: string,
     logDetails: LogDetails = {},
   ) {
     try {
@@ -2629,7 +2649,14 @@ self.__bx_behaviors.selectMainBehavior();
 
       for (const possibleUrl of urls) {
         const res = this.getScope(
-          { url: possibleUrl, extraHops: newExtraHops, depth, seedId, noOOS },
+          {
+            url: possibleUrl,
+            extraHops: newExtraHops,
+            depth,
+            seedId,
+            noOOS,
+            pageUrl,
+          },
           logDetails,
         );
 
