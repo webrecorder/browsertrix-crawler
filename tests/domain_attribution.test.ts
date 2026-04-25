@@ -71,4 +71,270 @@ describe("domain attribution", () => {
     );
     expect(writeSkippedPage).not.toHaveBeenCalled();
   });
+
+  test("adds completeness states to domain stats only for the opt-in depth-0 domain-scope mode", () => {
+    const crawler = Object.create(Crawler.prototype) as any;
+
+    crawler.params = {
+      domainStatsCompleteness: true,
+      scopeType: "domain",
+      depth: 0,
+    };
+    crawler.domainCompletenessByDomain = new Map([
+      ["large.example", "incomplete"],
+      ["unclear.example", "unknown"],
+      ["small.example", "complete"],
+    ]);
+
+    expect(
+      crawler.addDomainCompletenessToStats([
+        {
+          domain: "large.example",
+          bytes: 10,
+          objects: 1,
+          limitReached: false,
+        },
+        {
+          domain: "small.example",
+          bytes: 5,
+          objects: 1,
+          limitReached: false,
+        },
+        {
+          domain: "unclear.example",
+          bytes: 0,
+          objects: 0,
+          limitReached: false,
+        },
+      ]),
+    ).toEqual([
+      {
+        domain: "large.example",
+        bytes: 10,
+        objects: 1,
+        limitReached: false,
+        completeness: "incomplete",
+      },
+      {
+        domain: "small.example",
+        bytes: 5,
+        objects: 1,
+        limitReached: false,
+        completeness: "complete",
+      },
+      {
+        domain: "unclear.example",
+        bytes: 0,
+        objects: 0,
+        limitReached: false,
+        completeness: "unknown",
+      },
+    ]);
+  });
+
+  test("probes additional depth-1 candidates without queueing them", async () => {
+    const crawler = Object.create(Crawler.prototype) as any;
+
+    crawler.params = {
+      domainStatsCompleteness: true,
+      scopeType: "domain",
+      depth: 0,
+    };
+    crawler.domainCompletenessByDomain = new Map();
+    crawler.getAttributedDomain = jest.fn().mockReturnValue("seed.example");
+    crawler.getScope = jest
+      .fn()
+      .mockReturnValueOnce({
+        url: "https://seed.example/about",
+        isOOS: false,
+      })
+      .mockReturnValueOnce(false);
+    crawler.runLinkExtraction = jest.fn(async (_frames, _selectors, _logDetails) => {
+      await data.callbacks.addLink("https://seed.example/about");
+      await data.callbacks.addLink("https://offscope.example/");
+      return { hadErrors: false };
+    });
+
+    const data: any = {
+      url: "https://seed.example/",
+      seedId: 0,
+      depth: 0,
+      extraHops: 0,
+      filteredFrames: [],
+      callbacks: {},
+    };
+
+    await crawler.probeDomainStatsCompleteness(
+      {} as any,
+      data,
+      [],
+      {},
+    );
+
+    expect(crawler.getScope).toHaveBeenNthCalledWith(
+      1,
+      {
+        url: "https://seed.example/about",
+        extraHops: 0,
+        depth: 0,
+        seedId: 0,
+        noOOS: false,
+      },
+      {},
+    );
+    expect(crawler.getDomainCompleteness("seed.example")).toBe("incomplete");
+  });
+
+  test("marks completeness as unknown when the probe encounters link extraction errors", async () => {
+    const crawler = Object.create(Crawler.prototype) as any;
+
+    crawler.params = {
+      domainStatsCompleteness: true,
+      scopeType: "domain",
+      depth: 0,
+    };
+    crawler.domainCompletenessByDomain = new Map();
+    crawler.getAttributedDomain = jest.fn().mockReturnValue("seed.example");
+    crawler.runLinkExtraction = jest.fn(async () => ({ hadErrors: true }));
+
+    const data: any = {
+      url: "https://seed.example/",
+      seedId: 0,
+      depth: 0,
+      extraHops: 0,
+      filteredFrames: [],
+      callbacks: {},
+    };
+
+    await crawler.probeDomainStatsCompleteness(
+      {} as any,
+      data,
+      [],
+      {},
+    );
+
+    expect(crawler.getDomainCompleteness("seed.example")).toBe("unknown");
+  });
+
+  test("does not downgrade complete completeness to unknown for a failed sibling seed", () => {
+    const crawler = Object.create(Crawler.prototype) as any;
+
+    crawler.params = {
+      domainStatsCompleteness: true,
+      scopeType: "domain",
+      depth: 0,
+    };
+    crawler.domainCompletenessByDomain = new Map([["seed.example", "complete"]]);
+    crawler.getAttributedDomain = jest.fn().mockReturnValue("seed.example");
+
+    crawler.markDomainCompletenessUnknownForPage({
+      url: "https://seed.example/",
+      seedId: 0,
+      depth: 0,
+    });
+
+    expect(crawler.getDomainCompleteness("seed.example")).toBe("complete");
+  });
+
+  test("skips retries for failed sibling seeds once completeness is already known", () => {
+    const crawler = Object.create(Crawler.prototype) as any;
+
+    crawler.params = {
+      domainStatsCompleteness: true,
+      scopeType: "domain",
+      depth: 0,
+    };
+    crawler.domainCompletenessByDomain = new Map([["seed.example", "incomplete"]]);
+    crawler.getAttributedDomain = jest.fn().mockReturnValue("seed.example");
+
+    expect(
+      crawler.shouldSkipRetriesForDomainCompleteness({
+        url: "https://www.seed.example/",
+        seedId: 1,
+        depth: 0,
+      }),
+    ).toBe(true);
+  });
+
+  test("promotes unknown to complete when a later probe succeeds cleanly", async () => {
+    const crawler = Object.create(Crawler.prototype) as any;
+
+    crawler.params = {
+      domainStatsCompleteness: true,
+      scopeType: "domain",
+      depth: 0,
+    };
+    crawler.domainCompletenessByDomain = new Map([["seed.example", "unknown"]]);
+    crawler.getAttributedDomain = jest.fn().mockReturnValue("seed.example");
+    crawler.runLinkExtraction = jest.fn(async () => ({ hadErrors: false }));
+
+    const data: any = {
+      url: "http://seed.example/",
+      seedId: 0,
+      depth: 0,
+      extraHops: 0,
+      filteredFrames: [],
+      callbacks: {},
+    };
+
+    await crawler.probeDomainStatsCompleteness(
+      {} as any,
+      data,
+      [],
+      {},
+    );
+
+    expect(crawler.getDomainCompleteness("seed.example")).toBe("complete");
+  });
+
+  test("detects theoretical next-hop in-scope links even when depth is 0", async () => {
+    const crawler = Object.create(Crawler.prototype) as any;
+
+    crawler.params = {
+      domainStatsCompleteness: true,
+      scopeType: "domain",
+      depth: 0,
+    };
+    crawler.domainCompletenessByDomain = new Map();
+    crawler.getAttributedDomain = jest.fn().mockReturnValue("seed.example");
+    crawler.getScope = jest.fn().mockReturnValue({
+      url: "https://seed.example/about",
+      isOOS: false,
+    });
+    crawler.runLinkExtraction = jest.fn(async (_frames, _selectors, _logDetails) => {
+      await data.callbacks.addLink("https://seed.example/#top");
+      await data.callbacks.addLink("https://seed.example/about");
+      return { hadErrors: false };
+    });
+
+    const data: any = {
+      url: "https://seed.example/",
+      seedId: 0,
+      depth: 0,
+      extraHops: 0,
+      filteredFrames: [],
+      callbacks: {},
+    };
+
+    await crawler.probeDomainStatsCompleteness(
+      {
+        url: () => "https://seed.example/",
+      } as any,
+      data,
+      [],
+      {},
+    );
+
+    expect(crawler.getScope).toHaveBeenCalledWith(
+      {
+        url: "https://seed.example/about",
+        extraHops: 0,
+        depth: 0,
+        seedId: 0,
+        noOOS: false,
+      },
+      {},
+    );
+    expect(crawler.getDomainCompleteness("seed.example")).toBe("incomplete");
+  });
 });

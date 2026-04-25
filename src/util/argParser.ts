@@ -380,6 +380,13 @@ class ArgParser {
             "If set, output attributed per-domain crawl budget stats as JSON to reports/domainStats.json in the collection directory",
         },
 
+        domainStatsCompleteness: {
+          type: "boolean",
+          default: false,
+          describe:
+            "If set, add an optional completeness signal to domainStats.json for domain-scope crawls at depth 0, based on whether additional in-scope URLs are discovered from crawled depth-0 pages",
+        },
+
         behaviors: {
           describe: "Which background behaviors to enable on each page",
           type: "array",
