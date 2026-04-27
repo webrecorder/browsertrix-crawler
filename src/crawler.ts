@@ -1970,7 +1970,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.closeFiles();
 
-    await this.writeStats();
+    await this.writeStats(true);
 
     // if crawl has been stopped or finished, mark as final exit for post-crawl tasks
     if (
@@ -2253,7 +2253,7 @@ self.__bx_behaviors.selectMainBehavior();
     );
   }
 
-  async writeStats() {
+  async writeStats(finalize = false) {
     const shouldLogStats = this.params.logging.includes("stats");
     const shouldWriteStatsFile = !!this.params.statsFilename;
     const shouldWriteDomainStatsFile = !!this.params.writeDomainStats;
@@ -2301,6 +2301,7 @@ self.__bx_behaviors.selectMainBehavior();
         await fsp.mkdir(this.reportsDir, { recursive: true });
         const domainStats = await this.addDomainCompletenessToStats(
           await this.crawlState.getDomainStats(),
+          finalize,
         );
         const domainStatsJson = JSON.stringify(domainStats, null, 2);
         if (domainStatsJson !== this.lastDomainStatsJson) {
@@ -2614,6 +2615,7 @@ self.__bx_behaviors.selectMainBehavior();
         data,
         this.params.selectLinks,
         logDetails,
+        true,
       );
       logger.debug("Skipping Link Extraction, At Max Depth", {}, "links");
       return;
@@ -2749,12 +2751,15 @@ self.__bx_behaviors.selectMainBehavior();
     data: PageState,
     selectors: ExtractSelector[],
     logDetails: LogDetails,
+    allowMaxDepthProbe = false,
   ) {
     if (!this.isDomainStatsCompletenessEnabled()) {
       return;
     }
 
-    if (data.depth !== 0 || data.extraHops !== 0) {
+    const isDepthZeroProbe = data.depth === 0 && data.extraHops === 0;
+
+    if (!isDepthZeroProbe && !allowMaxDepthProbe) {
       return;
     }
 
@@ -2854,6 +2859,16 @@ self.__bx_behaviors.selectMainBehavior();
         "links",
       );
       await this.setDomainCompleteness(domain, "incomplete");
+      return;
+    }
+
+    const existingCompleteness = await this.crawlState.getDomainCompleteness(domain);
+    if (existingCompleteness === "incomplete") {
+      logger.debug(
+        "Domain stats completeness probe skipped complete — already incomplete",
+        { domain, seedId, depth, extraHops, ...logDetails },
+        "links",
+      );
       return;
     }
 
@@ -3010,6 +3025,7 @@ self.__bx_behaviors.selectMainBehavior();
           );
         }
         this.limitHit = true;
+        await this.markDomainCompletenessForUrl(url, seedId, "incomplete");
         this.writeSkippedPage(url, seedId, depth, SkippedReason.PageLimit);
         return false;
 
@@ -3079,15 +3095,19 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   isDomainStatsCompletenessEnabled() {
-    return (
-      !!this.params.domainStatsCompleteness &&
-      this.params.scopeType === "domain" &&
-      this.params.depth === 0
-    );
+    return !!this.params.domainStatsCompleteness && this.params.scopeType === "domain";
+  }
+
+  isDepthZeroDomainStatsCompletenessEnabled() {
+    return this.isDomainStatsCompletenessEnabled() && this.params.depth === 0;
+  }
+
+  isDeepDomainStatsCompletenessEnabled() {
+    return this.isDomainStatsCompletenessEnabled() && this.params.depth > 0;
   }
 
   async markDomainCompletenessUnknownForPage(data: PageState) {
-    if (!this.isDomainStatsCompletenessEnabled()) {
+    if (!this.isDepthZeroDomainStatsCompletenessEnabled()) {
       return;
     }
 
@@ -3112,7 +3132,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async shouldSkipRetriesForDomainCompleteness(data: PageState) {
-    if (!this.isDomainStatsCompletenessEnabled()) {
+    if (!this.isDepthZeroDomainStatsCompletenessEnabled()) {
       return false;
     }
 
@@ -3128,9 +3148,19 @@ self.__bx_behaviors.selectMainBehavior();
     return await this.hasFinalDomainCompleteness(domain);
   }
 
-  async addDomainCompletenessToStats(domainStats: DomainStatsEntry[]) {
+  async addDomainCompletenessToStats(
+    domainStats: DomainStatsEntry[],
+    finalize = false,
+  ) {
     if (!this.isDomainStatsCompletenessEnabled()) {
       return domainStats;
+    }
+
+    if (this.isDeepDomainStatsCompletenessEnabled()) {
+      if (!finalize) {
+        return domainStats;
+      }
+      return await this.finalizeDeepCrawlDomainCompleteness(domainStats);
     }
 
     const completenessMap = await this.crawlState.getDomainCompletenessMap();
@@ -3149,6 +3179,107 @@ self.__bx_behaviors.selectMainBehavior();
 
   async getDomainCompleteness(domain: string): Promise<DomainCompleteness> {
     return (await this.crawlState.getDomainCompleteness(domain)) || "unknown";
+  }
+
+  async markDomainCompletenessForUrl(
+    url: string,
+    seedId: number,
+    completeness: DomainCompleteness,
+  ) {
+    if (!this.isDomainStatsCompletenessEnabled()) {
+      return;
+    }
+
+    const domain = this.getAttributedDomain(url, seedId);
+    if (!domain) {
+      return;
+    }
+
+    await this.setDomainCompleteness(domain, completeness);
+  }
+
+  async finalizeDeepCrawlDomainCompleteness(domainStats: DomainStatsEntry[]) {
+    const completenessByDomain = new Map<string, DomainCompleteness>(
+      Object.entries(await this.crawlState.getDomainCompletenessMap()),
+    );
+    const serializedState = await this.crawlState.serialize();
+    const unresolvedDomains = this.getAttributedDomainsForSerializedEntries([
+      ...serializedState.queued,
+      ...serializedState.pending,
+    ]);
+    const failedDomains = this.getAttributedDomainsForSerializedEntries(
+      serializedState.failed,
+    );
+    const unknownOnInterrupt =
+      this.interruptReason === InterruptReason.BrowserCrashed;
+    const incompleteOnInterrupt =
+      this.interruptReason === InterruptReason.SignalInterrupted ||
+      this.interruptReason === InterruptReason.SizeLimit ||
+      this.interruptReason === InterruptReason.TimeLimit ||
+      this.interruptReason === InterruptReason.DiskUtilization ||
+      this.interruptReason === InterruptReason.CrawlPaused ||
+      (await this.crawlState.isCrawlStopped());
+
+    for (const domain of failedDomains) {
+      if (completenessByDomain.get(domain) !== "incomplete") {
+        completenessByDomain.set(domain, "unknown");
+      }
+    }
+
+    for (const domain of unresolvedDomains) {
+      if (unknownOnInterrupt && completenessByDomain.get(domain) !== "incomplete") {
+        completenessByDomain.set(domain, "unknown");
+      } else if (!unknownOnInterrupt && incompleteOnInterrupt) {
+        completenessByDomain.set(domain, "incomplete");
+      }
+    }
+
+    const finalizedStats = [];
+    for (const entry of domainStats) {
+      let completeness = completenessByDomain.get(entry.domain);
+
+      if (!completeness) {
+        completeness = entry.limitReached ? "incomplete" : "complete";
+      }
+
+      await this.setDomainCompleteness(entry.domain, completeness);
+      finalizedStats.push({
+        ...entry,
+        completeness,
+      });
+    }
+
+    return finalizedStats;
+  }
+
+  getAttributedDomainsForSerializedEntries(entries: Array<string | object>) {
+    const domains = new Set<string>();
+
+    for (const entry of entries) {
+      let data;
+      if (typeof entry === "string") {
+        try {
+          data = JSON.parse(entry);
+        } catch (e) {
+          continue;
+        }
+      } else {
+        data = entry;
+      }
+
+      const url = data?.url;
+      const seedId = data?.seedId;
+      if (typeof url !== "string" || typeof seedId !== "number") {
+        continue;
+      }
+
+      const domain = this.getAttributedDomain(url, seedId);
+      if (domain) {
+        domains.add(domain);
+      }
+    }
+
+    return domains;
   }
 
   async initPages(filename: string, title: string, isReport: boolean = false) {
