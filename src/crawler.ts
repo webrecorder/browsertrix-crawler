@@ -11,6 +11,7 @@ import {
   PageState,
   WorkerId,
   DomainStatsEntry,
+  DomainCompleteness,
 } from "./util/state.js";
 
 import { CrawlerArgs, parseArgs } from "./util/argParser.js";
@@ -142,10 +143,6 @@ export class Crawler {
   numOriginalSeeds = 0;
   originalSeedDomains: Set<string> = new Set<string>();
   seedAttributedDomains: Map<number, string> = new Map<number, string>();
-  domainCompletenessByDomain: Map<
-    string,
-    "complete" | "incomplete" | "unknown"
-  > = new Map();
   lastDomainStatsJson: string | null = null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1422,10 +1419,11 @@ self.__bx_behaviors.selectMainBehavior();
         }
         this.limitHit = false;
       } else {
-        this.markDomainCompletenessUnknownForPage(data);
+        await this.markDomainCompletenessUnknownForPage(data);
         const retry = await this.crawlState.markFailed(
           url,
-          data.noRetries || this.shouldSkipRetriesForDomainCompleteness(data),
+          data.noRetries ||
+            (await this.shouldSkipRetriesForDomainCompleteness(data)),
         );
 
         if (this.healthChecker) {
@@ -2301,7 +2299,7 @@ self.__bx_behaviors.selectMainBehavior();
       const domainStatsPath = path.join(this.reportsDir, "domainStats.json");
       try {
         await fsp.mkdir(this.reportsDir, { recursive: true });
-        const domainStats = this.addDomainCompletenessToStats(
+        const domainStats = await this.addDomainCompletenessToStats(
           await this.crawlState.getDomainStats(),
         );
         const domainStatsJson = JSON.stringify(domainStats, null, 2);
@@ -2554,7 +2552,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (!data.isHTMLPage) {
-      this.markDomainCompletenessUnknownForPage(data);
+      await this.markDomainCompletenessUnknownForPage(data);
       data.filteredFrames = [];
 
       logger.info(
@@ -2590,7 +2588,7 @@ self.__bx_behaviors.selectMainBehavior();
     const { seedId, extraHops } = data;
 
     if (!seed) {
-      this.markDomainCompletenessUnknownForPage(data);
+      await this.markDomainCompletenessUnknownForPage(data);
       logger.error(
         "Seed not found, likely invalid crawl state - skipping link extraction and behaviors",
         { seedId, ...logDetails },
@@ -2834,7 +2832,7 @@ self.__bx_behaviors.selectMainBehavior();
           { domain, seedId, depth, extraHops, ...logDetails },
           "links",
         );
-        this.setDomainCompleteness(domain, "unknown");
+        await this.setDomainCompleteness(domain, "unknown");
         return;
       }
     } catch (e) {
@@ -2843,7 +2841,7 @@ self.__bx_behaviors.selectMainBehavior();
         { domain, seedId, depth, extraHops, ...formatErr(e), ...logDetails },
         "links",
       );
-      this.setDomainCompleteness(domain, "unknown");
+      await this.setDomainCompleteness(domain, "unknown");
       return;
     } finally {
       callbacks.addLink = prevAddLink;
@@ -2855,7 +2853,7 @@ self.__bx_behaviors.selectMainBehavior();
         { domain, seedId, depth, extraHops, ...logDetails },
         "links",
       );
-      this.setDomainCompleteness(domain, "incomplete");
+      await this.setDomainCompleteness(domain, "incomplete");
       return;
     }
 
@@ -2864,7 +2862,7 @@ self.__bx_behaviors.selectMainBehavior();
       { domain, seedId, depth, extraHops, ...logDetails },
       "links",
     );
-    this.setDomainCompleteness(domain, "complete");
+    await this.setDomainCompleteness(domain, "complete");
   }
 
   async queueInScopeUrls(
@@ -3088,7 +3086,7 @@ self.__bx_behaviors.selectMainBehavior();
     );
   }
 
-  markDomainCompletenessUnknownForPage(data: PageState) {
+  async markDomainCompletenessUnknownForPage(data: PageState) {
     if (!this.isDomainStatsCompletenessEnabled()) {
       return;
     }
@@ -3100,20 +3098,20 @@ self.__bx_behaviors.selectMainBehavior();
     const domain = this.getAttributedDomain(data.url, data.seedId);
     if (
       !domain ||
-      this.hasFinalDomainCompleteness(domain)
+      (await this.hasFinalDomainCompleteness(domain))
     ) {
       return;
     }
 
-    this.setDomainCompleteness(domain, "unknown");
+    await this.setDomainCompleteness(domain, "unknown");
   }
 
-  hasFinalDomainCompleteness(domain: string) {
-    const completeness = this.domainCompletenessByDomain.get(domain);
+  async hasFinalDomainCompleteness(domain: string) {
+    const completeness = await this.crawlState.getDomainCompleteness(domain);
     return completeness === "incomplete" || completeness === "complete";
   }
 
-  shouldSkipRetriesForDomainCompleteness(data: PageState) {
+  async shouldSkipRetriesForDomainCompleteness(data: PageState) {
     if (!this.isDomainStatsCompletenessEnabled()) {
       return false;
     }
@@ -3127,29 +3125,30 @@ self.__bx_behaviors.selectMainBehavior();
       return false;
     }
 
-    return this.hasFinalDomainCompleteness(domain);
+    return await this.hasFinalDomainCompleteness(domain);
   }
 
-  addDomainCompletenessToStats(domainStats: DomainStatsEntry[]) {
+  async addDomainCompletenessToStats(domainStats: DomainStatsEntry[]) {
     if (!this.isDomainStatsCompletenessEnabled()) {
       return domainStats;
     }
 
+    const completenessMap = await this.crawlState.getDomainCompletenessMap();
     return domainStats.map((entry) => ({
       ...entry,
-      completeness: this.getDomainCompleteness(entry.domain),
+      completeness: completenessMap[entry.domain] || "unknown",
     }));
   }
 
-  setDomainCompleteness(
+  async setDomainCompleteness(
     domain: string,
-    completeness: "complete" | "incomplete" | "unknown",
+    completeness: DomainCompleteness,
   ) {
-    this.domainCompletenessByDomain.set(domain, completeness);
+    await this.crawlState.setDomainCompleteness(domain, completeness);
   }
 
-  getDomainCompleteness(domain: string): "complete" | "incomplete" | "unknown" {
-    return this.domainCompletenessByDomain.get(domain) || "unknown";
+  async getDomainCompleteness(domain: string): Promise<DomainCompleteness> {
+    return (await this.crawlState.getDomainCompleteness(domain)) || "unknown";
   }
 
   async initPages(filename: string, title: string, isReport: boolean = false) {
