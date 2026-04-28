@@ -465,4 +465,17 @@ scopeType: prefix
     "https://example.org/",
   );
   expect(result2).toBe(false);
+
+  const result3 = seeds[0].isIncluded(
+    "/abc",
+    0,
+    0,
+    {},
+    false,
+    "https://example.com/",
+  );
+  expect(result3).not.toBe(false);
+  expect((result3 as Exclude<typeof result1, false>).url).toBe(
+    "https://example.com/abc",
+  );
 });
