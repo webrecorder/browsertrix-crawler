@@ -405,3 +405,40 @@ scopeType: page
   expect(result).not.toBe(false);
   expect((result as Exclude<typeof result, false>).isOOS).toBe(false);
 });
+
+test("hashtag relative URL included", async () => {
+  const seeds = await getSeeds(`
+seeds:
+  - url: https://example.com/
+    allowHash: true
+
+scopeType: prefix
+`);
+
+  expect(seeds[0].scopeType).toEqual("prefix");
+  //todo: update after #1025 is merged
+  //expect(seeds[0].allowHash).toEqual(true);
+
+  const result1 = seeds[0].isIncluded(
+    "/abc",
+    0,
+    0,
+    {},
+    false,
+    "https://example.com/",
+  );
+  expect(result1).not.toBe(false);
+  expect((result1 as Exclude<typeof result1, false>).url).toBe(
+    "https://example.com/abc",
+  );
+
+  const result2 = seeds[0].isIncluded(
+    "#abc",
+    0,
+    0,
+    {},
+    false,
+    "https://example.org/",
+  );
+  expect(result2).toBe(false);
+});

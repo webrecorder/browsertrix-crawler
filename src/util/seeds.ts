@@ -143,10 +143,10 @@ export class ScopedSeed {
     }
   }
 
-  parseUrl(url: string, logDetails = {}) {
+  parseUrl(url: string, pageUrl?: string, logDetails = {}) {
     let parsedUrl = null;
     try {
-      parsedUrl = new URL(url.trim());
+      parsedUrl = new URL(url.trim(), pageUrl);
     } catch (e) {
       logger.warn("Invalid Page - not a valid URL", { url, ...logDetails });
       return null;
@@ -250,8 +250,9 @@ export class ScopedSeed {
     extraHops = 0,
     logDetails = {},
     noOOS = false,
+    pageUrl?: string,
   ): { url: string; isOOS: boolean } | false {
-    const urlParsed = this.parseUrl(url, logDetails);
+    const urlParsed = this.parseUrl(url, pageUrl, logDetails);
     if (!urlParsed) {
       return false;
     }
