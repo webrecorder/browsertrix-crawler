@@ -119,28 +119,23 @@ simply free up the data on the Redis.
 
 The crawler also has the option to skip loading of entire pages if the page HTML is a duplicate.
 
-In such cases, after the `revisit` record for the HTML page is written, and the crawler aborts loading the page in the browser, and moves on to the next page.
+In such cases, after the `revisit` record for the HTML page is written, the crawler aborts loading the page in the browser and moves on to the next page.
 
-This allows saving not only storage, but crawling time, as duplicate pages are quickly skipped by the browser.
+This allows saving not only storage but crawling time, as duplicate pages are quickly skipped by the browser.
 
-But as a trade-off, any page resources (images, stylesheets) or links are also skipped, and are not crawled, even if they may have changed.
+Note that there is a trade-off involved, as any page resources (images, stylesheets) or links are also skipped and are not crawled, even if they may have changed.
 
-To make this feature useful, it generally only make sense to enable on pages above a certain depth.
+To enable this feature, set the `--dedupePagesMinDepth` to a value of 0 or greater.
+Setting to a value of 0 means that even the seed page will be skipped if it has not changed, and no additional pages will be crawled.
 
-To enable this feature, set the `--dedupePagesMinDepth` must be set to a value of 0 or greater.
-Setting it to 0 means even the seed page will be skipped if it has not changed, not crawling any other pages.
-
-A `--dedupePagesMinDepth` of at least 1 is recommended, which will ensure that the seed page and pages 1 link away are always
-loaded, but pages at a higher depth, only if they have changed.
+It is generally recommended to set `--dedupePagesMinDepth` to a value of at least 1 when using this feature. Setting to a value of 1 will ensure that the seed page is always fully crawled and that its links will be added to the crawl queue. Pages one link away from the seed and at greater depths will be loaded and then skipped if they are unchanged.
 
 
 ### Incremental Crawling
 
-When duplicate pages are skipped, they do not count towards the page limit, and additional pages can be crawled up to the page limit. This approach can be used to crawl a site that hasn't changed incrementally, a few pages at a time.
+When duplicate pages are skipped they do not count towards the page limit, and additional pages can be crawled up to the page limit. This approach can be used to crawl a site that hasn't changed incrementally, a few pages at a time.
 
-For example, if a site has 100 pages: a home page and 99 other static pages that don't change, it can be fully crawled after 11 crawls with the setting `--dedupePagesMinDepth 10 --pageLimit 10`, which will crawl the home page + 9 other pages.
-A new set of 9 pages will be crawled each time, and after 11 crawls, all 99 will have been crawled.
-
+For example, if a site has 100 pages, a home page and 99 other static pages that don't change, it can be fully crawled after 11 crawls with the setting `--dedupePagesMinDepth 10 --pageLimit 10`, which will crawl the home page and up to 9 additional pages each time the crawler is run.
 
 ## Deduplication outputs
 
@@ -164,8 +159,7 @@ See the [WACZ dependency section of the developer documentation](../develop/dedu
 
 ### Reporting
 
-If page dedupe is enabled [skipped page reporting](./reports.md) is also enabled, pages that are skipped due to deduped are logged
-with the `duplicate` reason.
+If both page deduplication and [skipped page reporting](./reports.md) are enabled, pages that are skipped due to page deduplication are logged with the `duplicate` reason.
 
 ## Deduplication system architecture
 See the [developer docs for dedupe](../develop/dedupe.md) for more advanced information of the architecture of the dedupe system.

@@ -869,9 +869,8 @@ export class Recorder extends EventEmitter {
 
     const rewritten = await this.rewriteResponse(reqresp, mimeType);
 
-    // ** WIP: Experimental page-level dedupe **
-    // Will abort page loading in case of duplicate
-    // TODO: Write revisit record, track page as a duplicate in page list
+    // If page is at dedupePagesMinDepth or higher and HTML is a duplicate,
+    // write a revisit record, track pages as a duplicate, and abort the page
     if (
       url === this.pageUrl &&
       reqresp.payload &&
