@@ -407,7 +407,6 @@ scopeType: page
   expect((result as Exclude<typeof result, false>).isOOS).toBe(false);
 });
 
-<<<<<<< HEAD
 test("hashtag relative URL included", async () => {
   const seeds = await getSeeds(`
 allowHashUrls: true
@@ -428,6 +427,7 @@ seeds:
 scopeType: prefix
 `);
 
+  expect(seeds[0].scopeType).toEqual("prefix");
   expect(seeds[0].allowHash).toEqual(true);
 
   const result1 = seeds[0].isIncluded(
