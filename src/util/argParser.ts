@@ -172,6 +172,7 @@ class ArgParser {
         allowHashUrls: {
           describe:
             "Allow Hashtag URLs, useful for single-page-application crawling or when different hashtags load dynamic content",
+          type: "boolean",
         },
 
         selectLinks: {

@@ -34,6 +34,7 @@ seeds:
   expect(seeds[0].scopeType).toEqual("prefix");
   expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
   expect(seeds[0].exclude).toEqual([]);
+  expect(seeds[0].allowHash).toEqual(false);
 });
 
 test("default scope + exclude", async () => {
@@ -406,6 +407,30 @@ scopeType: page
   expect((result as Exclude<typeof result, false>).isOOS).toBe(false);
 });
 
+test("allowHashUrls global with scopeType prefix", async () => {
+  const seeds = await getSeeds(`
+allowHashUrls: true
+seeds:
+  - url: https://example.com/
+`);
+
+  expect(seeds[0].scopeType).toEqual("prefix");
+  expect(seeds[0].allowHash).toEqual(true);
+});
+
+test("allowHash with scopeType prefix", async () => {
+  const seeds = await getSeeds(`
+seeds:
+  - url: https://example.com/
+    allowHash: true
+
+scopeType: prefix
+`);
+
+  expect(seeds[0].scopeType).toEqual("prefix");
+  expect(seeds[0].allowHash).toEqual(true);
+});
+
 test("hashtag relative URL included", async () => {
   const seeds = await getSeeds(`
 seeds:
@@ -416,11 +441,10 @@ scopeType: prefix
 `);
 
   expect(seeds[0].scopeType).toEqual("prefix");
-  //todo: update after #1025 is merged
-  //expect(seeds[0].allowHash).toEqual(true);
+  expect(seeds[0].allowHash).toEqual(true);
 
   const result1 = seeds[0].isIncluded(
-    "/abc",
+    "#abc",
     0,
     0,
     {},
@@ -429,7 +453,7 @@ scopeType: prefix
   );
   expect(result1).not.toBe(false);
   expect((result1 as Exclude<typeof result1, false>).url).toBe(
-    "https://example.com/abc",
+    "https://example.com/#abc",
   );
 
   const result2 = seeds[0].isIncluded(
@@ -441,4 +465,17 @@ scopeType: prefix
     "https://example.org/",
   );
   expect(result2).toBe(false);
+
+  const result3 = seeds[0].isIncluded(
+    "/abc",
+    0,
+    0,
+    {},
+    false,
+    "https://example.com/",
+  );
+  expect(result3).not.toBe(false);
+  expect((result3 as Exclude<typeof result1, false>).url).toBe(
+    "https://example.com/abc",
+  );
 });
