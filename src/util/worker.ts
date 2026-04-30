@@ -7,7 +7,7 @@ import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
 import { PageState, WorkerId } from "./state.js";
 import { Crawler } from "../crawler.js";
-import { PAGE_OP_TIMEOUT_SECS } from "./constants.js";
+import { PAGE_OP_TIMEOUT_SECS, SkippedReason } from "./constants.js";
 
 const MAX_REUSE = 5;
 
@@ -275,7 +275,7 @@ export class PageWorker {
     this.logDetails = { page: url, workerid };
 
     if (this.recorder) {
-      this.recorder.startPage({ pageid, url });
+      this.recorder.startPage({ pageid, url, state: data });
     }
 
     try {
@@ -360,8 +360,28 @@ export class PageWorker {
 
       const data = await crawlState.nextFromQueue();
 
+      const limit = this.crawler.pageLimit;
+      const isDedupePages = this.crawler.params.dedupePagesMinDepth >= 0;
+
       // see if any work data in the queue
       if (data) {
+        if (
+          isDedupePages &&
+          limit > 0 &&
+          (await crawlState.numDone()) >= limit
+        ) {
+          const { url, seedId, depth } = data;
+          logger.info("Skipping queued page, at limit", { url, limit });
+          await crawlState.markExcluded(url);
+          this.crawler.writeSkippedPage(
+            url,
+            seedId,
+            depth,
+            SkippedReason.PageLimit,
+          );
+          continue;
+        }
+
         // filter out any out-of-scope pages right away
         if (!(await this.crawler.isInScope(data, this.logDetails))) {
           logger.info("Page no longer in scope", data);

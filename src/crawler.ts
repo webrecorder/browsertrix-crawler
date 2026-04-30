@@ -128,6 +128,7 @@ export class Crawler {
 
   limitHit = false;
   pageLimit: number;
+  queuePageLimit: number;
 
   saveStateFiles: string[] = [];
   lastSaveTime: number;
@@ -259,6 +260,13 @@ export class Crawler {
         ? Math.min(this.pageLimit, this.params.maxPageLimit)
         : this.params.maxPageLimit;
     }
+
+    // if using page dedupe, set queuePageLimit to 0
+    // so queue can be unlimited, as unknown how many pages may be skipped
+    // and additional pages needed from the queue
+    // otherwise, queuePageLimit == pagesLimit
+    this.queuePageLimit =
+      this.params.dedupePagesMinDepth >= 0 ? 0 : this.pageLimit;
 
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
@@ -613,7 +621,7 @@ export class Crawler {
 
     await this.loadCrawlState();
 
-    await this.crawlState.trimToLimit(this.pageLimit);
+    await this.crawlState.trimToLimit(this.queuePageLimit);
   }
 
   extraChromeArgs() {
@@ -1385,12 +1393,9 @@ self.__bx_behaviors.selectMainBehavior();
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
 
-        this.writeSkippedPage(
-          url,
-          data.seedId,
-          depth,
-          SkippedReason.RedirectToExcluded,
-        );
+        if (data.pageSkipReason) {
+          this.writeSkippedPage(url, data.seedId, depth, data.pageSkipReason);
+        }
         this.limitHit = false;
       } else {
         const retry = await this.crawlState.markFailed(url, noRetries);
@@ -2746,7 +2751,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     const result = await this.crawlState.addToQueue(
       { url, seedId, depth, extraHops, ts, pageid },
-      this.pageLimit,
+      this.queuePageLimit,
     );
 
     switch (result) {
@@ -2978,7 +2983,7 @@ self.__bx_behaviors.selectMainBehavior();
       headers,
       fromDate,
       toDate,
-      limit: this.pageLimit,
+      limit: this.queuePageLimit,
     });
 
     let power = 1;

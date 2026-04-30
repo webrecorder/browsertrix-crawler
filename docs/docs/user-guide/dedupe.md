@@ -115,6 +115,28 @@ This operational is not required - the data from the interrupted crawl will not 
 simply free up the data on the Redis.
 
 
+## Page Deduplication
+
+The crawler also has the option to skip loading of entire pages if the page HTML is a duplicate.
+
+In such cases, after the `revisit` record for the HTML page is written, the crawler aborts loading the page in the browser and moves on to the next page.
+
+This allows saving not only storage but crawling time, as duplicate pages are quickly skipped by the browser.
+
+Note that there is a trade-off involved, as any page resources (images, stylesheets) or links are also skipped and are not crawled, even if they may have changed.
+
+To enable this feature, set the `--dedupePagesMinDepth` to a value of 0 or greater.
+Setting to a value of 0 means that even the seed page will be skipped if it has not changed, and no additional pages will be crawled.
+
+It is generally recommended to set `--dedupePagesMinDepth` to a value of at least 1 when using this feature. Setting to a value of 1 will ensure that the seed page is always fully crawled and that its links will be added to the crawl queue. Pages one link away from the seed and at greater depths will be loaded and then skipped if they are unchanged.
+
+
+### Incremental Crawling
+
+When duplicate pages are skipped they do not count towards the page limit, and additional pages can be crawled up to the page limit. This approach can be used to crawl a site that hasn't changed incrementally, a few pages at a time.
+
+For example, if a site has 100 pages, a home page and 99 other static pages that don't change, it can be fully crawled after 11 crawls with the setting `--dedupePagesMinDepth 10 --pageLimit 10`, which will crawl the home page and up to 9 additional pages each time the crawler is run.
+
 ## Deduplication outputs
 
 When deduplication is enabled, the crawler output is changed in the following ways (in addition to using
@@ -134,6 +156,10 @@ When using deduplication, the crawler also stores dependency information between
 file(s) contain the WARCs with `response` records for each `revisit` record that is written.
 This allows for tracking which WACZ files are required by other WACZ files to get the full archived content.
 See the [WACZ dependency section of the developer documentation](../develop/dedupe.md#crawl-dependency-tracking-in-wacz-datapackagejson) for more details on the architecture of this dependency system.
+
+### Reporting
+
+If both page deduplication and [skipped page reporting](./reports.md) are enabled, pages that are skipped due to page deduplication are logged with the `duplicate` reason.
 
 ## Deduplication system architecture
 See the [developer docs for dedupe](../develop/dedupe.md) for more advanced information of the architecture of the dedupe system.

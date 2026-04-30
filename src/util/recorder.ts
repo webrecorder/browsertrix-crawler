@@ -27,8 +27,13 @@ import { Crawler } from "../crawler.js";
 import { getProxyDispatcher } from "./proxy.js";
 import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
-import { DEFAULT_MAX_RETRIES, WARC_REFERS_TO_CONTAINER } from "./constants.js";
+import {
+  DEFAULT_MAX_RETRIES,
+  SkippedReason,
+  WARC_REFERS_TO_CONTAINER,
+} from "./constants.js";
 import { Readable } from "stream";
+import { createHash } from "crypto";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -137,6 +142,7 @@ export class Recorder extends EventEmitter {
   mainFrameId: string | null = null;
   skipRangeUrls!: Map<string, number>;
   skipPageInfo = false;
+  state: PageState | null = null;
 
   swTargetId?: string | null;
   swFrameIds = new Set<string>();
@@ -160,7 +166,7 @@ export class Recorder extends EventEmitter {
 
   pageSeed?: ScopedSeed;
   pageSeedDepth = 0;
-  //minPageDedupeDepth = -1;
+  dedupePagesMinDepth = -1;
 
   frameIdToExecId: Map<string, number> | null;
 
@@ -184,7 +190,7 @@ export class Recorder extends EventEmitter {
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
 
-    //this.minPageDedupeDepth = crawler.params.minPageDedupeDepth;
+    this.dedupePagesMinDepth = crawler.params.dedupePagesMinDepth;
 
     this.writer = writer;
 
@@ -863,32 +869,33 @@ export class Recorder extends EventEmitter {
 
     const rewritten = await this.rewriteResponse(reqresp, mimeType);
 
-    // ** WIP: Experimental page-level dedupe **
-    // Will abort page loading in case of duplicate
-    // TODO: Write revisit record, track page as a duplicate in page list
-    // if (
-    //   url === this.pageUrl &&
-    //   reqresp.payload &&
-    //   this.minPageDedupeDepth >= 0 &&
-    //   this.pageSeedDepth >= this.minPageDedupeDepth
-    // ) {
-    //   const hash =
-    //     "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
-    //   const res = await this.crawlState.getHashDupe(hash);
-    //   if (res) {
-    //     const { index, crawlId } = res;
-    //     const errorReason = "BlockedByResponse";
-    //     await cdp.send("Fetch.failRequest", {
-    //       requestId,
-    //       errorReason,
-    //     });
-    //     await this.crawlState.addDupeCrawlDependency(crawlId, index);
-    //     // await this.crawlState.addConservedSizeStat(
-    //     //   size - reqresp.payload.length,
-    //     // );
-    //     return true;
-    //   }
-    // }
+    // If page is at dedupePagesMinDepth or higher and HTML is a duplicate,
+    // write a revisit record, track pages as a duplicate, and abort the page
+    if (
+      url === this.pageUrl &&
+      reqresp.payload &&
+      this.dedupePagesMinDepth >= 0 &&
+      this.pageSeedDepth >= this.dedupePagesMinDepth
+    ) {
+      const hash =
+        "sha256:" + createHash("sha256").update(reqresp.payload).digest("hex");
+      const res = await this.crawlState.getHashDupe(hash);
+      if (res) {
+        await cdp.send("Fetch.failRequest", {
+          requestId,
+          errorReason: "BlockedByResponse",
+        });
+        await this.serializeToWARC(reqresp, undefined, false, true, hash);
+        this.skipPageInfo = true;
+        this.state!.pageSkipReason = SkippedReason.Duplicate;
+        logger.debug(
+          "Skipped loading duplicate page",
+          { pageUrl: url, depth: this.pageSeedDepth, ...this.logDetails },
+          "pageStatus",
+        );
+        return true;
+      }
+    }
 
     // not rewritten, and not streaming, return false to continue
     if (!rewritten && !streamingConsume) {
@@ -978,6 +985,7 @@ export class Recorder extends EventEmitter {
           loc = new URL(loc, url).href;
 
           if (this.pageSeed && this.pageSeed.isExcluded(loc)) {
+            this.state!.pageSkipReason = SkippedReason.RedirectToExcluded;
             logger.warn(
               "Skipping page that redirects to excluded URL",
               { newUrl: loc, origUrl: this.pageUrl },
@@ -994,7 +1002,15 @@ export class Recorder extends EventEmitter {
     }
   }
 
-  startPage({ pageid, url }: { pageid: string; url: string }) {
+  startPage({
+    pageid,
+    url,
+    state,
+  }: {
+    pageid: string;
+    url: string;
+    state: PageState;
+  }) {
     this.pageid = pageid;
     this.pageUrl = url;
     this.finalPageUrl = this.pageUrl;
@@ -1012,6 +1028,7 @@ export class Recorder extends EventEmitter {
     this.skipRangeUrls = new Map<string, number>();
     this.skipPageInfo = false;
     this.pageFinished = false;
+    this.state = state;
     this.pageInfo = {
       pageid,
       urls: {},
@@ -1653,10 +1670,14 @@ export class Recorder extends EventEmitter {
     reqresp: RequestResponseInfo,
     iter?: AsyncIterable<Uint8Array>,
     canRetry = false,
+    skipPageInfo = false,
+    matchHash?: string,
   ): Promise<SerializeRes> {
     // always include in pageinfo record if going to serialize to WARC
     // even if serialization does not happen, indicates this URL was on the page
-    this.addPageRecord(reqresp);
+    if (!skipPageInfo) {
+      this.addPageRecord(reqresp);
+    }
 
     const { pageid, gzip } = this;
     const { url, status, requestId, method, payload } = reqresp;
@@ -1758,6 +1779,13 @@ export class Recorder extends EventEmitter {
     if (!isEmpty && url) {
       const res = await this.crawlState.getHashDupe(hash);
 
+      // if only writing revisit, ensure it's a revisit and hash
+      // matches expected value, otherwise just return
+      // should always match, but just in case!
+      if (matchHash && (matchHash !== hash || !res)) {
+        return SerializeRes.Skipped;
+      }
+
       if (res) {
         const { origUrl, origDate, crawlId, index, size } = res;
         origRecSize = size;
@@ -1827,8 +1855,6 @@ export class Recorder extends EventEmitter {
       serializer,
       addStatsCallback,
     );
-
-    this.addPageRecord(reqresp);
 
     return SerializeRes.Success;
   }
