@@ -888,6 +888,11 @@ export class Recorder extends EventEmitter {
         await this.serializeToWARC(reqresp, undefined, false, true, hash);
         this.skipPageInfo = true;
         this.state!.pageSkipReason = SkippedReason.Duplicate;
+        logger.debug(
+          "Skipped loading duplicate page",
+          { pageUrl: url, depth: this.pageSeedDepth, ...this.logDetails },
+          "pageStatus",
+        );
         return true;
       }
     }
