@@ -120,13 +120,13 @@ export type CrawlStatus =
 
 export const WARC_REFERS_TO_CONTAINER = "WARC-Refers-To-Container";
 
-<<<<<<< HEAD
 export enum SkippedReason {
   OutOfScope = "outOfScope",
   PageLimit = "pageLimit",
   RobotsTxt = "robotsTxt",
   RedirectToExcluded = "redirectToExcluded",
   Duplicate = "duplicate",
+  RateLimited = "rateLimited",
 }
 
 // default text matches to consider rate limit on 200
