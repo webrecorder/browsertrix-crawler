@@ -5,7 +5,6 @@ import { sleep, timedRun } from "./timing.js";
 import {
   RequestResponseInfo,
   isHTMLMime,
-  isRateLimitStatus,
   isRedirectStatus,
 } from "./reqresp.js";
 
@@ -177,6 +176,7 @@ export class Recorder extends EventEmitter {
   stopping = false;
 
   rateLimitOn200MatchText: string[] = [];
+  rateLimitStatusCodes: number[] = [];
 
   constructor({
     workerid,
@@ -192,6 +192,7 @@ export class Recorder extends EventEmitter {
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
     this.rateLimitOn200MatchText = crawler.params.rateLimitOn200MatchText;
+    this.rateLimitStatusCodes = crawler.params.rateLimitStatusCodes;
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
 
@@ -1006,7 +1007,7 @@ export class Recorder extends EventEmitter {
       }
     }
 
-    if (isRateLimitStatus(reqresp.status) || reqresp.status >= 500) {
+    if (this.rateLimitStatusCodes.includes(reqresp.status)) {
       this.markRateLimited(reqresp.status, reqresp.getHeader("Retry-After"));
     }
   }

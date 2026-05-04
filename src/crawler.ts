@@ -1212,7 +1212,9 @@ self.__bx_behaviors.selectMainBehavior();
           { status: result, ...logDetails },
           "fetch",
         );
-        await this.crawlState.incRateLimited(result, 0, true);
+        if (this.params.rateLimitStatusCodes.includes(result)) {
+          await this.crawlState.incRateLimited(result, 0, true);
+        }
         return false;
       } else {
         return true;

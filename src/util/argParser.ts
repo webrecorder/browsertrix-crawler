@@ -60,6 +60,7 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   warcInfo?: Record<string, string>;
 
   rateLimitOn200MatchText: string[];
+  rateLimitStatusCodes: number[];
 };
 
 // ============================================================================
@@ -753,6 +754,13 @@ class ArgParser {
             "Consider page rate limited given the following matches by status code and text",
           type: "array",
           default: RATE_LIMIT_MATCH_200,
+        },
+
+        rateLimitStatusCodes: {
+          describe:
+            "Consider responses with these status codes to be treated as rate-limited/blocked responses",
+          type: "array",
+          default: [403, 429, 503],
         },
       });
   }
