@@ -142,6 +142,7 @@ export class Recorder extends EventEmitter {
   mainFrameId: string | null = null;
   skipRangeUrls!: Map<string, number>;
   skipPageInfo = false;
+  skipRecordingPage = false;
   state: PageState | null = null;
 
   swTargetId?: string | null;
@@ -174,6 +175,9 @@ export class Recorder extends EventEmitter {
 
   stopping = false;
 
+  rateLimitOn200MatchText: string[] = [];
+  rateLimitStatusCodes: number[] = [];
+
   constructor({
     workerid,
     writer,
@@ -187,6 +191,8 @@ export class Recorder extends EventEmitter {
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
+    this.rateLimitOn200MatchText = crawler.params.rateLimitOn200MatchText;
+    this.rateLimitStatusCodes = crawler.params.rateLimitStatusCodes;
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
 
@@ -778,7 +784,7 @@ export class Recorder extends EventEmitter {
         responseHeaders,
       );
 
-      if (errorReason) {
+      if (errorReason === "BlockedByResponse") {
         this.skipPageInfo = true;
         await cdp.send("Fetch.failRequest", {
           requestId,
@@ -1000,6 +1006,10 @@ export class Recorder extends EventEmitter {
         logger.debug("Redirect check error", e, "recorder");
       }
     }
+
+    if (this.rateLimitStatusCodes.includes(reqresp.status)) {
+      this.markRateLimited(reqresp.status, reqresp.getHeader("Retry-After"));
+    }
   }
 
   startPage({
@@ -1027,6 +1037,7 @@ export class Recorder extends EventEmitter {
     this.skipIds = new Set();
     this.skipRangeUrls = new Map<string, number>();
     this.skipPageInfo = false;
+    this.skipRecordingPage = false;
     this.pageFinished = false;
     this.state = state;
     this.pageInfo = {
@@ -1037,6 +1048,16 @@ export class Recorder extends EventEmitter {
       tsStatus: 999,
     };
     this.mainFrameId = null;
+  }
+
+  markRateLimited(status: number, retryAfterHeader: string | null) {
+    this.skipRecordingPage = true;
+    if (this.state) {
+      this.state.pageRateLimited = status;
+      if (retryAfterHeader) {
+        this.state.pageRateLimitedRetryAfter = parseInt(retryAfterHeader) || 0;
+      }
+    }
   }
 
   addPageRecord(reqresp: RequestResponseInfo) {
@@ -1056,7 +1077,7 @@ export class Recorder extends EventEmitter {
   }
 
   writePageInfoRecord() {
-    if (this.skipPageInfo) {
+    if (this.skipPageInfo || this.skipRecordingPage) {
       logger.debug(
         "Skipping writing pageinfo for blocked page",
         { url: "urn:pageinfo:" + this.pageUrl },
@@ -1231,7 +1252,7 @@ export class Recorder extends EventEmitter {
   }
 
   async rewriteResponse(reqresp: RequestResponseInfo, contentType: string) {
-    const { url, extraOpts, payload } = reqresp;
+    const { url, extraOpts, payload, status } = reqresp;
 
     // don't rewrite if payload is missing or too big
     if (!payload || !payload.length || payload.length > MAX_TEXT_REWRITE_SIZE) {
@@ -1262,8 +1283,18 @@ export class Recorder extends EventEmitter {
       case "application/x-javascript": {
         const rw = getCustomRewriter(url, isHTMLMime(contentType));
 
+        string = payload.toString();
+
+        if (status === 200) {
+          for (const match of this.rateLimitOn200MatchText) {
+            if (string.indexOf(match) > 0) {
+              this.markRateLimited(status, reqresp.getHeader("Retry-After"));
+              return false;
+            }
+          }
+        }
+
         if (rw) {
-          string = payload.toString();
           newString = rw.rewrite(string, { live: true, save: extraOpts });
         }
         break;
@@ -1444,7 +1475,7 @@ export class Recorder extends EventEmitter {
     cdp,
     crawler,
     state,
-  }: DirectFetchRequest): Promise<boolean> {
+  }: DirectFetchRequest): Promise<number> {
     const reqresp = new RequestResponseInfo("0");
     const ts = new Date();
 
@@ -1471,20 +1502,23 @@ export class Recorder extends EventEmitter {
     });
 
     if (!(await fetcher.loadHeaders())) {
-      return false;
+      return 0;
     }
 
     const mime = reqresp.getMimeType() || "";
     // cancel if not 200 or mime is html
-    if (reqresp.status !== 200 || isHTMLMime(mime)) {
+    if (reqresp.status !== 200) {
       await fetcher.doCancel();
-      return false;
+      return reqresp.status;
+    }
+    if (isHTMLMime(mime)) {
+      return 600;
     }
     if (!this.stopping) {
       state.isDirectFetched = true;
       void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
     }
-    return true;
+    return reqresp.status;
   }
 
   async getCookieString(cdp: CDPSession, url: string): Promise<string> {
@@ -1673,6 +1707,10 @@ export class Recorder extends EventEmitter {
     skipPageInfo = false,
     matchHash?: string,
   ): Promise<SerializeRes> {
+    if (this.skipRecordingPage) {
+      return SerializeRes.Skipped;
+    }
+
     // always include in pageinfo record if going to serialize to WARC
     // even if serialization does not happen, indicates this URL was on the page
     if (!skipPageInfo) {
@@ -1907,6 +1945,10 @@ class AsyncFetcher {
   }
 
   async load() {
+    if (this.recorder.skipRecordingPage) {
+      return false;
+    }
+
     for (let i = 0; i < DEFAULT_MAX_RETRIES; i++) {
       if (!(await this.loadHeaders())) {
         continue;

@@ -19,6 +19,7 @@ import {
   DEFAULT_MAX_RETRIES,
   BxFunctionBindings,
   DEFAULT_CRAWL_ID_TEMPLATE,
+  RATE_LIMIT_MATCH_200,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -57,6 +58,9 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   state?: SaveState;
 
   warcInfo?: Record<string, string>;
+
+  rateLimitOn200MatchText: string[];
+  rateLimitStatusCodes: number[];
 };
 
 // ============================================================================
@@ -743,6 +747,20 @@ class ArgParser {
             "If set, write information about URLs encountered but not queued to reports/skippedPages.jsonl",
           type: "boolean",
           default: false,
+        },
+
+        rateLimitOn200MatchText: {
+          describe:
+            "Consider page rate limited given the following matches by status code and text",
+          type: "array",
+          default: RATE_LIMIT_MATCH_200,
+        },
+
+        rateLimitStatusCodes: {
+          describe:
+            "Consider responses with these status codes to be treated as rate-limited/blocked responses",
+          type: "array",
+          default: [403, 429, 503],
         },
       });
   }

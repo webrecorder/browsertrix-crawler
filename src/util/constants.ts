@@ -90,6 +90,7 @@ export enum ExitCodes {
   TimeLimit = 15,
   DiskUtilization = 16,
   Fatal = 17,
+  RateLimited = 18,
   ProxyError = 21,
   UploadFailed = 22,
 }
@@ -102,6 +103,7 @@ export enum InterruptReason {
   BrowserCrashed = 5,
   SignalInterrupted = 6,
   CrawlPaused = 7,
+  RateLimited = 8,
 }
 
 export type CrawlStatus =
@@ -124,4 +126,9 @@ export enum SkippedReason {
   RobotsTxt = "robotsTxt",
   RedirectToExcluded = "redirectToExcluded",
   Duplicate = "duplicate",
+  RateLimit = "RateLimited",
+  Failed = "failed",
 }
+
+// default text matches to consider rate limit on 200
+export const RATE_LIMIT_MATCH_200 = [`src="/_Incapsula_Resource?`];
