@@ -1432,7 +1432,11 @@ self.__bx_behaviors.selectMainBehavior();
         }
         this.limitHit = false;
       } else {
-        const retry = await this.crawlState.markFailed(url, noRetries);
+        const retry = await this.crawlState.markFailed(
+          url,
+          noRetries,
+          !!pageRateLimited,
+        );
 
         if (this.healthChecker) {
           this.healthChecker.incError();

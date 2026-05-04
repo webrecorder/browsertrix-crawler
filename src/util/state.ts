@@ -948,7 +948,9 @@ if json then
 
   redis.call('hdel', KEYS[1], ARGV[1]);
 
-  if retry < tonumber(ARGV[2]) then
+  local maxRetries = tonumber(ARGV[2]);
+
+  if maxRetries == -1 or retry < maxRetries then
     retry = retry + 1;
     data['retry'] = retry;
     json = cjson.encode(data);
@@ -1037,13 +1039,13 @@ return inx;
     return await this.redis.incr(this.dkey);
   }
 
-  async markFailed(url: string, noRetries = false) {
+  async markFailed(url: string, noRetries = false, alwaysRetry = false) {
     return await this.redis.requeuefailed(
       this.pkey,
       this.qkey,
       this.fkey,
       url,
-      noRetries ? 0 : this.maxRetries,
+      noRetries ? 0 : alwaysRetry ? -1 : this.maxRetries,
       MAX_DEPTH,
     );
   }
