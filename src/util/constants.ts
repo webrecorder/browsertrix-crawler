@@ -126,7 +126,8 @@ export enum SkippedReason {
   RobotsTxt = "robotsTxt",
   RedirectToExcluded = "redirectToExcluded",
   Duplicate = "duplicate",
-  RateLimited = "rateLimited",
+  RateLimit = "RateLimited",
+  Failed = "failed",
 }
 
 // default text matches to consider rate limit on 200
