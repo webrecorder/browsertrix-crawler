@@ -365,7 +365,6 @@ export class PageWorker {
 
       // see if any work data in the queue
       if (data) {
-<<<<<<< HEAD
         if (
           isDedupePages &&
           limit > 0 &&
@@ -380,10 +379,11 @@ export class PageWorker {
             depth,
             SkippedReason.PageLimit,
           );
-=======
+          continue;
+        }
+
         if (await this.crawler.shouldSkipForDomainLimit(data)) {
           await crawlState.markExcluded(data.url);
->>>>>>> 88da8e3 (Add attributed per-domain crawl budgets and stats)
           continue;
         }
 
