@@ -167,6 +167,7 @@ export class Recorder extends EventEmitter {
   pageSeed?: ScopedSeed;
   pageSeedDepth = 0;
   dedupePagesMinDepth = -1;
+  dedupeEnabled = true;
 
   frameIdToExecId: Map<string, number> | null;
 
@@ -190,7 +191,10 @@ export class Recorder extends EventEmitter {
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
 
-    this.dedupePagesMinDepth = crawler.params.dedupePagesMinDepth;
+    this.dedupeEnabled = crawler.params.dedupe;
+    this.dedupePagesMinDepth = this.dedupeEnabled
+      ? crawler.params.dedupePagesMinDepth
+      : -1;
 
     this.writer = writer;
 
@@ -1776,7 +1780,7 @@ export class Recorder extends EventEmitter {
 
     let origRecSize = 0;
 
-    if (!isEmpty && url) {
+    if (this.dedupeEnabled && !isEmpty && url) {
       const res = await this.crawlState.getHashDupe(hash);
 
       // if only writing revisit, ensure it's a revisit and hash
@@ -1843,7 +1847,9 @@ export class Recorder extends EventEmitter {
 
     const addStatsCallback = async (size: number) => {
       try {
-        await this.crawlState.addHashNew(hash, url, date, size, origRecSize);
+        if (this.dedupeEnabled) {
+          await this.crawlState.addHashNew(hash, url, date, size, origRecSize);
+        }
       } catch (e) {
         logger.warn("Error adding dupe hash", e, "recorder");
       }

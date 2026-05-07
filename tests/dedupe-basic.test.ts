@@ -26,14 +26,17 @@ afterAll(async () => {
   execSync("docker network rm dedupe");
 });
 
-function runCrawl(name: string, { db = 0, limit = 4, wacz = true } = {}) {
+function runCrawl(
+  name: string,
+  { db = 0, limit = 4, wacz = true, extraArgs = "" } = {},
+) {
   fs.rmSync(`./test-crawls/collections/${name}`, {
     recursive: true,
     force: true,
   });
 
   const crawler = exec(
-    `docker run -v $PWD/test-crawls:/crawls --network=dedupe -e CRAWL_ID=${name} webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit ${limit} --exclude community --collection ${name} --redisDedupeUrl redis://dedupe-redis:6379/${db} ${
+    `docker run -v $PWD/test-crawls:/crawls --network=dedupe -e CRAWL_ID=${name} webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --limit ${limit} --exclude community --collection ${name} --redisDedupeUrl redis://dedupe-redis:6379/${db} ${extraArgs} ${
       wacz ? "--generateWACZ" : ""
     }`,
   );
@@ -163,6 +166,43 @@ test("check revisit records written on duplicate crawl, same collection, no wacz
   numResponses = response;
 
   await checkSizeStats(numResponses, "allcounts", 0, 77000);
+});
+
+test("no dedupe disables revisit records even with redisDedupeUrl set", async () => {
+  const collName = "dedupe-test-disabled";
+
+  expect(
+    await runCrawl(collName, {
+      limit: 1,
+      wacz: false,
+      extraArgs: "--no-dedupe",
+    }),
+  ).toBe(0);
+  deleteFirstWARC(collName);
+
+  expect(
+    await runCrawl(collName, {
+      limit: 1,
+      wacz: false,
+      extraArgs: "--no-dedupe",
+    }),
+  ).toBe(0);
+
+  let revisit = 0;
+
+  const parser = loadFirstWARC(collName);
+
+  for await (const record of parser) {
+    if (record.warcTargetURI && record.warcTargetURI.startsWith("urn:")) {
+      continue;
+    }
+
+    if (record.warcType === "revisit") {
+      revisit++;
+    }
+  }
+
+  expect(revisit).toBe(0);
 });
 
 test("dedupe same collection, with wacz, no external waczs referenced", async () => {
