@@ -457,6 +457,13 @@ class ArgParser {
           type: "string",
         },
 
+        dedupe: {
+          describe:
+            "If set, enable content-based deduplication and WARC revisit records",
+          type: "boolean",
+          default: true,
+        },
+
         dedupePagesMinDepth: {
           describe:
             "If set >= 0, minimum depth at which duplicate pages can be skipped. -1 means never skip duplicate pages",
