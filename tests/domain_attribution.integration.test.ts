@@ -5,7 +5,8 @@ const COLLECTION = "domain-attribution-foreign";
 const DOMAIN_STATS_PATH = `test-crawls/collections/${COLLECTION}/reports/domainStats.json`;
 const COMPLETENESS_COLLECTION = "domain-attribution-completeness";
 const COMPLETENESS_DOMAIN_STATS_PATH = `test-crawls/collections/${COMPLETENESS_COLLECTION}/reports/domainStats.json`;
-const EXAMPLE_COMPLETENESS_COLLECTION = "domain-attribution-completeness-example";
+const EXAMPLE_COMPLETENESS_COLLECTION =
+  "domain-attribution-completeness-example";
 const EXAMPLE_COMPLETENESS_DOMAIN_STATS_PATH = `test-crawls/collections/${EXAMPLE_COMPLETENESS_COLLECTION}/reports/domainStats.json`;
 const LIMIT_COLLECTION = "domain-attribution-limit";
 const LIMIT_DOMAIN_STATS_PATH = `test-crawls/collections/${LIMIT_COLLECTION}/reports/domainStats.json`;
@@ -20,7 +21,9 @@ test("domain scope attributes embedded foreign resources to the originating seed
 
   expect(fs.existsSync(DOMAIN_STATS_PATH)).toBe(true);
 
-  const stats = JSON.parse(fs.readFileSync(DOMAIN_STATS_PATH, "utf8")) as Array<{
+  const stats = JSON.parse(
+    fs.readFileSync(DOMAIN_STATS_PATH, "utf8"),
+  ) as Array<{
     domain: string;
     bytes: number;
     objects: number;

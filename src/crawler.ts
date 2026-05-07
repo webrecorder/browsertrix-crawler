@@ -2695,11 +2695,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     const frames = filteredFrames || page.frames();
 
-    await this.runLinkExtraction(
-      frames,
-      selectors,
-      logDetails,
-    );
+    await this.runLinkExtraction(frames, selectors, logDetails);
   }
 
   async runLinkExtraction(
@@ -2786,7 +2782,12 @@ self.__bx_behaviors.selectMainBehavior();
       if (normalizedCandidateUrl === currentPageUrl) {
         logger.debug(
           "Domain stats completeness probe ignoring same-page candidate",
-          { candidateUrl: url, normalizedCandidateUrl, currentPageUrl, ...logDetails },
+          {
+            candidateUrl: url,
+            normalizedCandidateUrl,
+            currentPageUrl,
+            ...logDetails,
+          },
           "links",
         );
         return;
@@ -2862,7 +2863,8 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    const existingCompleteness = await this.crawlState.getDomainCompleteness(domain);
+    const existingCompleteness =
+      await this.crawlState.getDomainCompleteness(domain);
     if (existingCompleteness === "incomplete") {
       logger.debug(
         "Domain stats completeness probe skipped complete — already incomplete",
@@ -3095,7 +3097,10 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   isDomainStatsCompletenessEnabled() {
-    return !!this.params.domainStatsCompleteness && this.params.scopeType === "domain";
+    return (
+      !!this.params.domainStatsCompleteness &&
+      this.params.scopeType === "domain"
+    );
   }
 
   isDepthZeroDomainStatsCompletenessEnabled() {
@@ -3116,10 +3121,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const domain = this.getAttributedDomain(data.url, data.seedId);
-    if (
-      !domain ||
-      (await this.hasFinalDomainCompleteness(domain))
-    ) {
+    if (!domain || (await this.hasFinalDomainCompleteness(domain))) {
       return;
     }
 
@@ -3227,7 +3229,10 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     for (const domain of unresolvedDomains) {
-      if (unknownOnInterrupt && completenessByDomain.get(domain) !== "incomplete") {
+      if (
+        unknownOnInterrupt &&
+        completenessByDomain.get(domain) !== "incomplete"
+      ) {
         completenessByDomain.set(domain, "unknown");
       } else if (!unknownOnInterrupt && incompleteOnInterrupt) {
         completenessByDomain.set(domain, "incomplete");

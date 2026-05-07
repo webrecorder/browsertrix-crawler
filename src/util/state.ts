@@ -1226,8 +1226,13 @@ return {bytes, objects, limitReached, newlyLimitReached};
     await this.redis.hset(this.domainCompletenessKey, domain, completeness);
   }
 
-  async getDomainCompleteness(domain: string): Promise<DomainCompleteness | null> {
-    const completeness = await this.redis.hget(this.domainCompletenessKey, domain);
+  async getDomainCompleteness(
+    domain: string,
+  ): Promise<DomainCompleteness | null> {
+    const completeness = await this.redis.hget(
+      this.domainCompletenessKey,
+      domain,
+    );
     if (
       completeness === "complete" ||
       completeness === "incomplete" ||
@@ -1238,8 +1243,12 @@ return {bytes, objects, limitReached, newlyLimitReached};
     return null;
   }
 
-  async getDomainCompletenessMap(): Promise<Record<string, DomainCompleteness>> {
-    const completenessMap = await this.redis.hgetall(this.domainCompletenessKey);
+  async getDomainCompletenessMap(): Promise<
+    Record<string, DomainCompleteness>
+  > {
+    const completenessMap = await this.redis.hgetall(
+      this.domainCompletenessKey,
+    );
     const result: Record<string, DomainCompleteness> = {};
 
     for (const [domain, completeness] of Object.entries(completenessMap)) {
