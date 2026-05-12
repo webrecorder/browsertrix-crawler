@@ -73,13 +73,13 @@ import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
 
-const btrixBehaviors = fs.readFileSync(
-  new URL(
-    "../node_modules/browsertrix-behaviors/dist/behaviors.js",
-    import.meta.url,
-  ),
-  { encoding: "utf8" },
-);
+// const btrixBehaviors = fs.readFileSync(
+//   new URL(
+//     "../node_modules/browsertrix-behaviors/dist/behaviors.js",
+//     import.meta.url,
+//   ),
+//   { encoding: "utf8" },
+// );
 
 const RUN_DETACHED = process.env.DETACHED_CHILD_PROC == "1";
 
@@ -889,8 +889,15 @@ export class Crawler {
       (url: string) => callbacks.addLink && callbacks.addLink(url),
     );
 
+    let btrixOverride = "";
+    for (const { contents } of await collectCustomBehaviors(this.downloadsDir, [
+      "https://gist.githubusercontent.com/mistydemeo/abc94b632c7b77ce44f8952b45f52751/raw/behaviors.js",
+    ])) {
+      btrixOverride += contents;
+    }
+
     // used for both behaviors and link extraction now
-    await this.browser.addInitScript(page, btrixBehaviors);
+    await this.browser.addInitScript(page, btrixOverride);
 
     if (this.params.behaviorOpts) {
       await page.exposeFunction(
