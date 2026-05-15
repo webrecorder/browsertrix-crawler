@@ -72,7 +72,6 @@ export class ReplayCrawler extends Crawler {
   excludeRx: RegExp[];
   
   // QA policies
-  qaPageCount: number = 0;
   qaMaxUrls: number = Number.MAX_SAFE_INTEGER;;
   qaPolicy: string = "";
   qaRegex: RegExp = new RegExp("^https?:\\/\\/\\S+$");
@@ -294,12 +293,13 @@ export class ReplayCrawler extends Crawler {
 	}
 
     if (shouldQueue) {
-	  if (this.qaPageCount >= this.qaMaxUrls) {
-	    return;
-	  }
-	
-	  // Reserve the slot first to prevent races
-	  this.qaPageCount++;
+		// Have we reached the maximum amount of pages allowed?
+		const count = await  this.getRedis().incr(`qaPageCount-${this.crawlId}`);
+	    if (count > this.qaMaxUrls) {
+		  // Rollback
+		  await this.getRedis().decr(`qaPageCount-${this.crawlId}`);
+		  return;
+		}
 	
 	  // Queue it!
 	  await this.queueUrl(0, url, depth, 0, {}, ts, id);
