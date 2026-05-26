@@ -3,13 +3,13 @@ import path from "path";
 import crypto from "crypto";
 import { request } from "undici";
 import util from "util";
-import { exec as execCallback } from "child_process";
+import { execFile as execFileCallback } from "child_process";
 
 import { formatErr, logger } from "./logger.js";
 import { getFollowRedirectDispatcher } from "./proxy.js";
 import { parseRecorderFlowJson } from "./flowbehavior.js";
 
-const exec = util.promisify(execCallback);
+const execFile = util.promisify(execFileCallback);
 
 const MAX_DEPTH = 5;
 
@@ -182,11 +182,14 @@ async function collectGitBehaviors(
     `behaviors-repo-${urlHash}-${crypto.randomBytes(4).toString("hex")}`,
   );
 
-  let cloneCommand = "git clone ";
+  const args = ["clone"];
   if (branch) {
-    cloneCommand += `-b ${branch} --single-branch `;
+    args.push("-b");
+    args.push(branch);
+    args.push("--single-branch");
   }
-  cloneCommand += `${urlStripped} ${tmpDir}`;
+  args.push(urlStripped);
+  args.push(tmpDir);
 
   let pathToCollect = tmpDir;
   if (relPath) {
@@ -195,7 +198,7 @@ async function collectGitBehaviors(
 
   // Download behaviors to temp dir (in downloads directory)
   try {
-    await exec(cloneCommand);
+    await execFile("git", args);
     logger.info(
       "Custom behavior files downloaded from git repo",
       { url: urlStripped },
