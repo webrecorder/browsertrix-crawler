@@ -345,8 +345,8 @@ export async function checkDiskUtilization(
 }
 
 export async function getDFOutput(path: string) {
-  const exec = util.promisify(child_process.exec);
-  const res = await exec(`df ${path}`);
+  const execFile = util.promisify(child_process.execFile);
+  const res = await execFile("df", [path]);
   return res.stdout;
 }
 
