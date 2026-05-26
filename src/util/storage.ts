@@ -1,4 +1,4 @@
-import child_process from "child_process";
+import { execFile as execFileCallback } from "child_process";
 import fs from "fs";
 import fsp from "fs/promises";
 import util from "util";
@@ -26,6 +26,8 @@ import { CrawlerArgs } from "./argParser.js";
 const DEFAULT_REGION = "us-east-1";
 
 const PART_SIZE = 1024 * 1024 * 100;
+
+const execFile = util.promisify(execFileCallback);
 
 // ===========================================================================
 export type UploadResult = {
@@ -345,7 +347,6 @@ export async function checkDiskUtilization(
 }
 
 export async function getDFOutput(path: string) {
-  const execFile = util.promisify(child_process.execFile);
   const res = await execFile("df", [path]);
   return res.stdout;
 }
