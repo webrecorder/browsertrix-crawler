@@ -4,7 +4,7 @@ import child_process, { ExecException } from "child_process";
 test("check that urn:text and urn:textfinal records are written to WARC", async () => {
   try {
     child_process.execSync(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --collection text-extract --url https://old.webrecorder.net/ --scopeType page --generateCDX --text to-warc,final-to-warc",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --collection text-extract --url https://old.webrecorder.net/community --scopeType page --generateCDX --text to-warc,final-to-warc",
     );
   } catch (error) {
     //console.log(new TextDecoder().decode(error));
@@ -16,9 +16,9 @@ test("check that urn:text and urn:textfinal records are written to WARC", async 
     { encoding: "utf-8" },
   );
 
-  expect(data.indexOf("urn:text:https://old.webrecorder.net/") > 0).toBe(true);
+  expect(data.indexOf("urn:text:https://old.webrecorder.net/community") > 0).toBe(true);
 
-  expect(data.indexOf("urn:textFinal:https://old.webrecorder.net/") > 0).toBe(
+  expect(data.indexOf("urn:textFinal:https://old.webrecorder.net/community") > 0).toBe(
     true,
   );
 });
