@@ -61,6 +61,7 @@ export type QueueEntry = {
   ts?: number;
   pageid?: string;
   retry?: number;
+  ignoreScope?: boolean;
 };
 
 // ============================================================================
@@ -90,6 +91,7 @@ export class PageState {
   title?: string;
   mime?: string;
   ts?: Date;
+  ignoreScope?: boolean;
 
   callbacks: PageCallbacks = {};
 
@@ -124,6 +126,9 @@ export class PageState {
     this.pageid = redisData.pageid || uuidv4();
     this.status = 0;
     this.retry = redisData.retry || 0;
+    if (redisData.ignoreScope) {
+      this.ignoreScope = redisData.ignoreScope;
+    }
   }
 }
 
@@ -1365,6 +1370,7 @@ return inx;
       extraHops = 0,
       ts = 0,
       pageid = undefined,
+      ignoreScope = undefined,
     }: QueueEntry,
     limit = 0,
   ) {
@@ -1379,6 +1385,9 @@ return inx;
     }
     if (pageid) {
       data.pageid = pageid;
+    }
+    if (ignoreScope) {
+      data.ignoreScope = ignoreScope;
     }
 
     // return codes

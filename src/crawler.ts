@@ -810,15 +810,23 @@ export class Crawler {
       depth,
       pageUrl,
       extraHops,
+      ignoreScope,
     }: {
       seedId: number;
       url: string;
       depth: number;
       extraHops: number;
       pageUrl?: string;
+      ignoreScope?: boolean;
     },
     logDetails = {},
   ): Promise<boolean> {
+    // If we've been told to explicitly ignore the scope,
+    // then this is always in scope.
+    if (ignoreScope) {
+      return true;
+    }
+
     const seed = await this.crawlState.getSeedAt(
       this.seeds,
       this.numOriginalSeeds,
@@ -2730,12 +2738,11 @@ self.__bx_behaviors.selectMainBehavior();
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
     callbacks.addLink = async (url: string) => {
-      await this.queueInScopeUrls(
+      await this.queueNonExcludedUrls(
         seedId,
         [url],
         depth,
         extraHops,
-        false,
         page.url(),
         logDetails,
       );
@@ -2804,6 +2811,11 @@ self.__bx_behaviors.selectMainBehavior();
         );
 
         if (!res) {
+          logger.warn(
+            "Skipping Link; not in scope",
+            { url: possibleUrl },
+            "links",
+          );
           this.writeSkippedPage(
             possibleUrl,
             seedId,
@@ -2824,6 +2836,44 @@ self.__bx_behaviors.selectMainBehavior();
             logDetails,
           );
         }
+      }
+    } catch (e) {
+      logger.error("Queuing Error", e, "links");
+    }
+  }
+
+  async queueNonExcludedUrls(
+    seedId: number,
+    urls: string[],
+    depth: number,
+    extraHops = 0,
+    pageUrl?: string,
+    logDetails: LogDetails = {},
+  ) {
+    try {
+      depth += 1;
+
+      for (const possibleUrl of urls) {
+        if (this.seeds[seedId].isExcluded(possibleUrl)) {
+          logger.warn("Skipping Link; excluded", { url: possibleUrl }, "links");
+          this.writeSkippedPage(
+            possibleUrl,
+            seedId,
+            depth,
+            SkippedReason.OutOfScope,
+          );
+        }
+
+        await this.queueUrl(
+          seedId,
+          possibleUrl,
+          depth,
+          extraHops,
+          logDetails,
+          0,
+          undefined,
+          { ignoreScope: true },
+        );
       }
     } catch (e) {
       logger.error("Queuing Error", e, "links");
@@ -2863,6 +2913,7 @@ self.__bx_behaviors.selectMainBehavior();
     logDetails: LogDetails = {},
     ts = 0,
     pageid?: string,
+    extraData = {},
   ) {
     if (this.limitHit) {
       logger.debug(
@@ -2888,7 +2939,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const result = await this.crawlState.addToQueue(
-      { url, seedId, depth, extraHops, ts, pageid },
+      { url, seedId, depth, extraHops, ts, pageid, ...extraData },
       this.queuePageLimit,
     );
 
