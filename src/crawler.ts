@@ -2046,7 +2046,14 @@ self.__bx_behaviors.selectMainBehavior();
   protected async _addInitialSeeds() {
     for (let i = 0; i < this.seeds.length; i++) {
       const seed = this.seeds[i];
-      if (!(await this.queueUrl(i, seed.url, 0, 0))) {
+      if (
+        !(await this.queueUrl({
+          seedId: i,
+          url: seed.url,
+          depth: 0,
+          extraHops: 0,
+        }))
+      ) {
         if (this.limitHit) {
           break;
         }
@@ -2801,16 +2808,14 @@ self.__bx_behaviors.selectMainBehavior();
         const { url, isOOS } = res;
 
         if (url) {
-          await this.queueUrl(
+          await this.queueUrl({
             seedId,
             url,
             depth,
-            isOOS ? newExtraHops : extraHops,
+            extraHops: isOOS ? newExtraHops : extraHops,
             logDetails,
-            0,
-            undefined,
             ignoreScope,
-          );
+          });
         }
       }
     } catch (e) {
@@ -2843,16 +2848,25 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async queueUrl(
-    seedId: number,
-    url: string,
-    depth: number,
-    extraHops: number,
-    logDetails: LogDetails = {},
+  async queueUrl({
+    seedId,
+    url,
+    depth,
+    extraHops,
+    logDetails = {},
     ts = 0,
-    pageid?: string,
+    pageid = undefined,
     ignoreScope = false,
-  ) {
+  }: {
+    seedId: number;
+    url: string;
+    depth: number;
+    extraHops: number;
+    logDetails?: LogDetails;
+    ts?: number;
+    pageid?: string;
+    ignoreScope?: boolean;
+  }) {
     if (this.limitHit) {
       logger.debug(
         "Page URL not queued, at page limit",
