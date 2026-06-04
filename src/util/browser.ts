@@ -273,7 +273,7 @@ export class Browser {
     }
 
     try {
-      child_process.execSync("tar xvfz " + profileLocalSrc, {
+      child_process.execFileSync("tar", ["xvfz", profileLocalSrc], {
         cwd: profileDir,
         stdio: "ignore",
       });
@@ -284,8 +284,9 @@ export class Browser {
   }
 
   removeSingletons() {
+    const singletons = fs.globSync("./Singleton*");
     try {
-      child_process.execSync("rm ./Singleton*", {
+      child_process.execFileSync("rm", singletons, {
         cwd: this.profileDir,
         stdio: "ignore",
       });
