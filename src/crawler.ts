@@ -2694,7 +2694,11 @@ self.__bx_behaviors.selectMainBehavior();
   ) {
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
-    callbacks.addLink = async (url: string, enforceScope = false) => {
+    callbacks.addLink = async (url: string, enforceScope = true) => {
+      if (this.params.allowBehaviorLinks) {
+        enforceScope = false;
+      }
+
       await this.queueInScopeUrls({
         seedId,
         urls: [url],
@@ -2803,6 +2807,9 @@ self.__bx_behaviors.selectMainBehavior();
             depth,
             isOOS ? newExtraHops : extraHops,
             logDetails,
+            0,
+            undefined,
+            ignoreScope,
           );
         }
       }
