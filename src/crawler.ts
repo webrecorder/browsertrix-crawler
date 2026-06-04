@@ -67,7 +67,7 @@ import {
 } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
-import { ScopedSeed, parseSeeds } from "./util/seeds.js";
+import { LinkEntry, ScopedSeed, parseSeeds } from "./util/seeds.js";
 import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
@@ -775,55 +775,18 @@ export class Crawler {
     }
   }
 
-  protected getScope(
-    {
-      seedId,
-      url,
-      depth,
-      extraHops,
-      noOOS,
-      pageUrl,
-    }: {
-      seedId: number;
-      url: string;
-      depth: number;
-      extraHops: number;
-      noOOS: boolean;
-      pageUrl?: string;
-    },
-    logDetails = {},
-  ) {
-    return this.seeds[seedId].isIncluded(
-      url,
-      depth,
-      extraHops,
-      logDetails,
-      noOOS,
-      pageUrl,
-    );
+  protected getScope(seedId: number, link: LinkEntry, logDetails: LogDetails) {
+    return this.seeds[seedId].isIncluded(link, logDetails);
   }
 
   async isInScope(
-    {
-      seedId,
-      url,
-      depth,
-      pageUrl,
-      extraHops,
-      ignoreScope,
-    }: {
-      seedId: number;
-      url: string;
-      depth: number;
-      extraHops: number;
-      pageUrl?: string;
-      ignoreScope?: boolean;
-    },
-    logDetails = {},
+    seedId: number,
+    link: LinkEntry,
+    logDetails: LogDetails = {},
   ): Promise<boolean> {
     // If we've been told to explicitly ignore the scope,
     // then this is always in scope.
-    if (ignoreScope) {
+    if (link.ignoreScope) {
       return true;
     }
 
@@ -833,16 +796,10 @@ export class Crawler {
       seedId,
     );
 
-    const res = seed.isIncluded(
-      url,
-      depth,
-      extraHops,
-      logDetails,
-      false,
-      pageUrl,
-    );
+    const res = seed.isIncluded(link, logDetails);
 
     if (!res) {
+      const { url, depth } = link;
       this.writeSkippedPage(url, seedId, depth, SkippedReason.OutOfScope);
     }
 
@@ -1018,15 +975,15 @@ self.__bx_behaviors.selectMainBehavior();
 
           const logDetails = { page: url, workerid };
 
-          await this.queueInScopeUrls(
+          await this.queueInScopeUrls({
             seedId,
-            [params.url],
+            urls: [params.url],
             depth,
             extraHops,
-            false,
-            url,
+            noOOS: false,
+            pageUrl: url,
             logDetails,
-          );
+          });
         });
       }
     }
@@ -2737,15 +2694,16 @@ self.__bx_behaviors.selectMainBehavior();
   ) {
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
-    callbacks.addLink = async (url: string) => {
-      await this.queueNonExcludedUrls(
+    callbacks.addLink = async (url: string, enforceScope = false) => {
+      await this.queueInScopeUrls({
         seedId,
-        [url],
+        urls: [url],
         depth,
         extraHops,
-        page.url(),
+        pageUrl: page.url(),
         logDetails,
-      );
+        ignoreScope: !enforceScope,
+      });
     };
 
     const frames = filteredFrames || page.frames();
@@ -2782,15 +2740,25 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async queueInScopeUrls(
-    seedId: number,
-    urls: string[],
-    depth: number,
+  async queueInScopeUrls({
+    seedId,
+    urls,
+    depth,
     extraHops = 0,
     noOOS = false,
-    pageUrl?: string,
-    logDetails: LogDetails = {},
-  ) {
+    pageUrl = undefined,
+    ignoreScope = false,
+    logDetails = {},
+  }: {
+    seedId: number;
+    urls: string[];
+    depth: number;
+    extraHops?: number;
+    noOOS?: boolean;
+    pageUrl?: string;
+    ignoreScope?: boolean;
+    logDetails?: LogDetails;
+  }) {
     try {
       depth += 1;
 
@@ -2799,13 +2767,14 @@ self.__bx_behaviors.selectMainBehavior();
 
       for (const possibleUrl of urls) {
         const res = this.getScope(
+          seedId,
           {
             url: possibleUrl,
             extraHops: newExtraHops,
             depth,
-            seedId,
             noOOS,
             pageUrl,
+            ignoreScope,
           },
           logDetails,
         );
@@ -2836,44 +2805,6 @@ self.__bx_behaviors.selectMainBehavior();
             logDetails,
           );
         }
-      }
-    } catch (e) {
-      logger.error("Queuing Error", e, "links");
-    }
-  }
-
-  async queueNonExcludedUrls(
-    seedId: number,
-    urls: string[],
-    depth: number,
-    extraHops = 0,
-    pageUrl?: string,
-    logDetails: LogDetails = {},
-  ) {
-    try {
-      depth += 1;
-
-      for (const possibleUrl of urls) {
-        if (this.seeds[seedId].isExcluded(possibleUrl)) {
-          logger.warn("Skipping Link; excluded", { url: possibleUrl }, "links");
-          this.writeSkippedPage(
-            possibleUrl,
-            seedId,
-            depth,
-            SkippedReason.OutOfScope,
-          );
-        }
-
-        await this.queueUrl(
-          seedId,
-          possibleUrl,
-          depth,
-          extraHops,
-          logDetails,
-          0,
-          undefined,
-          { ignoreScope: true },
-        );
       }
     } catch (e) {
       logger.error("Queuing Error", e, "links");
@@ -2913,7 +2844,7 @@ self.__bx_behaviors.selectMainBehavior();
     logDetails: LogDetails = {},
     ts = 0,
     pageid?: string,
-    extraData = {},
+    ignoreScope = false,
   ) {
     if (this.limitHit) {
       logger.debug(
@@ -2939,7 +2870,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const result = await this.crawlState.addToQueue(
-      { url, seedId, depth, extraHops, ts, pageid, ...extraData },
+      { url, seedId, depth, extraHops, ts, pageid, ignoreScope },
       this.queuePageLimit,
     );
 
@@ -3210,9 +3141,13 @@ self.__bx_behaviors.selectMainBehavior();
             "sitemap",
           );
         }
-        this.queueInScopeUrls(seedId, [url], 0, 0, true).catch((e) =>
-          logger.warn("Error queuing urls", e, "links"),
-        );
+        this.queueInScopeUrls({
+          seedId,
+          urls: [url],
+          depth: 0,
+          extraHops: 0,
+          noOOS: true,
+        }).catch((e) => logger.warn("Error queuing urls", e, "links"));
         if (count >= 100 && !resolved) {
           logger.info(
             "Sitemap partially parsed, continue parsing large sitemap in the background",
