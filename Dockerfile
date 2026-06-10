@@ -40,6 +40,9 @@ ADD src /app/src
 
 RUN yarn run tsc
 
+# prune devDependencies from the shipped image; runtime only needs production deps
+RUN yarn install --production --frozen-lockfile --network-timeout 1000000 && yarn cache clean
+
 ADD config/ /app/
 
 ADD html/ /app/html/
