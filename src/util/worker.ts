@@ -19,7 +19,7 @@ export type WorkerState = {
   page: Page;
   cdp: CDPSession;
   workerid: WorkerId;
-  // eslint-disable-next-line @typescript-eslint/ban-types
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   callbacks: Record<string, Function>;
   recorder: Recorder | null;
   markPageUsed: () => void;
@@ -41,7 +41,7 @@ export class PageWorker {
   page?: Page | null;
   cdp?: CDPSession | null;
 
-  // eslint-disable-next-line @typescript-eslint/ban-types
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   callbacks?: Record<string, Function>;
 
   opts?: WorkerState;

@@ -520,7 +520,7 @@ export class Browser {
   private async _init(
     launchOpts: LaunchOptions,
     recording: boolean,
-    // eslint-disable-next-line @typescript-eslint/ban-types
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     ondisconnect: Function | null = null,
   ) {
     this.browser = await puppeteer.launch(launchOpts);
