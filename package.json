@@ -41,9 +41,9 @@
     "sharp": "^0.32.6",
     "tsc": "^2.0.4",
     "undici": "^7.18.0",
-    "uuid": "8.3.2",
+    "uuid": "^11.1.1",
     "warcio": "^2.4.9",
-    "ws": "^7.4.4",
+    "ws": "^8.20.1",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
@@ -56,7 +56,6 @@
     "@types/pixelmatch": "^5.2.6",
     "@types/pngjs": "^6.0.4",
     "@types/sax": "^1.2.7",
-    "@types/uuid": "^9.0.6",
     "@types/ws": "^8.5.8",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
     "@typescript-eslint/parser": "^6.10.0",
@@ -76,6 +75,7 @@
   "resolutions": {
     "wrap-ansi": "7.0.0",
     "warcio": "^2.4.9",
-    "@novnc/novnc": "1.4.0"
+    "@novnc/novnc": "1.4.0",
+    "**/@typescript-eslint/typescript-estree/minimatch": "9.0.7"
   }
 }
