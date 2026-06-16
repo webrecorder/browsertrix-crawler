@@ -40,7 +40,8 @@ ADD src /app/src
 # runtime only needs production deps
 RUN yarn install --network-timeout 1000000 && \
     yarn run tsc && \
-    yarn install --production --frozen-lockfile --network-timeout 1000000 && yarn cache clean
+    yarn install --production --frozen-lockfile --network-timeout 1000000 && \
+    yarn cache clean
 
 ADD config/ /app/
 
