@@ -1,4 +1,4 @@
-import ws, { type WebSocket } from "ws";
+import { WebSocketServer, type WebSocket } from "ws";
 import http, {
   type IncomingMessage,
   type Server,
@@ -24,13 +24,13 @@ class WSTransport {
   allWS = new Set<WebSocket>();
   // eslint-disable-next-line no-use-before-define
   caster!: ScreenCaster;
-  wss: ws.Server;
+  wss: WebSocketServer;
   httpServer: Server;
 
   constructor(port: number) {
     this.allWS = new Set();
 
-    this.wss = new ws.Server({ noServer: true });
+    this.wss = new WebSocketServer({ noServer: true });
 
     this.wss.on("connection", (ws: WebSocket) => this.initWebSocket(ws));
 

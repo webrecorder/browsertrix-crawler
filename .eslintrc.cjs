@@ -31,6 +31,8 @@ module.exports = {
     ],
     "@typescript-eslint/no-floating-promises": "error",
     "@typescript-eslint/await-thenable": "error",
+    // keep pre-v8 behavior: don't flag unused catch params
+    "@typescript-eslint/no-unused-vars": ["error", { caughtErrors: "none" }],
   },
   reportUnusedDisableDirectives: true,
   overrides: [
