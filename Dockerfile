@@ -33,15 +33,14 @@ RUN mkdir -p /tmp/ads && cd /tmp/ads && \
     cat ad-hosts.txt | grep '^0.0.0.0 '| awk '{ print $2; }' | grep -v '0.0.0.0' | jq --raw-input --slurp 'split("\n")' > /app/ad-hosts.json && \
     rm /tmp/ads/ad-hosts.txt
 
-RUN yarn install --network-timeout 1000000
-
 ADD tsconfig.json /app/
 ADD src /app/src
 
-RUN yarn run tsc
-
-# prune devDependencies from the shipped image; runtime only needs production deps
-RUN yarn install --production --frozen-lockfile --network-timeout 1000000 && yarn cache clean
+# Last step prunes devDependencies from the shipped image;
+# runtime only needs production deps
+RUN yarn install --network-timeout 1000000 && \
+    yarn run tsc && \
+    yarn install --production --frozen-lockfile --network-timeout 1000000 && yarn cache clean
 
 ADD config/ /app/
 
