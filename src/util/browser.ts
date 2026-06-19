@@ -118,6 +118,9 @@ export class Browser {
 
     await this.installProfile(profileUrl);
 
+    // remove singletons from profile dir always
+    this.removeSingletons();
+
     this.swOpt = swOpt;
 
     this.emulateDevice = emulateDevice;
@@ -277,7 +280,6 @@ export class Browser {
         cwd: profileDir,
         stdio: "ignore",
       });
-      this.removeSingletons();
     } catch (e) {
       throw new Error(`Profile ${profileLocalSrc} not a valid tar.gz`);
     }
