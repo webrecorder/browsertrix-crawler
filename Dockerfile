@@ -1,7 +1,25 @@
 ARG BROWSER_VERSION=1.91.175
 ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERSION}
 
-FROM ${BROWSER_IMAGE_BASE}
+# --- builder ---
+FROM ${BROWSER_IMAGE_BASE} AS builder
+WORKDIR /app
+
+ADD package.json yarn.lock /app/
+
+# Install ALL dependencies (including devDependencies needed for tsc)
+RUN yarn install --frozen-lockfile --network-timeout 1000000
+
+ADD tsconfig.json /app/
+ADD src /app/src
+
+RUN yarn run tsc
+
+RUN yarn install --production --frozen-lockfile --network-timeout 1000000
+#RUN yarn cache clean
+
+# ---- main image ---
+FROM ${BROWSER_IMAGE_BASE} AS crawler
 
 LABEL org.opencontainers.image.vendor="Webrecorder <https://webrecorder.net/>"
 LABEL org.opencontainers.image.source="https://github.com/webrecorder/browsertrix-crawler"
@@ -36,12 +54,8 @@ RUN mkdir -p /tmp/ads && cd /tmp/ads && \
 ADD tsconfig.json /app/
 ADD src /app/src
 
-# Last step prunes devDependencies from the shipped image;
-# runtime only needs production deps
-RUN yarn install --network-timeout 1000000 && \
-    yarn run tsc && \
-    yarn install --production --frozen-lockfile --network-timeout 1000000 && \
-    yarn cache clean
+COPY --from=builder /app/dist /app/dist
+COPY --from=builder /app/node_modules /app/node_modules
 
 ADD config/ /app/
 
