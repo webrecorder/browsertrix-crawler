@@ -194,8 +194,35 @@ declare module "ioredis" {
       url: string,
       seedData: string,
     ): Result<number, Context>;
+
+    incrdomainstats(
+      bytesKey: string,
+      objectsKey: string,
+      limitReachedKey: string,
+      domain: string,
+      bytes: number,
+      maxBytes: number,
+      maxObjects: number,
+    ): Result<[number, number, number, number], Context>;
   }
 }
+
+export type DomainStatsEntry = {
+  domain: string;
+  bytes: number;
+  objects: number;
+  limitReached: boolean;
+  completeness?: "complete" | "incomplete" | "unknown";
+};
+
+export type DomainCompleteness = "complete" | "incomplete" | "unknown";
+
+export type DomainStatsUpdate = {
+  bytes: number;
+  objects: number;
+  limitReached: boolean;
+  newlyLimitReached: boolean;
+};
 
 // ============================================================================
 export type SaveState = {
@@ -209,6 +236,8 @@ export type SaveState = {
   extraSeeds: string[];
   sitemapDone: boolean;
   excluded?: string[];
+  domainStats?: DomainStatsEntry[];
+  domainCompleteness?: Record<string, DomainCompleteness>;
 };
 
 // ============================================================================
@@ -786,6 +815,10 @@ export class RedisCrawlState extends RedisDedupeIndex {
   rkey: string;
   lkey: string;
   pageskey: string;
+  domainBytesKey: string;
+  domainObjectsKey: string;
+  domainLimitReachedKey: string;
+  domainCompletenessKey: string;
 
   esKey: string;
   esMap: string;
@@ -830,6 +863,10 @@ export class RedisCrawlState extends RedisDedupeIndex {
     this.lkey = this.crawlId + ":l";
     // pages
     this.pageskey = this.crawlId + ":pages";
+    this.domainBytesKey = this.crawlId + ":domain:bytes";
+    this.domainObjectsKey = this.crawlId + ":domain:objects";
+    this.domainLimitReachedKey = this.crawlId + ":domain:limit_reached";
+    this.domainCompletenessKey = this.crawlId + ":domain:completeness";
 
     this.esKey = this.crawlId + ":extraSeeds";
     this.esMap = this.crawlId + ":esMap";
@@ -999,6 +1036,31 @@ redis.call('sadd', KEYS[3], ARGV[2]);
 return inx;
 `,
     });
+
+    redis.defineCommand("incrdomainstats", {
+      numberOfKeys: 3,
+      lua: `
+local bytes = redis.call('hincrby', KEYS[1], ARGV[1], tonumber(ARGV[2]));
+local objects = redis.call('hincrby', KEYS[2], ARGV[1], 1);
+local maxBytes = tonumber(ARGV[3]);
+local maxObjects = tonumber(ARGV[4]);
+local limitReached = 0;
+local wasLimitReached = redis.call('hexists', KEYS[3], ARGV[1]);
+local newlyLimitReached = 0;
+
+if (maxBytes >= 0 and bytes >= maxBytes) or (maxObjects >= 0 and objects >= maxObjects) then
+  redis.call('hset', KEYS[3], ARGV[1], '1');
+  limitReached = 1;
+  if wasLimitReached == 0 then
+    newlyLimitReached = 1;
+  end
+elseif wasLimitReached == 1 then
+  limitReached = 1;
+end
+
+return {bytes, objects, limitReached, newlyLimitReached};
+`,
+    });
   }
 
   async _getNext() {
@@ -1151,6 +1213,103 @@ return inx;
 
   async setArchiveSize(size: number) {
     return await this.redis.hset(`${this.crawlId}:size`, this.uid, size);
+  }
+
+  async isDomainLimitReached(domain: string) {
+    return (await this.redis.hexists(this.domainLimitReachedKey, domain)) === 1;
+  }
+
+  async setDomainCompleteness(
+    domain: string,
+    completeness: DomainCompleteness,
+  ) {
+    await this.redis.hset(this.domainCompletenessKey, domain, completeness);
+  }
+
+  async getDomainCompleteness(
+    domain: string,
+  ): Promise<DomainCompleteness | null> {
+    const completeness = await this.redis.hget(
+      this.domainCompletenessKey,
+      domain,
+    );
+    if (
+      completeness === "complete" ||
+      completeness === "incomplete" ||
+      completeness === "unknown"
+    ) {
+      return completeness;
+    }
+    return null;
+  }
+
+  async getDomainCompletenessMap(): Promise<
+    Record<string, DomainCompleteness>
+  > {
+    const completenessMap = await this.redis.hgetall(
+      this.domainCompletenessKey,
+    );
+    const result: Record<string, DomainCompleteness> = {};
+
+    for (const [domain, completeness] of Object.entries(completenessMap)) {
+      if (
+        completeness === "complete" ||
+        completeness === "incomplete" ||
+        completeness === "unknown"
+      ) {
+        result[domain] = completeness;
+      }
+    }
+
+    return result;
+  }
+
+  async addDomainStats(
+    domain: string,
+    bytes: number,
+    maxBytes: number,
+    maxObjects: number,
+  ): Promise<DomainStatsUpdate> {
+    const [totalBytes, totalObjects, limitReached, newlyLimitReached] =
+      await this.redis.incrdomainstats(
+        this.domainBytesKey,
+        this.domainObjectsKey,
+        this.domainLimitReachedKey,
+        domain,
+        Math.max(0, bytes),
+        maxBytes,
+        maxObjects,
+      );
+
+    return {
+      bytes: Number(totalBytes),
+      objects: Number(totalObjects),
+      limitReached: Number(limitReached) === 1,
+      newlyLimitReached: Number(newlyLimitReached) === 1,
+    };
+  }
+
+  async getDomainStats(): Promise<DomainStatsEntry[]> {
+    const [bytesMap, objectsMap, limitReachedMap] = await Promise.all([
+      this.redis.hgetall(this.domainBytesKey),
+      this.redis.hgetall(this.domainObjectsKey),
+      this.redis.hgetall(this.domainLimitReachedKey),
+    ]);
+
+    const domains = new Set([
+      ...Object.keys(bytesMap),
+      ...Object.keys(objectsMap),
+      ...Object.keys(limitReachedMap),
+    ]);
+
+    return Array.from(domains)
+      .sort()
+      .map((domain) => ({
+        domain,
+        bytes: Number(bytesMap[domain] || 0),
+        objects: Number(objectsMap[domain] || 0),
+        limitReached: limitReachedMap[domain] === "1",
+      }));
   }
 
   async isCrawlStopped() {
@@ -1346,6 +1505,8 @@ return inx;
     const extraSeeds = await this._iterListKeys(this.esKey, seen);
     const sitemapDone = await this.isSitemapDone();
     const excludedSet = await this._iterSet(this.exKey);
+    const domainStats = await this.getDomainStats();
+    const domainCompleteness = await this.getDomainCompletenessMap();
 
     const finished = [...seen.values()];
     const excluded = [...excludedSet.values()];
@@ -1360,6 +1521,8 @@ return inx;
       failed,
       errors,
       excluded,
+      domainStats,
+      domainCompleteness,
     };
   }
 
@@ -1465,6 +1628,10 @@ return inx;
     await this.redis.del(this.skey);
     await this.redis.del(this.ekey);
     await this.redis.del(this.exKey);
+    await this.redis.del(this.domainBytesKey);
+    await this.redis.del(this.domainObjectsKey);
+    await this.redis.del(this.domainLimitReachedKey);
+    await this.redis.del(this.domainCompletenessKey);
 
     let seen: string[] = [];
 
@@ -1563,6 +1730,34 @@ return inx;
 
     if (state.excluded?.length) {
       await this.redis.sadd(this.exKey, state.excluded);
+    }
+
+    if (state.domainStats?.length) {
+      const pipe = this.redis.pipeline();
+      for (const entry of state.domainStats) {
+        pipe.hset(this.domainBytesKey, entry.domain, entry.bytes);
+        pipe.hset(this.domainObjectsKey, entry.domain, entry.objects);
+        if (entry.limitReached) {
+          pipe.hset(this.domainLimitReachedKey, entry.domain, "1");
+        }
+      }
+      await pipe.exec();
+    }
+
+    if (state.domainCompleteness) {
+      const pipe = this.redis.pipeline();
+      for (const [domain, completeness] of Object.entries(
+        state.domainCompleteness,
+      )) {
+        if (
+          completeness === "complete" ||
+          completeness === "incomplete" ||
+          completeness === "unknown"
+        ) {
+          pipe.hset(this.domainCompletenessKey, domain, completeness);
+        }
+      }
+      await pipe.exec();
     }
 
     return seen.length;
