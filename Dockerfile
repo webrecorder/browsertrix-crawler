@@ -8,8 +8,8 @@ LABEL org.opencontainers.image.source="https://github.com/webrecorder/browsertri
 LABEL org.opencontainers.image.documentation="https://crawler.docs.browsertrix.com/"
 LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
-# build optimized version
-ARG OPTIMIZE=0
+# set to 1 to minimize size for prod, but longer build time
+ARG MINIMIZE_IMAGE_SIZE=0
 
 # needed to add args to main build stage
 ARG BROWSER_VERSION
@@ -36,14 +36,14 @@ RUN mkdir -p /tmp/ads && cd /tmp/ads && \
     cat ad-hosts.txt | grep '^0.0.0.0 '| awk '{ print $2; }' | grep -v '0.0.0.0' | jq --raw-input --slurp 'split("\n")' > /app/ad-hosts.json && \
     rm /tmp/ads/ad-hosts.txt
 
-RUN if [ "$OPTIMIZE" != "1" ] ; then \
+RUN if [ "$MINIMIZE_IMAGE_SIZE" != "1" ] ; then \
       yarn install --network-timeout 1000000 --frozen-lockfile; \
     fi
 
 ADD tsconfig.json /app/
 ADD src /app/src
 
-RUN if [ "$OPTIMIZE" != "1" ] ; then \
+RUN if [ "$MINIMIZE_IMAGE_SIZE" != "1" ] ; then \
       yarn run tsc; \
     else \
       yarn install --network-timeout 1000000 --frozen-lockfile && \

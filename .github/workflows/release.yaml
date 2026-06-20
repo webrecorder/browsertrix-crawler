@@ -40,7 +40,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           platforms: "linux/amd64,linux/arm64"
           build-args: |
-            OPTIMIZE=1
+            MINIMIZE_IMAGE_SIZE=1
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}

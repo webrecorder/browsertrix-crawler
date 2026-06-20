@@ -2424,7 +2424,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const status = resp.status();
-    data.status = status + 0;
+    data.status = status;
 
     let failed = isChromeError;
 
