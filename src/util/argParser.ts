@@ -765,9 +765,10 @@ class ArgParser {
         },
 
         rateLimitTimeout: {
-          describe: "Time in seconds to track rate limited count for before resetting",
+          describe:
+            "Time in seconds to track rate limited count for before resetting",
           type: "number",
-          default: RATE_LIMIT_TTL,
+          default: RATE_LIMIT_TTL_SECS,
         },
 
         rateLimitInterruptCount: {

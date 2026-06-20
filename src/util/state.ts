@@ -1052,7 +1052,7 @@ return inx;
       this.qkey,
       this.fkey,
       url,
-      noRetries ? 0 : (alwaysRetry ? -1 : this.maxRetries),
+      noRetries ? 0 : alwaysRetry ? -1 : this.maxRetries,
       MAX_DEPTH,
     );
   }
