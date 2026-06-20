@@ -67,7 +67,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: build docker
-        run: docker compose build
+        run: docker compose build --build-arg OPTIMIZE=1
 
       - name: install python deps for docs
         run: pip install mkdocs-material
