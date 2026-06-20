@@ -1079,11 +1079,6 @@ return inx;
 
     const key = this.crawlId + (isDirectFetch ? ":rateDirect" : ":rate");
 
-    let incBy = 1;
-
-    if (rateLimitStatus === 429 && this.rateLimitInterruptCount > 0) {
-      incBy = this.rateLimitInterruptCount;
-    }
     if (retryAfter > 0) {
       logger.debug(
         "Rate limited with custom Retry-After",
@@ -1093,7 +1088,7 @@ return inx;
     } else {
       retryAfter = this.rateLimitTTL;
     }
-    const res = await this.redis.incrby(key, incBy);
+    const res = await this.redis.incrby(key, 1);
     await this.redis.expire(key, retryAfter);
 
     const isLimited =
