@@ -74,6 +74,7 @@ import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
+import { normalizedRedirectSeedUrl } from "./util/normalize.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -2505,17 +2506,40 @@ self.__bx_behaviors.selectMainBehavior();
       respUrl + "/" !== url &&
       !downloadResponse
     ) {
-      data.seedId = await this.crawlState.addExtraSeed(
-        this.seeds,
-        this.numOriginalSeeds,
-        data.seedId,
-        respUrl,
-      );
-      logger.info("Seed page redirected, adding redirected seed", {
-        origUrl: url,
-        newUrl: respUrl,
-        seedId: data.seedId,
-      });
+      const newUrl = respUrl;
+      const origUrl = url;
+      const seedId = data.seedId;
+
+      if (
+        normalizedRedirectSeedUrl(origUrl) == normalizedRedirectSeedUrl(newUrl)
+      ) {
+        data.seedId = await this.crawlState.addExtraSeed(
+          this.seeds,
+          this.numOriginalSeeds,
+          data.seedId,
+          respUrl,
+        );
+        logger.info(
+          "Seed page redirected out of scope, adding redirected seed",
+          {
+            origUrl,
+            newUrl,
+            seedId,
+          },
+        );
+      } else if (
+        !(await this.isInScope({ seedId, url: newUrl, depth, extraHops: 0 }))
+      ) {
+        logger.info(
+          "Seed page redirected, only crawling this page. " +
+            "New seed doesn't match original (ignoring scheme and www.), not adding new seed",
+          {
+            origUrl,
+            newUrl,
+            seedId,
+          },
+        );
+      }
     }
 
     const status = resp.status();
