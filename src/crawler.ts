@@ -1166,7 +1166,7 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    const doDirectFetch = async () => {
+    const doDirectFetch = async (): Promise<boolean> => {
       if (!recorder) {
         return false;
       }
@@ -1211,14 +1211,20 @@ self.__bx_behaviors.selectMainBehavior();
         status = STATUS_UNKNOWN_ERROR;
       }
 
-      // only consider successful if direct fetch status code is 200
+      // direct fetch succeeded
+      if (status === 200) {
+        return true;
+      }
+
+      // special status for HTML response, skipping direct fetch
       if (status === STATUS_IS_HTML_NO_DIRECT_FETCH) {
         logger.debug(
           "Direct fetch indicates HTML page, continuing with browser fetch",
           logDetails,
           "fetch",
         );
-      } else if (status != 200) {
+      } else {
+        // other error, not direct fetching
         logger.debug(
           "Direct fetch resulted in error response, continuing with browser fetch",
           { status, ...logDetails },
@@ -1227,10 +1233,9 @@ self.__bx_behaviors.selectMainBehavior();
         if (this.params.rateLimitStatusCodes.includes(status)) {
           await this.crawlState.incRateLimited(status, 0, true);
         }
-        return false;
-      } else {
-        return true;
       }
+
+      return false;
     };
 
     if (recorder && (await doDirectFetch())) {
