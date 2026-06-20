@@ -803,6 +803,7 @@ export class RedisCrawlState extends RedisDedupeIndex {
 
   rateLimitTTL: number;
   rateLimitInterruptCount: number;
+  rateLimitMaxRetries: number;
 
   constructor(
     redis: Redis,
@@ -813,6 +814,7 @@ export class RedisCrawlState extends RedisDedupeIndex {
     dedupeRedis?: Redis,
     rateLimitTTL?: number,
     rateLimitInterruptCount?: number,
+    rateLimitMaxRetries?: number,
   ) {
     super(dedupeRedis || redis, key);
     this.redis = redis;
@@ -820,6 +822,7 @@ export class RedisCrawlState extends RedisDedupeIndex {
     this.uid = uid;
     this.maxPageTime = maxPageTime;
     this.maxRetries = maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.rateLimitMaxRetries = rateLimitMaxRetries ?? -1;
 
     this.qkey = this.crawlId + ":q";
     this.pkey = this.crawlId + ":p";
@@ -1046,13 +1049,19 @@ return inx;
     return await this.redis.incr(this.dkey);
   }
 
-  async markFailed(url: string, noRetries = false, alwaysRetry = false) {
+  async markFailed(url: string, noRetries = false, isRateLimit = false) {
+    const retries = noRetries
+      ? 0
+      : isRateLimit
+      ? this.rateLimitMaxRetries
+      : this.maxRetries;
+
     return await this.redis.requeuefailed(
       this.pkey,
       this.qkey,
       this.fkey,
       url,
-      noRetries ? 0 : alwaysRetry ? -1 : this.maxRetries,
+      retries,
       MAX_DEPTH,
     );
   }

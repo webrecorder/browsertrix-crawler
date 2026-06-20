@@ -771,6 +771,14 @@ class ArgParser {
           default: RATE_LIMIT_TTL_SECS,
         },
 
+        rateLimitMaxRetries: {
+          alias: "retries",
+          describe:
+            "If set >=0, number of times to retry rate limited pages before marking them as failed. If -1, retry indefinitely",
+          type: "number",
+          default: -1,
+        },
+
         rateLimitInterruptCount: {
           describe:
             "If >0, threshold for number of rate limited pages before crawl is considered rate limited and is interrupted",
