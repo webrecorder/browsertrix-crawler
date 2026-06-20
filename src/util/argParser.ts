@@ -20,7 +20,7 @@ import {
   BxFunctionBindings,
   DEFAULT_CRAWL_ID_TEMPLATE,
   RATE_LIMIT_MATCH_200,
-  RATE_LIMIT_TTL,
+  RATE_LIMIT_TTL_SECS,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -765,7 +765,7 @@ class ArgParser {
         },
 
         rateLimitTimeout: {
-          describe: "Time to track rate limited count for before resetting",
+          describe: "Time in seconds to track rate limited count for before resetting",
           type: "number",
           default: RATE_LIMIT_TTL,
         },

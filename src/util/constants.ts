@@ -137,7 +137,7 @@ export const STATUS_UNKNOWN_ERROR = 999;
 
 // ============================================================================
 // Rate Limit Constants
-export const RATE_LIMIT_TTL = 300;
+export const RATE_LIMIT_TTL_SECS = 300;
 
 // default text matches to consider rate limit on 200
 export const RATE_LIMIT_MATCH_200 = [`src="/_Incapsula_Resource?`];

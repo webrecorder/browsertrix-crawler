@@ -13,7 +13,7 @@ import {
   DUPE_UNCOMMITTED,
   CrawlStatus,
   SkippedReason,
-  RATE_LIMIT_TTL,
+  RATE_LIMIT_TTL_SECS,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -848,7 +848,7 @@ export class RedisCrawlState extends RedisDedupeIndex {
 
     this.sitemapDoneKey = this.crawlId + ":sitemapDone";
 
-    this.rateLimitTTL = rateLimitTTL || RATE_LIMIT_TTL;
+    this.rateLimitTTL = rateLimitTTL || RATE_LIMIT_TTL_SECS;
     this.rateLimitInterruptCount = rateLimitInterruptCount || -1;
 
     this._initLuaCommands(this.redis);
@@ -1052,7 +1052,7 @@ return inx;
       this.qkey,
       this.fkey,
       url,
-      noRetries ? 0 : alwaysRetry ? -1 : this.maxRetries,
+      noRetries ? 0 : (alwaysRetry ? -1 : this.maxRetries),
       MAX_DEPTH,
     );
   }
