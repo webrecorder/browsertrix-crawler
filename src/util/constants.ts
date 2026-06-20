@@ -126,7 +126,7 @@ export enum SkippedReason {
   RobotsTxt = "robotsTxt",
   RedirectToExcluded = "redirectToExcluded",
   Duplicate = "duplicate",
-  RateLimit = "RateLimited",
+  RateLimit = "rateLimited",
   Failed = "failed",
 }
 
