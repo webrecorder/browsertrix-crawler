@@ -2500,7 +2500,7 @@ self.__bx_behaviors.selectMainBehavior();
           },
         );
       } else if (
-        !(await this.isInScope({ seedId, url: newUrl, depth, extraHops: 0 }))
+        !(await this.isInScope(seedId, { url: newUrl, depth, extraHops: 0 }))
       ) {
         logger.info(
           "Seed page redirected, only crawling this page. " +
