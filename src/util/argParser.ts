@@ -189,6 +189,13 @@ class ArgParser {
           coerce,
         },
 
+        ignoreScopeForBehaviorLinks: {
+          describe:
+            "If set, permits addLink() calls from behavior scripts to bypass crawl scope and ensures that the extra links are always crawled",
+          type: "boolean",
+          default: false,
+        },
+
         clickSelector: {
           describe:
             "Selector for elements to click when using the autoclick behavior",
@@ -784,13 +791,6 @@ class ArgParser {
             "If >0, threshold for number of rate limited pages before crawl is considered rate limited and is interrupted",
           type: "number",
           default: -1,
-        },
-
-        allowBehaviorLinks: {
-          describe:
-            "If set, permits addLink calls from behavior scripts to bypass crawl scope and ensures that the extra links are always crawled",
-          type: "boolean",
-          default: false,
         },
       });
   }

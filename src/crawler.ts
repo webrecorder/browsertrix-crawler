@@ -2701,9 +2701,11 @@ self.__bx_behaviors.selectMainBehavior();
   ) {
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
-    callbacks.addLink = async (url: string, enforceScope = true) => {
-      if (this.params.allowBehaviorLinks) {
-        enforceScope = false;
+    callbacks.addLink = async (url: string, ignoreScope = false) => {
+      // if crawler arg set, always ignore scope
+      // otherwise, may be determined by behavior addLink()
+      if (this.params.ignoreScopeForBehaviorLinks) {
+        ignoreScope = true;
       }
 
       await this.queueInScopeUrls({
@@ -2713,7 +2715,7 @@ self.__bx_behaviors.selectMainBehavior();
         extraHops,
         pageUrl: page.url(),
         logDetails,
-        ignoreScope: !enforceScope,
+        ignoreScope,
       });
     };
 
