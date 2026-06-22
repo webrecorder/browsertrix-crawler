@@ -8,7 +8,7 @@ LABEL org.opencontainers.image.source="https://github.com/webrecorder/browsertri
 LABEL org.opencontainers.image.documentation="https://crawler.docs.browsertrix.com/"
 LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
-# set to 1 to minimize size for prod, but longer build time
+# set to 1 to minimize size for prod, but longer build time, otherwise faster build and rebuild but larger image
 ARG MINIMIZE_IMAGE_SIZE=0
 
 # needed to add args to main build stage
@@ -36,6 +36,7 @@ RUN mkdir -p /tmp/ads && cd /tmp/ads && \
     cat ad-hosts.txt | grep '^0.0.0.0 '| awk '{ print $2; }' | grep -v '0.0.0.0' | jq --raw-input --slurp 'split("\n")' > /app/ad-hosts.json && \
     rm /tmp/ads/ad-hosts.txt
 
+# when not minimizing image size, do install here so that source changes do not trigger a rebuild (faster build)
 RUN if [ "$MINIMIZE_IMAGE_SIZE" != "1" ] ; then \
       yarn install --network-timeout 1000000 --frozen-lockfile; \
     fi
@@ -43,6 +44,7 @@ RUN if [ "$MINIMIZE_IMAGE_SIZE" != "1" ] ; then \
 ADD tsconfig.json /app/
 ADD src /app/src
 
+# when not minimizing image size, do only compile here for faster build, otherwise do full install and clean up in one layer and reduce image size
 RUN if [ "$MINIMIZE_IMAGE_SIZE" != "1" ] ; then \
       yarn run tsc; \
     else \
