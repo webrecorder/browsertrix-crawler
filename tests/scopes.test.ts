@@ -44,12 +44,63 @@ seeds:
 
 exclude: https://example.com/pathexclude
 
+depth: 2
 `);
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("prefix");
   expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
   expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
+
+  // included, in scope
+  expect(
+    seeds[0].isIncluded({ url: "https://example.com/path", depth: 0 }),
+  ).not.toBe(false);
+
+  // included, ignore scope
+  expect(
+    seeds[0].isIncluded({
+      url: "https://example.org/",
+      depth: 0,
+      ignoreScope: true,
+    }),
+  ).not.toBe(false);
+
+  // included, ignore scope, and depth limit exceeded
+  expect(
+    seeds[0].isIncluded({
+      url: "https://example.org/",
+      depth: 3,
+      ignoreScope: true,
+    }),
+  ).not.toBe(false);
+
+  // not included, in scope, but depth limit exceeded
+  expect(
+    seeds[0].isIncluded({ url: "https://example.com/path", depth: 3 }),
+  ).toBe(false);
+
+  // not included, not in scope
+  expect(seeds[0].isIncluded({ url: "https://example.org/", depth: 0 })).toBe(
+    false,
+  );
+
+  // not included, excluded
+  expect(
+    seeds[0].isIncluded({
+      url: "https://example.com/pathexclude/subpath",
+      depth: 0,
+    }),
+  ).toBe(false);
+
+  // not included, ignore scope, but still excluded
+  expect(
+    seeds[0].isIncluded({
+      url: "https://example.com/pathexclude/subpath",
+      depth: 0,
+      ignoreScope: true,
+    }),
+  ).toBe(false);
 });
 
 test("default scope + exclude is numeric", async () => {
@@ -348,20 +399,18 @@ seeds:
   expect(seeds[0].maxExtraHops).toEqual(0);
 
   // Test with the same URL (should match)
-  const result1 = seeds[0].isIncluded(
-    "https://example.com/page?foo=bar&baz=qux",
-    0,
-    0,
-  );
+  const result1 = seeds[0].isIncluded({
+    url: "https://example.com/page?foo=bar&baz=qux",
+    depth: 0,
+  });
   expect(result1).not.toBe(false);
   expect((result1 as Exclude<typeof result1, false>).isOOS).toBe(false);
 
   // Test with reordered query parameters (should still match)
-  const result2 = seeds[0].isIncluded(
-    "https://example.com/page?baz=qux&foo=bar",
-    0,
-    0,
-  );
+  const result2 = seeds[0].isIncluded({
+    url: "https://example.com/page?baz=qux&foo=bar",
+    depth: 0,
+  });
   expect(result2).not.toBe(false);
   expect((result2 as Exclude<typeof result2, false>).isOOS).toBe(false);
 });
@@ -381,12 +430,12 @@ seeds:
   expect(seeds[0].maxExtraHops).toEqual(0);
 
   // Test with the same URL (should match)
-  const result1 = seeds[0].isIncluded(doubleEncodedUrl, 0, 0);
+  const result1 = seeds[0].isIncluded({ url: doubleEncodedUrl, depth: 0 });
   expect(result1).not.toBe(false);
   expect((result1 as Exclude<typeof result1, false>).isOOS).toBe(false);
 
   // Test with self (should match)
-  const result2 = seeds[0].isIncluded(seeds[0].url, 0, 0);
+  const result2 = seeds[0].isIncluded({ url: seeds[0].url, depth: 0 });
   expect(result2).not.toBe(false);
   expect((result2 as Exclude<typeof result2, false>).isOOS).toBe(false);
 });
@@ -402,7 +451,10 @@ scopeType: page
   expect(seeds[0].scopeType).toEqual("page");
 
   // Test with self (should match)
-  const result = seeds[0].isIncluded("https://example.com/#hashtag", 0, 0);
+  const result = seeds[0].isIncluded({
+    url: "https://example.com/#hashtag",
+    depth: 0,
+  });
   expect(result).not.toBe(false);
   expect((result as Exclude<typeof result, false>).isOOS).toBe(false);
 });
@@ -443,37 +495,28 @@ scopeType: prefix
   expect(seeds[0].scopeType).toEqual("prefix");
   expect(seeds[0].allowHash).toEqual(true);
 
-  const result1 = seeds[0].isIncluded(
-    "#abc",
-    0,
-    0,
-    {},
-    false,
-    "https://example.com/",
-  );
+  const result1 = seeds[0].isIncluded({
+    url: "#abc",
+    depth: 0,
+    pageUrl: "https://example.com/",
+  });
   expect(result1).not.toBe(false);
   expect((result1 as Exclude<typeof result1, false>).url).toBe(
     "https://example.com/#abc",
   );
 
-  const result2 = seeds[0].isIncluded(
-    "#abc",
-    0,
-    0,
-    {},
-    false,
-    "https://example.org/",
-  );
+  const result2 = seeds[0].isIncluded({
+    url: "#abc",
+    depth: 0,
+    pageUrl: "https://example.org/",
+  });
   expect(result2).toBe(false);
 
-  const result3 = seeds[0].isIncluded(
-    "/abc",
-    0,
-    0,
-    {},
-    false,
-    "https://example.com/",
-  );
+  const result3 = seeds[0].isIncluded({
+    url: "/abc",
+    depth: 0,
+    pageUrl: "https://example.com/",
+  });
   expect(result3).not.toBe(false);
   expect((result3 as Exclude<typeof result1, false>).url).toBe(
     "https://example.com/abc",

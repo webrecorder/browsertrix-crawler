@@ -252,7 +252,14 @@ export class ReplayCrawler extends Crawler {
       }
     }
 
-    await this.queueUrl(0, url, depth, 0, {}, ts, id);
+    await this.queueUrl({
+      seedId: 0,
+      url,
+      depth,
+      extraHops: 0,
+      ts,
+      pageid: id,
+    });
   }
 
   async loadPagesDirect(pages: ReplayPage[]) {

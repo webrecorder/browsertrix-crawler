@@ -383,7 +383,9 @@ export class PageWorker {
         }
 
         // filter out any out-of-scope pages right away
-        if (!(await this.crawler.isInScope(data, this.logDetails))) {
+        if (
+          !(await this.crawler.isInScope(data.seedId, data, this.logDetails))
+        ) {
           logger.info("Page no longer in scope", data);
           await crawlState.markExcluded(data.url);
           continue;
