@@ -1,6 +1,11 @@
-browsertrix-mini
+browsertrix-crawler
 
 Copyright (C) 2020  Webrecorder Software
+
+This is a fork maintained by the Berkman Klein Center for Internet & Society 
+at Harvard University (2026).
+
+Original project: https://github.com/webrecorder/browsertrix-crawler
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by

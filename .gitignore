@@ -10,3 +10,22 @@ dist
 scratch/
 venv/
 docs/venv/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Security
+*.pem
+*.key
+*.cert
+*.crt
+
+# IDE
+.vscode/
+.idea/
+
+# Coverage reports
+coverage/
+.nyc_output/
