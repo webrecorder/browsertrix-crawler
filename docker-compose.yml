@@ -2,7 +2,7 @@ version: "3.5"
 
 services:
   crawler:
-    image: ${REGISTRY}webrecorder/browsertrix-crawler:latest
+    image: browsertrix-thub:1.2
     build:
       context: ./
 

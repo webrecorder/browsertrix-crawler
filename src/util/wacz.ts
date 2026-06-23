@@ -38,7 +38,6 @@ export type WACZInitOpts = {
   pages: string;
   warcCdxDir: string;
   indexesDir: string;
-  logDirectory: string;
 
   softwareString: string;
 
@@ -99,7 +98,6 @@ export class WACZ {
   warcs: string[];
 
   pagesDir: string;
-  logsDir: string;
   warcCdxDir: string;
   indexesDir: string;
 
@@ -115,7 +113,6 @@ export class WACZ {
   constructor(config: WACZInitOpts, collDir: string) {
     this.warcs = config.input;
     this.pagesDir = config.pages;
-    this.logsDir = config.logDirectory;
     this.warcCdxDir = config.warcCdxDir;
     this.collDir = collDir;
     this.indexesDir = config.indexesDir;
@@ -148,7 +145,6 @@ export class WACZ {
       ...this.warcs,
       ...addDirFiles(this.indexesDir),
       ...addDirFiles(this.pagesDir),
-      ...addDirFiles(this.logsDir),
     ];
 
     const zip = makeZip(

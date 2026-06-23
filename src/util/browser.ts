@@ -88,7 +88,8 @@ export class Browser {
 
   constructor(rootDir: string) {
     this.downloadsDir = path.join(rootDir, "downloads");
-    this.profileDir = path.join(rootDir, "profile");
+    // Use /tmp/profile to avoid writing profile files to the mounted crawls volume
+    this.profileDir = path.join("/tmp", "profile");
 
     this.majorVersion = this.getMajorVersion();
 
@@ -332,15 +333,14 @@ export class Browser {
       }
 
       if (localFilename && !localFilename.startsWith("/")) {
-        localFilename = path.resolve("/crawls/profiles/", localFilename);
+        localFilename = path.resolve("/tmp/profiles/", localFilename);
         logger.info(
           `Absolute path for filename not provided, saving to ${localFilename}`,
           "browser",
         );
       }
 
-      const profileFilename =
-        localFilename || "/crawls/profiles/profile.tar.gz";
+      const profileFilename = localFilename || "/tmp/profiles/profile.tar.gz";
 
       const outputDir = path.dirname(profileFilename);
       if (outputDir && !fs.existsSync(outputDir)) {

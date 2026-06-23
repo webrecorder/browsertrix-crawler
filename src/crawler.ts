@@ -216,7 +216,7 @@ export class Crawler {
       "collections",
       this.params.collection,
     );
-    this.logDir = path.join(this.collDir, "logs");
+    this.logDir = path.join("/tmp", "logs");
     this.logFilename = path.join(
       this.logDir,
       `${interpolateFilename("@ts", "")}.log`,
@@ -1280,8 +1280,83 @@ self.__bx_behaviors.selectMainBehavior();
           data.loadState = LoadState.BEHAVIORS_DONE;
         }
 
-        if (textextract && this.params.text.includes("final-to-warc")) {
-          await textextract.extractAndStoreText("textFinal", true, true);
+        if (textextract) {
+          if (this.params.text.includes("final-to-warc")) {
+            await textextract.extractAndStoreText("textFinal", true, true);
+          }
+          if (
+            (this.params.detachedText.includes("initial-page") &&
+              data.depth === 0) ||
+            this.params.detachedText.includes("all-pages")
+          ) {
+            const { text } = await textextract.extractAndStoreText(
+              "text",
+              false,
+              false,
+            );
+            if (text !== null) {
+              fs.writeFile(
+                path.join(
+                  this.archivesDir,
+                  `${
+                    data.title
+                      ? data.title
+                      : data.url.replace(/[\\/:*?"<>|]/g, "_")
+                  }.txt`,
+                ),
+                text,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (err: any) => {
+                  if (err) logger.warn("Text write failed", err, "writer");
+                  logger.info("The text file has been saved");
+                },
+              );
+            }
+          }
+        }
+
+        if (
+          (this.params.generatePDF.includes("initial-page") &&
+            data.depth === 0) ||
+          this.params.generatePDF.includes("all-pages")
+        ) {
+          await timedRun(
+            page.pdf({
+              path: path.join(
+                this.archivesDir,
+                `${
+                  data.title
+                    ? data.title
+                    : data.url.replace(/[\\/:*?"<>|]/g, "_")
+                }.pdf`,
+              ),
+              omitBackground: true,
+              printBackground: true,
+            }),
+            PAGE_OP_TIMEOUT_SECS * 6,
+            "Page PDF timed out",
+            logDetails,
+          );
+        }
+
+        if (
+          (this.params.detachedHTML.includes("initial-page") &&
+            data.depth === 0) ||
+          this.params.detachedHTML.includes("all-pages")
+        ) {
+          const html = await page.content(),
+            filename = `${
+              data.title ? data.title : data.url.replace(/[\\/:*?"<>|]/g, "_")
+            }.html`;
+          fs.writeFile(
+            path.join(this.archivesDir, filename),
+            html,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (err: any) => {
+              if (err) logger.warn("HTML write failed", err, "writer");
+              logger.info("The html file has been saved");
+            },
+          );
         }
 
         if (
@@ -2093,7 +2168,6 @@ self.__bx_behaviors.selectMainBehavior();
       input: warcFileList.map((x) => path.join(this.archivesDir, x)),
       output: waczPath,
       pages: this.pagesDir,
-      logDirectory: this.logDir,
       warcCdxDir: this.warcCdxDir,
       indexesDir: this.indexesDir,
       softwareString: this.infoString,

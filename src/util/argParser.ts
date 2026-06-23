@@ -264,6 +264,15 @@ class ArgParser {
           default: false,
         },
 
+        generatePDF: {
+          alias: ["generatepdf", "generatePdf"],
+          describe:
+            "If set, generate PDF captures on disk, can include: initial-page (enabled by default), all-pages",
+          type: "array",
+          default: ["initial-page"],
+          coerce,
+        },
+
         useSHA1: {
           describe:
             "If set, sha-1 instead of sha-256 hashes will be used for creating records",
@@ -307,7 +316,7 @@ class ArgParser {
 
         text: {
           describe:
-            "Extract initial (default) or final text to pages.jsonl or WARC resource record(s)",
+            "Extract initial (default) or final text to pages.jsonl, a txt, or WARC resource record(s)",
           type: "array",
           choices: EXTRACT_TEXT_TYPES,
           coerce: (array) => {
@@ -320,6 +329,22 @@ class ArgParser {
             }
             return coerce(array);
           },
+        },
+
+        detachedText: {
+          describe:
+            "If set, extracts text captures to a separate record, can include: initial-page (enabled by default), all-pages",
+          type: "array",
+          default: ["initial-page"],
+          coerce,
+        },
+
+        detachedHTML: {
+          describe:
+            "If set, extracts HTML captures to a separate record, can include: initial-page (enabled by default), all-pages",
+          type: "array",
+          default: ["initial-page"],
+          coerce,
         },
 
         cwd: {
