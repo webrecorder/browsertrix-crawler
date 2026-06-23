@@ -57,6 +57,7 @@ nav:
     - user-guide/proxies.md
     - user-guide/behaviors.md
     - user-guide/qa.md
+    - user-guide/reports.md
     - user-guide/cli-options.md
   - Develop:
     - develop/index.md

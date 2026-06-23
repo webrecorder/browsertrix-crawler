@@ -46,9 +46,12 @@ import {
   SITEMAP_INITIAL_FETCH_TIMEOUT_SECS,
   ExitCodes,
   InterruptReason,
+  SkippedReason,
   BxFunctionBindings,
   MAX_JS_DIALOG_PER_PAGE,
   CrawlStatus,
+  STATUS_UNKNOWN_ERROR,
+  STATUS_IS_HTML_NO_DIRECT_FETCH,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -64,13 +67,14 @@ import {
 } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
-import { ScopedSeed, parseSeeds } from "./util/seeds.js";
+import { LinkEntry, ScopedSeed, parseSeeds } from "./util/seeds.js";
 import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
+import { normalizedRedirectSeedUrl } from "./util/normalize.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -119,6 +123,7 @@ export class Crawler {
 
   pagesFH?: WriteStream | null = null;
   extraPagesFH?: WriteStream | null = null;
+  skippedPagesFH?: WriteStream | null = null;
 
   crawlId: string;
 
@@ -126,6 +131,7 @@ export class Crawler {
 
   limitHit = false;
   pageLimit: number;
+  queuePageLimit: number;
 
   saveStateFiles: string[] = [];
   lastSaveTime: number;
@@ -148,6 +154,9 @@ export class Crawler {
   pagesDir: string;
   seedPagesFile: string;
   otherPagesFile: string;
+
+  reportsDir: string;
+  skippedPagesFile: string;
 
   archivesDir: string;
   warcCdxDir: string;
@@ -255,6 +264,13 @@ export class Crawler {
         : this.params.maxPageLimit;
     }
 
+    // if using page dedupe, set queuePageLimit to 0
+    // so queue can be unlimited, as unknown how many pages may be skipped
+    // and additional pages needed from the queue
+    // otherwise, queuePageLimit == pagesLimit
+    this.queuePageLimit =
+      this.params.dedupePagesMinDepth >= 0 ? 0 : this.pageLimit;
+
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
 
@@ -283,6 +299,12 @@ export class Crawler {
     // pages file
     this.seedPagesFile = path.join(this.pagesDir, "pages.jsonl");
     this.otherPagesFile = path.join(this.pagesDir, "extraPages.jsonl");
+
+    // reports directory
+    this.reportsDir = path.join(this.collDir, "reports");
+
+    // reports files
+    this.skippedPagesFile = path.join(this.reportsDir, "skippedPages.jsonl");
 
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
@@ -377,6 +399,9 @@ export class Crawler {
       os.hostname(),
       this.params.maxPageRetries,
       dedupeRedis,
+      this.params.rateLimitTimeout,
+      this.params.rateLimitInterruptCount,
+      this.params.rateLimitMaxRetries,
     );
 
     if (this.params.logErrorsToRedis) {
@@ -602,7 +627,7 @@ export class Crawler {
 
     await this.loadCrawlState();
 
-    await this.crawlState.trimToLimit(this.pageLimit);
+    await this.crawlState.trimToLimit(this.queuePageLimit);
   }
 
   extraChromeArgs() {
@@ -668,6 +693,9 @@ export class Crawler {
               break;
             case InterruptReason.TimeLimit:
               exitCode = ExitCodes.TimeLimit;
+              break;
+            case InterruptReason.RateLimited:
+              exitCode = ExitCodes.RateLimited;
               break;
           }
         }
@@ -747,47 +775,35 @@ export class Crawler {
     }
   }
 
-  protected getScope(
-    {
-      seedId,
-      url,
-      depth,
-      extraHops,
-      noOOS,
-    }: {
-      seedId: number;
-      url: string;
-      depth: number;
-      extraHops: number;
-      noOOS: boolean;
-    },
-    logDetails = {},
-  ) {
-    return this.seeds[seedId].isIncluded(
-      url,
-      depth,
-      extraHops,
-      logDetails,
-      noOOS,
-    );
+  protected getScope(seedId: number, link: LinkEntry, logDetails: LogDetails) {
+    return this.seeds[seedId].isIncluded(link, logDetails);
   }
 
   async isInScope(
-    {
-      seedId,
-      url,
-      depth,
-      extraHops,
-    }: { seedId: number; url: string; depth: number; extraHops: number },
-    logDetails = {},
+    seedId: number,
+    link: LinkEntry,
+    logDetails: LogDetails = {},
   ): Promise<boolean> {
+    // If we've been told to explicitly ignore the scope,
+    // then this is always in scope.
+    if (link.ignoreScope) {
+      return true;
+    }
+
     const seed = await this.crawlState.getSeedAt(
       this.seeds,
       this.numOriginalSeeds,
       seedId,
     );
 
-    return !!seed.isIncluded(url, depth, extraHops, logDetails);
+    const res = seed.isIncluded(link, logDetails);
+
+    if (!res) {
+      const { url, depth } = link;
+      this.writeSkippedPage(url, seedId, depth, SkippedReason.OutOfScope);
+    }
+
+    return !!res;
   }
 
   async setupPage(opts: WorkerState) {
@@ -959,14 +975,15 @@ self.__bx_behaviors.selectMainBehavior();
 
           const logDetails = { page: url, workerid };
 
-          await this.queueInScopeUrls(
+          await this.queueInScopeUrls({
             seedId,
-            [params.url],
+            urls: [params.url],
             depth,
             extraHops,
-            false,
+            noOOS: false,
+            pageUrl: url,
             logDetails,
-          );
+          });
         });
       }
     }
@@ -1116,15 +1133,27 @@ self.__bx_behaviors.selectMainBehavior();
     data.logDetails = logDetails;
     data.workerid = workerid;
 
-    let result = false;
+    const doDirectFetch = async (): Promise<boolean> => {
+      if (!recorder) {
+        return false;
+      }
+      if (await this.crawlState.isRateLimited(true)) {
+        logger.warn(
+          "Direct fetch skipped, rate limited",
+          { url, ...logDetails },
+          "fetch",
+        );
+        return false;
+      }
 
-    if (recorder) {
+      let status = 0;
+
       try {
         const headers = auth
           ? { Authorization: auth, ...this.headers }
           : this.headers;
 
-        result = await timedRun(
+        status = await timedRun(
           recorder.directFetchCapture({
             url,
             headers,
@@ -1136,6 +1165,8 @@ self.__bx_behaviors.selectMainBehavior();
           "Direct fetch of page URL timed out",
           logDetails,
           "fetch",
+          false,
+          true,
         );
       } catch (e) {
         logger.error(
@@ -1143,18 +1174,41 @@ self.__bx_behaviors.selectMainBehavior();
           { e, ...logDetails },
           "fetch",
         );
+        // indicate this was some other error
+        status = STATUS_UNKNOWN_ERROR;
       }
 
-      if (!result) {
+      // direct fetch succeeded
+      if (status === 200) {
+        return true;
+      }
+
+      // special status for HTML response, skipping direct fetch
+      if (status === STATUS_IS_HTML_NO_DIRECT_FETCH) {
         logger.debug(
-          "Direct fetch response not accepted, continuing with browser fetch",
+          "Direct fetch indicates HTML page, continuing with browser fetch",
           logDetails,
           "fetch",
         );
       } else {
-        await this.awaitPageExtraDelay(opts);
-        return;
+        // other error, not direct fetching
+        logger.debug(
+          "Direct fetch resulted in error response, continuing with browser fetch",
+          { status, ...logDetails },
+          "fetch",
+        );
+        if (this.params.rateLimitStatusCodes.includes(status)) {
+          await this.crawlState.incRateLimited(status, 0, true);
+        }
       }
+
+      return false;
+    };
+
+    if (recorder && (await doDirectFetch())) {
+      // return if direct fetch succeeds
+      await this.awaitPageExtraDelay(opts);
+      return;
     }
 
     opts.markPageUsed();
@@ -1405,7 +1459,16 @@ self.__bx_behaviors.selectMainBehavior();
   async pageFinished(data: PageState, lastErrorText = "") {
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
-    const { loadState, logDetails, depth, url, pageSkipped, noRetries } = data;
+    const {
+      loadState,
+      logDetails,
+      depth,
+      url,
+      pageSkipped,
+      pageRateLimited,
+      pageRateLimitedRetryAfter,
+      noRetries,
+    } = data;
 
     if (data.loadState >= LoadState.FULL_PAGE_LOADED) {
       await this.writePage(data);
@@ -1424,12 +1487,27 @@ self.__bx_behaviors.selectMainBehavior();
     } else {
       if (pageSkipped) {
         await this.crawlState.markExcluded(url);
+
+        if (data.pageSkipReason) {
+          this.writeSkippedPage(url, data.seedId, depth, data.pageSkipReason);
+        }
         this.limitHit = false;
       } else {
-        const retry = await this.crawlState.markFailed(url, noRetries);
+        const retry = await this.crawlState.markFailed(
+          url,
+          noRetries,
+          !!pageRateLimited,
+        );
 
         if (this.healthChecker) {
           this.healthChecker.incError();
+        }
+        if (pageRateLimited) {
+          await this.crawlState.incRateLimited(
+            pageRateLimited,
+            pageRateLimitedRetryAfter,
+            false,
+          );
         }
 
         if (retry < 0) {
@@ -1465,7 +1543,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
 
-      await this.checkLimits();
+      await this.checkLimits(true);
     }
   }
 
@@ -1672,7 +1750,7 @@ self.__bx_behaviors.selectMainBehavior();
     return size;
   }
 
-  async checkLimits() {
+  async checkLimits(checkRateLimit = false) {
     let interrupt: InterruptReason | null = null;
 
     const size = await this.updateCurrSize();
@@ -1723,6 +1801,14 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (await this.crawlState.isCrawlPaused()) {
       interrupt = InterruptReason.CrawlPaused;
+    }
+
+    if (
+      !interrupt &&
+      checkRateLimit &&
+      (await this.crawlState.isRateLimited(false))
+    ) {
+      interrupt = InterruptReason.RateLimited;
     }
 
     if (interrupt) {
@@ -1897,6 +1983,13 @@ self.__bx_behaviors.selectMainBehavior();
       this.otherPagesFile,
       "Non-Seed Pages",
     );
+    if (this.params.reportSkipped) {
+      this.skippedPagesFH = await this.initPages(
+        this.skippedPagesFile,
+        "Skipped Pages",
+        true,
+      );
+    }
 
     this.adBlockRules = new AdBlockRules(
       this.captureBasePrefix,
@@ -2002,6 +2095,18 @@ self.__bx_behaviors.selectMainBehavior();
         this.extraPagesFH = null;
       }
     }
+
+    if (this.skippedPagesFH) {
+      try {
+        await new Promise<void>((resolve) =>
+          this.skippedPagesFH!.close(() => resolve()),
+        );
+      } catch (e) {
+        // ignore
+      } finally {
+        this.skippedPagesFH = null;
+      }
+    }
   }
 
   async closeFiles() {
@@ -2016,7 +2121,14 @@ self.__bx_behaviors.selectMainBehavior();
   protected async _addInitialSeeds() {
     for (let i = 0; i < this.seeds.length; i++) {
       const seed = this.seeds[i];
-      if (!(await this.queueUrl(i, seed.url, 0, 0))) {
+      if (
+        !(await this.queueUrl({
+          seedId: i,
+          url: seed.url,
+          depth: 0,
+          extraHops: 0,
+        }))
+      ) {
         if (this.limitHit) {
           break;
         }
@@ -2181,6 +2293,10 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
+    if (this.params.reportSkipped) {
+      waczOpts.reportsDir = this.reportsDir;
+    }
+
     if (this.params.title) {
       waczOpts.title = this.params.title;
     }
@@ -2264,6 +2380,20 @@ self.__bx_behaviors.selectMainBehavior();
         logger.warn("Stats output failed", err);
       }
     }
+  }
+
+  pageSkipped(
+    reason: string,
+    loadDetails: Record<string, string>,
+    data: PageState,
+  ) {
+    data.pageSkipped = true;
+    logger.warn(
+      reason,
+      { ...loadDetails, loadState: data.loadState },
+      "pageStatus",
+    );
+    throw new Error("logged");
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2376,10 +2506,17 @@ self.__bx_behaviors.selectMainBehavior();
 
           if (msg.startsWith("net::ERR_BLOCKED_BY_RESPONSE")) {
             // excluded in recorder
-            data.pageSkipped = true;
-            logger.warn(
+            return this.pageSkipped(
               "Page Load Blocked, skipping",
-              { msg, loadState },
+              { msg },
+              data,
+            );
+          } else if (msg.startsWith("net::ERR_HTTP2_PROTOCOL_ERROR")) {
+            // treat as rate limit, page blocked
+            data.pageRateLimited = STATUS_UNKNOWN_ERROR;
+            logger.warn(
+              "Page load interrupted, possibly rate limited",
+              { url, msg, ...logDetails },
               "pageStatus",
             );
             throw new Error("logged");
@@ -2405,7 +2542,8 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const respUrl = resp.url().split("#")[0];
-    const isChromeError = page.url().startsWith("chrome-error://");
+    const pageUrl = page.url();
+    const isChromeError = pageUrl.startsWith("chrome-error://");
 
     if (
       depth === 0 &&
@@ -2414,21 +2552,53 @@ self.__bx_behaviors.selectMainBehavior();
       respUrl + "/" !== url &&
       !downloadResponse
     ) {
-      data.seedId = await this.crawlState.addExtraSeed(
-        this.seeds,
-        this.numOriginalSeeds,
-        data.seedId,
-        respUrl,
-      );
-      logger.info("Seed page redirected, adding redirected seed", {
-        origUrl: url,
-        newUrl: respUrl,
-        seedId: data.seedId,
-      });
+      const newUrl = respUrl;
+      const origUrl = url;
+      const seedId = data.seedId;
+
+      if (
+        normalizedRedirectSeedUrl(origUrl) == normalizedRedirectSeedUrl(newUrl)
+      ) {
+        data.seedId = await this.crawlState.addExtraSeed(
+          this.seeds,
+          this.numOriginalSeeds,
+          data.seedId,
+          respUrl,
+        );
+        logger.info(
+          "Seed page redirected out of scope, adding redirected seed",
+          {
+            origUrl,
+            newUrl,
+            seedId,
+          },
+        );
+      } else if (
+        !(await this.isInScope(seedId, { url: newUrl, depth, extraHops: 0 }))
+      ) {
+        logger.info(
+          "Seed page redirected, only crawling this page. " +
+            "New seed doesn't match original (ignoring scheme and www.), not adding new seed",
+          {
+            origUrl,
+            newUrl,
+            seedId,
+          },
+        );
+      }
     }
 
     const status = resp.status();
     data.status = status;
+
+    if (!isChromeError && data.pageRateLimited) {
+      logger.warn(
+        "Page possibly rate limited, retrying",
+        { url, status, ...logDetails },
+        "pageStatus",
+      );
+      throw new Error("logged");
+    }
 
     let failed = isChromeError;
 
@@ -2473,6 +2643,16 @@ self.__bx_behaviors.selectMainBehavior();
     // - if first response was received, but not fully loaded
     if (fullLoadedResponse || downloadResponse) {
       data.loadState = LoadState.FULL_PAGE_LOADED;
+    }
+
+    if (!isChromeError && pageUrl !== urlNoHash) {
+      if (!(await this.crawlState.addToUserSet(pageUrl))) {
+        return this.pageSkipped(
+          "Page dynamically changed to seen page, skipping",
+          { pageUrl, url },
+          data,
+        );
+      }
     }
 
     if (!data.isHTMLPage) {
@@ -2595,15 +2775,22 @@ self.__bx_behaviors.selectMainBehavior();
   ) {
     const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
 
-    callbacks.addLink = async (url: string) => {
-      await this.queueInScopeUrls(
+    callbacks.addLink = async (url: string, ignoreScope = false) => {
+      // if crawler arg set, always ignore scope
+      // otherwise, may be determined by behavior addLink()
+      if (this.params.ignoreScopeForBehaviorLinks) {
+        ignoreScope = true;
+      }
+
+      await this.queueInScopeUrls({
         seedId,
-        [url],
+        urls: [url],
         depth,
         extraHops,
-        false,
+        pageUrl: page.url(),
         logDetails,
-      );
+        ignoreScope,
+      });
     };
 
     const frames = filteredFrames || page.frames();
@@ -2640,14 +2827,25 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async queueInScopeUrls(
-    seedId: number,
-    urls: string[],
-    depth: number,
+  async queueInScopeUrls({
+    seedId,
+    urls,
+    depth,
     extraHops = 0,
     noOOS = false,
-    logDetails: LogDetails = {},
-  ) {
+    pageUrl = undefined,
+    ignoreScope = false,
+    logDetails = {},
+  }: {
+    seedId: number;
+    urls: string[];
+    depth: number;
+    extraHops?: number;
+    noOOS?: boolean;
+    pageUrl?: string;
+    ignoreScope?: boolean;
+    logDetails?: LogDetails;
+  }) {
     try {
       depth += 1;
 
@@ -2656,24 +2854,44 @@ self.__bx_behaviors.selectMainBehavior();
 
       for (const possibleUrl of urls) {
         const res = this.getScope(
-          { url: possibleUrl, extraHops: newExtraHops, depth, seedId, noOOS },
+          seedId,
+          {
+            url: possibleUrl,
+            extraHops: newExtraHops,
+            depth,
+            noOOS,
+            pageUrl,
+            ignoreScope,
+          },
           logDetails,
         );
 
         if (!res) {
+          logger.warn(
+            "Skipping Link; not in scope",
+            { url: possibleUrl },
+            "links",
+          );
+          this.writeSkippedPage(
+            possibleUrl,
+            seedId,
+            depth,
+            SkippedReason.OutOfScope,
+          );
           continue;
         }
 
         const { url, isOOS } = res;
 
         if (url) {
-          await this.queueUrl(
+          await this.queueUrl({
             seedId,
             url,
             depth,
-            isOOS ? newExtraHops : extraHops,
+            extraHops: isOOS ? newExtraHops : extraHops,
             logDetails,
-          );
+            ignoreScope,
+          });
         }
       }
     } catch (e) {
@@ -2706,16 +2924,32 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async queueUrl(
-    seedId: number,
-    url: string,
-    depth: number,
-    extraHops: number,
-    logDetails: LogDetails = {},
+  async queueUrl({
+    seedId,
+    url,
+    depth,
+    extraHops,
+    logDetails = {},
     ts = 0,
-    pageid?: string,
-  ) {
+    pageid = undefined,
+    ignoreScope = false,
+  }: {
+    seedId: number;
+    url: string;
+    depth: number;
+    extraHops: number;
+    logDetails?: LogDetails;
+    ts?: number;
+    pageid?: string;
+    ignoreScope?: boolean;
+  }) {
     if (this.limitHit) {
+      logger.debug(
+        "Page URL not queued, at page limit",
+        { url, ...logDetails },
+        "links",
+      );
+      this.writeSkippedPage(url, seedId, depth, SkippedReason.PageLimit);
       return false;
     }
 
@@ -2728,12 +2962,13 @@ self.__bx_behaviors.selectMainBehavior();
         { url, ...logDetails },
         "links",
       );
+      this.writeSkippedPage(url, seedId, depth, SkippedReason.RobotsTxt);
       return false;
     }
 
     const result = await this.crawlState.addToQueue(
-      { url, seedId, depth, extraHops, ts, pageid },
-      this.pageLimit,
+      { url, seedId, depth, extraHops, ts, pageid, ignoreScope },
+      this.queuePageLimit,
     );
 
     switch (result) {
@@ -2753,6 +2988,7 @@ self.__bx_behaviors.selectMainBehavior();
           );
         }
         this.limitHit = true;
+        this.writeSkippedPage(url, seedId, depth, SkippedReason.PageLimit);
         return false;
 
       case QueueState.DUPE_URL:
@@ -2767,11 +3003,13 @@ self.__bx_behaviors.selectMainBehavior();
     return false;
   }
 
-  async initPages(filename: string, title: string) {
+  async initPages(filename: string, title: string, isReport: boolean = false) {
     let fh = null;
 
     try {
-      await fsp.mkdir(this.pagesDir, { recursive: true });
+      await fsp.mkdir(isReport ? this.reportsDir : this.pagesDir, {
+        recursive: true,
+      });
 
       const createNew = !fs.existsSync(filename);
 
@@ -2884,6 +3122,48 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  writeSkippedPage(
+    url: string,
+    seedId: number,
+    depth: number,
+    reason: SkippedReason,
+  ) {
+    if (!this.params.reportSkipped) {
+      return;
+    }
+
+    const seedUrl = this.seeds[seedId]?.url || "";
+
+    const ts = new Date();
+
+    let seed = false;
+    if (depth === 0) {
+      seed = true;
+    }
+
+    const row = { url, seedUrl, depth, seed, reason, ts: ts.toISOString() };
+    const processedRow = JSON.stringify(row) + "\n";
+
+    if (!this.skippedPagesFH) {
+      logger.error(
+        "Can't write skipped pages, missing stream",
+        {},
+        "pageStatus",
+      );
+      return;
+    }
+
+    try {
+      this.skippedPagesFH.write(processedRow);
+    } catch (err) {
+      logger.warn(
+        "Page append failed",
+        { pagesFile: this.skippedPagesFile },
+        "pageStatus",
+      );
+    }
+  }
+
   async parseSitemap({ url, sitemap }: ScopedSeed, seedId: number) {
     if (!sitemap) {
       return;
@@ -2920,7 +3200,7 @@ self.__bx_behaviors.selectMainBehavior();
       headers,
       fromDate,
       toDate,
-      limit: this.pageLimit,
+      limit: this.queuePageLimit,
     });
 
     let power = 1;
@@ -2958,9 +3238,13 @@ self.__bx_behaviors.selectMainBehavior();
             "sitemap",
           );
         }
-        this.queueInScopeUrls(seedId, [url], 0, 0, true).catch((e) =>
-          logger.warn("Error queuing urls", e, "links"),
-        );
+        this.queueInScopeUrls({
+          seedId,
+          urls: [url],
+          depth: 0,
+          extraHops: 0,
+          noOOS: true,
+        }).catch((e) => logger.warn("Error queuing urls", e, "links"));
         if (count >= 100 && !resolved) {
           logger.info(
             "Sitemap partially parsed, continue parsing large sitemap in the background",

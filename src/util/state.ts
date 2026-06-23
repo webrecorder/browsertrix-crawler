@@ -12,6 +12,8 @@ import {
   DUPE_ALL_COUNTS,
   DUPE_UNCOMMITTED,
   CrawlStatus,
+  SkippedReason,
+  RATE_LIMIT_TTL_SECS,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -38,7 +40,7 @@ export enum QueueState {
 }
 
 // ============================================================================
-// treat 0 or 206 as 200 for purposes of dedup
+// treat 0 or 206 as 200 for purposes of dedupe
 export function normalizeDedupeStatus(status: number): string {
   if (status === 0 || status === 206) {
     return "200";
@@ -59,6 +61,7 @@ export type QueueEntry = {
   ts?: number;
   pageid?: string;
   retry?: number;
+  ignoreScope?: boolean;
 };
 
 // ============================================================================
@@ -88,6 +91,7 @@ export class PageState {
   title?: string;
   mime?: string;
   ts?: Date;
+  ignoreScope?: boolean;
 
   callbacks: PageCallbacks = {};
 
@@ -98,6 +102,9 @@ export class PageState {
 
   skipBehaviors = false;
   pageSkipped = false;
+  pageSkipReason: SkippedReason | null = null;
+  pageRateLimited = 0;
+  pageRateLimitedRetryAfter = 0;
   noRetries = false;
 
   isDirectFetched = false;
@@ -119,6 +126,9 @@ export class PageState {
     this.pageid = redisData.pageid || uuidv4();
     this.status = 0;
     this.retry = redisData.retry || 0;
+    if (redisData.ignoreScope) {
+      this.ignoreScope = redisData.ignoreScope;
+    }
   }
 }
 
@@ -796,6 +806,10 @@ export class RedisCrawlState extends RedisDedupeIndex {
 
   includedCrawls: Set<string> = new Set<string>();
 
+  rateLimitTTL: number;
+  rateLimitInterruptCount: number;
+  rateLimitMaxRetries: number;
+
   constructor(
     redis: Redis,
     key: string,
@@ -803,6 +817,9 @@ export class RedisCrawlState extends RedisDedupeIndex {
     uid: string,
     maxRetries?: number,
     dedupeRedis?: Redis,
+    rateLimitTTL?: number,
+    rateLimitInterruptCount?: number,
+    rateLimitMaxRetries?: number,
   ) {
     super(dedupeRedis || redis, key);
     this.redis = redis;
@@ -810,6 +827,7 @@ export class RedisCrawlState extends RedisDedupeIndex {
     this.uid = uid;
     this.maxPageTime = maxPageTime;
     this.maxRetries = maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.rateLimitMaxRetries = rateLimitMaxRetries ?? -1;
 
     this.qkey = this.crawlId + ":q";
     this.pkey = this.crawlId + ":p";
@@ -837,6 +855,9 @@ export class RedisCrawlState extends RedisDedupeIndex {
     this.exKey = this.crawlId + ":excluded";
 
     this.sitemapDoneKey = this.crawlId + ":sitemapDone";
+
+    this.rateLimitTTL = rateLimitTTL || RATE_LIMIT_TTL_SECS;
+    this.rateLimitInterruptCount = rateLimitInterruptCount || -1;
 
     this._initLuaCommands(this.redis);
   }
@@ -939,7 +960,9 @@ if json then
 
   redis.call('hdel', KEYS[1], ARGV[1]);
 
-  if retry < tonumber(ARGV[2]) then
+  local maxRetries = tonumber(ARGV[2]);
+
+  if maxRetries == -1 or retry < maxRetries then
     retry = retry + 1;
     data['retry'] = retry;
     json = cjson.encode(data);
@@ -1023,16 +1046,27 @@ return inx;
   async markFinished(url: string) {
     await this.redis.hdel(this.pkey, url);
 
+    await this.redis.del(
+      `${this.crawlId}:rateLimited`,
+      `${this.crawlId}:rateLimitedDirect`,
+    );
+
     return await this.redis.incr(this.dkey);
   }
 
-  async markFailed(url: string, noRetries = false) {
+  async markFailed(url: string, noRetries = false, isRateLimit = false) {
+    const retries = noRetries
+      ? 0
+      : isRateLimit
+      ? this.rateLimitMaxRetries
+      : this.maxRetries;
+
     return await this.redis.requeuefailed(
       this.pkey,
       this.qkey,
       this.fkey,
       url,
-      noRetries ? 0 : this.maxRetries,
+      retries,
       MAX_DEPTH,
     );
   }
@@ -1043,10 +1077,73 @@ return inx;
     await this.redis.sadd(this.exKey, url);
   }
 
+  async incRateLimited(
+    rateLimitStatus: number,
+    retryAfter = 0,
+    isDirectFetch = false,
+  ) {
+    if (rateLimitStatus < 400 || rateLimitStatus === 404) {
+      return false;
+    }
+
+    const statVal = rateLimitStatus + (isDirectFetch ? " d" : "");
+
+    // track rate limit stats
+    await this.redis.hincrby(`${this.crawlId}:rateStats`, statVal, 1);
+
+    const key = this.crawlId + (isDirectFetch ? ":rateDirect" : ":rate");
+
+    if (retryAfter > 0) {
+      logger.debug(
+        "Rate limited with custom Retry-After",
+        { retryAfter },
+        "state",
+      );
+    } else {
+      retryAfter = this.rateLimitTTL;
+    }
+    const res = await this.redis.incrby(key, 1);
+    await this.redis.expire(key, retryAfter);
+
+    const isLimited =
+      this.rateLimitInterruptCount > 0 && res >= this.rateLimitInterruptCount;
+
+    if (isLimited) {
+      const rateLimitKey = this.getRateLimitKey(isDirectFetch);
+      await this.redis.set(rateLimitKey, isLimited ? "1" : "");
+      await this.redis.expire(rateLimitKey, retryAfter);
+
+      if (!isDirectFetch) {
+        logger.debug(
+          "Rate Limit Interrupt Count Reached, interrupting crawl on too many rate limited pages",
+          {
+            rateLimitCount: res,
+            interruptCount: this.rateLimitInterruptCount,
+          },
+          "state",
+        );
+      }
+    }
+  }
+
+  getRateLimitKey(isDirectFetch: boolean) {
+    return (
+      this.crawlId + (isDirectFetch ? ":rateLimitedDirect" : ":rateLimited")
+    );
+  }
+
+  async isRateLimited(isDirectFetch: boolean) {
+    const rateLimitKey = this.getRateLimitKey(isDirectFetch);
+    const res = await this.redis.get(rateLimitKey);
+    return res === "1";
+  }
+
   recheckScope(data: QueueEntry, seeds: ScopedSeed[]) {
     const seed = seeds[data.seedId];
 
-    return seed.isIncluded(data.url, data.depth, data.extraHops);
+    const { url, depth, extraHops } = data;
+
+    return seed.isIncluded({ url, depth, extraHops });
   }
 
   async isFinished() {
@@ -1275,6 +1372,7 @@ return inx;
       extraHops = 0,
       ts = 0,
       pageid = undefined,
+      ignoreScope = undefined,
     }: QueueEntry,
     limit = 0,
   ) {
@@ -1289,6 +1387,9 @@ return inx;
     }
     if (pageid) {
       data.pageid = pageid;
+    }
+    if (ignoreScope) {
+      data.ignoreScope = ignoreScope;
     }
 
     // return codes

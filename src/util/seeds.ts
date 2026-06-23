@@ -2,11 +2,11 @@ import fs from "fs";
 
 import { MAX_DEPTH } from "./constants.js";
 import { collectOnlineSeedFile } from "./file_reader.js";
-import { logger } from "./logger.js";
+import { LogDetails, logger } from "./logger.js";
 import { type CrawlerArgs } from "./argParser.js";
 import { normalizeUrl } from "./normalize.js";
 
-type ScopeType =
+export type ScopeType =
   | "prefix"
   | "host"
   | "domain"
@@ -14,6 +14,27 @@ type ScopeType =
   | "page-spa"
   | "any"
   | "custom";
+
+export type ScopedSeedInitOpts = {
+  url: string;
+  scopeType: ScopeType | undefined;
+  include: string[];
+  exclude: string[];
+  allowHash?: boolean;
+  depth?: number;
+  sitemap?: string | boolean | null;
+  extraHops?: number;
+  auth?: string | null;
+};
+
+export type LinkEntry = {
+  url: string;
+  depth: number;
+  extraHops?: number;
+  noOOS?: boolean;
+  ignoreScope?: boolean;
+  pageUrl?: string;
+};
 
 export class ScopedSeed {
   url: string;
@@ -43,17 +64,7 @@ export class ScopedSeed {
     sitemap = false,
     extraHops = 0,
     auth = null,
-  }: {
-    url: string;
-    scopeType: ScopeType | undefined;
-    include: string[];
-    exclude: string[];
-    allowHash?: boolean;
-    depth?: number;
-    sitemap?: string | boolean | null;
-    extraHops?: number;
-    auth?: string | null;
-  }) {
+  }: ScopedSeedInitOpts) {
     const parsedUrl = this.parseUrl(url);
     if (!parsedUrl) {
       throw new Error("Invalid URL");
@@ -84,7 +95,7 @@ export class ScopedSeed {
         parsedUrl,
       );
       this.include = [...includeNew, ...this.include];
-      allowHash = allowHashNew;
+      allowHash ||= allowHashNew;
     }
 
     // for page scope, the depth is set to extraHops, as no other
@@ -143,10 +154,10 @@ export class ScopedSeed {
     }
   }
 
-  parseUrl(url: string, logDetails = {}) {
+  parseUrl(url: string, pageUrl?: string, logDetails: LogDetails = {}) {
     let parsedUrl = null;
     try {
-      parsedUrl = new URL(url.trim());
+      parsedUrl = new URL(url.trim(), pageUrl);
     } catch (e) {
       logger.warn("Invalid Page - not a valid URL", { url, ...logDetails });
       return null;
@@ -245,13 +256,17 @@ export class ScopedSeed {
   }
 
   isIncluded(
-    url: string,
-    depth: number,
-    extraHops = 0,
-    logDetails = {},
-    noOOS = false,
+    {
+      url,
+      depth = 0,
+      extraHops = 0,
+      noOOS = false,
+      ignoreScope = false,
+      pageUrl,
+    }: LinkEntry,
+    logDetails: LogDetails = {},
   ): { url: string; isOOS: boolean } | false {
-    const urlParsed = this.parseUrl(url, logDetails);
+    const urlParsed = this.parseUrl(url, pageUrl, logDetails);
     if (!urlParsed) {
       return false;
     }
@@ -270,15 +285,12 @@ export class ScopedSeed {
       return { url, isOOS: false };
     }
 
-    // skip already crawled
-    // if (this.seenList.has(url)) {
-    //  return false;
-    //}
-    let inScope = false;
+    // if ignoring scope, all URLs in scope unless excluded
+    let inScope = ignoreScope;
 
     // check scopes if depth <= maxDepth
     // if depth exceeds, than always out of scope
-    if (depth <= this.maxDepth) {
+    if (!inScope && depth <= this.maxDepth) {
       for (const s of this.include) {
         if (s.test(normUrl)) {
           inScope = true;
@@ -348,13 +360,14 @@ export async function parseSeeds(
     }
   }
 
-  const scopeOpts = {
+  const scopeOpts: Omit<ScopedSeedInitOpts, "url"> = {
     scopeType: params.scopeType as ScopeType | undefined,
     sitemap: params.sitemap,
     include: params.include,
     exclude: params.exclude,
     depth: params.depth,
     extraHops: params.extraHops,
+    allowHash: params.allowHashUrls,
   };
 
   for (const seed of seeds) {

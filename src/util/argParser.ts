@@ -19,6 +19,8 @@ import {
   DEFAULT_MAX_RETRIES,
   BxFunctionBindings,
   DEFAULT_CRAWL_ID_TEMPLATE,
+  RATE_LIMIT_MATCH_200,
+  RATE_LIMIT_TTL_SECS,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -57,6 +59,9 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   state?: SaveState;
 
   warcInfo?: Record<string, string>;
+
+  rateLimitOn200MatchText: string[];
+  rateLimitStatusCodes: number[];
 };
 
 // ============================================================================
@@ -172,6 +177,7 @@ class ArgParser {
         allowHashUrls: {
           describe:
             "Allow Hashtag URLs, useful for single-page-application crawling or when different hashtags load dynamic content",
+          type: "boolean",
         },
 
         selectLinks: {
@@ -181,6 +187,13 @@ class ArgParser {
           type: "array",
           default: ["a[href]->href"],
           coerce,
+        },
+
+        ignoreScopeForBehaviorLinks: {
+          describe:
+            "If set, permits addLink() calls from behavior scripts to bypass crawl scope and ensures that the extra links are always crawled",
+          type: "boolean",
+          default: false,
         },
 
         clickSelector: {
@@ -481,12 +494,12 @@ class ArgParser {
           type: "string",
         },
 
-        // minPageDedupeDepth: {
-        //   describe:
-        //     "If set >= 0, minimum depth at which duplicate pages can be skipped. -1 means never skip duplicate pages",
-        //   type: "number",
-        //   default: -1,
-        // },
+        dedupePagesMinDepth: {
+          describe:
+            "If set >= 0, minimum depth at which duplicate pages can be skipped. -1 means never skip duplicate pages",
+          type: "number",
+          default: -1,
+        },
 
         saveState: {
           describe:
@@ -760,6 +773,49 @@ class ArgParser {
           describe: "Agent to check in addition to '*' for robots rules",
           type: "string",
           default: "Browsertrix/1.x",
+        },
+
+        reportSkipped: {
+          describe:
+            "If set, write information about URLs encountered but not queued to reports/skippedPages.jsonl",
+          type: "boolean",
+          default: false,
+        },
+
+        rateLimitOn200MatchText: {
+          describe:
+            "Consider page rate limited given the following matches by status code and text",
+          type: "array",
+          default: RATE_LIMIT_MATCH_200,
+        },
+
+        rateLimitStatusCodes: {
+          describe:
+            "Consider responses with these status codes to be treated as rate-limited/blocked responses",
+          type: "array",
+          default: [403, 429, 503],
+        },
+
+        rateLimitTimeout: {
+          describe:
+            "Time in seconds to track rate limited count for before resetting",
+          type: "number",
+          default: RATE_LIMIT_TTL_SECS,
+        },
+
+        rateLimitMaxRetries: {
+          alias: "retries",
+          describe:
+            "If set >=0, number of times to retry rate limited pages before marking them as failed. If -1, retry indefinitely",
+          type: "number",
+          default: -1,
+        },
+
+        rateLimitInterruptCount: {
+          describe:
+            "If >0, threshold for number of rate limited pages before crawl is considered rate limited and is interrupted",
+          type: "number",
+          default: -1,
         },
       });
   }

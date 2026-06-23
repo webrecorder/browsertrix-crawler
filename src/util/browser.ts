@@ -119,6 +119,9 @@ export class Browser {
 
     await this.installProfile(profileUrl);
 
+    // remove singletons from profile dir always
+    this.removeSingletons();
+
     this.swOpt = swOpt;
 
     this.emulateDevice = emulateDevice;
@@ -274,19 +277,19 @@ export class Browser {
     }
 
     try {
-      child_process.execSync("tar xvfz " + profileLocalSrc, {
+      child_process.execFileSync("tar", ["xvfz", profileLocalSrc], {
         cwd: profileDir,
         stdio: "ignore",
       });
-      this.removeSingletons();
     } catch (e) {
       throw new Error(`Profile ${profileLocalSrc} not a valid tar.gz`);
     }
   }
 
   removeSingletons() {
+    const singletons = fs.globSync("./Singleton*");
     try {
-      child_process.execSync("rm ./Singleton*", {
+      child_process.execFileSync("rm", singletons, {
         cwd: this.profileDir,
         stdio: "ignore",
       });
@@ -519,7 +522,7 @@ export class Browser {
   private async _init(
     launchOpts: LaunchOptions,
     recording: boolean,
-    // eslint-disable-next-line @typescript-eslint/ban-types
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     ondisconnect: Function | null = null,
   ) {
     this.browser = await puppeteer.launch(launchOpts);

@@ -16,12 +16,12 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
       - name: install requirements
@@ -34,17 +34,17 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.x
 
@@ -60,13 +60,14 @@ jobs:
           key: docker-${{ runner.os }}-${{ hashFiles('Dockerfile') }}
 
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: build docker
-        run: docker compose build
+        run: docker compose build --build-arg MINIMIZE_IMAGE_SIZE=1
 
       - name: install python deps for docs
         run: pip install mkdocs-material
@@ -87,4 +88,4 @@ jobs:
         run: |
           sudo rm -rf ./test-crawls
           mkdir test-crawls
-          sudo CI=true yarn test ./tests/saved-state.test.js ./tests/qa_compare.test.js
+          sudo CI=true yarn test ./tests/saved-state.test.ts ./tests/qa_compare.test.ts

@@ -100,6 +100,7 @@ export class WACZ {
   pagesDir: string;
   warcCdxDir: string;
   indexesDir: string;
+  reportsDir: string | null;
 
   datapackage: WACZDataPackage;
 
@@ -116,6 +117,7 @@ export class WACZ {
     this.warcCdxDir = config.warcCdxDir;
     this.collDir = collDir;
     this.indexesDir = config.indexesDir;
+    this.reportsDir = config.reportsDir || null;
 
     this.datapackage = {
       resources: [],
@@ -141,11 +143,15 @@ export class WACZ {
   }
 
   generate(): Readable {
-    const files = [
+    const baseFiles = [
       ...this.warcs,
       ...addDirFiles(this.indexesDir),
       ...addDirFiles(this.pagesDir),
     ];
+
+    const files = this.reportsDir
+      ? [...baseFiles, ...addDirFiles(this.reportsDir)]
+      : baseFiles;
 
     const zip = makeZip(
       this.iterDirForZip(files),

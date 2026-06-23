@@ -90,6 +90,7 @@ export enum ExitCodes {
   TimeLimit = 15,
   DiskUtilization = 16,
   Fatal = 17,
+  RateLimited = 18,
   ProxyError = 21,
   UploadFailed = 22,
 }
@@ -102,6 +103,7 @@ export enum InterruptReason {
   BrowserCrashed = 5,
   SignalInterrupted = 6,
   CrawlPaused = 7,
+  RateLimited = 8,
 }
 
 export type CrawlStatus =
@@ -117,3 +119,25 @@ export type CrawlStatus =
   | "canceled";
 
 export const WARC_REFERS_TO_CONTAINER = "WARC-Refers-To-Container";
+
+export enum SkippedReason {
+  OutOfScope = "outOfScope",
+  PageLimit = "pageLimit",
+  RobotsTxt = "robotsTxt",
+  RedirectToExcluded = "redirectToExcluded",
+  Duplicate = "duplicate",
+  RateLimit = "rateLimited",
+  Failed = "failed",
+}
+
+// Direct Fetch Error Constants
+export const STATUS_IS_HTML_NO_DIRECT_FETCH = 600;
+
+export const STATUS_UNKNOWN_ERROR = 999;
+
+// ============================================================================
+// Rate Limit Constants
+export const RATE_LIMIT_TTL_SECS = 300;
+
+// default text matches to consider rate limit on 200
+export const RATE_LIMIT_MATCH_200 = [`src="/_Incapsula_Resource?`];
