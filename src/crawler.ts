@@ -76,6 +76,8 @@ import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
 import { normalizedRedirectSeedUrl } from "./util/normalize.js";
 
+import { DISABLE_MEDIASOURCE_SCRIPT } from "@webrecorder/wabac";
+
 const btrixBehaviors = fs.readFileSync(
   new URL(
     "../node_modules/browsertrix-behaviors/dist/behaviors.js",
@@ -888,6 +890,10 @@ self.__bx_behaviors.selectMainBehavior();
       });
 
       await this.browser.addInitScript(page, initScript);
+    }
+
+    if (this.params.disableMediaSource) {
+      await this.browser.addInitScript(page, DISABLE_MEDIASOURCE_SCRIPT);
     }
 
     let dialogCount = 0;

@@ -792,6 +792,13 @@ class ArgParser {
           type: "number",
           default: -1,
         },
+
+        disableMediaSource: {
+          describe:
+            "If set, runs a script to disable AV1 media types for video site captures",
+          type: "boolean",
+          default: true,
+        },
       });
   }
 
