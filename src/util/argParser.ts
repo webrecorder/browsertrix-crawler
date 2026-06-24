@@ -792,6 +792,15 @@ class ArgParser {
           type: "number",
           default: -1,
         },
+
+        disableMediaSource: {
+          describe:
+            "If set, runs a script to disable AV1 media types for video site captures",
+          type: "boolean",
+          // We should consider changing the default to false in the future
+          // when this is less necessary for capturing sites like YouTube.
+          default: true,
+        },
       });
   }
 
