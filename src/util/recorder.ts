@@ -1533,7 +1533,7 @@ export class Recorder extends EventEmitter {
     }
     if (!this.stopping) {
       state.isDirectFetched = true;
-      void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
+      void this.browserFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
     }
     return reqresp.status;
   }
