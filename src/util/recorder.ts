@@ -1115,9 +1115,9 @@ export class Recorder extends EventEmitter {
         await this.serializeToWARC(reqresp);
         // if no url, and not fetching,
         // drop this request, as it was not being loaded
-      } else if (!reqresp.url || !isFetching) {
+      } else if (!reqresp.url && !isFetching) {
         logger.debug(
-          "Removing pending request that was never fetched",
+          "Removing empty request that was never fetched",
           { requestId, url: reqresp.url, ...this.logDetails },
           "recorder",
         );
