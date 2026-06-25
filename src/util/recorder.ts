@@ -1108,14 +1108,16 @@ export class Recorder extends EventEmitter {
   async awaitPageResources() {
     for (const [requestId, reqresp] of this.pendingRequests.entries()) {
       // check if possibly being fetched
-      const isFetching = reqresp.asyncLoading || reqresp.intercepting;
+      if (reqresp.asyncLoading || reqresp.intercepting) {
+        continue;
+      }
 
-      if (reqresp.payload?.length && !isFetching) {
+      if (reqresp.payload?.length) {
         this.removeReqResp(requestId);
         await this.serializeToWARC(reqresp);
         // if no url, and not fetching,
         // drop this request, as it was not being loaded
-      } else if (!reqresp.url && !isFetching) {
+      } else if (!reqresp.url) {
         logger.debug(
           "Removing empty request that was never fetched",
           { requestId, url: reqresp.url, ...this.logDetails },
