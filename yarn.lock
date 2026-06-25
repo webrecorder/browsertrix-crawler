@@ -1425,19 +1425,12 @@
   resolved "https://registry.yarnpkg.com/@types/md5/-/md5-2.3.6.tgz#db6901a9fc1d95eeed851a62c5ce5dedfac8ff9a"
   integrity sha512-WD69gNXtRBnpknfZcb4TRQ0XJQbUPZcai/Qdhmka3sxUR3Et8NrXoeAoknG/LghYHTf4ve795rInVYHBTQdNVA==
 
-"@types/node@*":
-  version "22.9.3"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-22.9.3.tgz#08f3d64b3bc6d74b162d36f60213e8a6704ef2b4"
-  integrity sha512-F3u1fs/fce3FFk+DAxbxc78DF8x0cY09RRL8GnXLmkJ1jvx3TtPdWoTT5/NiYfI5ASqXBmfqJi9dZ3gxMx4lzw==
+"@types/node@*", "@types/node@^26.1.1":
+  version "26.1.1"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-26.1.1.tgz#bad758d601e97d6cf457d204ee76a35fce7bd119"
+  integrity sha512-nxAkRSVkN1Y0JC1W8ky/fTfkGsMmcrRsbx+3XoZE+rMOX71kLYTV7fLXpqud1GpbpP5TuffXFqfX7fH2GgZREw==
   dependencies:
-    undici-types "~6.19.8"
-
-"@types/node@^25.5.0":
-  version "25.5.0"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-25.5.0.tgz#5c99f37c443d9ccc4985866913f1ed364217da31"
-  integrity sha512-jp2P3tQMSxWugkCUKLRPVUpGaL5MVFwF8RDuSRztfwgN1wmqJeMSbKlnEtQqU8UrhTmzEmZdu2I6v2dpp7XIxw==
-  dependencies:
-    undici-types "~7.18.0"
+    undici-types "~8.3.0"
 
 "@types/pako@^1.0.7":
   version "1.0.7"
@@ -3016,13 +3009,13 @@ fdir@^6.5.0:
   resolved "https://registry.yarnpkg.com/fdir/-/fdir-6.5.0.tgz#ed2ab967a331ade62f18d077dae192684d50d350"
   integrity sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==
 
-fetch-socks@^1.3.2:
-  version "1.3.2"
-  resolved "https://registry.yarnpkg.com/fetch-socks/-/fetch-socks-1.3.2.tgz#1b59a382049fc349bd2ac885860882b2635022ca"
-  integrity sha512-vkH5+Zgj2yEbU57Cei0iyLgTZ4OkEKJj56Xu3ViB5dpsl599JgEooQ3x6NVagIFRHWnWJ+7K0MO0aIV1TMgvnw==
+fetch-socks@^1.3.3:
+  version "1.3.3"
+  resolved "https://registry.yarnpkg.com/fetch-socks/-/fetch-socks-1.3.3.tgz#bc459399b52c3395c8bac37649d7638ee479db7a"
+  integrity sha512-jI22jzTf7x3GAcUoZARwuxKBPotb3PFkemVWqxlF2qV55FhRytRJrn95HeLoUMq2vkIbY3aQqNYytvZKqUoMaQ==
   dependencies:
-    socks "^2.8.2"
-    undici ">=6"
+    socks "^2.8.7"
+    undici ">=7"
 
 file-entry-cache@^6.0.1:
   version "6.0.1"
@@ -5466,7 +5459,7 @@ smart-buffer@^4.2.0:
   resolved "https://registry.yarnpkg.com/smart-buffer/-/smart-buffer-4.2.0.tgz#6e1d71fa4f18c05f7d0ff216dd16a481d0e8d9ae"
   integrity sha512-94hK0Hh8rPqQl2xXc3HsaBoOXKV20MToPkcXvwbISWLEs+64sBq5kFgn2kJDHb1Pry9yrP0dxrCI9RRci7RXKg==
 
-socks@^2.8.2:
+socks@^2.8.7:
   version "2.8.9"
   resolved "https://registry.yarnpkg.com/socks/-/socks-2.8.9.tgz#aa5f130ca0f88a43fa44faf4869c50d22aa27752"
   integrity sha512-LJhUYUvItdQ0LkJTmPeaEObWXAqFyfmP85x0tch/ez9cahmhlBBLbIqDFnvBnUJGagb0JbIQrkBs1wJ+yRYpEw==
@@ -5959,20 +5952,20 @@ unbox-primitive@^1.0.2, unbox-primitive@^1.1.0:
     has-symbols "^1.1.0"
     which-boxed-primitive "^1.1.1"
 
-undici-types@~6.19.8:
-  version "6.19.8"
-  resolved "https://registry.yarnpkg.com/undici-types/-/undici-types-6.19.8.tgz#35111c9d1437ab83a7cdc0abae2f26d88eda0a02"
-  integrity sha512-ve2KP6f/JnbPBFyobGHuerC9g1FYGn/F8n1LWTwNxCEzd6IfqTwUQcNXgEtmmQ6DlRrC1hrSrBnCZPokRrDHjw==
+undici-types@~8.3.0:
+  version "8.3.0"
+  resolved "https://registry.yarnpkg.com/undici-types/-/undici-types-8.3.0.tgz#44e9fc9f3244648cdea35e4f9bb2d681e9410809"
+  integrity sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==
 
-undici-types@~7.18.0:
-  version "7.18.2"
-  resolved "https://registry.yarnpkg.com/undici-types/-/undici-types-7.18.2.tgz#29357a89e7b7ca4aef3bf0fd3fd0cd73884229e9"
-  integrity sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==
+undici@>=7:
+  version "8.5.0"
+  resolved "https://registry.yarnpkg.com/undici/-/undici-8.5.0.tgz#31ba9021a3d84c15e61cc5e28be2d7c451e66a66"
+  integrity sha512-xamtWoB1EshgjpmlXd7GGm2VfdDtw1+rD8uhry8pSNW3If6S8E0m2T2+orSKeZXEn/aPJMviCpDBA65WJt8zhg==
 
-undici@>=6, undici@^7.28.0:
-  version "7.28.0"
-  resolved "https://registry.yarnpkg.com/undici/-/undici-7.28.0.tgz#97d64564198b285bc281f0e8e29597e3d11fe7ec"
-  integrity sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==
+undici@^8.7.0:
+  version "8.7.0"
+  resolved "https://registry.yarnpkg.com/undici/-/undici-8.7.0.tgz#04c5aae1db34d9867488588b44b8c749dee9baee"
+  integrity sha512-N7iQtfyLhIMOFgQubvmLV26svHpO0bqKnAiWotTQCVKCmWrcGbBotPuW1x+xwYZ2VHdSTVUfPQQnlEt1/LouTQ==
 
 union@~0.5.0:
   version "0.5.0"
