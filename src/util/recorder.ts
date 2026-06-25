@@ -1106,18 +1106,22 @@ export class Recorder extends EventEmitter {
   }
 
   async awaitPageResources() {
+    // Check stale requests left in the pendingRequests list
     for (const [requestId, reqresp] of this.pendingRequests.entries()) {
-      if (reqresp.payload && !reqresp.asyncLoading) {
+      // check if possibly being fetched, continue
+      if (reqresp.asyncLoading || reqresp.intercepting) {
+        continue;
+      }
+
+      // if request payload has finished, but somehow wasn't removed
+      // write and remove here
+      if (reqresp.payload?.length) {
         this.removeReqResp(requestId);
         await this.serializeToWARC(reqresp);
-        // if no url, and not fetch intercept or async loading,
-        // drop this request, as it was not being loaded
-      } else if (
-        !reqresp.url ||
-        (!reqresp.intercepting && !reqresp.asyncLoading)
-      ) {
+        // if no URL set, likely this has been abandoned, drop
+      } else if (!reqresp.url) {
         logger.debug(
-          "Removing pending request that was never fetched",
+          "Removing empty request that was never fetched",
           { requestId, url: reqresp.url, ...this.logDetails },
           "recorder",
         );
