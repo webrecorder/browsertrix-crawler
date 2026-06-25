@@ -50,12 +50,17 @@ Options:
       --allowHashUrls                       Allow Hashtag URLs, useful for singl
                                             e-page-application crawling or when
                                             different hashtags load dynamic cont
-                                            ent
+                                            ent                        [boolean]
       --selectLinks, --linkSelector         One or more selectors for extracting
                                              links, in the format [css selector]
                                             ->[property to use],[css selector]->
                                             @[attribute to use]
                                             [array] [default: ["a[href]->href"]]
+      --alwaysAddBehaviorLinks              If set, permits addLink() calls from
+                                             behavior scripts to bypass crawl sc
+                                            ope and ensures that the extra links
+                                             are always crawled
+                                                      [boolean] [default: false]
       --clickSelector                       Selector for elements to click when
                                             using the autoclick behavior
                                                          [string] [default: "a"]
@@ -345,6 +350,25 @@ Options:
                                              encountered but not queued to repor
                                             ts/skippedPages.jsonl
                                                       [boolean] [default: false]
+      --rateLimitOn200MatchText             Consider page rate limited given the
+                                             following matches by status code an
+                                            d text
+                              [array] [default: ["src=\"/_Incapsula_Resource?"]]
+      --rateLimitStatusCodes                Consider responses with these status
+                                             codes to be treated as rate-limited
+                                            /blocked responses
+                                                [array] [default: [403,429,503]]
+      --rateLimitTimeout                    Time in seconds to track rate limite
+                                            d count for before resetting
+                                                         [number] [default: 300]
+      --rateLimitMaxRetries, --retries      If set >=0, number of times to retry
+                                             rate limited pages before marking t
+                                            hem as failed. If -1, retry indefini
+                                            tely          [number] [default: -1]
+      --rateLimitInterruptCount             If >0, threshold for number of rate
+                                            limited pages before crawl is consid
+                                            ered rate limited and is interrupted
+                                                          [number] [default: -1]
       --config                              Path to YAML config file
 ```
 

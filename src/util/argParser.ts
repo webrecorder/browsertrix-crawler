@@ -189,7 +189,7 @@ class ArgParser {
           coerce,
         },
 
-        ignoreScopeForBehaviorLinks: {
+        alwaysAddBehaviorLinks: {
           describe:
             "If set, permits addLink() calls from behavior scripts to bypass crawl scope and ensures that the extra links are always crawled",
           type: "boolean",

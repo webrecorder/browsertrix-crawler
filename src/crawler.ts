@@ -2704,7 +2704,7 @@ self.__bx_behaviors.selectMainBehavior();
     callbacks.addLink = async (url: string, ignoreScope = false) => {
       // if crawler arg set, always ignore scope
       // otherwise, may be determined by behavior addLink()
-      if (this.params.ignoreScopeForBehaviorLinks) {
+      if (this.params.alwaysAddBehaviorLinks) {
         ignoreScope = true;
       }
 
