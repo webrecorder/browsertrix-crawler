@@ -26,6 +26,7 @@ export const DUPE_ALL_HASH_KEY = "alldupes";
 export const DUPE_ALL_CRAWLS = "allcrawls";
 export const DUPE_ALL_COUNTS = "allcounts";
 export const DUPE_UNCOMMITTED = "uncommittedcrawls";
+export const DUPE_CANCELED_CRAWLS = "allcanceled";
 
 export enum BxFunctionBindings {
   BehaviorLogFunc = "__bx_log",

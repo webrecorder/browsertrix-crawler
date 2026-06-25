@@ -476,6 +476,13 @@ class ArgParser {
           default: -1,
         },
 
+        dedupeConcurrent: {
+          describe:
+            "If set, immediately add deduped URLs to the dedupe index instead to allow dedupe of concurrently running crawls, but makes cancelling crawls potentially lossy",
+          type: "boolean",
+          default: false,
+        },
+
         saveState: {
           describe:
             "If the crawl state should be serialized to the crawls/ directory. Defaults to 'partial', only saved when crawl is interrupted",

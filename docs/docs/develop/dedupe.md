@@ -65,6 +65,12 @@ Once a crawl is finished, the merged index keys are updated as follows:
 Committing the crawl may take a long time, depending on the size of the crawl. For this reason, the indexer entrypoint
 includes a dedicated command to commit a single crawl, `indexer --commitCrawlId <crawlid>`.
 
+### Concurrent Crawl Support
+
+If running with `--dedupeConcurrent`, each new hash is automatically committed to `allhashes` and `allcounts` is updated
+for every new hash. If a concurrent crawl is canceled, it is additionally tracked in `allcanceled` to indicate that it
+needs to be included in the remove crawl count
+
 #### Dedupe Lookup
 
 To write a revisit record, two Redis lookups are needed:

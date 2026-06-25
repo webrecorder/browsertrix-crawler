@@ -26,10 +26,16 @@ been archived, it will not be saved again, instead a [`revisit` record will be c
   
     While the index needs to be Redis-compatible, any Redis-compatible database can be used as well without additional changes. [Apache Kvrocks](https://kvrocks.apache.org/) is a good choice for the dedupe index database as it persists the data on disk, instead of keeping it all in memory like Redis. 
 
-When multiple crawls are running at the same time, the resources from one crawl are not yet available to the other crawls.
-This is to account for crawls that may be cancelled or fail.
+
+### Crawl Cancellation and Concurrent Crawl support
+
+Bt default, when multiple crawls are running at the same time, the resources from one crawl are not yet available to the other crawls.
+This is to account for crawls that may be cancelled or fail. If the crawl is cancelled/failed, the data is not entered into the shared dedupe index.
 
 Once a crawl is complete, its data is fully 'committed' to the index and available to be deduplicated against by future crawls. This happens automatically when running the crawler via command line but can also be triggered [via a special indexer command](#committing-finished-crawls-to-the-index).
+
+Sometimes it is necessary to run dedupe concurrently running crawls. The `--dedupeConcurrent` flag can be used to ensure
+the dedupe index is updated immediately while the crawl is running. As a trade-off, if the crawl is canceled/failed/deleted, there may be data loss as crawler does not write the data on the assumption that duplicate is stored in a concurrently running crawl, but that crawl is canceled/failed, that data may not be there. For this reason, this is not the default behavior, but may be enabled if concurrent crawls will not be canceled and will be retried on failure.
 
 ### Example: Running crawls with deduplication
 
@@ -98,9 +104,13 @@ docker run -it webrecorder/browsertrix-crawler indexer --commitCrawlId <crawl-id
 
 The commit process may take a long time if it was a large crawl, but generally should finish quickly.
 
+If running with `--dedupeConcurrent`, no commit operation is needed as the data is automatically committed.
+
 ### Handling interrupted or canceled crawls
 
-If a crawler is interrupted, eg. with SIGINT, the dedupe data stored for that crawl will not yet committed.
+If a crawler is interrupted, eg. with SIGINT, the dedupe data stored for that crawl will not yet committed
+(unless `--dedupeConcurrent` was used, see below).
+
 Since the crawl has not finished, the user may or may not want to include the data in the dedupe index.
 
 To include the partially finished crawl, run the above command with `--commitCrawlId`.
@@ -113,6 +123,14 @@ docker run -it webrecorder/browsertrix-crawler indexer --cancelCrawlId <crawl-id
 
 This operational is not required - the data from the interrupted crawl will not be used in further dedupe, it will
 simply free up the data on the Redis.
+
+#### With concurrent crawl support
+
+If the crawl was run with `--dedupeConcurrent`, and it is canceled/failed, the crawl is tracked in a list of removed crawls that
+should be purged. The crawl will be removed when the `indexer --remove` operation is performed.
+
+Since other crawl data may have been deduped against the failed crawl, it is possible that there is missing data,
+if the crawl is marked as dependency of another crawl. Rerunning the crawl may patch the missing data in this case.
 
 
 ## Page Deduplication
