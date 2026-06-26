@@ -204,8 +204,8 @@ export class Recorder extends EventEmitter {
 
     this.writer = writer;
 
-    this.browserFetchQ = new PQueue({ concurrency: 1 });
-    this.asyncFetchQ = new PQueue({ concurrency: 1 });
+    this.browserFetchQ = new PQueue({ concurrency: 10 });
+    this.asyncFetchQ = new PQueue({ concurrency: 10 });
 
     this.frameIdToExecId = null;
   }
@@ -1532,9 +1532,8 @@ export class Recorder extends EventEmitter {
       return STATUS_IS_HTML_NO_DIRECT_FETCH;
     }
     if (!this.stopping) {
-      //state.isDirectFetched = true;
-      //void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
-      await fetcher.loadDirectPage(state, crawler);
+      state.isDirectFetched = true;
+      void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
     }
     return reqresp.status;
   }

@@ -30,6 +30,7 @@ const baseOpts: Agent.Options = {
 
   // allow HTTP/2 connections
   allowH2: true,
+  connections: 20,
 };
 
 // Opts for all archival content requests
