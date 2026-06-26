@@ -2278,8 +2278,9 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    const pendingPages = await this.crawlState.getPendingList();
-    const pending = pendingPages.length;
+    const pendingPagesFull = await this.crawlState.getPendingList();
+    const pending = pendingPagesFull.length;
+    const pendingPages = pendingPagesFull.slice(0, 10);
     const crawled = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
     const total = await this.crawlState.numFound();

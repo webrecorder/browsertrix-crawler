@@ -1195,9 +1195,6 @@ export class Recorder extends EventEmitter {
     this.frameIdToExecId = null;
 
     this.pageFinished = true;
-
-    // clear out async fetch queues here
-    await this.asyncFetchQ.onIdle();
   }
 
   async onDone(timeout: number) {
@@ -1535,8 +1532,9 @@ export class Recorder extends EventEmitter {
       return STATUS_IS_HTML_NO_DIRECT_FETCH;
     }
     if (!this.stopping) {
-      state.isDirectFetched = true;
-      void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
+      //state.isDirectFetched = true;
+      //void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
+      await fetcher.loadDirectPage(state, crawler);
     }
     return reqresp.status;
   }
