@@ -1147,6 +1147,8 @@ export class Recorder extends EventEmitter {
           expectedSize?: number;
           readSize?: number;
           resourceType?: string;
+          size?: number;
+          status?: string;
         } = { requestId, url };
         if (reqresp.expectedSize) {
           entry.expectedSize = reqresp.expectedSize;
@@ -1157,6 +1159,13 @@ export class Recorder extends EventEmitter {
         if (reqresp.resourceType) {
           entry.resourceType = reqresp.resourceType;
         }
+        entry.size = reqresp.payload?.length;
+        entry.status = reqresp.intercepting
+          ? "intercepting"
+          : reqresp.asyncLoading
+          ? "async"
+          : "unknown";
+
         pending.push(entry);
       }
 
