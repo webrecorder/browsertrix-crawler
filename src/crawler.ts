@@ -269,7 +269,9 @@ export class Crawler {
     // and additional pages needed from the queue
     // otherwise, queuePageLimit == pagesLimit
     this.queuePageLimit =
-      this.params.dedupePagesMinDepth >= 0 ? 0 : this.pageLimit;
+      this.params.dedupe && this.params.dedupePagesMinDepth >= 0
+        ? 0
+        : this.pageLimit;
 
     this.saveStateFiles = [];
     this.lastSaveTime = 0;
@@ -366,7 +368,9 @@ export class Crawler {
 
   async initCrawlState() {
     const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
-    const dedupeRedisUrl = this.params.redisDedupeUrl || redisUrl;
+    const dedupeRedisUrl = this.params.dedupe
+      ? this.params.redisDedupeUrl || redisUrl
+      : redisUrl;
 
     this.isExternalDedupeStore = dedupeRedisUrl !== redisUrl;
 

@@ -361,7 +361,9 @@ export class PageWorker {
       const data = await crawlState.nextFromQueue();
 
       const limit = this.crawler.pageLimit;
-      const isDedupePages = this.crawler.params.dedupePagesMinDepth >= 0;
+      const isDedupePages =
+        this.crawler.params.dedupe &&
+        this.crawler.params.dedupePagesMinDepth >= 0;
 
       // see if any work data in the queue
       if (data) {

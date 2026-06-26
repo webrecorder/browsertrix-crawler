@@ -3,6 +3,11 @@
 With version 1.12, the crawler includes full support for deduplication ("dedupe") of crawled content by content hash,
 avoiding saving the same content multuple times. When a duplicate is encountered, the crawler saves a reference to the original content, instead of the full response. The crawler supports deduplication in several ways.
 
+To disable content-based deduplication entirely, pass `--no-dedupe`. When
+disabled, the crawler will not write `revisit` records and will ignore
+dedupe-specific options such as `--redisDedupeUrl` and
+`--dedupePagesMinDepth`.
+
 ## Automatic deduplication within a single crawl
 
 By default, the crawler applies the following deduplication automatically:
