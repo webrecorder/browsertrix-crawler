@@ -86,6 +86,10 @@ export class RequestResponseInfo {
   // set to add truncated message
   truncated?: string;
 
+  // for pending request tracking
+  lastSize = 0;
+  lastUnchanged = 0;
+
   constructor(requestId: string) {
     this.requestId = requestId;
   }

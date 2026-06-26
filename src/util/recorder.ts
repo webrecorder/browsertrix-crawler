@@ -1166,6 +1166,24 @@ export class Recorder extends EventEmitter {
           ? "async"
           : "unknown";
 
+        if (reqresp.lastSize === entry.size) {
+          reqresp.lastUnchanged++;
+        }
+        reqresp.lastSize = entry.size || 0;
+        if (reqresp.lastUnchanged > 3) {
+          if (reqresp.payload?.length) {
+            logger.debug(
+              "Async request appears unchanged, serializing and removing",
+              { lastSize: reqresp.lastSize },
+            );
+            await this.serializeToWARC(reqresp);
+          } else {
+            logger.debug("Async request appears empty, removing", {
+              lastSize: reqresp.lastSize,
+            });
+          }
+          this.removeReqResp(requestId);
+        }
         pending.push(entry);
       }
 
