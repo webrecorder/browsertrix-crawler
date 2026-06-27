@@ -639,6 +639,13 @@ export class Recorder extends EventEmitter {
         { url, ...formatErr(e), ...this.logDetails },
         "recorder",
       );
+    } finally {
+      if (networkId) {
+        const reqresp = this.pendingReqResp(networkId, true);
+        if (reqresp) {
+          reqresp.intercepting = false;
+        }
+      }
     }
 
     if (!continued) {
@@ -880,6 +887,7 @@ export class Recorder extends EventEmitter {
     // If page is at dedupePagesMinDepth or higher and HTML is a duplicate,
     // write a revisit record, track pages as a duplicate, and abort the page
     if (
+      !streamingConsume &&
       url === this.pageUrl &&
       reqresp.payload &&
       this.dedupePagesMinDepth >= 0 &&
@@ -1149,6 +1157,8 @@ export class Recorder extends EventEmitter {
           resourceType?: string;
           size?: number;
           status?: string;
+          lastUnchanged?: number;
+          lastSize?: number;
         } = { requestId, url };
         if (reqresp.expectedSize) {
           entry.expectedSize = reqresp.expectedSize;
@@ -1170,7 +1180,7 @@ export class Recorder extends EventEmitter {
           reqresp.lastUnchanged++;
         }
         reqresp.lastSize = entry.size || 0;
-        if (reqresp.lastUnchanged > 3) {
+        if (reqresp.lastUnchanged >= 3) {
           if (reqresp.payload?.length) {
             logger.debug(
               "Async request appears unchanged, serializing and removing",
@@ -1184,6 +1194,8 @@ export class Recorder extends EventEmitter {
           }
           this.removeReqResp(requestId);
         }
+        entry.lastSize = reqresp.lastSize;
+        entry.lastUnchanged = reqresp.lastUnchanged;
         pending.push(entry);
       }
 
