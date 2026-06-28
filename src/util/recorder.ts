@@ -44,6 +44,8 @@ const MAX_NETWORK_LOAD_SIZE = 200_000_000;
 
 const TAKE_STREAM_BUFF_SIZE = 1024 * 64;
 
+const PENDING_UNCHANGED_COUNT = 3;
+
 const ASYNC_FETCH_DUPE_KEY = "s:fetchdupe";
 
 const WRITE_DUPE_KEY = "s:writedupe";
@@ -1180,7 +1182,7 @@ export class Recorder extends EventEmitter {
           reqresp.lastUnchanged++;
         }
         reqresp.lastSize = entry.size || 0;
-        if (reqresp.lastUnchanged >= 3) {
+        if (reqresp.lastUnchanged >= PENDING_UNCHANGED_COUNT) {
           if (reqresp.payload?.length) {
             logger.debug(
               "Async request appears unchanged, serializing and removing",
