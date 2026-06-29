@@ -87,8 +87,8 @@ export class RequestResponseInfo {
   truncated?: string;
 
   // for pending request tracking
-  lastSize = 0;
-  lastUnchanged = 0;
+  lastSize = -1;
+  unchangedCount = 0;
 
   constructor(requestId: string) {
     this.requestId = requestId;
@@ -439,6 +439,46 @@ export class RequestResponseInfo {
     }
     // replace newlines with spaces
     return value.replace(/\n/g, ", ");
+  }
+
+  toJSON(): string {
+    const entry: {
+      requestId: string;
+      url: string;
+      expectedSize?: number;
+      readSize?: number;
+      resourceType?: string;
+      size?: number;
+      status?: string;
+      unchangedCount?: number;
+      lastSize?: number;
+    } = {
+      url: this.url,
+      requestId: this.requestId,
+      lastSize: this.lastSize,
+      unchangedCount: this.unchangedCount,
+    };
+
+    if (this.expectedSize) {
+      entry.expectedSize = this.expectedSize;
+    }
+    if (this.readSize) {
+      entry.readSize = this.readSize;
+    }
+    if (this.resourceType) {
+      entry.resourceType = this.resourceType;
+    }
+    entry.size = this.payload?.length;
+
+    if (this.intercepting) {
+      entry.status = "intercepting";
+    } else if (this.asyncLoading) {
+      entry.status = "async";
+    } else {
+      entry.status = "unknown";
+    }
+
+    return JSON.stringify(entry);
   }
 }
 

@@ -1144,48 +1144,22 @@ export class Recorder extends EventEmitter {
 
     let numPending = this.pendingRequests.size;
 
-    let pending = [];
     while (
       numPending &&
       !this.pageFinished &&
       !this.crawler.interruptReason &&
       !this.crawler.postCrawling
     ) {
-      pending = [];
+      const pending = [];
       for (const [requestId, reqresp] of this.pendingRequests.entries()) {
-        const url = reqresp.url || "";
-        const entry: {
-          requestId: string;
-          url: string;
-          expectedSize?: number;
-          readSize?: number;
-          resourceType?: string;
-          size?: number;
-          status?: string;
-          lastUnchanged?: number;
-          lastSize?: number;
-        } = { requestId, url };
-        if (reqresp.expectedSize) {
-          entry.expectedSize = reqresp.expectedSize;
-        }
-        if (reqresp.readSize) {
-          entry.readSize = reqresp.readSize;
-        }
-        if (reqresp.resourceType) {
-          entry.resourceType = reqresp.resourceType;
-        }
-        entry.size = reqresp.payload?.length;
-        entry.status = reqresp.intercepting
-          ? "intercepting"
-          : reqresp.asyncLoading
-          ? "async"
-          : "unknown";
+        const size = reqresp.payload?.length || 0;
 
-        if (reqresp.lastSize === entry.size) {
-          reqresp.lastUnchanged++;
+        if (reqresp.lastSize === size) {
+          reqresp.unchangedCount++;
         }
-        reqresp.lastSize = entry.size || 0;
-        if (reqresp.lastUnchanged >= PENDING_UNCHANGED_COUNT) {
+        reqresp.lastSize = size;
+
+        if (reqresp.unchangedCount >= PENDING_UNCHANGED_COUNT) {
           if (reqresp.payload?.length) {
             logger.debug(
               "Async request appears unchanged, serializing and removing",
@@ -1199,9 +1173,7 @@ export class Recorder extends EventEmitter {
           }
           this.removeReqResp(requestId);
         }
-        entry.lastSize = reqresp.lastSize;
-        entry.lastUnchanged = reqresp.lastUnchanged;
-        pending.push(entry);
+        pending.push(reqresp.toJSON());
       }
 
       logger.debug(
