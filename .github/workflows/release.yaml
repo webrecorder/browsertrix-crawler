@@ -13,14 +13,14 @@ jobs:
 
       - name: Docker image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: webrecorder/browsertrix-crawler
           tags: |
             type=semver,pattern={{version}}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
 
