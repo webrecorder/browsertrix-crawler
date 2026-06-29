@@ -780,9 +780,12 @@ export class Recorder extends EventEmitter {
       return false;
     }
 
-    reqresp.fetchContinued = true;
-
     reqresp.fillFetchRequestPaused(params);
+
+    // if this is a redirect, requestPaused() will be called with same id, so don't mark as continued yet
+    if (!reqresp.isRedirectStatus()) {
+      reqresp.fetchContinued = true;
+    }
 
     if (
       url === this.pageUrl &&
