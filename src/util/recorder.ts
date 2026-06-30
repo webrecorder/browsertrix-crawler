@@ -1152,16 +1152,8 @@ export class Recorder extends EventEmitter {
     ) {
       const pending = [];
       for (const [requestId, reqresp] of this.pendingRequests.entries()) {
-        const size = reqresp.payload?.length || 0;
-
-        // increment counter if current size of request not changed since last check
-        if (reqresp.lastSize === size) {
-          reqresp.unchangedCount++;
-        }
-        reqresp.lastSize = size;
-
-        if (reqresp.unchangedCount >= PENDING_UNCHANGED_COUNT) {
-          if (reqresp.payload?.length) {
+        if (reqresp.unchangedSizeCount() >= PENDING_UNCHANGED_COUNT) {
+          if (reqresp.currSize) {
             logger.debug(
               "Async request appears unchanged, serializing and removing",
               { lastSize: reqresp.lastSize },
@@ -1605,6 +1597,7 @@ export class Recorder extends EventEmitter {
     stream: Protocol.IO.StreamHandle,
   ) {
     let size = 0;
+    reqresp.currSize = 0;
     try {
       while (true) {
         const { data, base64Encoded, eof } = await cdp.send("IO.read", {
@@ -1614,6 +1607,7 @@ export class Recorder extends EventEmitter {
         const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
 
         size += buff.length;
+        reqresp.currSize += buff.length;
         yield buff;
 
         if (eof) {
@@ -2189,6 +2183,7 @@ class AsyncFetcher {
     try {
       for await (const value of reader) {
         size += value.length;
+        this.reqresp.currSize += value.length;
         yield value;
       }
     } catch (e) {

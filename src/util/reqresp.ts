@@ -87,6 +87,7 @@ export class RequestResponseInfo {
   truncated?: string;
 
   // for pending request tracking
+  currSize = 0;
   lastSize = -1;
   unchangedCount = 0;
 
@@ -441,34 +442,36 @@ export class RequestResponseInfo {
     return value.replace(/\n/g, ", ");
   }
 
+  unchangedSizeCount() {
+    // increment counter if current size of request not changed since the size
+    // was last checked, and increment counter
+    if (this.lastSize === this.currSize) {
+      this.unchangedCount++;
+    }
+    this.lastSize = this.currSize;
+    return this.unchangedCount;
+  }
+
   toJSON(): string {
     const entry: {
       requestId: string;
       url: string;
-      expectedSize?: number;
-      readSize?: number;
+      currSize: number;
+      lastSize: number;
+      unchangedCount: number;
       resourceType?: string;
-      size?: number;
       status?: string;
-      unchangedCount?: number;
-      lastSize?: number;
     } = {
       url: this.url,
       requestId: this.requestId,
+      currSize: this.currSize,
       lastSize: this.lastSize,
       unchangedCount: this.unchangedCount,
     };
 
-    if (this.expectedSize) {
-      entry.expectedSize = this.expectedSize;
-    }
-    if (this.readSize) {
-      entry.readSize = this.readSize;
-    }
     if (this.resourceType) {
       entry.resourceType = this.resourceType;
     }
-    entry.size = this.payload?.length;
 
     if (this.intercepting) {
       entry.status = "intercepting";
