@@ -87,7 +87,7 @@ export class CrawlIndexer {
     const params = this.initArgs();
 
     const redis = await initRedisWaitForSuccess(params.redisDedupeUrl);
-    const dedupeIndex = new RedisDedupeIndex(redis, "");
+    const dedupeIndex = new RedisDedupeIndex(redis, "", false);
 
     if (params.commitCrawlId) {
       // Commit one crawl and exit
@@ -97,11 +97,20 @@ export class CrawlIndexer {
       await dedupeIndex.commitDedupeDone(params.commitCrawlId);
       process.exit(ExitCodes.Success);
     } else if (params.cancelCrawlId) {
-      // Cancel one crawl and exit
-      logger.info("Deleting data for cancelled uncommitted crawl", {
-        crawlId: params.cancelCrawlId,
-      });
-      await dedupeIndex.clearUncommitted(params.cancelCrawlId);
+      if (await dedupeIndex.clearUncommitted(params.cancelCrawlId)) {
+        // Cancel one crawl and exit
+        logger.info("Deleting data for cancelled uncommitted crawl", {
+          crawlId: params.cancelCrawlId,
+        });
+      } else if (await dedupeIndex.markCanceledCrawl(params.cancelCrawlId)) {
+        logger.info("Crawl already committed, mark crawl for removal", {
+          crawlId: params.cancelCrawlId,
+        });
+      } else {
+        logger.info("Canceled crawl id not found, exiting", {
+          crawlId: params.cancelCrawlId,
+        });
+      }
       process.exit(ExitCodes.Success);
     } else if (!params.sourceUrl) {
       await logger.fatal(

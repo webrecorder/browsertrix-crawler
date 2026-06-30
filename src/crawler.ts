@@ -399,6 +399,7 @@ export class Crawler {
       os.hostname(),
       this.params.maxPageRetries,
       dedupeRedis,
+      this.params.dedupeConcurrent,
       this.params.rateLimitTimeout,
       this.params.rateLimitInterruptCount,
       this.params.rateLimitMaxRetries,
@@ -1875,7 +1876,7 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
     if (this.isExternalDedupeStore) {
-      await this.crawlState.addUncommited();
+      await this.crawlState.addCrawlForDedupe();
     }
 
     if (POST_CRAWL_STATES.includes(initState)) {

@@ -10,6 +10,7 @@ import {
   DUPE_ALL_HASH_KEY,
   DUPE_ALL_CRAWLS,
   DUPE_ALL_COUNTS,
+  DUPE_CANCELED_CRAWLS,
   DUPE_UNCOMMITTED,
   CrawlStatus,
   SkippedReason,
@@ -250,9 +251,12 @@ export class RedisDedupeIndex {
 
   noremove = "noremove:" + Date.now();
 
-  constructor(dedupeRedis: Redis, crawlId: string) {
+  autoCommit = false;
+
+  constructor(dedupeRedis: Redis, crawlId: string, autoCommit: boolean) {
     this.dedupeRedis = dedupeRedis;
     this.crawlId = crawlId;
+    this.autoCommit = autoCommit;
   }
 
   // DEDUPE SOURCE WACZ (to track dependencies)
@@ -384,20 +388,34 @@ export class RedisDedupeIndex {
     logger.debug("Crawl counts added to allcounts", {}, "dedupe");
   }
 
-  // ADD UNCOMITTED CRAWL
-  async addUncommited() {
+  // ADD UNCOMMITTED CRAWL
+  async addCrawlForDedupe() {
     if (this.crawlId) {
-      await this.dedupeRedis.sadd(DUPE_UNCOMMITTED, this.crawlId);
+      // if autoCommit, add directly to all crawls list
+      if (this.autoCommit) {
+        await this.dedupeRedis.sadd(DUPE_ALL_CRAWLS, this.crawlId);
+      } else {
+        await this.dedupeRedis.sadd(DUPE_UNCOMMITTED, this.crawlId);
+      }
     }
   }
 
   // CLEAR UNCOMMITTED
-  async clearUncommitted(crawlId?: string) {
+  async clearUncommitted(crawlId?: string): Promise<boolean> {
+    // won't be in the uncommitted list as auto-committing
+    if (this.autoCommit) {
+      return false;
+    }
+
     crawlId ||= this.crawlId;
     if (crawlId) {
-      await this.dedupeRedis.srem(DUPE_UNCOMMITTED, crawlId);
-      await this.deleteCrawlDedupeKeys(crawlId);
+      if ((await this.dedupeRedis.srem(DUPE_UNCOMMITTED, crawlId)) > 0) {
+        await this.deleteCrawlDedupeKeys(crawlId);
+        return true;
+      }
     }
+
+    return false;
   }
 
   async clearAllUncommitted() {
@@ -458,11 +476,21 @@ export class RedisDedupeIndex {
     if (!origRecSize) {
       const { key, val } = this.getHashValue(hash, url, date, size);
       pipe.hsetnx(rootKey, key, val);
+
+      if (this.autoCommit) {
+        pipe.hsetnx(DUPE_ALL_HASH_KEY, key, this.crawlId);
+      }
     }
     this.incrTotalUrls(pipe, statsKey);
+    if (this.autoCommit) {
+      this.incrTotalUrls(pipe, DUPE_ALL_COUNTS);
+    }
 
     if (origRecSize) {
       this.incrDeduped(pipe, statsKey, origRecSize - size);
+      if (this.autoCommit) {
+        this.incrDeduped(pipe, DUPE_ALL_COUNTS, origRecSize - size);
+      }
     }
 
     await pipe.exec();
@@ -690,21 +718,45 @@ export class RedisDedupeIndex {
 
   async purgeUnusedCrawls() {
     const noRemoveSet = new Set<string>(
-      await this.dedupeRedis.smembers(this.noremove),
+      await this.dedupeRedis.sdiff(this.noremove, DUPE_CANCELED_CRAWLS),
     );
 
     await this.clearAndReadd(noRemoveSet);
 
     await this.dedupeRedis.del(this.noremove);
+    await this.dedupeRedis.del(DUPE_CANCELED_CRAWLS);
+  }
+
+  async markCanceledCrawl(removeCrawlId: string) {
+    if (!(await this.dedupeRedis.sismember(DUPE_ALL_CRAWLS, removeCrawlId))) {
+      return false;
+    }
+
+    await this.dedupeRedis.sadd(DUPE_CANCELED_CRAWLS, removeCrawlId);
+
+    await this.countUnusedCrawls();
+
+    return true;
   }
 
   async countUnusedCrawls() {
-    const removable = await this.dedupeRedis.sdiff(
-      DUPE_ALL_CRAWLS,
-      this.noremove,
-    );
+    const removeListCanceled =
+      await this.dedupeRedis.smembers(DUPE_CANCELED_CRAWLS);
 
-    await this.dedupeRedis.del(this.noremove);
+    let removable: Set<string>;
+
+    if (await this.dedupeRedis.scard(this.noremove)) {
+      const removeList = await this.dedupeRedis.sdiff(
+        DUPE_ALL_CRAWLS,
+        this.noremove,
+      );
+
+      await this.dedupeRedis.del(this.noremove);
+
+      removable = new Set<string>([...removeList, ...removeListCanceled]);
+    } else {
+      removable = new Set<string>(removeListCanceled);
+    }
 
     let total = 0;
 
@@ -722,7 +774,7 @@ export class RedisDedupeIndex {
     await this.dedupeRedis.hset(
       DUPE_ALL_COUNTS,
       "removedCrawls",
-      removable.length,
+      removable.size,
     );
     await this.dedupeRedis.hset(DUPE_ALL_COUNTS, "removedCrawlSize", total);
   }
@@ -817,11 +869,12 @@ export class RedisCrawlState extends RedisDedupeIndex {
     uid: string,
     maxRetries?: number,
     dedupeRedis?: Redis,
+    dedupeAutoCommit = false,
     rateLimitTTL?: number,
     rateLimitInterruptCount?: number,
     rateLimitMaxRetries?: number,
   ) {
-    super(dedupeRedis || redis, key);
+    super(dedupeRedis || redis, key, dedupeAutoCommit);
     this.redis = redis;
 
     this.uid = uid;

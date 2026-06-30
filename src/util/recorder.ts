@@ -893,7 +893,7 @@ export class Recorder extends EventEmitter {
     // write a revisit record, track pages as a duplicate, and abort the page
     if (
       !streamingConsume &&
-      url === this.pageUrl &&
+      url === this.finalPageUrl &&
       reqresp.payload &&
       this.dedupePagesMinDepth >= 0 &&
       this.pageSeedDepth >= this.dedupePagesMinDepth

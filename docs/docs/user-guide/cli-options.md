@@ -203,6 +203,13 @@ Options:
                                             duplicate pages can be skipped. -1 m
                                             eans never skip duplicate pages
                                                           [number] [default: -1]
+      --dedupeConcurrent                    If set, immediately add deduped URLs
+                                             to the main dedupe index instead of
+                                             to uncommittedcrawls. This allows d
+                                            edupe of concurrently running crawls
+                                            , but makes cancelling or failed cra
+                                            wls potentially lossy
+                                                      [boolean] [default: false]
       --saveState                           If the crawl state should be seriali
                                             zed to the crawls/ directory. Defaul
                                             ts to 'partial', only saved when cra
