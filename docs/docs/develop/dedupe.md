@@ -69,7 +69,7 @@ includes a dedicated command to commit a single crawl, `indexer --commitCrawlId 
 
 If running with `--dedupeConcurrent`, each new hash is automatically committed to `allhashes` and `allcounts` is updated
 for every new hash. If a concurrent crawl is canceled, it is additionally tracked in `allcanceled` to indicate that it
-needs to be included in the remove crawl count
+needs to be included in the removed crawl count.
 
 #### Dedupe Lookup
 

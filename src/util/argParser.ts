@@ -478,7 +478,7 @@ class ArgParser {
 
         dedupeConcurrent: {
           describe:
-            "If set, immediately add deduped URLs to the dedupe index instead to allow dedupe of concurrently running crawls, but makes cancelling crawls potentially lossy",
+            "If set, immediately add deduped URLs to the main dedupe index instead of to uncommittedcrawls. This allows dedupe of concurrently running crawls, but makes cancelling or failed crawls potentially lossy",
           type: "boolean",
           default: false,
         },
