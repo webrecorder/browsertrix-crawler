@@ -1154,6 +1154,7 @@ export class Recorder extends EventEmitter {
       for (const [requestId, reqresp] of this.pendingRequests.entries()) {
         const size = reqresp.payload?.length || 0;
 
+        // increment counter if current size of request not changed since last check
         if (reqresp.lastSize === size) {
           reqresp.unchangedCount++;
         }
