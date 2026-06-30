@@ -44,6 +44,8 @@ const MAX_NETWORK_LOAD_SIZE = 200_000_000;
 
 const TAKE_STREAM_BUFF_SIZE = 1024 * 64;
 
+const PENDING_UNCHANGED_COUNT = 4;
+
 const ASYNC_FETCH_DUPE_KEY = "s:fetchdupe";
 
 const WRITE_DUPE_KEY = "s:writedupe";
@@ -639,6 +641,13 @@ export class Recorder extends EventEmitter {
         { url, ...formatErr(e), ...this.logDetails },
         "recorder",
       );
+    } finally {
+      if (networkId) {
+        const reqresp = this.pendingReqResp(networkId, true);
+        if (reqresp) {
+          reqresp.intercepting = false;
+        }
+      }
     }
 
     if (!continued) {
@@ -771,9 +780,12 @@ export class Recorder extends EventEmitter {
       return false;
     }
 
-    reqresp.fetchContinued = true;
-
     reqresp.fillFetchRequestPaused(params);
+
+    // if this is a redirect, requestPaused() will be called with same id, so don't mark as continued yet
+    if (!reqresp.isRedirectStatus()) {
+      reqresp.fetchContinued = true;
+    }
 
     if (
       url === this.pageUrl &&
@@ -880,6 +892,7 @@ export class Recorder extends EventEmitter {
     // If page is at dedupePagesMinDepth or higher and HTML is a duplicate,
     // write a revisit record, track pages as a duplicate, and abort the page
     if (
+      !streamingConsume &&
       url === this.pageUrl &&
       reqresp.payload &&
       this.dedupePagesMinDepth >= 0 &&
@@ -1131,33 +1144,29 @@ export class Recorder extends EventEmitter {
 
     let numPending = this.pendingRequests.size;
 
-    let pending = [];
     while (
       numPending &&
       !this.pageFinished &&
       !this.crawler.interruptReason &&
       !this.crawler.postCrawling
     ) {
-      pending = [];
+      const pending = [];
       for (const [requestId, reqresp] of this.pendingRequests.entries()) {
-        const url = reqresp.url || "";
-        const entry: {
-          requestId: string;
-          url: string;
-          expectedSize?: number;
-          readSize?: number;
-          resourceType?: string;
-        } = { requestId, url };
-        if (reqresp.expectedSize) {
-          entry.expectedSize = reqresp.expectedSize;
+        if (reqresp.unchangedSizeCount() >= PENDING_UNCHANGED_COUNT) {
+          if (reqresp.currSize) {
+            logger.debug(
+              "Async request appears unchanged, serializing and removing",
+              { lastSize: reqresp.lastSize },
+            );
+            await this.serializeToWARC(reqresp);
+          } else {
+            logger.debug("Async request appears empty, removing", {
+              lastSize: reqresp.lastSize,
+            });
+          }
+          this.removeReqResp(requestId);
         }
-        if (reqresp.readSize) {
-          entry.readSize = reqresp.readSize;
-        }
-        if (reqresp.resourceType) {
-          entry.resourceType = reqresp.resourceType;
-        }
-        pending.push(entry);
+        pending.push(reqresp.toJSON());
       }
 
       logger.debug(
@@ -1588,6 +1597,7 @@ export class Recorder extends EventEmitter {
     stream: Protocol.IO.StreamHandle,
   ) {
     let size = 0;
+    reqresp.currSize = 0;
     try {
       while (true) {
         const { data, base64Encoded, eof } = await cdp.send("IO.read", {
@@ -1597,6 +1607,7 @@ export class Recorder extends EventEmitter {
         const buff = Buffer.from(data, base64Encoded ? "base64" : "utf-8");
 
         size += buff.length;
+        reqresp.currSize += buff.length;
         yield buff;
 
         if (eof) {
@@ -2172,6 +2183,7 @@ class AsyncFetcher {
     try {
       for await (const value of reader) {
         size += value.length;
+        this.reqresp.currSize += value.length;
         yield value;
       }
     } catch (e) {
