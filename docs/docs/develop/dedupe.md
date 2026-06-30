@@ -60,7 +60,10 @@ Once a crawl is finished, the merged index keys are updated as follows:
 
 - `allhashes`: `{[hash]: [crawlid]}` - The main merged index. For each hash in `h:${crawlid}`, an entry is added mapping `hash` to the `crawlid`, indicating the hash is found in this crawl. The full data from `h:${crawlid}` is not copied to save space.
 
-- `allcounts`: A sum of all the `h:${crawlid}:counts` for all crawlids in `allcrawls`. The `allcounts` fields are incremented by each new `h:${crawlid}:counts`
+- `allcounts`: A sum of all the `h:${crawlid}:counts` for all crawl ids in `allcrawls`. The `allcounts` fields are incremented by each new `h:${crawlid}:counts`.
+
+- `allcanceled`: Use with concurrent crawls only to store crawl ids of crawls that were cancelled or have failed
+while being deduped. If this key exists, indicates there may be data missing, if it has not been re-crawled.
 
 Committing the crawl may take a long time, depending on the size of the crawl. For this reason, the indexer entrypoint
 includes a dedicated command to commit a single crawl, `indexer --commitCrawlId <crawlid>`.

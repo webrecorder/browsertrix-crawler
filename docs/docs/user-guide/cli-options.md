@@ -204,10 +204,11 @@ Options:
                                             eans never skip duplicate pages
                                                           [number] [default: -1]
       --dedupeConcurrent                    If set, immediately add deduped URLs
-                                             to the dedupe index instead to allo
-                                            w dedupe of concurrently running cra
-                                            wls, but makes cancelling crawls pot
-                                            entially lossy
+                                             to the main dedupe index instead of
+                                             to uncommittedcrawls. This allows d
+                                            edupe of concurrently running crawls
+                                            , but makes cancelling or failed cra
+                                            wls potentially lossy
                                                       [boolean] [default: false]
       --saveState                           If the crawl state should be seriali
                                             zed to the crawls/ directory. Defaul
