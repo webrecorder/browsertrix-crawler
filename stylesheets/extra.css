@@ -1,0 +1,197 @@
+/* Font style definitions */
+
+@font-face {
+  font-family: "Recursive";
+  font-style: oblique 0deg 15deg;
+  font-weight: 300 1000;
+  src: url("../assets/fonts/Recursive_VF_1.084.woff2") format("woff2");
+  font-feature-settings: "ss12";
+}
+
+@font-face {
+  font-family: "Inter";
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+  src: url("../assets/fonts/Inter.var.woff2") format("woff2");
+  font-feature-settings: "ss03";
+}
+
+@font-face {
+  font-family: "Inter";
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: italic;
+  src: url("../assets/fonts/Inter-Italic.var.woff2") format("woff2");
+  font-feature-settings: "ss03";
+}
+
+@font-face {
+  font-family: "Konsole";
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+  src: url("https://wr-static.sfo3.cdn.digitaloceanspaces.com/fonts/konsole/Konsolev1.1-VF.woff2")
+    format("woff2");
+}
+
+:root {
+  --md-display-font: "Konsole", "Helvetica", sans-serif;
+  --md-code-font: "Recursive", monospace;
+  --md-text-font: "Inter", "Helvetica", "Arial", sans-serif;
+  --wr-blue-primary: #088eaf;
+  --wr-orange-primary: #bb4a00;
+}
+
+[data-md-color-scheme="webrecorder"] {
+  --md-primary-fg-color: #4D7C0F;
+  --md-primary-fg-color--light: #0782A1;
+  --md-primary-fg-color--dark: #066B84;
+  --md-typeset-color: black;
+  --md-accent-fg-color: #0782A1;
+  --md-typeset-a-color: #066B84;
+  --md-code-bg-color: #F9FAFB;
+}
+
+/* Nav changes */
+
+.md-header__title,
+.md-nav__title {
+  font-family: var(--md-display-font);
+  text-transform: uppercase;
+  font-variation-settings:
+    "wght" 750,
+    "wdth" 87;
+  margin-left: 0 !important;
+}
+
+.md-header__title--active {
+  font-family: var(--md-display-font);
+  text-transform: none;
+  font-variation-settings:
+    "wght" 550,
+    "wdth" 90;
+}
+
+.md-header__button {
+  margin-right: 0 !important;
+}
+
+/* Custom menu item hover */
+
+.md-tabs__link {
+  font-family: var(--md-code-font);
+  font-weight: 400;
+  opacity: 0.9;
+  transition:
+    0.4s cubic-bezier(0.1, 0.7, 0.1, 1),
+    opacity 0.25s;
+}
+
+.md-tabs__link:hover {
+  font-weight: 600;
+}
+
+/* Custom body typography rules */
+
+.md-typeset a {
+  text-decoration: underline;
+}
+
+.headerlink {
+  text-decoration: none !important;
+}
+
+code,
+pre,
+kbd {
+  font-variation-settings: "MONO" 1;
+  font-feature-settings: "ss01", "ss02", "ss08";
+}
+
+code {
+  border-width: 1px;
+  border-color: #d1d5db;
+  border-style: solid;
+
+  white-space : pre-wrap !important;
+}
+
+.md-typeset h1,
+h2,
+h3,
+h4,
+h5 {
+  color: black;
+}
+
+.md-typeset h1,
+h2,
+h3 {
+  font-weight: 650 !important;
+  font-variation-settings: "OPSZ" 35;
+}
+
+/* Custom badge classes, applies custom overrides to inline-code blocks */
+
+.badge-blue {
+  background-color: var(--wr-blue-primary) !important;
+  border-color: var(--wr-blue-primary) !important;
+  color: white !important;
+  font-family: var(--md-text-font);
+  font-weight: 600;
+}
+
+.badge-green {
+  background-color: hsl(142 76% 36%) !important;
+  border-color: hsl(142 76% 36%) !important;
+  color: white !important;
+  font-family: var(--md-text-font);
+  font-weight: 600;
+}
+
+.badge-orange {
+  background-color: var(--wr-orange-primary) !important;
+  border-color: var(--wr-orange-primary) !important;
+  color: white !important;
+  font-family: var(--md-text-font);
+  font-weight: 600;
+}
+
+/* Status Styling */
+
+.status-success {
+  font-family: var(--md-code-font);
+  font-weight: 500;
+  white-space: nowrap;
+  & svg {
+    color: hsl(142.1 76.2% 36.3%);
+  }
+}
+
+.status-warning {
+  font-family: var(--md-code-font);
+  font-weight: 500;
+  white-space: nowrap;
+  & svg {
+    color: hsl(32.1 94.6% 43.7%);
+  }
+}
+
+.status-danger {
+  font-family: var(--md-code-font);
+  font-weight: 500;
+  white-space: nowrap;
+  & svg {
+    color: hsl(0 72.2% 50.6%);
+  }
+}
+
+.status-waiting {
+  font-family: var(--md-code-font);
+  font-weight: 500;
+  white-space: nowrap;
+  & svg {
+    color: hsl(271.5 81.3% 55.9%);
+  }
+}
