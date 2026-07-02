@@ -46,6 +46,20 @@ For example, this is most useful when crawling with a `host` or `prefix` scope, 
 
 The `--extraHops` setting can be set globally or per seed to allow expanding the current inclusion scope N 'hops' beyond the configured scope. Note that this mechanism only expands the inclusion scope, and any exclusion rules are still applied. If a URL is to be excluded via the exclusion rules, that will take precedence over the `--extraHops`.
 
+## Seed Redirects
+
+Some seed URLs may redirect to a different URL that would be otherwise out of scope. The `--redirectSeedOutOfScope` setting can be used to specify how such redirects should be handled with regard to crawl scope.
+
+The default value `strict` will add the new URL as a seed to the crawl sif it differs from the specified seed URL only by scheme (`http` vs. `https`) or `www.` subdomain (`example.com` vs `www.example.com`).
+
+The other available options are:
+
+- `allow` - always add the redirect URL as a new seed to the crawl scope
+
+- `block` - never add the redirect URL as a new seed to the crawl scope
+
+If the URL a seed redirects to is not added as a new seed due to the option chosen, only the immediate page that is redirected to will be included in the crawl.
+
 ## Scope Rule Examples
 
 !!! example "Regular expression exclude rules"
