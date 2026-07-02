@@ -63,6 +63,7 @@ export type QueueEntry = {
   pageid?: string;
   retry?: number;
   ignoreScope?: boolean;
+  weight?: number;
 };
 
 // ============================================================================
@@ -1423,6 +1424,28 @@ return inx;
     });
   }
 
+  computeLogWeight(num: number) {
+    return 0.5 * (1 - 1 / Math.log(num + Math.E));
+  }
+
+  async updateHostWeight(url: string, inc: number) {
+    try {
+      const hostname = new URL(url).hostname;
+      return await this.redis.hincrby(`hostsQueued`, hostname, inc);
+    } catch (e) {
+      // ignore, shouldn't happen
+    }
+    return 0;
+  }
+
+  async computeUrlWeight(url: string) {
+    const hostWeight = await this.updateHostWeight(url, 1);
+
+    return (
+      this.computeLogWeight(this.computeLogWeight(url.length)) + hostWeight
+    ); //this.computeLogWeight(hostWeight);
+  }
+
   async addToQueue(
     {
       url,
@@ -1435,8 +1458,9 @@ return inx;
     }: QueueEntry,
     limit = 0,
   ) {
+    const weight = await this.computeUrlWeight(url);
     const added = this._timestamp();
-    const data: QueueEntry = { added, url, seedId, depth, extraHops };
+    const data: QueueEntry = { added, url, seedId, depth, extraHops, weight };
     // add original url to actual queue
     // normalize url for seen list
     url = normalizeUrl(url);
@@ -1462,7 +1486,7 @@ return inx;
       this.esKey,
       this.exKey,
       url,
-      this._getScore(data),
+      this._getScore(data, weight),
       JSON.stringify(data),
       limit,
     );
@@ -1483,6 +1507,8 @@ return inx;
       logger.error("Invalid queued json", json, "state");
       return null;
     }
+
+    await this.updateHostWeight(data.url, -1);
 
     await this.markStarted(data.url);
 
@@ -1521,11 +1547,12 @@ return inx;
     };
   }
 
-  _getScore(data: QueueEntry) {
+  _getScore(data: QueueEntry, weight = 0) {
     return (
       (data.depth || 0) +
       (data.extraHops || 0) * MAX_DEPTH +
-      (data.retry || 0) * MAX_DEPTH * 2
+      (data.retry || 0) * MAX_DEPTH * 2 +
+      weight
     );
   }
 
