@@ -2503,6 +2503,7 @@ self.__bx_behaviors.selectMainBehavior();
             origUrl,
             newUrl,
             seedId,
+            policy: this.redirectSeedOutOfScope,
           },
         );
       } else if (
@@ -2512,6 +2513,7 @@ self.__bx_behaviors.selectMainBehavior();
           origUrl,
           newUrl,
           seedId,
+          policy: this.redirectSeedOutOfScope,
         });
       }
     }
