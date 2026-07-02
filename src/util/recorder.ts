@@ -909,7 +909,10 @@ export class Recorder extends EventEmitter {
           requestId,
           errorReason: "BlockedByResponse",
         });
-        await this.serializeToWARC(reqresp, undefined, false, true, hash);
+        await this.serializeToWARC(reqresp, {
+          canRetry: true,
+          matchHash: hash,
+        });
         this.skipPageInfo = true;
         this.state!.pageSkipReason = SkippedReason.Duplicate;
         logger.debug(
@@ -1574,8 +1577,10 @@ export class Recorder extends EventEmitter {
       try {
         // if aborted, allow retrying
         if (
-          (await this.serializeToWARC(reqresp, iter, true)) ===
-          SerializeRes.Aborted
+          (await this.serializeToWARC(reqresp, {
+            iter,
+            skipPageInfo: true,
+          })) === SerializeRes.Aborted
         ) {
           return false;
         }
@@ -1724,10 +1729,19 @@ export class Recorder extends EventEmitter {
 
   async serializeToWARC(
     reqresp: RequestResponseInfo,
-    iter?: AsyncIterable<Uint8Array>,
-    canRetry = false,
-    skipPageInfo = false,
-    matchHash?: string,
+    {
+      iter = undefined,
+      canRetry = false,
+      skipPageInfo = false,
+      matchHash = undefined,
+      alwaysWriteRevisit = false,
+    }: {
+      iter?: AsyncIterable<Uint8Array>;
+      canRetry?: boolean;
+      skipPageInfo?: boolean;
+      matchHash?: string;
+      alwaysWriteRevisit?: boolean;
+    } = {},
   ): Promise<SerializeRes> {
     // skip here if skipping recording page, and not asyncLoading outside of page
     if (this.skipRecordingPage && !reqresp.asyncLoading) {
@@ -1744,7 +1758,7 @@ export class Recorder extends EventEmitter {
     const { url, status, requestId, method, payload } = reqresp;
 
     // Specifically log skipping cached resources
-    if (reqresp.isCached()) {
+    if (reqresp.isCached() && !alwaysWriteRevisit) {
       logger.debug(
         "Skipping cached resource, should be already recorded",
         { url, status },
@@ -1767,6 +1781,7 @@ export class Recorder extends EventEmitter {
     }
 
     if (
+      !alwaysWriteRevisit &&
       url &&
       method === "GET" &&
       !isRedirectStatus(status) &&
@@ -2016,7 +2031,7 @@ class AsyncFetcher {
     return success;
   }
 
-  async loadBody(): Promise<SerializeRes> {
+  async loadBody(alwaysWriteRevisit = false): Promise<SerializeRes> {
     try {
       const { reqresp, useBrowserNetwork, body, stream, cdp, recorder } = this;
 
@@ -2031,7 +2046,10 @@ class AsyncFetcher {
         throw new Error("resp body missing");
       }
 
-      const res = await recorder.serializeToWARC(reqresp, iter);
+      const res = await recorder.serializeToWARC(reqresp, {
+        iter,
+        alwaysWriteRevisit,
+      });
 
       if (res == SerializeRes.SkippedNoWrite || res === SerializeRes.Aborted) {
         await this.doCancel();
@@ -2205,7 +2223,7 @@ class AsyncFetcher {
   }
 
   async loadDirectPage(state: PageState, crawler: Crawler) {
-    const result = await this.loadBody();
+    const result = await this.loadBody(true);
 
     this.recorder.addPageRecord(this.reqresp);
 
@@ -2215,10 +2233,7 @@ class AsyncFetcher {
       state.mime = mime;
       state.isHTMLPage = isHTMLMime(mime);
     }
-    if (
-      result === SerializeRes.Success ||
-      result === SerializeRes.SkippedDupe
-    ) {
+    if (result === SerializeRes.Success) {
       state.loadState = LoadState.FULL_PAGE_LOADED;
       state.status = 200;
       state.ts = this.reqresp.ts || new Date();
