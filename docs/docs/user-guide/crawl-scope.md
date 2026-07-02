@@ -54,7 +54,7 @@ The default value `strict` will add the new URL as a seed to the crawl scope if 
 
 The other available options are:
 
-- `allow` - always add the redirect URL as a new seed to the crawl scope
+- `add` - always add the redirect URL as a new seed to the crawl scope
 
 - `block` - never add the redirect URL as a new seed to the crawl scope
 

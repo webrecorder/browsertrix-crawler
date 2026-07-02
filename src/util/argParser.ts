@@ -803,7 +803,7 @@ class ArgParser {
 
         redirectSeedOutOfScope: {
           describe:
-            "Policy for how to handle seeds that redirect to a URL out of scope. Default (strict): add the redirect URL as a seed only if it differs in scheme or www subdomain. Other options: allow (always add redirect URL as new seed), block (never add redirect URL as new seed).",
+            "Policy for how to handle seeds that redirect to a URL out of scope. Default (strict): add the redirect URL as a seed only if it differs in scheme or www subdomain. Other options: add (always add as new seed), block (never add as new seed)",
           type: "string",
           choices: REDIRECT_OUT_OF_SCOPE_OPTS,
           default: "strict",

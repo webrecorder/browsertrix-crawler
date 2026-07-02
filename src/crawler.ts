@@ -2486,7 +2486,7 @@ self.__bx_behaviors.selectMainBehavior();
       const seedId = data.seedId;
 
       if (
-        this.redirectSeedOutOfScope === "allow" ||
+        this.redirectSeedOutOfScope === "add" ||
         (this.redirectSeedOutOfScope === "strict" &&
           normalizedRedirectSeedUrl(origUrl) ==
             normalizedRedirectSeedUrl(newUrl))
