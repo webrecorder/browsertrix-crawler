@@ -136,6 +136,8 @@ export class PageState {
 // ============================================================================
 declare module "ioredis" {
   interface RedisCommander<Context> {
+    hdelifeq(hset: string, key: string, value: string): Result<number, Context>;
+
     numfound(
       skey: string,
       esKey: string,
@@ -257,6 +259,21 @@ export class RedisDedupeIndex {
     this.dedupeRedis = dedupeRedis;
     this.crawlId = crawlId;
     this.autoCommit = autoCommit;
+
+    this._initDedupeLuaCommands();
+  }
+
+  _initDedupeLuaCommands() {
+    this.dedupeRedis.defineCommand("hdelifeq", {
+      numberOfKeys: 2,
+      lua: `
+      if redis.call('hget', KEYS[1], ARGV[1]) == ARGV[2] then
+        return redis.call('hdel', KEYS[1], ARGV[1])
+      else
+        return 0
+      end
+`,
+    });
   }
 
   // DEDUPE SOURCE WACZ (to track dependencies)
@@ -733,6 +750,15 @@ export class RedisDedupeIndex {
     }
 
     await this.dedupeRedis.sadd(DUPE_CANCELED_CRAWLS, removeCrawlId);
+
+    // if dedupe hash points to this crawl, remove it immediately so other crawls don't use it for dedupe
+    for await (const hashes of this.dedupeRedis.hscanStream(
+      `h:${removeCrawlId}`,
+    )) {
+      for (const hash of hashes) {
+        await this.dedupeRedis.hdelifeq(DUPE_ALL_HASH_KEY, hash, removeCrawlId);
+      }
+    }
 
     await this.countUnusedCrawls();
 
