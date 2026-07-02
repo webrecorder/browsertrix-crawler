@@ -1729,17 +1729,15 @@ self.__bx_behaviors.selectMainBehavior();
       interrupt = InterruptReason.CrawlPaused;
     }
 
-    if (
-      !interrupt &&
-      checkRateLimit &&
-      (await this.crawlState.isRateLimited(false))
-    ) {
-      interrupt = InterruptReason.RateLimited;
-    }
-
     if (interrupt) {
       this.uploadAndDeleteLocal = true;
       this.gracefulFinishOnInterrupt(interrupt);
+      return true;
+    }
+
+    if (checkRateLimit && (await this.crawlState.isRateLimited(false))) {
+      // don't set updateAndDelete local, as don't necessarily need to create WACZ yet
+      this.gracefulFinishOnInterrupt(InterruptReason.RateLimited);
       return true;
     }
 
