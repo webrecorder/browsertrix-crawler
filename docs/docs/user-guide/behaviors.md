@@ -16,12 +16,66 @@ There is also a built-in 'main' behavior, which runs to completion (or until a t
 
 ## Site-Specific Behaviors
 
-Browsertrix also comes with several 'site-specific' behaviors, which run only on specific sites. These behaviors will run instead of Autoscroll and will run until completion or timeout. Currently, site-specific behaviors include major social media sites.
+Browsertrix also comes with several 'site-specific' behaviors, which run only on specific sites. These behaviors will run instead of Autoscroll and will run until completion or timeout. Currently, site-specific behaviors include the following major social media sites:
 
-Refer to [Browsertrix Behaviors](https://github.com/webrecorder/browsertrix-behaviors) for the latest list of site-specific behaviors.
+- Bluesky
+- Facebook
+- Instagram
+- Telegram
+- TikTok
+- Twitter/X
 
 User-defined custom behaviors are also considered site-specific.
- 
+
+### Bluesky
+
+The Bluesky behavior loads additional JavaScript artifacts in order to ensure that Bluesky posts can be replayed with the user interface in any language.
+
+### Facebook
+
+The Facebook behavior is able to automate the following features:
+
+- Viewing posts from the timeline for an individual, organization, or group page
+- Expanding the comment section in a post or photo in order to load additional comments
+- Browsing the photos grid and viewing full size versions of posts and their descriptions
+- Browsing all reels (videos) on a page
+
+The Facebook behavior will use `addLink` to add single-page versions of posts encountered when crawling a profile to the crawl queue. For more information on `addLink` and scoping, [see below](#additional-links-from-behaviors).
+
+### Instagram
+
+The Instagram behavior is able to automate the following features:
+
+- Viewing all photos/videos on a single post
+- Viewing all media from a profile
+- Viewing the currently-active story (requires a logged-in profile)
+- Viewing story highlights
+- Expanding the comment section in order to load additional comments
+
+The Instagram behavior will use `addLink` to add stories and single-page versions of posts encountered when crawling a profile to the crawl queue. For more information on `addLink` and scoping, [see below](#additional-links-from-behaviors).
+
+### Telegram
+
+The Instagram behavior is intended to work with public Telegram channels. It supports the following features:
+
+- Scrolling through all of the messages in a public channel
+- Loading external images
+
+### TikTok
+
+The TikTok behavior is designed to expand comment threads when viewing single videos.
+
+### Twitter/X
+
+The Facebook behavior is able to automate the following features:
+
+- Viewing a timeline
+- Viewing a specific profile
+- Viewing single posts
+- Clicking through "view sensitive" buttons to ensure content is captured (requires a logged-in profile)
+- Viewing full-size images, audio and video
+- Viewing quoted posts
+
 ## Enabling Behaviors
 
 To enable built-in behaviors, specify them via a comma-separated list passed to the `--behaviors` option. All behaviors except Autoclick are enabled by default, the equivalent of `--behaviors autoscroll,autoplay,autofetch,siteSpecific`. To enable only a single behavior, such as Autoscroll, use `--behaviors autoscroll`.
@@ -59,6 +113,10 @@ Custom behaviors are specified with the `--customBehaviors` flag, which can be r
 - A path to a directory of behavior files. This can be mounted into the crawler as a volume.
 - A URL for a single behavior file to download. This should be a URL that the crawler has access to.
 - A URL for a git repository of the form `git+https://git.example.com/repo.git`, with optional query parameters `branch` (to specify a particular branch to use) and `path` (to specify a relative path to a directory within the git repository where the custom behaviors are located). This should be a git repo the crawler has access to without additional auth.
+
+### Additional Links From Behaviors
+
+Although behaviors can use `addLink` to add additional pages to the crawl queue, these pages are still subject to the crawl scope. This means that certain extra social media links may not be crawled. The `--alwaysAddBehaviorLinks` crawler flag can be used to instruct the crawler to always crawl these pages, even if they are outside the initial scope defined for the crawl. (In Browsertrix, this is controlled via the "Smart Scoping" setting in the user interface.)
 
 ### Examples
 
