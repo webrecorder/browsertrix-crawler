@@ -212,6 +212,8 @@ export class Crawler {
   recording: boolean;
   isExternalDedupeStore = false;
 
+  redirectSeedOutOfScope: string;
+
   constructor() {
     const args = this.parseArgs();
     this.params = args as CrawlerArgs;
@@ -292,6 +294,8 @@ export class Crawler {
       waitUntil: this.params.waitUntil,
       timeout: this.params.pageLoadTimeout * 1000,
     };
+
+    this.redirectSeedOutOfScope = this.params.redirectSeedOutOfScope;
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
@@ -2482,7 +2486,10 @@ self.__bx_behaviors.selectMainBehavior();
       const seedId = data.seedId;
 
       if (
-        normalizedRedirectSeedUrl(origUrl) == normalizedRedirectSeedUrl(newUrl)
+        this.redirectSeedOutOfScope === "allow" ||
+        (this.redirectSeedOutOfScope === "strict" &&
+          normalizedRedirectSeedUrl(origUrl) ==
+            normalizedRedirectSeedUrl(newUrl))
       ) {
         data.seedId = await this.crawlState.addExtraSeed(
           this.seeds,
@@ -2501,15 +2508,11 @@ self.__bx_behaviors.selectMainBehavior();
       } else if (
         !(await this.isInScope(seedId, { url: newUrl, depth, extraHops: 0 }))
       ) {
-        logger.info(
-          "Seed page redirected, only crawling this page. " +
-            "New seed doesn't match original (ignoring scheme and www.), not adding new seed",
-          {
-            origUrl,
-            newUrl,
-            seedId,
-          },
-        );
+        logger.info("Seed page redirected out of scope, not adding new seed", {
+          origUrl,
+          newUrl,
+          seedId,
+        });
       }
     }
 

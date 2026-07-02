@@ -18,6 +18,8 @@ export const SERVICE_WORKER_OPTS = [
 
 export type ServiceWorkerOpt = (typeof SERVICE_WORKER_OPTS)[number];
 
+export const REDIRECT_OUT_OF_SCOPE_OPTS = ["strict", "allow", "block"] as const;
+
 export const DETECT_SITEMAP = "<detect>";
 
 export const EXTRACT_TEXT_TYPES = ["to-pages", "to-warc", "final-to-warc"];
