@@ -910,7 +910,7 @@ export class Recorder extends EventEmitter {
           errorReason: "BlockedByResponse",
         });
         await this.serializeToWARC(reqresp, {
-          canRetry: true,
+          skipPageInfo: true,
           matchHash: hash,
         });
         this.skipPageInfo = true;
@@ -1579,7 +1579,7 @@ export class Recorder extends EventEmitter {
         if (
           (await this.serializeToWARC(reqresp, {
             iter,
-            skipPageInfo: true,
+            canRetry: true,
           })) === SerializeRes.Aborted
         ) {
           return false;
