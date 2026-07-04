@@ -1,6 +1,7 @@
 import { Redis } from "ioredis";
 import { logger } from "./logger.js";
 import { sleep } from "./timing.js";
+import { ExitCodes } from "./constants.js";
 
 const error = console.error;
 
@@ -19,10 +20,11 @@ console.error = function (...args) {
 
     if (now - lastLogTime > REDIS_ERROR_LOG_INTERVAL_SECS) {
       if (lastLogTime && exitOnError) {
-        void logger.fatal(
-          "Crawl interrupted, redis gone, exiting",
+        void logger.interrupt(
+          "Redis unavailable, interrupting crawl",
           {},
           "redis",
+          ExitCodes.RedisUnavailable,
         );
       }
       logger.warn("ioredis error", { error: args[0] }, "redis");

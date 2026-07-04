@@ -81,8 +81,9 @@ export const DISPLAY = ":99";
 export enum ExitCodes {
   Success = 0,
   GenericError = 1,
-  Failed = 9,
   OutOfSpace = 3,
+  RedisUnavailable = 8,
+  Failed = 9,
   BrowserCrashed = 10,
   SignalInterrupted = 11,
   FailedLimit = 12,
