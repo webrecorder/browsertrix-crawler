@@ -129,7 +129,7 @@ For any SSH proxy that is listed as a possible proxy in `matchHosts` configurati
 will be interrupted. However, the `--proxyServerConfigIgnoreFailedProxies` flag can be provided to ignore any failing
 proxies and use a direct connection instead.
 
-SOCKS5 and HTTP proxy connections are made by the browser only on first use, and are not checked for successful connection until/if they are used.
+SOCKS5 and HTTP proxy connections are made by the browser only on first use, and are not checked for successful connection until they are used.
 
 ### Proxy Precedence
 
