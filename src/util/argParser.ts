@@ -707,13 +707,6 @@ class ArgParser {
           type: "string",
         },
 
-        proxyServerConfigIgnoreFailed: {
-          describe:
-            "if set, ignore any per-URL regex proxy servers set with --proxyServerConfig if they are not available rather than interrupting crawl",
-          type: "boolean",
-          default: false,
-        },
-
         dryRun: {
           describe:
             "If true, no archive data is written to disk, only pages and logs (and optionally saved state).",

@@ -53,6 +53,7 @@ export type ProxyDef = {
   url: string;
   privateKeyFile?: string;
   publicHostsFile?: string;
+  ignoreOnFailedSSHTunnel?: boolean;
 };
 
 export type ProxyServerConfig = {
@@ -68,7 +69,6 @@ export type ProxyCLIArgs = {
 
   proxyServer?: string;
   proxyServerPreferSingleProxy?: boolean;
-  proxyServerConfigIgnoreFailed?: boolean;
 
   proxyMap?: ProxyServerConfig;
 };
@@ -175,6 +175,7 @@ export async function initProxy(
     let url = "";
     let privateKeyFile: string | undefined = "";
     let publicHostsFile: string | undefined = "";
+    let ignoreOnFailedSSHTunnel = false;
 
     if (typeof value === "string") {
       url = value;
@@ -182,16 +183,19 @@ export async function initProxy(
       url = value.url;
       privateKeyFile = value.privateKeyFile;
       publicHostsFile = value.publicHostsFile;
+      ignoreOnFailedSSHTunnel = value.ignoreOnFailedSSHTunnel ?? false;
     }
 
     privateKeyFile = privateKeyFile || sshProxyPrivateKeyFile;
     publicHostsFile = publicHostsFile || sshProxyKnownHostsFile;
 
-    nameToProxy.set(name, { url, privateKeyFile, publicHostsFile });
+    nameToProxy.set(name, {
+      url,
+      privateKeyFile,
+      publicHostsFile,
+      ignoreOnFailedSSHTunnel,
+    });
   }
-
-  // if set, ignore failed proxies on match hosts
-  const ignoreFailed = params.proxyServerConfigIgnoreFailed;
 
   for (const [rx, name] of Object.entries(params.proxyMap.matchHosts)) {
     const proxyDef = nameToProxy.get(name);
@@ -203,7 +207,8 @@ export async function initProxy(
     }
 
     if (proxyDef.entry === undefined) {
-      const { url, privateKeyFile, publicHostsFile } = proxyDef;
+      const { url, privateKeyFile, publicHostsFile, ignoreOnFailedSSHTunnel } =
+        proxyDef;
 
       proxyDef.entry = await initSingleProxy(
         url,
@@ -211,7 +216,7 @@ export async function initProxy(
         detached,
         privateKeyFile,
         publicHostsFile,
-        ignoreFailed,
+        ignoreOnFailedSSHTunnel,
       );
     }
 

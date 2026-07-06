@@ -330,10 +330,6 @@ Options:
       --proxyServerConfig                   if set, path to yaml/json file that
                                             configures multiple proxy servers pe
                                             r URL regex                 [string]
-      --proxyServerConfigIgnoreFailedProxi  if set, and --proxyServerConfig is u
-      es                                    sed, any of the per URL regex proxy
-                                            servers if they are not accessible
-                                                      [boolean] [default: false]
       --dryRun                              If true, no archive data is written
                                             to disk, only pages and logs (and op
                                             tionally saved state).     [boolean]
