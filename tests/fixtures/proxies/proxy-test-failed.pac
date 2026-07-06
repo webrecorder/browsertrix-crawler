@@ -1,5 +1,8 @@
 matchHosts:
-  old.webrecorder.net: socks-proxy
+  old.webrecorder.net: ssh-proxy
 
 proxies:
-  socks-proxy: socks5://proxy-not-found:1081
+  ssh-proxy: ssh://proxy-not-found:1081
+
+  # this is ignored as the proxy is not used in matchHosts
+  unused-ssh-proxy: ssh://proxy-not-found:1082

@@ -470,6 +470,12 @@ export async function runSSHD(
         "proxy",
         ExitCodes.ProxyError,
       );
+    } else {
+      logger.warn(
+        "Ignoring failed proxy, using direct connection",
+        { proxyString: getSafeProxyString(proxyString) },
+        "proxy",
+      );
     }
     return "";
   }

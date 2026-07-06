@@ -121,14 +121,15 @@ files, the crawler can be started with:
 docker run -v $PWD/crawls:/crawls -v $PWD/proxies:/proxies -it webrecorder/browsertrix-crawler --url https://example.com/ --proxyServerConfig /proxies/proxyConfig.yaml
 ```
 
-Note that if SSH proxies are provided, an SSH tunnel must be opened for each one before the crawl starts.
-The crawl will not start if any of the SSH proxy connections fail, even if a host-specific proxy is not yet used.
-The `--proxyServerConfigIgnoreFailedProxies` flag can be provided to silently ignore
-any failed proxies and connect directly.
-
-SOCKS5 and HTTP proxy connections are attempted only on first use.
-
 The same `--proxyServerConfig` option can also be used in browser profile creation with the `create-login-profile` command in the same way.
+
+### SSH Tunnels
+
+For any SSH proxy that is listed as a possible proxy in `matchHosts` configuration, the crawler will attempt to set up an SSH tunnel before starting the crawl. By default, the crawl will not start if any of the SSH tunnel connections fail and the crawl
+will be interrupted. However, the `--proxyServerConfigIgnoreFailedProxies` flag can be provided to ignore any failing
+proxies and use a direct connection instead.
+
+SOCKS5 and HTTP proxy connections are made by the browser only on first use, and are not checked for successful connection until/if they are used.
 
 ### Proxy Precedence
 
