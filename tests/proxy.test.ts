@@ -254,7 +254,7 @@ test("proxy per-host, ignore only if flag set", () => {
   // ignored
   try {
     execSync(
-      `docker run --rm -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-failed.pac --proxyServerConfigIgnoreFailedProxies --url ${HTML} ${extraArgs}`,
+      `docker run --rm -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-failed.pac --proxyServerConfigIgnoreFailed --url ${HTML} ${extraArgs}`,
       { encoding: "utf-8" },
     );
   } catch (e) {
