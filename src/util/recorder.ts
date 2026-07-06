@@ -122,8 +122,11 @@ enum SerializeRes {
   // WARC record writing aborted due to incomplete, should retry
   Aborted = 1,
 
-  // WARC record skipped (eg. dupe, cached) and should not be retried
-  Skipped = 2,
+  // WARC record skipped because it is already been written
+  SkippedDupe = 2,
+
+  // WARC record skipped because it should not be written
+  SkippedNoWrite = 3,
 }
 
 // =================================================================
@@ -906,7 +909,10 @@ export class Recorder extends EventEmitter {
           requestId,
           errorReason: "BlockedByResponse",
         });
-        await this.serializeToWARC(reqresp, undefined, false, true, hash);
+        await this.serializeToWARC(reqresp, {
+          skipPageInfo: true,
+          matchHash: hash,
+        });
         this.skipPageInfo = true;
         this.state!.pageSkipReason = SkippedReason.Duplicate;
         logger.debug(
@@ -1571,8 +1577,10 @@ export class Recorder extends EventEmitter {
       try {
         // if aborted, allow retrying
         if (
-          (await this.serializeToWARC(reqresp, iter, true)) ===
-          SerializeRes.Aborted
+          (await this.serializeToWARC(reqresp, {
+            iter,
+            canRetry: true,
+          })) === SerializeRes.Aborted
         ) {
           return false;
         }
@@ -1721,13 +1729,23 @@ export class Recorder extends EventEmitter {
 
   async serializeToWARC(
     reqresp: RequestResponseInfo,
-    iter?: AsyncIterable<Uint8Array>,
-    canRetry = false,
-    skipPageInfo = false,
-    matchHash?: string,
+    {
+      iter = undefined,
+      canRetry = false,
+      skipPageInfo = false,
+      matchHash = undefined,
+      alwaysWriteRevisit = false,
+    }: {
+      iter?: AsyncIterable<Uint8Array>;
+      canRetry?: boolean;
+      skipPageInfo?: boolean;
+      matchHash?: string;
+      alwaysWriteRevisit?: boolean;
+    } = {},
   ): Promise<SerializeRes> {
-    if (this.skipRecordingPage) {
-      return SerializeRes.Skipped;
+    // skip here if skipping recording page, and not asyncLoading outside of page
+    if (this.skipRecordingPage && !reqresp.asyncLoading) {
+      return SerializeRes.SkippedNoWrite;
     }
 
     // always include in pageinfo record if going to serialize to WARC
@@ -1740,13 +1758,13 @@ export class Recorder extends EventEmitter {
     const { url, status, requestId, method, payload } = reqresp;
 
     // Specifically log skipping cached resources
-    if (reqresp.isCached()) {
+    if (reqresp.isCached() && !alwaysWriteRevisit) {
       logger.debug(
         "Skipping cached resource, should be already recorded",
         { url, status },
         "recorder",
       );
-      return SerializeRes.Skipped;
+      return SerializeRes.SkippedDupe;
     } else if (!iter && reqresp.shouldSkipSave()) {
       logger.debug(
         "Skipping writing request/response",
@@ -1759,10 +1777,11 @@ export class Recorder extends EventEmitter {
         },
         "recorder",
       );
-      return SerializeRes.Skipped;
+      return SerializeRes.SkippedNoWrite;
     }
 
     if (
+      !alwaysWriteRevisit &&
       url &&
       method === "GET" &&
       !isRedirectStatus(status) &&
@@ -1773,7 +1792,7 @@ export class Recorder extends EventEmitter {
         status,
         ...this.logDetails,
       });
-      return SerializeRes.Skipped;
+      return SerializeRes.SkippedDupe;
     }
 
     let responseRecord = createResponse(reqresp, pageid, iter);
@@ -1837,10 +1856,10 @@ export class Recorder extends EventEmitter {
       const res = await this.crawlState.getHashDupe(hash);
 
       // if only writing revisit, ensure it's a revisit and hash
-      // matches expected value, otherwise just return
+      // matches expected value, otherwise return SkippedNoWrite
       // should always match, but just in case!
       if (matchHash && (matchHash !== hash || !res)) {
-        return SerializeRes.Skipped;
+        return SerializeRes.SkippedNoWrite;
       }
 
       if (res) {
@@ -1972,7 +1991,7 @@ class AsyncFetcher {
       if (!(await this.loadHeaders())) {
         continue;
       }
-      if (!(await this.loadBody())) {
+      if ((await this.loadBody()) === SerializeRes.Aborted) {
         continue;
       }
       return true;
@@ -2012,7 +2031,7 @@ class AsyncFetcher {
     return success;
   }
 
-  async loadBody() {
+  async loadBody(alwaysWriteRevisit = false): Promise<SerializeRes> {
     try {
       const { reqresp, useBrowserNetwork, body, stream, cdp, recorder } = this;
 
@@ -2027,20 +2046,22 @@ class AsyncFetcher {
         throw new Error("resp body missing");
       }
 
-      if (
-        (await recorder.serializeToWARC(reqresp, iter)) === SerializeRes.Skipped
-      ) {
+      const res = await recorder.serializeToWARC(reqresp, {
+        iter,
+        alwaysWriteRevisit,
+      });
+
+      if (res == SerializeRes.SkippedNoWrite || res === SerializeRes.Aborted) {
         await this.doCancel();
-        return false;
       }
-      return true;
+      return res;
     } catch (e) {
       logger.warn(
         "Async load body failed",
         { ...formatErr(e), ...this.recorder.logDetails },
         "fetch",
       );
-      return false;
+      return SerializeRes.Aborted;
     }
   }
 
@@ -2202,7 +2223,7 @@ class AsyncFetcher {
   }
 
   async loadDirectPage(state: PageState, crawler: Crawler) {
-    const success = await this.loadBody();
+    const result = await this.loadBody(true);
 
     this.recorder.addPageRecord(this.reqresp);
 
@@ -2212,16 +2233,17 @@ class AsyncFetcher {
       state.mime = mime;
       state.isHTMLPage = isHTMLMime(mime);
     }
-    if (success) {
+    if (result === SerializeRes.Success) {
       state.loadState = LoadState.FULL_PAGE_LOADED;
       state.status = 200;
       state.ts = this.reqresp.ts || new Date();
-      logger.info(
-        "Direct fetch successful",
-        { url: this.reqresp.url, mime, workerid: this.recorder.workerid },
-        "fetch",
-      );
     }
+    logger.debug(
+      "Direct fetch page done",
+      { result, url: this.reqresp.url, mime, workerid: this.recorder.workerid },
+      "fetch",
+    );
+
     await crawler.pageFinished(state);
   }
 }
