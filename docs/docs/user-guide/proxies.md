@@ -122,7 +122,10 @@ docker run -v $PWD/crawls:/crawls -v $PWD/proxies:/proxies -it webrecorder/brows
 ```
 
 Note that if SSH proxies are provided, an SSH tunnel must be opened for each one before the crawl starts.
-The crawl will not start if any of the SSH proxy connections fail, even if a host-specific proxy is not actually used.
+The crawl will not start if any of the SSH proxy connections fail, even if a host-specific proxy is not yet used.
+The `--proxyServerConfigIgnoreFailedProxies` flag can be provided to silently ignore
+any failed proxies and connect directly.
+
 SOCKS5 and HTTP proxy connections are attempted only on first use.
 
 The same `--proxyServerConfig` option can also be used in browser profile creation with the `create-login-profile` command in the same way.

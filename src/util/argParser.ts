@@ -703,8 +703,15 @@ class ArgParser {
 
         proxyServerConfig: {
           describe:
-            "if set, path to yaml/json file that configures multiple path servers per URL regex",
+            "if set, path to yaml/json file that configures multiple proxy servers per URL regex",
           type: "string",
+        },
+
+        proxyServerConfigIgnoreFailedProxies: {
+          describe:
+            "if set, and --proxyServerConfig is used, any of the per URL regex proxy servers if they are not accessible",
+          type: "boolean",
+          default: false,
         },
 
         dryRun: {
