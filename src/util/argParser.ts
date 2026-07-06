@@ -707,7 +707,7 @@ class ArgParser {
           type: "string",
         },
 
-        proxyServerConfigIgnoreFailedProxies: {
+        proxyServerConfigIgnoreFailed: {
           describe:
             "if set, ignore any per-URL regex proxy servers set with --proxyServerConfig if they are not available rather than interrupting crawl",
           type: "boolean",

@@ -68,7 +68,7 @@ export type ProxyCLIArgs = {
 
   proxyServer?: string;
   proxyServerPreferSingleProxy?: boolean;
-  proxyServerConfigIgnoreFailedProxies?: boolean;
+  proxyServerConfigIgnoreFailed?: boolean;
 
   proxyMap?: ProxyServerConfig;
 };
@@ -191,7 +191,7 @@ export async function initProxy(
   }
 
   // if set, ignore failed proxies on match hosts
-  const ignoreFailed = params.proxyServerConfigIgnoreFailedProxies;
+  const ignoreFailed = params.proxyServerConfigIgnoreFailed;
 
   for (const [rx, name] of Object.entries(params.proxyMap.matchHosts)) {
     const proxyDef = nameToProxy.get(name);
