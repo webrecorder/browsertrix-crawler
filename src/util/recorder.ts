@@ -29,6 +29,7 @@ import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
 import {
   DEFAULT_MAX_RETRIES,
+  RateLimitRule,
   SkippedReason,
   STATUS_IS_HTML_NO_DIRECT_FETCH,
   STATUS_UNKNOWN_ERROR,
@@ -182,7 +183,7 @@ export class Recorder extends EventEmitter {
 
   stopping = false;
 
-  rateLimitOn200MatchText: string[] = [];
+  rateLimitCustomRules: RateLimitRule[] = [];
   rateLimitStatusCodes: number[] = [];
 
   constructor({
@@ -198,7 +199,7 @@ export class Recorder extends EventEmitter {
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
-    this.rateLimitOn200MatchText = crawler.params.rateLimitOn200MatchText;
+    this.rateLimitCustomRules = crawler.params.rateLimitCustomRules ?? [];
     this.rateLimitStatusCodes = crawler.params.rateLimitStatusCodes;
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
@@ -1306,12 +1307,19 @@ export class Recorder extends EventEmitter {
 
         string = payload.toString();
 
-        if (status === 200) {
-          for (const match of this.rateLimitOn200MatchText) {
-            if (string.indexOf(match) > 0) {
-              this.markRateLimited(status, reqresp.getHeader("Retry-After"));
-              return false;
-            }
+        for (const rule of this.rateLimitCustomRules) {
+          if (
+            (rule.status === 0 || rule.status === status) &&
+            string.search(rule.regex) >= 0
+          ) {
+            const retryAfter = reqresp.getHeader("Retry-After");
+            logger.debug(
+              "Rate Limited By Custom Rule",
+              { rule: rule.regex.toString(), retryAfter },
+              "recorder",
+            );
+            this.markRateLimited(status, retryAfter);
+            return false;
           }
         }
 

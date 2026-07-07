@@ -19,8 +19,9 @@ import {
   DEFAULT_MAX_RETRIES,
   BxFunctionBindings,
   DEFAULT_CRAWL_ID_TEMPLATE,
-  RATE_LIMIT_MATCH_200,
+  DEFAULT_RATE_LIMIT_RULES,
   RATE_LIMIT_TTL_SECS,
+  RateLimitRule,
   ADD_REDIRECTED_SEEDS_OPTS,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
@@ -61,7 +62,7 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
 
   warcInfo?: Record<string, string>;
 
-  rateLimitOn200MatchText: string[];
+  rateLimitCustomRules?: RateLimitRule[];
   rateLimitStatusCodes: number[];
 };
 
@@ -765,18 +766,18 @@ class ArgParser {
           default: false,
         },
 
-        rateLimitOn200MatchText: {
-          describe:
-            "Consider page rate limited given the following matches by status code and text",
-          type: "array",
-          default: RATE_LIMIT_MATCH_200,
-        },
-
         rateLimitStatusCodes: {
           describe:
             "Consider responses with these status codes to be treated as rate-limited/blocked responses",
           type: "array",
           default: [403, 429, 503],
+        },
+
+        rateLimitOnMatch: {
+          describe:
+            "One or more rules in the format <regex> or <regex>:<status code> matched against page text to determine if a page is rate limited. If a status is provided, only matches if the response has the specified status",
+          type: "array",
+          default: DEFAULT_RATE_LIMIT_RULES,
         },
 
         rateLimitTimeout: {
@@ -973,6 +974,24 @@ class ArgParser {
     }
     if (argv.saveProfile) {
       logger.info("Updating profile on successful crawl");
+    }
+
+    if (argv.rateLimitOnMatch) {
+      const rules: RateLimitRule[] = [];
+      for (const rule of argv.rateLimitOnMatch) {
+        // match any status by default
+        let status = 0;
+        let regex = "";
+        if (rule.match(/:[\d]+$/)) {
+          const parts = rule.split(":");
+          regex = parts[0];
+          status = parseInt(parts[1]) ?? 0;
+        } else {
+          regex = rule;
+        }
+        rules.push({ regex: new RegExp(regex), status });
+        argv.rateLimitCustomRules = rules;
+      }
     }
 
     return true;

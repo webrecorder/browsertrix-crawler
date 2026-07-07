@@ -24,7 +24,7 @@ Additionally, the collection may include:
 - An `indexes/` directory containing merged [CDXJ](https://specs.webrecorder.net/cdxj/0.1.0/) index files for the crawl, if the `--generateCDX` or `--generateWACZ` arguments are provided. If the combined size of the CDXJ files in the `warc-cdx/` directory is over 50 KB, the resulting final CDXJ file will be gzipped.
 - A single combined gzipped [WARC](https://www.iso.org/standard/68004.html) file for the crawl, if the `--combineWARC` argument is provided.
 - A `crawls/` directory including YAML files describing the crawl state, if the `--saveState` argument is provided with a value of "always", or if the crawl is interrupted and `--saveState` is not set to "never". These files can be used to restart a crawl from its saved state.
-- A `reports/` directory containing various reports generated during the crawl. See [Reports](reports) for more info.
+- A `reports/` directory containing various reports generated during the crawl. See [Reports](reports.md) for more info.
 - 
 
 ## Profile Outputs
