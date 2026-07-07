@@ -376,12 +376,12 @@ Options:
                                             limited pages before crawl is consid
                                             ered rate limited and is interrupted
                                                           [number] [default: -1]
-      --redirectSeedOutOfScope              Policy for how to handle seeds that
+      --addRedirectSeeds                    Policy for how to handle seeds that
                                             redirect to a URL out of scope. Defa
                                             ult (strict): add the redirect URL a
                                             s a seed only if it differs in schem
                                             e or www subdomain
-                [string] [choices: "strict", "add", "block"] [default: "strict"]
+             [string] [choices: "always", "strict", "never"] [default: "strict"]
       --config                              Path to YAML config file
 ```
 

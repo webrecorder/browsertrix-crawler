@@ -21,7 +21,7 @@ import {
   DEFAULT_CRAWL_ID_TEMPLATE,
   RATE_LIMIT_MATCH_200,
   RATE_LIMIT_TTL_SECS,
-  OOS_REDIRECT_ADD_SEEDS,
+  ADD_REDIRECT_SEEDS_OPTS,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -801,12 +801,11 @@ class ArgParser {
           default: -1,
         },
 
-        outOfScopeRedirectAddSeeds: {
-          alias: "oosRedirectAddSeeds",
+        addRedirectSeeds: {
           describe:
             "Policy for how to handle seeds that redirect to a URL out of scope. Default (strict): add the redirect URL as a seed only if it differs in scheme or www subdomain",
           type: "string",
-          choices: OOS_REDIRECT_ADD_SEEDS,
+          choices: ADD_REDIRECT_SEEDS_OPTS,
           default: "strict",
         },
       });

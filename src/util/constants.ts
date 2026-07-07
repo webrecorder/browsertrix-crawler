@@ -18,7 +18,7 @@ export const SERVICE_WORKER_OPTS = [
 
 export type ServiceWorkerOpt = (typeof SERVICE_WORKER_OPTS)[number];
 
-export const OOS_REDIRECT_ADD_SEEDS = ["always", "strict", "never"] as const;
+export const ADD_REDIRECT_SEEDS_OPTS = ["always", "strict", "never"] as const;
 
 export const DETECT_SITEMAP = "<detect>";
 
