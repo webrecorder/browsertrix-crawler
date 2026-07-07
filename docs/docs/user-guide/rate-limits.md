@@ -39,8 +39,8 @@ By default, the crawler will continue, skipping rate limited pages and retrying 
 If the `--rateLimitInterruptCount M` flag is set, the crawler will exit with a rate limit exit code (exit code 21) after M rate limited pages within the N seconds, configured via `--rateLimitTimeout`.
 
 This can allow a job runner or other system that starts and monitors the crawler container to implement an exponential backoff system if the crawler repeatedly exits due to being rate limited.
-The Browsertrix application provides this through built-in exponential backoff available in Kubernetes, where a crawler
-will restart only once every 5 minutes if continuously rate limited.
+The Browsertrix application provides this through built-in exponential backoff available in Kubernetes, where the system
+will restart the crawler in increasing intervals if continuously rate limited, up to once every 5 minutes.
 
 Additionally, if direct fetch reaches this threshold, further direct fetches will also be skipped until the timeout expires.
 
