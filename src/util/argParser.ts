@@ -970,7 +970,8 @@ class ArgParser {
     if (argv.rateLimitOnMatch) {
       const rules: RateLimitRule[] = [];
       for (const rule of argv.rateLimitOnMatch) {
-        let status = 200;
+        // match any status by default
+        let status = 0;
         let regex = "";
         if (rule.match(/:[\d]+$/)) {
           const parts = rule.split(":");
