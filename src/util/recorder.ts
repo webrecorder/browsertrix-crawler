@@ -1308,7 +1308,10 @@ export class Recorder extends EventEmitter {
         string = payload.toString();
 
         for (const rule of this.rateLimitCustomRules) {
-          if (rule.status === status && string.search(rule.regex) >= 0) {
+          if (
+            (rule.status === 0 || rule.status === status) &&
+            string.search(rule.regex) >= 0
+          ) {
             const retryAfter = reqresp.getHeader("Retry-After");
             logger.debug(
               "Rate Limited By Custom Rule",

@@ -55,6 +55,7 @@ nav:
     - user-guide/browser-profiles.md
     - user-guide/dedupe.md
     - user-guide/proxies.md
+    - user-guide/rateLimits.md
     - user-guide/behaviors.md
     - user-guide/qa.md
     - user-guide/reports.md

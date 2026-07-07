@@ -765,18 +765,18 @@ class ArgParser {
           default: false,
         },
 
-        rateLimitMatchRules: {
-          describe:
-            "Consider page rate limited given the following matches by status code and text",
-          type: "array",
-          default: DEFAULT_RATE_LIMIT_RULES,
-        },
-
         rateLimitStatusCodes: {
           describe:
             "Consider responses with these status codes to be treated as rate-limited/blocked responses",
           type: "array",
           default: [403, 429, 503],
+        },
+
+        rateLimitOnMatch: {
+          describe:
+            "One or more rules of format <regex> or <regex>:<status code> to match on page to mark page as rate limited. If no status provided, matches only apply for that status code",
+          type: "array",
+          default: DEFAULT_RATE_LIMIT_RULES,
         },
 
         rateLimitTimeout: {
@@ -969,20 +969,20 @@ class ArgParser {
       logger.info("Updating profile on successful crawl");
     }
 
-    if (argv.rateLimitMatchRules) {
-      const rateLimitCustomRules: RateLimitRule[] = [];
+    if (argv.rateLimitOnMatch) {
+      const rules: RateLimitRule[] = [];
       for (const rule of argv.rateLimitMatchRules) {
         let status = 200;
         let regex = "";
         if (rule.match(/:[\d]+$/)) {
           const parts = rule.split(":");
           regex = parts[0];
-          status = parseInt(parts[1]) ?? 200;
+          status = parseInt(parts[1]) ?? 0;
         } else {
           regex = rule;
         }
-        rateLimitCustomRules.push({ regex: new RegExp(regex), status });
-        argv.rateLimitCustomRules = rateLimitCustomRules;
+        rules.push({ regex: new RegExp(regex), status });
+        argv.rateLimitCustomRules = rules;
       }
     }
 

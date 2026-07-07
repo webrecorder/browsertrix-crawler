@@ -146,5 +146,5 @@ export type RateLimitRule = {
   status: number;
 };
 
-// default text matches to consider rate limit on 200
-export const DEFAULT_RATE_LIMIT_RULES = ['src="/_Incapsula_Resource?'];
+// default text matches to consider rate limit
+export const DEFAULT_RATE_LIMIT_RULES = ['src="/_Incapsula_Resource?:200'];
