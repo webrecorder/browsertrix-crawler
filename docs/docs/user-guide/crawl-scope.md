@@ -48,7 +48,7 @@ The `--extraHops` setting can be set globally or per seed to allow expanding the
 
 ## Seed Redirects
 
-Some seed URLs may redirect to a different URL that would be otherwise out of scope. The `--addRedirectSeeds` setting can be used to specify how such redirects should be handled with regard to crawl scope.
+Some seed URLs may redirect to a different URL that would be otherwise out of scope. The `--addRedirectedSeeds` setting can be used to specify how such redirects should be handled with regard to crawl scope.
 
 The default value `strict` will add the new URL as a seed to the crawl scope if it differs from the specified seed URL in its scheme (`http` vs. `https`) or `www.` subdomain (`example.com` vs `www.example.com`).
 

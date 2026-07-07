@@ -212,7 +212,7 @@ export class Crawler {
   recording: boolean;
   isExternalDedupeStore = false;
 
-  addRedirectSeeds: string;
+  addRedirectedSeeds: string;
 
   constructor() {
     const args = this.parseArgs();
@@ -296,7 +296,7 @@ export class Crawler {
     };
 
     // Out Of Scope Redirects: Add Seeds Mode
-    this.addRedirectSeeds = this.params.addRedirectSeeds;
+    this.addRedirectedSeeds = this.params.addRedirectedSeeds;
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
@@ -2487,8 +2487,8 @@ self.__bx_behaviors.selectMainBehavior();
       const seedId = data.seedId;
 
       if (
-        this.addRedirectSeeds === "always" ||
-        (this.addRedirectSeeds === "strict" &&
+        this.addRedirectedSeeds === "always" ||
+        (this.addRedirectedSeeds === "strict" &&
           normalizedRedirectSeedUrl(origUrl) ==
             normalizedRedirectSeedUrl(newUrl))
       ) {
@@ -2504,7 +2504,7 @@ self.__bx_behaviors.selectMainBehavior();
             origUrl,
             newUrl,
             seedId,
-            policy: this.addRedirectSeeds,
+            policy: this.addRedirectedSeeds,
           },
         );
       } else if (
@@ -2514,7 +2514,7 @@ self.__bx_behaviors.selectMainBehavior();
           origUrl,
           newUrl,
           seedId,
-          policy: this.addRedirectSeeds,
+          policy: this.addRedirectedSeeds,
         });
       }
     }
