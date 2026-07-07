@@ -19,8 +19,9 @@ import {
   DEFAULT_MAX_RETRIES,
   BxFunctionBindings,
   DEFAULT_CRAWL_ID_TEMPLATE,
-  RATE_LIMIT_MATCH_200,
+  DEFAULT_RATE_LIMIT_RULES,
   RATE_LIMIT_TTL_SECS,
+  RateLimitRule,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -60,7 +61,7 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
 
   warcInfo?: Record<string, string>;
 
-  rateLimitOn200MatchText: string[];
+  rateLimitCustomRules?: RateLimitRule[];
   rateLimitStatusCodes: number[];
 };
 
@@ -764,11 +765,11 @@ class ArgParser {
           default: false,
         },
 
-        rateLimitOn200MatchText: {
+        rateLimitMatchRules: {
           describe:
             "Consider page rate limited given the following matches by status code and text",
           type: "array",
-          default: RATE_LIMIT_MATCH_200,
+          default: DEFAULT_RATE_LIMIT_RULES,
         },
 
         rateLimitStatusCodes: {
@@ -833,6 +834,8 @@ class ArgParser {
       .parseSync();
 
     parsed.origConfig = origConfig;
+
+    console.log(parsed);
 
     return parsed;
   }
@@ -964,6 +967,23 @@ class ArgParser {
     }
     if (argv.saveProfile) {
       logger.info("Updating profile on successful crawl");
+    }
+
+    if (argv.rateLimitMatchRules) {
+      const rateLimitCustomRules: RateLimitRule[] = [];
+      for (const rule of argv.rateLimitMatchRules) {
+        let status = 200;
+        let regex = "";
+        if (rule.match(/:[\d]+$/)) {
+          const parts = rule.split(":");
+          regex = parts[0];
+          status = parseInt(parts[1]) ?? 200;
+        } else {
+          regex = rule;
+        }
+        rateLimitCustomRules.push({ regex: new RegExp(regex), status });
+        argv.rateLimitCustomRules = rateLimitCustomRules;
+      }
     }
 
     return true;
