@@ -49,12 +49,17 @@ const followRedirectDispatcher = addRedirectInterceptor(
   addDecompressInterceptor(new Agent(baseOpts)),
 );
 
+export type ProxyDef = {
+  url: string;
+  privateKeyFile?: string;
+  publicHostsFile?: string;
+  ignoreOnFailedSSHTunnel?: boolean;
+};
+
 export type ProxyServerConfig = {
   matchHosts?: Record<string, string>;
-  proxies?: Record<
-    string,
-    string | { url: string; privateKeyFile?: string; publicHostsFile?: string }
-  >;
+  ignoreFailedHostProxies?: boolean;
+  proxies?: Record<string, string | ProxyDef>;
 };
 
 export type ProxyCLIArgs = {
@@ -68,7 +73,7 @@ export type ProxyCLIArgs = {
   proxyMap?: ProxyServerConfig;
 };
 
-const proxyMap = new Map<RegExp, ProxyEntry>();
+const proxyMap = new Map<RegExp, ProxyEntry | null>();
 let defaultProxyEntry: ProxyEntry | null = null;
 
 export function getEnvProxyUrl() {
@@ -147,9 +152,10 @@ export async function initProxy(
       detached,
       sshProxyPrivateKeyFile,
       sshProxyKnownHostsFile,
+      false,
     );
-    if (params.proxyServerPreferSingleProxy && defaultProxyEntry.proxyUrl) {
-      return { proxyServer: defaultProxyEntry.proxyUrl };
+    if (params.proxyServerPreferSingleProxy && defaultProxyEntry!.proxyUrl) {
+      return { proxyServer: defaultProxyEntry!.proxyUrl };
     }
   }
 
@@ -160,49 +166,64 @@ export async function initProxy(
     return { proxyServer: defaultProxyEntry?.proxyUrl };
   }
 
-  const nameToProxy = new Map<string, ProxyEntry>();
+  const nameToProxy = new Map<
+    string,
+    ProxyDef & { entry?: ProxyEntry | null }
+  >();
 
   for (const [name, value] of Object.entries(params.proxyMap.proxies)) {
-    let proxyUrl = "";
+    let url = "";
     let privateKeyFile: string | undefined = "";
     let publicHostsFile: string | undefined = "";
+    let ignoreOnFailedSSHTunnel = false;
 
     if (typeof value === "string") {
-      proxyUrl = value;
+      url = value;
     } else {
-      proxyUrl = value.url;
+      url = value.url;
       privateKeyFile = value.privateKeyFile;
       publicHostsFile = value.publicHostsFile;
+      ignoreOnFailedSSHTunnel = value.ignoreOnFailedSSHTunnel ?? false;
     }
 
     privateKeyFile = privateKeyFile || sshProxyPrivateKeyFile;
     publicHostsFile = publicHostsFile || sshProxyKnownHostsFile;
 
-    const entry = await initSingleProxy(
-      proxyUrl,
-      localPort++,
-      detached,
+    nameToProxy.set(name, {
+      url,
       privateKeyFile,
       publicHostsFile,
-    );
-
-    nameToProxy.set(name, entry);
+      ignoreOnFailedSSHTunnel,
+    });
   }
 
   for (const [rx, name] of Object.entries(params.proxyMap.matchHosts)) {
-    const entry = nameToProxy.get(name);
-
-    if (!entry) {
+    const proxyDef = nameToProxy.get(name);
+    if (!proxyDef) {
       await logger.fatal(
         "Proxy specified but not found in proxies list: " + name,
       );
       return {};
     }
 
+    if (proxyDef.entry === undefined) {
+      const { url, privateKeyFile, publicHostsFile, ignoreOnFailedSSHTunnel } =
+        proxyDef;
+
+      proxyDef.entry = await initSingleProxy(
+        url,
+        localPort++,
+        detached,
+        privateKeyFile,
+        publicHostsFile,
+        ignoreOnFailedSSHTunnel,
+      );
+    }
+
     if (rx) {
-      proxyMap.set(new RegExp(rx), entry);
+      proxyMap.set(new RegExp(rx), proxyDef.entry);
     } else {
-      defaultProxyEntry = entry;
+      defaultProxyEntry = proxyDef.entry;
     }
   }
 
@@ -219,7 +240,8 @@ export async function initSingleProxy(
   detached: boolean,
   sshProxyPrivateKeyFile?: string,
   sshProxyKnownHostsFile?: string,
-): Promise<ProxyEntry> {
+  ignoreFailed = false,
+): Promise<ProxyEntry | null> {
   logger.debug("Initing proxy", {
     url: getSafeProxyString(proxyUrl),
     localPort,
@@ -234,7 +256,12 @@ export async function initSingleProxy(
       detached,
       sshProxyPrivateKeyFile,
       sshProxyKnownHostsFile,
+      ignoreFailed,
     );
+  }
+
+  if (!proxyUrl) {
+    return null;
   }
 
   return createDispatchers(
@@ -338,6 +365,7 @@ export async function runSSHD(
   detached: boolean,
   privateKey?: string,
   publicKnownHost?: string,
+  ignoreFailed = false,
 ) {
   if (!proxyServer || !proxyServer.startsWith("ssh://")) {
     return "";
@@ -435,17 +463,25 @@ export async function runSSHD(
   try {
     await waitForSocksPort;
   } catch (e) {
-    await logger.interrupt(
-      "Unable to establish SSH connection for proxy",
-      {
-        error: e,
-        stdout: procStdout,
-        stderr: procStderr,
-        code: proc.exitCode,
-      },
-      "proxy",
-      ExitCodes.ProxyError,
-    );
+    if (!ignoreFailed) {
+      await logger.interrupt(
+        "Unable to establish SSH connection for proxy",
+        {
+          error: e,
+          stdout: procStdout,
+          stderr: procStderr,
+          code: proc.exitCode,
+        },
+        "proxy",
+        ExitCodes.ProxyError,
+      );
+    } else {
+      logger.warn(
+        "Ignoring failed proxy, using direct connection",
+        { proxyString: getSafeProxyString(proxyString) },
+        "proxy",
+      );
+    }
     return "";
   }
 
@@ -472,6 +508,7 @@ export async function runSSHD(
       detached,
       privateKey,
       publicKnownHost,
+      ignoreFailed,
     ).catch((e) => logger.error("proxy retry error", e, "proxy"));
   });
 
@@ -511,10 +548,9 @@ class ProxyPacServer {
 function FindProxyForURL(url, host) {
 
 `;
-    proxyMap.forEach(({ proxyUrl }, k) => {
-      this.proxyPacText += `  if (url.match(/${
-        k.source
-      }/)) { return ${urlToProxy(proxyUrl)}; }\n`;
+    proxyMap.forEach((proxyEntry, k) => {
+      const target = proxyEntry ? urlToProxy(proxyEntry.proxyUrl) : `"DIRECT"`;
+      this.proxyPacText += `  if (url.match(/${k.source}/)) { return ${target}; }\n`;
     });
 
     this.proxyPacText += `\n  return ${

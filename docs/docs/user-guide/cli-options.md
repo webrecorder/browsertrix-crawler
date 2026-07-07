@@ -328,8 +328,8 @@ Options:
                                             xyServer value will be preferred
                                                       [boolean] [default: false]
       --proxyServerConfig                   if set, path to yaml/json file that
-                                            configures multiple path servers per
-                                             URL regex                  [string]
+                                            configures multiple proxy servers pe
+                                            r URL regex                 [string]
       --dryRun                              If true, no archive data is written
                                             to disk, only pages and logs (and op
                                             tionally saved state).     [boolean]
@@ -379,6 +379,12 @@ Options:
                                             limited pages before crawl is consid
                                             ered rate limited and is interrupted
                                                           [number] [default: -1]
+      --addRedirectedSeeds                  Policy for how to handle seeds that
+                                            redirect to a URL out of scope. Defa
+                                            ult (strict): add the redirect URL a
+                                            s a seed only if it differs in schem
+                                            e or www subdomain
+             [string] [choices: "always", "strict", "never"] [default: "strict"]
       --config                              Path to YAML config file
 ```
 

@@ -22,6 +22,7 @@ import {
   DEFAULT_RATE_LIMIT_RULES,
   RATE_LIMIT_TTL_SECS,
   RateLimitRule,
+  ADD_REDIRECTED_SEEDS_OPTS,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -704,7 +705,7 @@ class ArgParser {
 
         proxyServerConfig: {
           describe:
-            "if set, path to yaml/json file that configures multiple path servers per URL regex",
+            "if set, path to yaml/json file that configures multiple proxy servers per URL regex",
           type: "string",
         },
 
@@ -799,6 +800,14 @@ class ArgParser {
             "If >0, threshold for number of rate limited pages before crawl is considered rate limited and is interrupted",
           type: "number",
           default: -1,
+        },
+
+        addRedirectedSeeds: {
+          describe:
+            "Policy for how to handle seeds that redirect to a URL out of scope. Default (strict): add the redirect URL as a seed only if it differs in scheme or www subdomain",
+          type: "string",
+          choices: ADD_REDIRECTED_SEEDS_OPTS,
+          default: "strict",
         },
       });
   }
