@@ -212,7 +212,7 @@ export class Crawler {
   recording: boolean;
   isExternalDedupeStore = false;
 
-  redirectSeedOutOfScope: string;
+  oosRedirectAddSeeds: string;
 
   constructor() {
     const args = this.parseArgs();
@@ -295,7 +295,8 @@ export class Crawler {
       timeout: this.params.pageLoadTimeout * 1000,
     };
 
-    this.redirectSeedOutOfScope = this.params.redirectSeedOutOfScope;
+    // Out Of Scope Redirects: Add Seeds Mode
+    this.oosRedirectAddSeeds = this.params.outOfScopeRedirectAddSeeds;
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
@@ -2486,8 +2487,8 @@ self.__bx_behaviors.selectMainBehavior();
       const seedId = data.seedId;
 
       if (
-        this.redirectSeedOutOfScope === "add" ||
-        (this.redirectSeedOutOfScope === "strict" &&
+        this.oosRedirectAddSeeds === "always" ||
+        (this.oosRedirectAddSeeds === "strict" &&
           normalizedRedirectSeedUrl(origUrl) ==
             normalizedRedirectSeedUrl(newUrl))
       ) {
@@ -2503,7 +2504,7 @@ self.__bx_behaviors.selectMainBehavior();
             origUrl,
             newUrl,
             seedId,
-            policy: this.redirectSeedOutOfScope,
+            policy: this.oosRedirectAddSeeds,
           },
         );
       } else if (
@@ -2513,7 +2514,7 @@ self.__bx_behaviors.selectMainBehavior();
           origUrl,
           newUrl,
           seedId,
-          policy: this.redirectSeedOutOfScope,
+          policy: this.oosRedirectAddSeeds,
         });
       }
     }
