@@ -328,8 +328,8 @@ Options:
                                             xyServer value will be preferred
                                                       [boolean] [default: false]
       --proxyServerConfig                   if set, path to yaml/json file that
-                                            configures multiple path servers per
-                                             URL regex                  [string]
+                                            configures multiple proxy servers pe
+                                            r URL regex                 [string]
       --dryRun                              If true, no archive data is written
                                             to disk, only pages and logs (and op
                                             tionally saved state).     [boolean]

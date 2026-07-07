@@ -112,6 +112,9 @@ proxies:
   default-proxy:
     url: ssh://user@my-social-proxy.example.com
     privateKeyFile: /proxies/default-proxy-private-key
+
+    # optional, if set, ignore this proxy if tunnel can not be established at crawl start time
+    ignoreOnFailedSSHTunnel: true
 ```
 
 If the above config is stored in `./proxies/proxyConfig.yaml` along with the SSH private keys and known public hosts
@@ -121,11 +124,13 @@ files, the crawler can be started with:
 docker run -v $PWD/crawls:/crawls -v $PWD/proxies:/proxies -it webrecorder/browsertrix-crawler --url https://example.com/ --proxyServerConfig /proxies/proxyConfig.yaml
 ```
 
-Note that if SSH proxies are provided, an SSH tunnel must be opened for each one before the crawl starts.
-The crawl will not start if any of the SSH proxy connections fail, even if a host-specific proxy is not actually used.
-SOCKS5 and HTTP proxy connections are attempted only on first use.
-
 The same `--proxyServerConfig` option can also be used in browser profile creation with the `create-login-profile` command in the same way.
+
+### SSH Tunnels
+
+For any SSH proxy that is listed as a possible proxy in `matchHosts` configuration, the crawler will attempt to set up an SSH tunnel before starting the crawl. By default, the crawl will not start and will be interrupted if any of the SSH tunnel connections fail. To allow ignoring failing SSH proxies and perform a direct connection instead, `ignoreOnFailedSSHTunnel: true` can be set for each SSH proxy that should be ignored on failure.
+
+SOCKS5 and HTTP proxy connections are made by the browser only on first use, and are not checked for successful connection until they are used.
 
 ### Proxy Precedence
 

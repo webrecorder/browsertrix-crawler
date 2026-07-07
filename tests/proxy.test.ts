@@ -247,3 +247,29 @@ test("proxy with config file, correct auth or no match", () => {
     { encoding: "utf-8" },
   );
 });
+
+test("proxy per-host, ignore only if option set", () => {
+  let status = 0;
+
+  // ignored
+  try {
+    execSync(
+      `docker run --rm -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-failed-ignore.pac --url ${HTML} ${extraArgs}`,
+      { encoding: "utf-8" },
+    );
+  } catch (e) {
+    status = (e as ErrorWithStatus).status;
+  }
+  expect(status).toBe(0);
+
+  // not ignored
+  try {
+    execSync(
+      `docker run --rm -v $PWD/tests/fixtures/proxies/:/proxies/ webrecorder/browsertrix-crawler crawl --proxyServerConfig /proxies/proxy-test-failed.pac --url ${HTML} ${extraArgs}`,
+      { encoding: "utf-8" },
+    );
+  } catch (e) {
+    status = (e as ErrorWithStatus).status;
+  }
+  expect(status).toBe(PROXY_EXIT_CODE);
+});

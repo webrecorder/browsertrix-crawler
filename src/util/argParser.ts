@@ -703,7 +703,7 @@ class ArgParser {
 
         proxyServerConfig: {
           describe:
-            "if set, path to yaml/json file that configures multiple path servers per URL regex",
+            "if set, path to yaml/json file that configures multiple proxy servers per URL regex",
           type: "string",
         },
 
