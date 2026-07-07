@@ -357,14 +357,16 @@ Options:
                                              encountered but not queued to repor
                                             ts/skippedPages.jsonl
                                                       [boolean] [default: false]
-      --rateLimitOn200MatchText             Consider page rate limited given the
-                                             following matches by status code an
-                                            d text
-                              [array] [default: ["src=\"/_Incapsula_Resource?"]]
       --rateLimitStatusCodes                Consider responses with these status
                                              codes to be treated as rate-limited
                                             /blocked responses
                                                 [array] [default: [403,429,503]]
+      --rateLimitOnMatch                    One or more rules of format <regex>
+                                            or <regex>:<status code> to match on
+                                             page to mark page as rate limited.
+                                            If no status provided, matches only
+                                            apply for that status code
+                          [array] [default: ["src=\"/_Incapsula_Resource?:200"]]
       --rateLimitTimeout                    Time in seconds to track rate limite
                                             d count for before resetting
                                                          [number] [default: 300]
