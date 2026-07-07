@@ -361,11 +361,12 @@ Options:
                                              codes to be treated as rate-limited
                                             /blocked responses
                                                 [array] [default: [403,429,503]]
-      --rateLimitOnMatch                    One or more rules of format <regex>
-                                            or <regex>:<status code> to match on
-                                             page to mark page as rate limited.
-                                            If no status provided, matches only
-                                            apply for that status code
+      --rateLimitOnMatch                    One or more rules in the format <reg
+                                            ex> or <regex>:<status code> matched
+                                             against page text to determine if a
+                                             page is rate limited. If a status i
+                                            s provided, only matches if the resp
+                                            onse has the specified status
                           [array] [default: ["src=\"/_Incapsula_Resource?:200"]]
       --rateLimitTimeout                    Time in seconds to track rate limite
                                             d count for before resetting
