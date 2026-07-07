@@ -14,7 +14,7 @@ Instead, the pages may be queued to be retried at a later time or skipped altoge
 
 The simplest mechanism for detection is by checking the status code. By default, the crawler now skips all pages that have a 403, 429, or 503 status code. This list can be customized with the `--rateLimitStatusCodes` setting, which accepts a list of status codes to always skip and retry.
 
-The crawler also includes a custom option `--rateLimitOnMatch`, which can take one more values in the form of `<regex>` or `<regex>:<status>`, e.g. `--rateLimitOnMatch <regex-1> --rateLimitOnMatch <regex-2>:<status>`. This setting allows for custom detection of CAPTCHAs and rate-limited pages based on page content, and optionally status code, so even 200 pages can be flagged as rate limited.
+The crawler also includes a custom option `--rateLimitOnMatch`, which can take additional values in the form of `<regex>` or `<regex>:<status>`, e.g. `--rateLimitOnMatch <regex-1> --rateLimitOnMatch <regex-2>:<status>`. This setting allows for custom detection of CAPTCHAs and rate-limited pages based on page content, and optionally status code, so even 200 pages can be flagged as rate limited.
 
 ## Rate Limit Counters
 
