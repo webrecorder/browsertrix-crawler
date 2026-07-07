@@ -38,15 +38,18 @@ By default, the crawler will continue, skipping rate limited pages and retrying 
 
 If the `--rateLimitInterruptCount M` flag is set, the crawler will exit with a rate limit exit code (exit code 21) after M rate limited pages within the N seconds, configured via `--rateLimitTimeout`.
 
-This can allow another application (e.g. Kubernetes) to provide an exponential backoff system when the crawler is repeatedly exiting due to rate limited pages.
+This can allow a job runner or other system that starts and monitors the crawler container to implement an exponential backoff system if the crawler repeatedly exits due to being rate limited.
+The Browsertrix application provides this through built-in exponential backoff available in Kubernetes, where a crawler
+will restart only once every 5 minutes if continuously rate limited.
 
 Additionally, if direct fetch reaches this threshold, further direct fetches will also be skipped until the timeout expires.
 
-If a page loads successfully, the rate limit counter is cleared.
+If any page loads successfully, the rate limit counter is cleared.
 
 ## Caveats and Multi-Domain Crawling
 
-Interrupting the crawl when the rate limit threshold is reached is disabled by default as it may not always be desirable when crawling many seeds across different domains, where one site may be rate limited while others are not. Currently, the rate limits are applied globally and not per-domain.
+It should be noted that the rate limits are applied globally and not per seed or per domain, and it may not always be desirable to interrupt a crawl containing many seeds across different domains when a rate limit is reached.
+The rate limit interrupt threshold is disabled by default for this reason.
 
 For multi-domain crawling the threshold could be set to a large number so that if multiple domains are flagged as rate limited the crawl is still interrupted, while for a single domain crawl the number may be set lower.
 It may make sense to set `--rateLimitMaxRetries` to a fixed value so that larger crawls do eventually finish with certain pages skipped as rate limited.
