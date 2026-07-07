@@ -248,7 +248,7 @@ test("proxy with config file, correct auth or no match", () => {
   );
 });
 
-test("proxy per-host, ignore only if flag set", () => {
+test("proxy per-host, ignore only if option set", () => {
   let status = 0;
 
   // ignored

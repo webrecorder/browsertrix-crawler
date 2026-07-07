@@ -128,7 +128,7 @@ The same `--proxyServerConfig` option can also be used in browser profile creati
 
 ### SSH Tunnels
 
-For any SSH proxy that is listed as a possible proxy in `matchHosts` configuration, the crawler will attempt to set up an SSH tunnel before starting the crawl. By default, the crawl will not start and will be interrupted if any of the SSH tunnel connections fail. To allow ignoring failing SSH proxies (and perform a direct connection) the `ignoreOnFailedSSHTunnel: true` can be set for each SSH proxy that should be ignored on failure.
+For any SSH proxy that is listed as a possible proxy in `matchHosts` configuration, the crawler will attempt to set up an SSH tunnel before starting the crawl. By default, the crawl will not start and will be interrupted if any of the SSH tunnel connections fail. To allow ignoring failing SSH proxies and perform a direct connection instead, `ignoreOnFailedSSHTunnel: true` can be set for each SSH proxy that should be ignored on failure.
 
 SOCKS5 and HTTP proxy connections are made by the browser only on first use, and are not checked for successful connection until they are used.
 
