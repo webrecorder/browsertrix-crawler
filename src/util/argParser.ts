@@ -835,8 +835,6 @@ class ArgParser {
 
     parsed.origConfig = origConfig;
 
-    console.log(parsed);
-
     return parsed;
   }
 
