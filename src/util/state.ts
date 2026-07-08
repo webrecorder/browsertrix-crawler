@@ -1009,12 +1009,13 @@ end
       lua: `
 local json = redis.call('hget', KEYS[1], ARGV[1]);
 
+redis.call('del', KEYS[1] .. ":" .. ARGV[1]);
+
 if json then
   local data = cjson.decode(json);
   local retry = data['retry'] or 0;
 
   redis.call('hdel', KEYS[1], ARGV[1]);
-  redis.call('del', KEYS[1] .. ":" .. ARGV[1]);
 
   local maxRetries = tonumber(ARGV[2]);
 
@@ -1029,7 +1030,6 @@ if json then
     redis.call('lpush', KEYS[3], json);
   end
 end
-redis.call('del', KEYS[1] .. ":" .. ARGV[1]);
 return -1;
 
 `,
