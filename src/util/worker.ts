@@ -5,7 +5,7 @@ import { sleep, timedRun } from "./timing.js";
 import { Recorder } from "./recorder.js";
 import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
-import { PageState, WorkerId } from "./state.js";
+import { PageState, QueueEntry, WorkerId } from "./state.js";
 import { Crawler } from "../crawler.js";
 import { PAGE_OP_TIMEOUT_SECS, SkippedReason } from "./constants.js";
 
@@ -356,7 +356,17 @@ export class PageWorker {
     let loggedWaiting = false;
 
     while (await this.crawler.isCrawlRunning()) {
-      await crawlState.processMessage(this.crawler.seeds);
+      await crawlState.processMessage(
+        this.crawler.seeds,
+        (entry: QueueEntry) => {
+          this.crawler.writeSkippedPage(
+            entry.url,
+            entry.seedId,
+            entry.depth,
+            SkippedReason.ExcludedMidCrawl,
+          );
+        },
+      );
 
       const data = await crawlState.nextFromQueue();
 
@@ -388,6 +398,12 @@ export class PageWorker {
         ) {
           logger.info("Page no longer in scope", data);
           await crawlState.markExcluded(data.url);
+          this.crawler.writeSkippedPage(
+            data.url,
+            data.seedId,
+            data.depth,
+            SkippedReason.ExcludedMidCrawl,
+          );
           continue;
         }
 

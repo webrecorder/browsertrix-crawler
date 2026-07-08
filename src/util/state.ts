@@ -156,10 +156,10 @@ declare module "ioredis" {
 
     trimqueue(
       qkey: string,
-      pkey: string,
-      skey: string,
+      // pkey: string,
+      // skey: string,
       limit: number,
-    ): Result<number, Context>;
+    ): Result<string | null, Context>;
 
     getnext(qkey: string, pkey: string): Result<string, Context>;
 
@@ -217,6 +217,7 @@ export type SaveState = {
   errors: string[];
   extraSeeds: string[];
   sitemapDone: boolean;
+  excludedCount?: number;
   excluded?: string[];
 };
 
@@ -903,9 +904,9 @@ export class RedisCrawlState extends RedisDedupeIndex {
     this.esKey = this.crawlId + ":extraSeeds";
     this.esMap = this.crawlId + ":esMap";
 
-    // stores URLs that have been seen but excluded
+    // stores count of URLs that have been excluded
     // (eg. redirect-to-excluded or trimmed)
-    this.exKey = this.crawlId + ":excluded";
+    this.exKey = this.crawlId + ":numExcluded";
 
     this.sitemapDoneKey = this.crawlId + ":sitemapDone";
 
@@ -919,14 +920,14 @@ export class RedisCrawlState extends RedisDedupeIndex {
     redis.defineCommand("numfound", {
       numberOfKeys: 3,
       lua: `
-return redis.call('scard', KEYS[1]) - redis.call('llen', KEYS[2]) - redis.call('scard', KEYS[3]);
+return redis.call('scard', KEYS[1]) - redis.call('llen', KEYS[2]) - (tonumber(redis.call('get', KEYS[3])) or 0);
 `,
     });
 
     redis.defineCommand("addqueue", {
       numberOfKeys: 5,
       lua: `
-local size = redis.call('scard', KEYS[3]) - redis.call('llen', KEYS[4]) - redis.call('scard', KEYS[5]);
+local size = redis.call('scard', KEYS[3]) - redis.call('llen', KEYS[4]) - (tonumber(redis.call('get', KEYS[5])) or 0);
 local limit = tonumber(ARGV[4]);
 if limit > 0 and size >= limit then
   return 1;
@@ -942,22 +943,13 @@ return 0;
     });
 
     redis.defineCommand("trimqueue", {
-      numberOfKeys: 3,
+      numberOfKeys: 1,
       lua: `
       local limit = tonumber(ARGV[1]);
       if redis.call('zcard', KEYS[1]) <= limit then
-        return 0
+        return '';
       end
-      local res = redis.call('zpopmax', KEYS[1]);
-      local json = res[1];
-
-      if json then
-        local data = cjson.decode(json);
-        redis.call('hdel', KEYS[2], data.url);
-        redis.call('del', KEYS[2] .. ":" .. data.url);
-        redis.call('sadd', KEYS[3], data.url);
-      end
-      return 1;
+      return redis.call('zpopmax', KEYS[1]);
       `,
     });
 
@@ -1133,7 +1125,7 @@ return inx;
     await this.redis.hdel(this.pkey, url);
     await this.redis.del(this.pkey + ":" + url);
 
-    await this.redis.sadd(this.exKey, url);
+    await this.redis.incr(this.exKey);
   }
 
   async incRateLimited(
@@ -1219,14 +1211,15 @@ return inx;
   }
 
   async numExcluded() {
-    return await this.redis.scard(this.exKey);
+    const res = await this.redis.get(this.exKey);
+    return parseInt(res || "0") ?? 0;
   }
 
   async numFound() {
     return await this.redis.numfound(this.skey, this.esKey, this.exKey);
   }
 
-  async trimToLimit(limit: number) {
+  async *trimToLimit(limit: number) {
     if (limit === 0) {
       return;
     }
@@ -1239,12 +1232,18 @@ return inx;
       return;
     }
     const remain = Math.max(0, limit - totalComplete);
-    // trim queue until size <= remain
-    while (
-      (await this.redis.trimqueue(this.qkey, this.pkey, this.exKey, remain)) ===
-      1
-    ) {
-      /* ignore */
+
+    while (true) {
+      const json = await this.redis.trimqueue(this.qkey, remain);
+      if (!json) {
+        break;
+      }
+      const data: QueueEntry = JSON.parse(json);
+      const { url } = data;
+      await this.redis.hdel(this.pkey, url);
+      await this.redis.del(this.pkey + ":" + url);
+      await this.redis.incr(this.exKey);
+      yield data;
     }
   }
 
@@ -1337,7 +1336,10 @@ return inx;
     await this.redis.set(`${this.crawlId}:stopping`, "1");
   }
 
-  async processMessage(seeds: ScopedSeed[]) {
+  async processMessage(
+    seeds: ScopedSeed[],
+    writeExcluded: (entry: QueueEntry) => void,
+  ) {
     while (true) {
       const result = await this.redis.lpop(`${this.uid}:msg`);
       if (!result) {
@@ -1357,7 +1359,7 @@ return inx;
             // can happen async w/o slowing down crawling
             // each page is still checked if in scope before crawling, even while
             // queue is being filtered
-            this.filterQueue(regex).catch((e) =>
+            this.filterQueue(regex, writeExcluded).catch((e) =>
               logger.warn("filtering queue error", e, "exclusion"),
             );
             break;
@@ -1383,7 +1385,7 @@ return inx;
     return s.replace(/\\/g, "").replace(/[\\^$*+?.()|[\]{}]/g, "\\$&") === s;
   }
 
-  filterQueue(regexStr: string) {
+  filterQueue(regexStr: string, writeExcluded: (entry: QueueEntry) => void) {
     const regex = new RegExp(regexStr);
 
     let matcher = undefined;
@@ -1399,11 +1401,13 @@ return inx;
       stream.pause();
 
       for (const result of results) {
-        const { url } = JSON.parse(result);
+        const entry: QueueEntry = JSON.parse(result);
+        const { url } = entry;
         if (regex.test(url)) {
           const removed = await this.redis.zrem(this.qkey, result);
           //if (removed) {
           await this.markExcluded(url);
+          void writeExcluded(entry);
           //}
           logger.debug(
             "Removing excluded URL",
@@ -1503,10 +1507,9 @@ return inx;
     const errors = await this.getErrorList();
     const extraSeeds = await this._iterListKeys(this.esKey, seen);
     const sitemapDone = await this.isSitemapDone();
-    const excludedSet = await this._iterSet(this.exKey);
+    const excludedCount = await this.numExcluded();
 
     const finished = [...seen.values()];
-    const excluded = [...excludedSet.values()];
 
     return {
       id: this.crawlId,
@@ -1517,7 +1520,7 @@ return inx;
       sitemapDone,
       failed,
       errors,
-      excluded,
+      excludedCount,
     };
   }
 
@@ -1719,9 +1722,10 @@ return inx;
 
     await this.redis.sadd(this.skey, seen);
 
-    if (state.excluded?.length) {
-      await this.redis.sadd(this.exKey, state.excluded);
-    }
+    await this.redis.set(
+      this.exKey,
+      state.excludedCount ?? state.excluded?.length ?? 0,
+    );
 
     return seen.length;
   }

@@ -633,7 +633,11 @@ export class Crawler {
 
     await this.loadCrawlState();
 
-    await this.crawlState.trimToLimit(this.queuePageLimit);
+    for await (const { url, depth, seedId } of this.crawlState.trimToLimit(
+      this.queuePageLimit,
+    )) {
+      this.writeSkippedPage(url, seedId, depth, SkippedReason.OutOfScope);
+    }
   }
 
   extraChromeArgs() {
