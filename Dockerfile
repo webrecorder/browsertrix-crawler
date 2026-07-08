@@ -4,9 +4,7 @@ ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERS
 FROM ${BROWSER_IMAGE_BASE}
 
 LABEL org.opencontainers.image.vendor="Webrecorder <https://webrecorder.net/>"
-LABEL org.opencontainers.image.source="https://github.com/webrecorder/browsertrix-crawler"
 LABEL org.opencontainers.image.documentation="https://crawler.docs.browsertrix.com/"
-LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
 # set to 1 to minimize size for prod, but longer build time, otherwise faster build and rebuild but larger image
 ARG MINIMIZE_IMAGE_SIZE=0
