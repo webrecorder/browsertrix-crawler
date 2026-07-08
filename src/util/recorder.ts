@@ -1502,7 +1502,6 @@ export class Recorder extends EventEmitter {
     url,
     headers,
     cdp,
-    crawler,
     state,
   }: DirectFetchRequest): Promise<number> {
     const reqresp = new RequestResponseInfo("0");
@@ -1546,8 +1545,11 @@ export class Recorder extends EventEmitter {
       return STATUS_IS_HTML_NO_DIRECT_FETCH;
     }
     if (!this.stopping) {
-      state.isDirectFetched = true;
-      void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
+      // todo: revisit async queuing at a later time
+      //state.isDirectFetched = true;
+      //void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
+      // load immediately for now
+      await fetcher.loadDirectPage(state);
     }
     return reqresp.status;
   }
@@ -2230,7 +2232,7 @@ class AsyncFetcher {
     }
   }
 
-  async loadDirectPage(state: PageState, crawler: Crawler) {
+  async loadDirectPage(state: PageState, crawler?: Crawler) {
     const result = await this.loadBody(true);
 
     this.recorder.addPageRecord(this.reqresp);
@@ -2252,7 +2254,9 @@ class AsyncFetcher {
       "fetch",
     );
 
-    await crawler.pageFinished(state);
+    if (crawler) {
+      await crawler.pageFinished(state);
+    }
   }
 }
 

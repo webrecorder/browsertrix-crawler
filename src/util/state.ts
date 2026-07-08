@@ -936,6 +936,7 @@ if redis.call('sadd', KEYS[3], ARGV[1]) == 0 then
 end
 redis.call('zadd', KEYS[2], ARGV[2], ARGV[3]);
 redis.call('hdel', KEYS[1], ARGV[1]);
+redis.call('del', KEYS[1] .. ":" .. ARGV[1]);
 return 0;
 `,
     });
@@ -953,6 +954,7 @@ return 0;
       if json then
         local data = cjson.decode(json);
         redis.call('hdel', KEYS[2], data.url);
+        redis.call('del', KEYS[2] .. ":" .. data.url);
         redis.call('sadd', KEYS[3], data.url);
       end
       return 1;
@@ -1006,6 +1008,8 @@ end
       numberOfKeys: 3,
       lua: `
 local json = redis.call('hget', KEYS[1], ARGV[1]);
+
+redis.call('del', KEYS[1] .. ":" .. ARGV[1]);
 
 if json then
   local data = cjson.decode(json);
@@ -1100,6 +1104,7 @@ return inx;
     await this.redis.hdel(this.pkey, url);
 
     await this.redis.del(
+      this.pkey + ":" + url,
       `${this.crawlId}:rateLimited`,
       `${this.crawlId}:rateLimitedDirect`,
     );
@@ -1126,6 +1131,7 @@ return inx;
 
   async markExcluded(url: string) {
     await this.redis.hdel(this.pkey, url);
+    await this.redis.del(this.pkey + ":" + url);
 
     await this.redis.sadd(this.exKey, url);
   }
