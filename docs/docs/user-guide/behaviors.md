@@ -24,6 +24,7 @@ Browsertrix also comes with several 'site-specific' behaviors, which run only on
 - Telegram
 - TikTok
 - Twitter/X
+- YouTube
 
 User-defined custom behaviors are also considered site-specific.
 
@@ -75,6 +76,13 @@ The Facebook behavior is able to automate the following features:
 - Clicking through "view sensitive" buttons to ensure content is captured (requires a logged-in profile)
 - Viewing full-size images, audio and video
 - Viewing quoted posts
+
+### YouTube
+
+The YouTube behavior is able to automate the following features:
+
+- Selecting a video format that the crawler will be able to capture in a single stream. Currently, this will be a .mp4 with resolution of <= 320p due to YouTube limitations.
+- Ensuring that video playback has started
 
 ## Enabling Behaviors
 
