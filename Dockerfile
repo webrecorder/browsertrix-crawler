@@ -23,7 +23,7 @@ EXPOSE 9222 9223 6080
 
 WORKDIR /app
 
-ADD package.json yarn.lock /app/
+ADD .yarnrc.yml package.json yarn.lock /app/
 
 # to allow forcing rebuilds from this stage
 ARG REBUILD
@@ -34,9 +34,11 @@ RUN mkdir -p /tmp/ads && cd /tmp/ads && \
     cat ad-hosts.txt | grep '^0.0.0.0 '| awk '{ print $2; }' | grep -v '0.0.0.0' | jq --raw-input --slurp 'split("\n")' > /app/ad-hosts.json && \
     rm /tmp/ads/ad-hosts.txt
 
+RUN corepack enable yarn
+
 # when not minimizing image size, do install here so that source changes do not trigger a rebuild (faster build)
 RUN if [ "$MINIMIZE_IMAGE_SIZE" != "1" ] ; then \
-      yarn install --network-timeout 1000000 --frozen-lockfile; \
+      yarn install --network-timeout 1000000 --immutable; \
     fi
 
 ADD tsconfig.json /app/
@@ -46,9 +48,9 @@ ADD src /app/src
 RUN if [ "$MINIMIZE_IMAGE_SIZE" != "1" ] ; then \
       yarn run tsc; \
     else \
-      yarn install --network-timeout 1000000 --frozen-lockfile && \
+      yarn install --network-timeout 1000000 --immutable && \
       yarn run tsc && \
-      yarn install --production --frozen-lockfile --network-timeout 1000000 && \
+      yarn workspaces focus --production && \
       yarn cache clean && \
       rm -rf /root/.npm; \
     fi
