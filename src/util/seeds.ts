@@ -36,6 +36,12 @@ export type LinkEntry = {
   pageUrl?: string;
 };
 
+let normalizeWWWAndScheme = false;
+
+export function setNormalizeWWWAndScheme(value: boolean) {
+  normalizeWWWAndScheme = value;
+}
+
 export class ScopedSeed {
   url: string;
   normUrl: string;
@@ -88,6 +94,10 @@ export class ScopedSeed {
       scopeType = this.include.length ? "custom" : "prefix";
     }
     this.scopeType = scopeType;
+
+    if (normalizeWWWAndScheme || this.scopeType === "domain") {
+      parsedUrl.hostname = parsedUrl.hostname.replace(/^www[\d]*\./, "");
+    }
 
     if (this.scopeType !== "custom") {
       const [includeNew, allowHashNew] = this.scopeFromType(
@@ -195,9 +205,7 @@ export class ScopedSeed {
 
       case "page-spa":
         // allow scheme-agnostic URLS as likely redirects
-        include = [
-          new RegExp("^" + urlRxEscape(parsedUrl.href, parsedUrl) + "#.+"),
-        ];
+        include = [new RegExp("^" + urlRxEscape(parsedUrl.href) + "#.+")];
         allowHash = true;
         break;
 
@@ -211,26 +219,20 @@ export class ScopedSeed {
                     0,
                     parsedUrl.pathname.lastIndexOf("/") + 1,
                   ),
-                parsedUrl,
               ),
           ),
         ];
         break;
 
       case "host":
-        include = [
-          new RegExp("^" + urlRxEscape(parsedUrl.origin + "/", parsedUrl)),
-        ];
+        include = [new RegExp("^" + urlRxEscape(parsedUrl.origin + "/"))];
         break;
 
       case "domain":
-        if (parsedUrl.hostname.startsWith("www.")) {
-          parsedUrl.hostname = parsedUrl.hostname.replace("www.", "");
-        }
         include = [
           new RegExp(
             "^" +
-              urlRxEscape(parsedUrl.origin + "/", parsedUrl).replace(
+              urlRxEscape(parsedUrl.origin + "/").replace(
                 "\\/\\/",
                 "\\/\\/([^/]+\\.)*",
               ),
@@ -285,6 +287,8 @@ export class ScopedSeed {
       return { url, isOOS: false };
     }
 
+    console.log("NORM", normUrl, this.normUrl);
+
     // if ignoring scope, all URLs in scope unless excluded
     let inScope = ignoreScope;
 
@@ -292,6 +296,7 @@ export class ScopedSeed {
     // if depth exceeds, than always out of scope
     if (!inScope && depth <= this.maxDepth) {
       for (const s of this.include) {
+        console.log("RX", s, normUrl);
         if (s.test(normUrl)) {
           inScope = true;
           break;
@@ -405,8 +410,17 @@ export function rxEscape(string: string) {
   return string.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 }
 
-export function urlRxEscape(url: string, parsedUrl: URL) {
-  return rxEscape(url).replace(parsedUrl.protocol, "https?:");
+export function urlRxEscape(url: string) {
+  if (normalizeWWWAndScheme) {
+    // match either http/https and with or without wwwN.
+    return rxEscape(url).replace(
+      /^https:\\\/\\\/(www[\d]*\\.)?/,
+      "https?:\\/\\/(www[\\d]*\\.)?",
+    );
+  } else {
+    // match either http/https, but keep wwwN. as is
+    return rxEscape(url).replace(/^https:\\\/\\\//, "https?:\\/\\/");
+  }
 }
 
 export function parseRx(

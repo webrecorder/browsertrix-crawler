@@ -23,6 +23,7 @@ import {
   RATE_LIMIT_TTL_SECS,
   RateLimitRule,
   ADD_REDIRECTED_SEEDS_OPTS,
+  AddRedirectedSeedOpt,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -64,6 +65,8 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
 
   rateLimitCustomRules?: RateLimitRule[];
   rateLimitStatusCodes: number[];
+
+  addRedirectedSeeds: AddRedirectedSeedOpt;
 };
 
 // ============================================================================

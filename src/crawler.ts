@@ -53,6 +53,7 @@ import {
   CrawlStatus,
   STATUS_UNKNOWN_ERROR,
   STATUS_IS_HTML_NO_DIRECT_FETCH,
+  AddRedirectedSeedOpt,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -68,7 +69,12 @@ import {
 } from "puppeteer-core";
 import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
-import { LinkEntry, ScopedSeed, parseSeeds } from "./util/seeds.js";
+import {
+  LinkEntry,
+  ScopedSeed,
+  parseSeeds,
+  setNormalizeWWWAndScheme,
+} from "./util/seeds.js";
 import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
 import { initProxy } from "./util/proxy.js";
@@ -213,7 +219,7 @@ export class Crawler {
   recording: boolean;
   isExternalDedupeStore = false;
 
-  addRedirectedSeeds: string;
+  addRedirectedSeeds: AddRedirectedSeedOpt;
 
   constructor() {
     const args = this.parseArgs();
@@ -298,6 +304,8 @@ export class Crawler {
 
     // Out Of Scope Redirects: Add Seeds Mode
     this.addRedirectedSeeds = this.params.addRedirectedSeeds;
+
+    setNormalizeWWWAndScheme(this.addRedirectedSeeds !== "never");
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
@@ -2510,10 +2518,8 @@ self.__bx_behaviors.selectMainBehavior();
       const seedId = data.seedId;
 
       if (
-        this.addRedirectedSeeds === "always" ||
-        (this.addRedirectedSeeds === "strict" &&
-          normalizedRedirectSeedUrl(origUrl) ==
-            normalizedRedirectSeedUrl(newUrl))
+        this.addRedirectedSeeds === "always" &&
+        normalizedRedirectSeedUrl(origUrl) !== normalizedRedirectSeedUrl(newUrl)
       ) {
         data.seedId = await this.crawlState.addExtraSeed(
           this.seeds,
