@@ -73,7 +73,7 @@ import {
   LinkEntry,
   ScopedSeed,
   parseSeeds,
-  setNormalizeWWWAndScheme,
+  setNormalizeWWWOnAllScopes,
 } from "./util/seeds.js";
 import { WARCWriter, createWARCInfo, setWARCInfo } from "./util/warcwriter.js";
 import { isHTMLMime, isRedirectStatus } from "./util/reqresp.js";
@@ -305,7 +305,7 @@ export class Crawler {
     // Out Of Scope Redirects: Add Seeds Mode
     this.addRedirectedSeeds = this.params.addRedirectedSeeds;
 
-    setNormalizeWWWAndScheme(this.addRedirectedSeeds !== "never");
+    setNormalizeWWWOnAllScopes(this.addRedirectedSeeds !== "never");
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");

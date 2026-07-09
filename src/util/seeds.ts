@@ -36,10 +36,10 @@ export type LinkEntry = {
   pageUrl?: string;
 };
 
-let normalizeWWWAndScheme = false;
+let normalizeWWWOnAllScopes = false;
 
-export function setNormalizeWWWAndScheme(value: boolean) {
-  normalizeWWWAndScheme = value;
+export function setNormalizeWWWOnAllScopes(value: boolean) {
+  normalizeWWWOnAllScopes = value;
 }
 
 export class ScopedSeed {
@@ -95,7 +95,8 @@ export class ScopedSeed {
     }
     this.scopeType = scopeType;
 
-    if (normalizeWWWAndScheme || this.scopeType === "domain") {
+    // if normalizing always, remove www<N>. here, otherwise just for domain
+    if (normalizeWWWOnAllScopes || this.scopeType === "domain") {
       parsedUrl.hostname = parsedUrl.hostname.replace(/^www[\d]*\./, "");
     }
 
@@ -287,8 +288,6 @@ export class ScopedSeed {
       return { url, isOOS: false };
     }
 
-    console.log("NORM", normUrl, this.normUrl);
-
     // if ignoring scope, all URLs in scope unless excluded
     let inScope = ignoreScope;
 
@@ -296,7 +295,6 @@ export class ScopedSeed {
     // if depth exceeds, than always out of scope
     if (!inScope && depth <= this.maxDepth) {
       for (const s of this.include) {
-        console.log("RX", s, normUrl);
         if (s.test(normUrl)) {
           inScope = true;
           break;
@@ -411,14 +409,14 @@ export function rxEscape(string: string) {
 }
 
 export function urlRxEscape(url: string) {
-  if (normalizeWWWAndScheme) {
-    // match either http/https and with or without wwwN.
+  if (normalizeWWWOnAllScopes) {
+    // match either http/https and with or without www<N>.
     return rxEscape(url).replace(
       /^https:\\\/\\\/(www[\d]*\\.)?/,
       "https?:\\/\\/(www[\\d]*\\.)?",
     );
   } else {
-    // match either http/https, but keep wwwN. as is
+    // match either http/https, but keep www<N>. as is
     return rxEscape(url).replace(/^https:\\\/\\\//, "https?:\\/\\/");
   }
 }
