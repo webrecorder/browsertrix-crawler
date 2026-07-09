@@ -412,12 +412,12 @@ export function urlRxEscape(url: string) {
   if (normalizeWWWOnAllScopes) {
     // match either http/https and with or without www<N>.
     return rxEscape(url).replace(
-      /^https:\\\/\\\/(www[\d]*\\.)?/,
+      /^https?:\\\/\\\/(www[\d]*\\.)?/,
       "https?:\\/\\/(www[\\d]*\\.)?",
     );
   } else {
     // match either http/https, but keep www<N>. as is
-    return rxEscape(url).replace(/^https:\\\/\\\//, "https?:\\/\\/");
+    return rxEscape(url).replace(/^https?:\\\/\\\//, "https?:\\/\\/");
   }
 }
 
