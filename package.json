@@ -74,5 +74,6 @@
     "wrap-ansi": "7.0.0",
     "warcio": "^2.4.10",
     "@novnc/novnc": "1.7.0"
-  }
+  },
+  "packageManager": "yarn@4.17.1"
 }
