@@ -1240,9 +1240,11 @@ return inx;
       }
       const data: QueueEntry = JSON.parse(json);
       const { url } = data;
-      await this.redis.hdel(this.pkey, url);
-      await this.redis.del(this.pkey + ":" + url);
-      await this.redis.incr(this.exKey);
+      const pipe = this.redis.pipeline();
+      pipe.hdel(this.pkey, url);
+      pipe.del(this.pkey + ":" + url);
+      pipe.incr(this.exKey);
+      await pipe.exec();
       yield data;
     }
   }
