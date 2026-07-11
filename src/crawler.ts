@@ -1427,7 +1427,7 @@ self.__bx_behaviors.selectMainBehavior();
         const retry = await this.crawlState.markFailed(
           url,
           noRetries,
-          !!pageRateLimited,
+          !!pageRateLimited && depth > 0,
         );
 
         if (this.healthChecker) {
