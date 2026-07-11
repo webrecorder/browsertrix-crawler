@@ -1178,7 +1178,7 @@ export class Recorder extends EventEmitter {
 
       logger.debug(
         "Finishing pending requests for page",
-        { numPending, pending, ...this.logDetails },
+        { numPending, ...this.logDetails },
         "recorder",
       );
       await sleep(5.0);
