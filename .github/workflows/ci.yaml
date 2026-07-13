@@ -20,6 +20,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+      - name: corepack
+        run: corepack enable yarn
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v6
         with:
@@ -38,6 +40,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: corepack
+        run: corepack enable yarn
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v6
@@ -80,6 +85,11 @@ jobs:
 
       - name: install py-wacz as root for tests
         run: sudo pip install wacz --ignore-installed
+
+      - name: set up yarn as root for tests
+        run: |
+          sudo corepack enable yarn
+          sudo yarn install
 
       - name: run all tests as root
         run: sudo DOCKER_HOST_NAME=172.17.0.1 CI=true yarn test -validate
