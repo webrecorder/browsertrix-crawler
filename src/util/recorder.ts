@@ -1157,7 +1157,7 @@ export class Recorder extends EventEmitter {
       !this.crawler.interruptReason &&
       !this.crawler.postCrawling
     ) {
-      const pendingLog = [];
+      const pending = [];
       for (const [requestId, reqresp] of this.pendingRequests.entries()) {
         if (reqresp.unchangedSizeCount() >= PENDING_UNCHANGED_COUNT) {
           if (reqresp.currSize) {
@@ -1173,12 +1173,12 @@ export class Recorder extends EventEmitter {
           }
           this.removeReqResp(requestId);
         }
-        pendingLog.push(reqresp.toJSON());
+        pending.push(reqresp.toJSON());
       }
 
       logger.debug(
         "Finishing pending requests for page",
-        { numPending, pendingLog, ...this.logDetails },
+        { numPending, pending, ...this.logDetails },
         "recorder",
       );
       await sleep(5.0);
@@ -1188,7 +1188,7 @@ export class Recorder extends EventEmitter {
     if (this.pendingRequests.size) {
       logger.warn(
         "Dropping timed out requests",
-        { numPending, ...this.logDetails },
+        { numPending, pending, ...this.logDetails },
         "recorder",
       );
       for (const requestId of this.pendingRequests.keys()) {
