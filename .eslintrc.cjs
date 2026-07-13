@@ -10,6 +10,10 @@ module.exports = {
     "plugin:@typescript-eslint/recommended",
     "prettier",
   ],
+  globals: {
+    "NodeJS": "readonly",
+    "NonSharedBuffer": "readonly"
+  },
   parser: "@typescript-eslint/parser",
   plugins: ["@typescript-eslint"],
   parserOptions: {
@@ -20,6 +24,7 @@ module.exports = {
   },
   rules: {
     "no-constant-condition": ["error", { checkLoops: false }],
+    "no-undef": ["error"],
     "no-use-before-define": [
       "error",
       {
