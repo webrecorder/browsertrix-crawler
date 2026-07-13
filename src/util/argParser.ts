@@ -788,7 +788,6 @@ class ArgParser {
         },
 
         rateLimitMaxRetries: {
-          alias: "retries",
           describe:
             "If set >=0, number of times to retry rate limited pages before marking them as failed. If -1, retry indefinitely",
           type: "number",
