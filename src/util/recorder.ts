@@ -1178,7 +1178,7 @@ export class Recorder extends EventEmitter {
 
       logger.debug(
         "Finishing pending requests for page",
-        { numPending, pending, ...this.logDetails },
+        { numPending, ...this.logDetails },
         "recorder",
       );
       await sleep(5.0);
@@ -1188,7 +1188,7 @@ export class Recorder extends EventEmitter {
     if (this.pendingRequests.size) {
       logger.warn(
         "Dropping timed out requests",
-        { numPending, pending, ...this.logDetails },
+        { numPending, ...this.logDetails },
         "recorder",
       );
       for (const requestId of this.pendingRequests.keys()) {
