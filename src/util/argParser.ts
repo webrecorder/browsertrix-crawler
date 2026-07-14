@@ -23,6 +23,7 @@ import {
   RATE_LIMIT_TTL_SECS,
   RateLimitRule,
   ADD_REDIRECTED_SEEDS_OPTS,
+  DEFAULT_RATE_LIMIT_STATUS_CODES,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -770,7 +771,7 @@ class ArgParser {
           describe:
             "Consider responses with these status codes to be treated as rate-limited/blocked responses",
           type: "array",
-          default: [403, 429, 503],
+          default: DEFAULT_RATE_LIMIT_STATUS_CODES,
         },
 
         rateLimitOnMatch: {

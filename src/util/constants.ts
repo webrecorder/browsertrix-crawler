@@ -148,5 +148,12 @@ export type RateLimitRule = {
   status: number;
 };
 
+export const DEFAULT_RATE_LIMIT_STATUS_CODES = [429, 503];
+
 // default text matches to consider rate limit
-export const DEFAULT_RATE_LIMIT_RULES = ['src="/_Incapsula_Resource?:200'];
+export const DEFAULT_RATE_LIMIT_RULES = [
+  // Cloudflare Challenges
+  'challenges.cloudflare.com.*id="challenge-error-text":403',
+  // Incapsula with 200
+  'src="/_Incapsula_Resource?:200',
+];
