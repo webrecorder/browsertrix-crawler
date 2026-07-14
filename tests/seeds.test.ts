@@ -7,7 +7,7 @@ test("ensure one invalid seed doesn't end crawl if failOnFailedSeed is not set",
   let passed = true;
   try {
     await exec(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --url https://example.invalid --generateWACZ --limit 2 --collection invalidseed",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --url https://example.invalid --generateWACZ --limit 2 --collection invalidseed",
     );
   } catch (error) {
     console.log(error);
@@ -20,7 +20,7 @@ test("ensure one invalid seed fails crawl if failOnFailedSeed is set", async () 
   let passed = true;
   try {
     await exec(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --url example.invalid --generateWACZ --limit 2 --failOnFailedSeed --collection failseed",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --url example.invalid --generateWACZ --limit 2 --failOnFailedSeed --collection failseed",
     );
   } catch (error) {
     expect((error as ExecException).code).toEqual(1);
@@ -33,7 +33,7 @@ test("ensure seed with network error fails crawl if failOnFailedSeed and failOnI
   let passed = true;
   try {
     await exec(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --url https://example.invalid --generateWACZ --limit 2 --failOnFailedSeed --failOnInvalidStatus --collection failseedstatus",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --url https://example.invalid --generateWACZ --limit 2 --failOnFailedSeed --failOnInvalidStatus --collection failseedstatus",
     );
   } catch (error) {
     expect((error as ExecException).code).toEqual(1);
@@ -46,7 +46,7 @@ test("ensure seed with 4xx/5xx response fails crawl if failOnFailedSeed and fail
   let passed = true;
   try {
     await exec(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --url https://old.webrecorder.net/doesntexist --generateWACZ --limit 2 --failOnFailedSeed --failOnInvalidStatus --collection failseed404status",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --url https://old.webrecorder.net/doesntexist --generateWACZ --limit 2 --failOnFailedSeed --failOnInvalidStatus --collection failseed404status",
     );
   } catch (error) {
     expect((error as ExecException).code).toEqual(1);
@@ -59,7 +59,7 @@ test("ensure seed with 4xx/5xx response succeeds if failOnInvalidStatus is not s
   let passed = true;
   try {
     await exec(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --url https://old.webrecorder.net/doesntexist --generateWACZ --limit 2 --failOnFailedSeed --collection failseedwithoutinvalidstatus",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --url https://old.webrecorder.net/doesntexist --generateWACZ --limit 2 --failOnFailedSeed --collection failseedwithoutinvalidstatus",
     );
   } catch (error) {
     console.log(error);
@@ -72,7 +72,7 @@ test("ensure crawl fails if no valid seeds are passed", async () => {
   let passed = true;
   try {
     await exec(
-      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url iana.org/ --url example.invalid --generateWACZ --limit 2 --collection allinvalidseeds",
+      "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url old.webrecorder.net/ --url example.invalid --generateWACZ --limit 2 --collection allinvalidseeds",
     );
   } catch (error) {
     expect((error as ExecException).code).toEqual(17);

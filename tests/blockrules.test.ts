@@ -37,34 +37,16 @@ function checkVideo(coll: string) {
   return doesCDXContain(coll, '"video/mp4"');
 }
 
-// Test Disabled for Brave -- should always be blocked, but seeing inconsistent ci behavior
-/*
-test("test crawl without block for specific URL", () => {
-  const config = {
-    "url": "https://www.iana.org/",
-    "pageExtraDelay": 10
-  };
-
-  runCrawl("block-1-no-block", config);
-
-  // without blocks, URL with add sense is included
-  expect(doesCDXContain("block-1-no-block", "https://cse.google.com/adsense/search/async-ads.js")).toBe(true);
-});
-*/
-
 test("test block rule on specific URL", () => {
   const config = {
-    url: "https://www.iana.org/",
-    blockRules: [{ url: "adsense" }],
+    url: "https://old.webrecorder.net/tools",
+    blockRules: [{ url: "filter.js" }],
   };
 
   runCrawl("block-1", config);
 
   expect(
-    doesCDXContain(
-      "block-1",
-      "https://cse.google.com/adsense/search/async-ads.js",
-    ),
+    doesCDXContain("block-1", "https://old.webrecorder.net/assets/filter.js"),
   ).toBe(false);
 });
 
