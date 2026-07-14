@@ -3,7 +3,6 @@ module.exports = {
     browser: true,
     es2021: true,
     node: true,
-    jest: true,
   },
   extends: [
     "eslint:recommended",
@@ -37,10 +36,16 @@ module.exports = {
   reportUnusedDisableDirectives: true,
   overrides: [
     {
-      "files": ["tests/*.ts"],
-      "rules": {
-        "@typescript-eslint/no-floating-promises": "off"
-      }
-    }
-  ]
+      files: ["tests/*.ts"],
+      env: {
+        jest: true,
+      },
+      parserOptions: {
+        project: ["./tsconfig.test.json"],
+      },
+      rules: {
+        "@typescript-eslint/no-floating-promises": "off",
+      },
+    },
+  ],
 };
