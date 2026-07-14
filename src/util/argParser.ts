@@ -19,9 +19,6 @@ import {
   DEFAULT_MAX_RETRIES,
   BxFunctionBindings,
   DEFAULT_CRAWL_ID_TEMPLATE,
-  DEFAULT_RATE_LIMIT_RULES,
-  RATE_LIMIT_TTL_SECS,
-  RateLimitRule,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -35,6 +32,10 @@ import {
 } from "./logger.js";
 import { SaveState } from "./state.js";
 import { loadProxyConfig } from "./proxy.js";
+import {
+  DEFAULT_RATE_LIMIT_STATUS_CODES,
+  RATE_LIMIT_TTL_SECS,
+} from "./ratelimits.js";
 
 // ============================================================================
 export type CrawlerArgs = ReturnType<typeof parseArgs> & {
@@ -61,7 +62,7 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
 
   warcInfo?: Record<string, string>;
 
-  rateLimitCustomRules?: RateLimitRule[];
+  rateLimitOnMatch: string[];
   rateLimitStatusCodes: number[];
 };
 
@@ -767,16 +768,16 @@ class ArgParser {
 
         rateLimitStatusCodes: {
           describe:
-            "Consider responses with these status codes to be treated as rate-limited/blocked responses",
+            "Consider responses with these status codes to be *always* treated as rate-limited/blocked responses",
           type: "array",
-          default: [403, 429, 503],
+          default: DEFAULT_RATE_LIMIT_STATUS_CODES,
         },
 
         rateLimitOnMatch: {
           describe:
             "One or more rules in the format <regex> or <regex>:<status code> matched against page text to determine if a page is rate limited. If a status is provided, only matches if the response has the specified status",
           type: "array",
-          default: DEFAULT_RATE_LIMIT_RULES,
+          default: [],
         },
 
         rateLimitTimeout: {
@@ -971,24 +972,6 @@ class ArgParser {
     }
     if (argv.saveProfile) {
       logger.info("Updating profile on successful crawl");
-    }
-
-    if (argv.rateLimitOnMatch) {
-      const rules: RateLimitRule[] = [];
-      for (const rule of argv.rateLimitOnMatch) {
-        // match any status by default
-        let status = 0;
-        let regex = "";
-        if (rule.match(/:[\d]+$/)) {
-          const parts = rule.split(":");
-          regex = parts[0];
-          status = parseInt(parts[1]) ?? 0;
-        } else {
-          regex = rule;
-        }
-        rules.push({ regex: new RegExp(regex), status });
-        argv.rateLimitCustomRules = rules;
-      }
     }
 
     return true;

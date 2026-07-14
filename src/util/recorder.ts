@@ -29,7 +29,6 @@ import { ScopedSeed } from "./seeds.js";
 import EventEmitter from "events";
 import {
   DEFAULT_MAX_RETRIES,
-  RateLimitRule,
   SkippedReason,
   STATUS_IS_HTML_NO_DIRECT_FETCH,
   STATUS_UNKNOWN_ERROR,
@@ -37,6 +36,7 @@ import {
 } from "./constants.js";
 import { Readable } from "stream";
 import { createHash } from "crypto";
+import { isRateLimitTextMatched } from "./ratelimits.js";
 
 const MAX_BROWSER_DEFAULT_FETCH_SIZE = 5_000_000;
 const MAX_TEXT_REWRITE_SIZE = 25_000_000;
@@ -183,7 +183,6 @@ export class Recorder extends EventEmitter {
 
   stopping = false;
 
-  rateLimitCustomRules: RateLimitRule[] = [];
   rateLimitStatusCodes: number[] = [];
 
   constructor({
@@ -199,7 +198,6 @@ export class Recorder extends EventEmitter {
     this.workerid = workerid;
     this.crawler = crawler;
     this.crawlState = crawler.crawlState;
-    this.rateLimitCustomRules = crawler.params.rateLimitCustomRules ?? [];
     this.rateLimitStatusCodes = crawler.params.rateLimitStatusCodes;
 
     this.shouldSaveStorage = !!crawler.params.saveStorage;
@@ -1074,6 +1072,7 @@ export class Recorder extends EventEmitter {
 
   markRateLimited(status: number, retryAfterHeader: string | null) {
     this.skipRecordingPage = true;
+    this.skipPageInfo = true;
     if (this.state) {
       this.state.pageRateLimited = status;
       if (retryAfterHeader) {
@@ -1157,7 +1156,7 @@ export class Recorder extends EventEmitter {
       !this.crawler.interruptReason &&
       !this.crawler.postCrawling
     ) {
-      const pending = [];
+      const pendingReqs = [];
       for (const [requestId, reqresp] of this.pendingRequests.entries()) {
         if (reqresp.unchangedSizeCount() >= PENDING_UNCHANGED_COUNT) {
           if (reqresp.currSize) {
@@ -1173,12 +1172,12 @@ export class Recorder extends EventEmitter {
           }
           this.removeReqResp(requestId);
         }
-        pending.push(reqresp.toJSON());
+        pendingReqs.push(reqresp.toJSON());
       }
 
       logger.debug(
         "Finishing pending requests for page",
-        { numPending, pending, ...this.logDetails },
+        { numPending, ...this.logDetails },
         "recorder",
       );
       await sleep(5.0);
@@ -1307,20 +1306,16 @@ export class Recorder extends EventEmitter {
 
         string = payload.toString();
 
-        for (const rule of this.rateLimitCustomRules) {
-          if (
-            (rule.status === 0 || rule.status === status) &&
-            string.search(rule.regex) >= 0
-          ) {
-            const retryAfter = reqresp.getHeader("Retry-After");
-            logger.debug(
-              "Rate Limited By Custom Rule",
-              { rule: rule.regex.toString(), retryAfter },
-              "recorder",
-            );
-            this.markRateLimited(status, retryAfter);
-            return false;
-          }
+        const rule = isRateLimitTextMatched(string, status);
+        if (rule) {
+          const retryAfter = reqresp.getHeader("Retry-After");
+          logger.debug(
+            "Rate Limited By Rule",
+            { rule, retryAfter },
+            "recorder",
+          );
+          this.markRateLimited(status, retryAfter);
+          return false;
         }
 
         if (rw) {

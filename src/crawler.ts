@@ -75,6 +75,7 @@ import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
+import { initRateLimitMatchRules } from "./util/ratelimits.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -256,6 +257,8 @@ export class Crawler {
     // was the limit hit?
     this.limitHit = false;
     this.pageLimit = this.params.pageLimit;
+
+    initRateLimitMatchRules(this.params.rateLimitOnMatch);
 
     // resolve maxPageLimit and ensure pageLimit is no greater than maxPageLimit
     if (this.params.maxPageLimit) {

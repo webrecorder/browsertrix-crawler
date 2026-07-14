@@ -138,15 +138,3 @@ export enum SkippedReason {
 export const STATUS_IS_HTML_NO_DIRECT_FETCH = 600;
 
 export const STATUS_UNKNOWN_ERROR = 999;
-
-// ============================================================================
-// Rate Limit Constants
-export const RATE_LIMIT_TTL_SECS = 300;
-
-export type RateLimitRule = {
-  regex: RegExp;
-  status: number;
-};
-
-// default text matches to consider rate limit
-export const DEFAULT_RATE_LIMIT_RULES = ['src="/_Incapsula_Resource?:200'];

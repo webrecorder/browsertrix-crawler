@@ -14,7 +14,6 @@ import {
   DUPE_UNCOMMITTED,
   CrawlStatus,
   SkippedReason,
-  RATE_LIMIT_TTL_SECS,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -23,6 +22,7 @@ import { normalizeUrl } from "./normalize.js";
 import { WACZ } from "./wacz.js";
 import path from "path";
 import fsp from "fs/promises";
+import { RATE_LIMIT_TTL_SECS } from "./ratelimits.js";
 
 // ============================================================================
 export enum LoadState {
