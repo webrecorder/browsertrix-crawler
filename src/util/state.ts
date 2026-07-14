@@ -1337,7 +1337,10 @@ return inx;
     await this.redis.set(`${this.crawlId}:stopping`, "1");
   }
 
-  async processMessage(seeds: ScopedSeed[]) {
+  async processMessage(
+    seeds: ScopedSeed[],
+    markExcluded: (data: QueueEntry) => Promise<void>,
+  ) {
     while (true) {
       const result = await this.redis.lpop(`${this.uid}:msg`);
       if (!result) {
@@ -1357,7 +1360,7 @@ return inx;
             // can happen async w/o slowing down crawling
             // each page is still checked if in scope before crawling, even while
             // queue is being filtered
-            this.filterQueue(regex).catch((e) =>
+            this.filterQueue(regex, markExcluded).catch((e) =>
               logger.warn("filtering queue error", e, "exclusion"),
             );
             break;
@@ -1383,7 +1386,10 @@ return inx;
     return s.replace(/\\/g, "").replace(/[\\^$*+?.()|[\]{}]/g, "\\$&") === s;
   }
 
-  filterQueue(regexStr: string) {
+  filterQueue(
+    regexStr: string,
+    markExcluded: (data: QueueEntry) => Promise<void>,
+  ) {
     const regex = new RegExp(regexStr);
 
     let matcher = undefined;
@@ -1399,12 +1405,11 @@ return inx;
       stream.pause();
 
       for (const result of results) {
-        const { url } = JSON.parse(result);
+        const data = JSON.parse(result);
+        const { url } = data;
         if (regex.test(url)) {
           const removed = await this.redis.zrem(this.qkey, result);
-          //if (removed) {
-          await this.markExcluded(url);
-          //}
+          await markExcluded(data);
           logger.debug(
             "Removing excluded URL",
             { url, regex, removed },

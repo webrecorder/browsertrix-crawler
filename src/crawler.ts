@@ -10,6 +10,7 @@ import {
   QueueState,
   PageState,
   WorkerId,
+  QueueEntry,
 } from "./util/state.js";
 
 import { CrawlerArgs, parseArgs } from "./util/argParser.js";
@@ -1387,6 +1388,13 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
+  async markExcluded(data: QueueEntry | PageState, skipReason: SkippedReason) {
+    const { url, seedId, depth } = data;
+    await this.crawlState.markExcluded(url);
+
+    this.writeSkippedPage(url, seedId, depth, skipReason);
+  }
+
   async pageFinished(data: PageState, lastErrorText = "") {
     // if page loaded, considered page finished successfully
     // (even if behaviors timed out)
@@ -1417,11 +1425,11 @@ self.__bx_behaviors.selectMainBehavior();
       await this.checkLimits();
     } else {
       if (pageSkipped) {
-        await this.crawlState.markExcluded(url);
+        await this.markExcluded(
+          data,
+          data.pageSkipReason || SkippedReason.Failed,
+        );
 
-        if (data.pageSkipReason) {
-          this.writeSkippedPage(url, data.seedId, depth, data.pageSkipReason);
-        }
         this.limitHit = false;
       } else {
         const retry = await this.crawlState.markFailed(
