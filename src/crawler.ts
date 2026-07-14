@@ -1416,7 +1416,7 @@ self.__bx_behaviors.selectMainBehavior();
 
       await this.checkLimits();
     } else {
-      if (pageSkipped) {
+      if (pageSkipped || data.pageSkipReason) {
         await this.crawlState.markExcluded(url);
 
         if (data.pageSkipReason) {
