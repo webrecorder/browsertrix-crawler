@@ -813,7 +813,25 @@ export class Crawler {
   }
 
   async setupPage(opts: WorkerState) {
-    const { page, cdp, workerid, callbacks, frameIdToExecId, recorder } = opts;
+    const { page, cdp, workerid, frameIdToExecId, recorder } = opts;
+
+    const addLink = async (url: string, alwaysObeyScope: boolean = false) => {
+      const { seedId, depth, extraHops = 0, logDetails } = opts.data;
+
+      // if not always obeying scope and allowed to ignore scope, set to true
+      const ignoreScope =
+        !alwaysObeyScope && this.params.alwaysAddBehaviorLinks;
+
+      await this.queueInScopeUrls({
+        seedId,
+        urls: [url],
+        depth,
+        extraHops,
+        pageUrl: page.url(),
+        logDetails,
+        ignoreScope,
+      });
+    };
 
     await this.browser.setupPage({ page, cdp });
 
@@ -864,10 +882,7 @@ export class Crawler {
       await this.screencaster.screencastPage(page, cdp, workerid);
     }
 
-    await page.exposeFunction(
-      BxFunctionBindings.AddLinkFunc,
-      (url: string) => callbacks.addLink && callbacks.addLink(url),
-    );
+    await page.exposeFunction(BxFunctionBindings.AddLinkFunc, addLink);
 
     // used for both behaviors and link extraction now
     await this.browser.addInitScript(page, btrixBehaviors);
@@ -998,7 +1013,7 @@ self.__bx_behaviors.selectMainBehavior();
       BxFunctionBindings.AddToSeenSet,
       (data: string) => {
         if (data && (data.startsWith("https:") || data.startsWith("http:"))) {
-          void callbacks.addLink(data);
+          void addLink(data);
         }
         return this.crawlState.addToUserSet(data);
       },
@@ -1121,8 +1136,7 @@ self.__bx_behaviors.selectMainBehavior();
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
-    const { page, cdp, data, workerid, callbacks, recorder } = opts;
-    data.callbacks = callbacks;
+    const { page, cdp, data, workerid, recorder } = opts;
 
     const { url, seedId, depth } = data;
 
@@ -2705,25 +2719,7 @@ self.__bx_behaviors.selectMainBehavior();
     selectors: ExtractSelector[],
     logDetails: LogDetails,
   ) {
-    const { seedId, depth, extraHops = 0, filteredFrames, callbacks } = data;
-
-    callbacks.addLink = async (url: string, ignoreScope = false) => {
-      // if crawler arg set, always ignore scope
-      // otherwise, may be determined by behavior addLink()
-      if (this.params.alwaysAddBehaviorLinks) {
-        ignoreScope = true;
-      }
-
-      await this.queueInScopeUrls({
-        seedId,
-        urls: [url],
-        depth,
-        extraHops,
-        pageUrl: page.url(),
-        logDetails,
-        ignoreScope,
-      });
-    };
+    const { filteredFrames } = data;
 
     const frames = filteredFrames || page.frames();
 
