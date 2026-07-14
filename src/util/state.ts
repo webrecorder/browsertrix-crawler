@@ -1071,7 +1071,7 @@ if res then
     return tonumber(res);
 end
 
-local inx = redis.call('lpush', KEYS[1], ARGV[1]) - 1;
+local inx = redis.call('rpush', KEYS[1], ARGV[1]) - 1;
 redis.call('hset', KEYS[2], ARGV[2], tostring(inx));
 redis.call('sadd', KEYS[3], ARGV[2]);
 return inx;
@@ -1868,7 +1868,7 @@ return inx;
     origLength: number,
     origSeedId: number,
     newUrl: string,
-  ) {
+  ): Promise<number> {
     if (!seeds[origSeedId]) {
       await logger.fatal(
         "State load, original seed missing",
@@ -1876,6 +1876,16 @@ return inx;
         "state",
       );
     }
+
+    const indexStr = await this.redis.hget(this.esMap, newUrl);
+    const indexNum = parseInt(indexStr || "");
+
+    // already exists, don't readd same seed
+    if (!isNaN(indexNum)) {
+      await this.getSeedAt(seeds, origLength, indexNum);
+      return indexNum;
+    }
+
     const redirectSeed: ExtraRedirectSeed = { origSeedId, newUrl };
     const seedData = JSON.stringify(redirectSeed);
     const newSeedId =
@@ -1889,25 +1899,25 @@ return inx;
       ));
     seeds[newSeedId] = seeds[origSeedId].newScopedSeed(newUrl);
 
-    //const newSeedId = seeds.length - 1;
-    //await this.redis.sadd(this.skey, newUrl);
-    //await this.redis.lpush(this.esKey, JSON.stringify(redirectSeed));
     return newSeedId;
   }
 
-  async getSeedAt(seeds: ScopedSeed[], origLength: number, newSeedId: number) {
+  async getSeedAt(
+    seeds: ScopedSeed[],
+    origLength: number,
+    newSeedId: number,
+  ): Promise<ScopedSeed> {
     if (seeds[newSeedId]) {
       return seeds[newSeedId];
     }
 
-    const newSeedDataList = await this.redis.lrange(
+    const newSeedData = await this.redis.lindex(
       this.esKey,
       newSeedId - origLength,
-      newSeedId - origLength,
     );
-    if (newSeedDataList.length) {
+    if (newSeedData) {
       const { origSeedId, newUrl } = JSON.parse(
-        newSeedDataList[0],
+        newSeedData,
       ) as ExtraRedirectSeed;
       seeds[newSeedId] = seeds[origSeedId].newScopedSeed(newUrl);
     }
