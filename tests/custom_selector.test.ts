@@ -5,7 +5,7 @@ import { ErrorWithStatus } from "./utils";
 test("test custom selector crawls JS files as pages", async () => {
   try {
     child_process.execSync(
-      'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --collection custom-sel-1 --selectLinks "script[src]->src"',
+      'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/tools --collection custom-sel-1 --selectLinks "script[src]->src" --selectLinks "div#wr-logo img->src"',
     );
   } catch (error) {
     console.log(error);
@@ -39,11 +39,11 @@ test("test custom selector crawls JS files as pages", async () => {
     extraPages.add(url);
   }
 
-  const expectedPages = new Set(["https://www.iana.org/"]);
+  const expectedPages = new Set(["https://old.webrecorder.net/tools"]);
 
   const expectedExtraPages = new Set([
-    "https://www.iana.org/static/_js/jquery.js",
-    "https://www.iana.org/static/_js/iana.js",
+    "https://old.webrecorder.net/assets/filter.js",
+    "https://old.webrecorder.net/assets/wr-logo.svg",
   ]);
 
   expect(pages).toEqual(expectedPages);
@@ -54,7 +54,7 @@ test("test invalid selector, crawl fails", async () => {
   let status = 0;
   try {
     child_process.execSync(
-      'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.iana.org/ --collection custom-sel-invalid --selectLinks "script["',
+      'docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/tools --collection custom-sel-invalid --selectLinks "script["',
     );
   } catch (e) {
     status = (e as ErrorWithStatus).status;
