@@ -1104,11 +1104,7 @@ return inx;
   async markFinished(url: string) {
     await this.redis.hdel(this.pkey, url);
 
-    await this.redis.del(
-      this.pkey + ":" + url,
-      `${this.crawlId}:rateLimited`,
-      `${this.crawlId}:rateLimitedDirect`,
-    );
+    await this.redis.del(this.pkey + ":" + url);
 
     return await this.redis.incr(this.dkey);
   }
