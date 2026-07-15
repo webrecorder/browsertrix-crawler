@@ -24,7 +24,7 @@ To make this configuration as simple as possible, there are several predefined s
 
 - `custom` — crawl based on the `--include` regular expression rules.
 
-Note that the scope settings for multi-page crawls (page-spa, prefix, host, domain) are also affected by [#url-normalization](URL Normalization)
+Note that the scope settings for multi-page crawls (page-spa, prefix, host, domain) are also affected by [URL Normalization](#url-normalization)
 
 ## Custom Scope Inclusion Rules
 
@@ -54,7 +54,7 @@ format to treat similar URLs as the same and ignore insignificant differences.
 - For `prefix`, `host` and `domain` scope types, the `www<optional number>.` prefix and `http` or `https` schemes
 are ignored. For example, given a seed with `prefix` scope of `http://example.com/path/`, URLs starting with `https://example.com/path/` and `https://www.example.com/path/` will also be included.
 
-- For seed pages that redirect, the default behavior is to also apply the same normalization, but see [#seed-redirects](below) for more details.
+- For seed pages that redirect, the default behavior is to also apply the same normalization, but see [below](#seed-redirects) for more details.
 
 - For all pages, the query arguments are sorted, so that URL `https://example.com/query?A=1&B=2` and `https://example.com/query?B=2&A=1` are considered the same URL and crawled only once.
 
