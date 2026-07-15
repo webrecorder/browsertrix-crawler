@@ -1882,15 +1882,6 @@ return inx;
       );
     }
 
-    const indexStr = await this.redis.hget(this.esMap, newUrl);
-    const indexNum = parseInt(indexStr || "");
-
-    // already exists, don't readd same seed
-    if (!isNaN(indexNum)) {
-      await this.getSeedAt(seeds, origLength, indexNum);
-      return indexNum;
-    }
-
     const redirectSeed: ExtraRedirectSeed = { origSeedId, newUrl };
     const seedData = JSON.stringify(redirectSeed);
     const newSeedId =
