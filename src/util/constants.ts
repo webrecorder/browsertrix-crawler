@@ -126,6 +126,8 @@ export const WARC_REFERS_TO_CONTAINER = "WARC-Refers-To-Container";
 
 export enum SkippedReason {
   OutOfScope = "outOfScope",
+  OutOfScopeMidCrawl = "outOfScopeMidCrawl",
+  ExcludedMidCrawl = "outOfScopeUserExclusion",
   PageLimit = "pageLimit",
   RobotsTxt = "robotsTxt",
   RedirectToExcluded = "redirectToExcluded",

@@ -5,7 +5,7 @@ import { sleep, timedRun } from "./timing.js";
 import { Recorder } from "./recorder.js";
 import { rxEscape } from "./seeds.js";
 import { CDPSession, Page } from "puppeteer-core";
-import { PageState, WorkerId } from "./state.js";
+import { PageState, QueueEntry, WorkerId } from "./state.js";
 import { Crawler } from "../crawler.js";
 import { PAGE_OP_TIMEOUT_SECS, SkippedReason } from "./constants.js";
 
@@ -356,7 +356,9 @@ export class PageWorker {
     let loggedWaiting = false;
 
     while (await this.crawler.isCrawlRunning()) {
-      await crawlState.processMessage(this.crawler.seeds);
+      await crawlState.processMessage(this.crawler.seeds, (data: QueueEntry) =>
+        this.crawler.markExcluded(data, SkippedReason.ExcludedMidCrawl),
+      );
 
       const data = await crawlState.nextFromQueue();
 
@@ -370,15 +372,9 @@ export class PageWorker {
           limit > 0 &&
           (await crawlState.numDone()) >= limit
         ) {
-          const { url, seedId, depth } = data;
+          const { url } = data;
           logger.info("Skipping queued page, at limit", { url, limit });
-          await crawlState.markExcluded(url);
-          this.crawler.writeSkippedPage(
-            url,
-            seedId,
-            depth,
-            SkippedReason.PageLimit,
-          );
+          await this.crawler.markExcluded(data, SkippedReason.PageLimit);
           continue;
         }
 
@@ -387,7 +383,10 @@ export class PageWorker {
           !(await this.crawler.isInScope(data.seedId, data, this.logDetails))
         ) {
           logger.info("Page no longer in scope", data);
-          await crawlState.markExcluded(data.url);
+          await this.crawler.markExcluded(
+            data,
+            SkippedReason.OutOfScopeMidCrawl,
+          );
           continue;
         }
 

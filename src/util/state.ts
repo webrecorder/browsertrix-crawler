@@ -1071,7 +1071,7 @@ if res then
     return tonumber(res);
 end
 
-local inx = redis.call('lpush', KEYS[1], ARGV[1]) - 1;
+local inx = redis.call('rpush', KEYS[1], ARGV[1]) - 1;
 redis.call('hset', KEYS[2], ARGV[2], tostring(inx));
 redis.call('sadd', KEYS[3], ARGV[2]);
 return inx;
@@ -1337,7 +1337,10 @@ return inx;
     await this.redis.set(`${this.crawlId}:stopping`, "1");
   }
 
-  async processMessage(seeds: ScopedSeed[]) {
+  async processMessage(
+    seeds: ScopedSeed[],
+    markExcluded: (data: QueueEntry) => Promise<void>,
+  ) {
     while (true) {
       const result = await this.redis.lpop(`${this.uid}:msg`);
       if (!result) {
@@ -1357,7 +1360,7 @@ return inx;
             // can happen async w/o slowing down crawling
             // each page is still checked if in scope before crawling, even while
             // queue is being filtered
-            this.filterQueue(regex).catch((e) =>
+            this.filterQueue(regex, markExcluded).catch((e) =>
               logger.warn("filtering queue error", e, "exclusion"),
             );
             break;
@@ -1383,7 +1386,10 @@ return inx;
     return s.replace(/\\/g, "").replace(/[\\^$*+?.()|[\]{}]/g, "\\$&") === s;
   }
 
-  filterQueue(regexStr: string) {
+  filterQueue(
+    regexStr: string,
+    markExcluded: (data: QueueEntry) => Promise<void>,
+  ) {
     const regex = new RegExp(regexStr);
 
     let matcher = undefined;
@@ -1399,12 +1405,11 @@ return inx;
       stream.pause();
 
       for (const result of results) {
-        const { url } = JSON.parse(result);
+        const data = JSON.parse(result);
+        const { url } = data;
         if (regex.test(url)) {
           const removed = await this.redis.zrem(this.qkey, result);
-          //if (removed) {
-          await this.markExcluded(url);
-          //}
+          await markExcluded(data);
           logger.debug(
             "Removing excluded URL",
             { url, regex, removed },
@@ -1868,7 +1873,7 @@ return inx;
     origLength: number,
     origSeedId: number,
     newUrl: string,
-  ) {
+  ): Promise<number> {
     if (!seeds[origSeedId]) {
       await logger.fatal(
         "State load, original seed missing",
@@ -1876,6 +1881,7 @@ return inx;
         "state",
       );
     }
+
     const redirectSeed: ExtraRedirectSeed = { origSeedId, newUrl };
     const seedData = JSON.stringify(redirectSeed);
     const newSeedId =
@@ -1889,25 +1895,25 @@ return inx;
       ));
     seeds[newSeedId] = seeds[origSeedId].newScopedSeed(newUrl);
 
-    //const newSeedId = seeds.length - 1;
-    //await this.redis.sadd(this.skey, newUrl);
-    //await this.redis.lpush(this.esKey, JSON.stringify(redirectSeed));
     return newSeedId;
   }
 
-  async getSeedAt(seeds: ScopedSeed[], origLength: number, newSeedId: number) {
+  async getSeedAt(
+    seeds: ScopedSeed[],
+    origLength: number,
+    newSeedId: number,
+  ): Promise<ScopedSeed> {
     if (seeds[newSeedId]) {
       return seeds[newSeedId];
     }
 
-    const newSeedDataList = await this.redis.lrange(
+    const newSeedData = await this.redis.lindex(
       this.esKey,
       newSeedId - origLength,
-      newSeedId - origLength,
     );
-    if (newSeedDataList.length) {
+    if (newSeedData) {
       const { origSeedId, newUrl } = JSON.parse(
-        newSeedDataList[0],
+        newSeedData,
       ) as ExtraRedirectSeed;
       seeds[newSeedId] = seeds[origSeedId].newScopedSeed(newUrl);
     }
