@@ -802,7 +802,7 @@ class ArgParser {
 
         addRedirectedSeeds: {
           describe:
-            "If set, add redirected seeds as new seeds, otherwise do not. Changes in 'www.' prefix / scheme do not requires a new seed and are always in scope",
+            "If set, add redirected seeds as new seeds, otherwise do not. Changes in 'www.' prefix / scheme do not require a new seed and are always in scope",
           type: "boolean",
           default: false,
         },
