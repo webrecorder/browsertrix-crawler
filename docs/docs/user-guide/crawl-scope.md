@@ -24,7 +24,7 @@ To make this configuration as simple as possible, there are several predefined s
 
 - `custom` — crawl based on the `--include` regular expression rules.
 
-Note that the scope settings for multi-page crawls (page-spa, prefix, host, domain) are also affected by [URL Normalization](#url-normalization)
+Note that the scope settings for multi-page crawls (page-spa, prefix, host, domain) are also affected by [URL Normalization](#url-normalization).
 
 ## Custom Scope Inclusion Rules
 
@@ -60,12 +60,12 @@ are ignored. For example, given a seed with `prefix` scope of `http://example.co
 
 Given the URL normalization rules above, if a seed page redirects to another page that differs only by scheme or www prefix, e.g. if `https://example.com/` redirects to `http://example.com/` or `http://www.example.com/`, they are treated as the same seed, and no new seed is added.
 
-If the seed page redirects to another URL, eg. `http://example.com/` to `https://example.org/`, the new page is *not*
+If the seed page redirects to another URL, e.g. `http://example.com/` to `https://example.org/`, the new page is *not*
 added as a new seed by default, but that immediate page is crawled (unless the page was explicitly excluded).
 
 The `--addRedirectedSeeds` flag can be used to always add the new redirected page URL as a seed, with the same scope as the original seed.
 
-Note that this can lead to potentially broader or narrower scope, for example if the seed is `https://example.com/path/` and it redirects to `https://example.org/` with `scopeType: prefix`, the new seed added is `https://example.org/` with `scopeType: prefix` as well, but potentially expanding the size of the crawl.
+Note that this can lead to potentially broader or narrower scope. For example, if the seed is `https://example.com/path/` and it redirects to `https://example.org/` with `scopeType: prefix`, the new seed added is `https://example.org/` with `scopeType: prefix` as well, but potentially expanding the size of the crawl.
 
 
 !!! note "Previous behavior"
