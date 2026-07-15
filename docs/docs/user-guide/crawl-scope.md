@@ -54,24 +54,23 @@ format to treat similar URLs as the same and ignore insignificant differences.
 - For `prefix`, `host` and `domain` scope types, the `www<optional number>.` prefix and `http` or `https` schemes
 are ignored. For example, given a seed with `prefix` scope of `http://example.com/path/`, URLs starting with `https://example.com/path/` and `https://www.example.com/path/` will also be included.
 
-- For seed pages that redirect, the default behavior is to also apply the same normalization, but see [below](#seed-redirects) for more details.
-
 - For all pages, the query arguments are sorted, so that URL `https://example.com/query?A=1&B=2` and `https://example.com/query?B=2&A=1` are considered the same URL and crawled only once.
 
+## Seed Page Redirects
 
-## Seed Redirects
+Given the URL normalization rules above, if a seed pages redirect to another page, eg. if `https://example.com/` redirects to `http://example.com/` or `http://www.example.com/`, they are treated as the same seed, and no new seed is added.
 
-Some seed URLs may redirect to a different URL that would be otherwise out of scope. The `--addRedirectedSeeds` setting can be used to specify how such redirects should be handled with regard to crawl scope.
+If the seed page redirects to another URL, eg. `http://example.com/` to `https://example.org`, the new page is *not*
+added as a new seed by default, but that immediate page is crawled (unless the page was explicitly excluded)
 
-The default value `strict` will add the new URL as a seed to the crawl scope if it differs from the specified seed URL in its scheme (`http` vs. `https`) or `www.` subdomain (`example.com` vs `www.example.com`).
+The `--addRedirectedSeeds` can be used to always add the new page URL as a seed, with the same scope as the original seed.
 
-The other available options are:
+Note that this can lead to unintended consequences, for example if the seed is `https://example.com/path/` and it redirects to `https://example.org/` with `scopeType: prefix`, the new seed added is `https://example.org/` with `scopeType: prefix` as well, but potentially expanding the size of the crawl.
 
-- `always` - always add the redirect URL as a new seed to the crawl scope
 
-- `never` - never add the redirect URL as a new seed to the crawl scope
+!!! note "Previous behavior"
 
-If the URL a seed redirects to is not added as a new seed due to the option chosen, only the immediate page that is redirected to will be included in the crawl.
+    Prior to 1.14.0 release, crawler would always add all redirected seeds as new seeds. The equivalent behavior can now be enabled with the `--addRedirectedSeeds` flag.
 
 ## Scope Rule Examples
 
