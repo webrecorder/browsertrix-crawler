@@ -2506,6 +2506,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (
         !(await this.isInScope(seedId, { url: newUrl, depth, extraHops: 0 }))
       ) {
+        let msg = "";
         if (this.params.addRedirectedSeeds) {
           data.seedId = await this.crawlState.addExtraSeed(
             this.seeds,
@@ -2513,16 +2514,11 @@ self.__bx_behaviors.selectMainBehavior();
             data.seedId,
             respUrl,
           );
-          logger.info(
-            "Seed page redirected out of scope, adding redirected seed",
-            {
-              origUrl,
-              newUrl,
-              seedId,
-            },
-          );
+          msg = "Seed page redirected out of scope, adding redirected seed";
+        } else {
+          msg = "Seed page redirected out of scope, not adding new seed";
         }
-        logger.info("Seed page redirected out of scope, not adding new seed", {
+        logger.info(msg, {
           origUrl,
           newUrl,
           seedId,
