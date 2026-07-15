@@ -19,8 +19,6 @@ export type WorkerState = {
   page: Page;
   cdp: CDPSession;
   workerid: WorkerId;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  callbacks: Record<string, Function>;
   recorder: Recorder | null;
   markPageUsed: () => void;
   frameIdToExecId: Map<string, number>;
@@ -40,9 +38,6 @@ export class PageWorker {
   alwaysReuse: boolean;
   page?: Page | null;
   cdp?: CDPSession | null;
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  callbacks?: Record<string, Function>;
 
   opts?: WorkerState;
 
@@ -171,13 +166,11 @@ export class PageWorker {
 
         this.page = page;
         this.cdp = cdp;
-        this.callbacks = {};
 
         this.opts = {
           page,
           cdp,
           workerid,
-          callbacks: this.callbacks,
           recorder: this.recorder,
           frameIdToExecId: new Map<string, number>(),
           markPageUsed: () => {
