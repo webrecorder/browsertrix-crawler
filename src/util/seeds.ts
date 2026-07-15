@@ -36,12 +36,6 @@ export type LinkEntry = {
   pageUrl?: string;
 };
 
-let normalizeWWWOnAllScopes = false;
-
-export function setNormalizeWWWOnAllScopes(value: boolean) {
-  normalizeWWWOnAllScopes = value;
-}
-
 export class ScopedSeed {
   url: string;
   normUrl: string;
@@ -95,10 +89,8 @@ export class ScopedSeed {
     }
     this.scopeType = scopeType;
 
-    // if normalizing always, remove www<N>. here, otherwise just for domain
-    if (normalizeWWWOnAllScopes || this.scopeType === "domain") {
-      parsedUrl.hostname = parsedUrl.hostname.replace(/^www[\d]*\./, "");
-    }
+    // remove www<N>. here always, as we normalize it out
+    parsedUrl.hostname = parsedUrl.hostname.replace(/^www[\d]*\./, "");
 
     if (this.scopeType !== "custom") {
       const [includeNew, allowHashNew] = this.scopeFromType(
@@ -409,16 +401,11 @@ export function rxEscape(string: string) {
 }
 
 export function urlRxEscape(url: string) {
-  if (normalizeWWWOnAllScopes) {
-    // match either http/https and with or without www<N>.
-    return rxEscape(url).replace(
-      /^https?:\\\/\\\/(www[\d]*\\.)?/,
-      "https?:\\/\\/(www[\\d]*\\.)?",
-    );
-  } else {
-    // match either http/https, but keep www<N>. as is
-    return rxEscape(url).replace(/^https?:\\\/\\\//, "https?:\\/\\/");
-  }
+  // match either http/https and with or without www<N>.
+  return rxEscape(url).replace(
+    /^https?:\\\/\\\/(www[\d]*\\.)?/,
+    "https?:\\/\\/(www[\\d]*\\.)?",
+  );
 }
 
 export function parseRx(
