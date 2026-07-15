@@ -15,6 +15,7 @@ import {
   CrawlStatus,
   SkippedReason,
   RATE_LIMIT_TTL_SECS,
+  DEFAULT_RATE_LIMIT_PER_HOST_MAX,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
 import { Frame } from "puppeteer-core";
@@ -859,8 +860,11 @@ export class RedisCrawlState extends RedisDedupeIndex {
   includedCrawls: Set<string> = new Set<string>();
 
   rateLimitTTL: number;
+  rateLimitHostMax: number;
   rateLimitInterruptCount: number;
   rateLimitMaxRetries: number;
+
+  rateLimitInterruptKey: string;
 
   constructor(
     redis: Redis,
@@ -871,6 +875,7 @@ export class RedisCrawlState extends RedisDedupeIndex {
     dedupeRedis?: Redis,
     dedupeAutoCommit = false,
     rateLimitTTL?: number,
+    rateLimitHostMax?: number,
     rateLimitInterruptCount?: number,
     rateLimitMaxRetries?: number,
   ) {
@@ -881,6 +886,7 @@ export class RedisCrawlState extends RedisDedupeIndex {
     this.maxPageTime = maxPageTime;
     this.maxRetries = maxRetries ?? DEFAULT_MAX_RETRIES;
     this.rateLimitMaxRetries = rateLimitMaxRetries ?? -1;
+    this.rateLimitHostMax = rateLimitHostMax ?? DEFAULT_RATE_LIMIT_PER_HOST_MAX;
 
     this.qkey = this.crawlId + ":q";
     this.pkey = this.crawlId + ":p";
@@ -911,6 +917,8 @@ export class RedisCrawlState extends RedisDedupeIndex {
 
     this.rateLimitTTL = rateLimitTTL || RATE_LIMIT_TTL_SECS;
     this.rateLimitInterruptCount = rateLimitInterruptCount || -1;
+
+    this.rateLimitInterruptKey = this.crawlId + ":rateLimited";
 
     this._initLuaCommands(this.redis);
   }
@@ -1136,22 +1144,58 @@ return inx;
     await this.redis.sadd(this.exKey, url);
   }
 
-  async incRateLimited(
-    rateLimitStatus: number,
-    retryAfter = 0,
-    isDirectFetch = false,
-  ) {
-    if (rateLimitStatus < 400 || rateLimitStatus === 404) {
-      return false;
-    }
+  // RATE LIMITING
 
-    const statVal = rateLimitStatus + (isDirectFetch ? " d" : "");
+  private getHost(url: string) {
+    try {
+      return new URL(url).host;
+    } catch (e) {
+      return "<invalid-host>";
+    }
+  }
+
+  private getRateLimitHostKey(isDirectFetch: boolean) {
+    return `${this.crawlId}:rateLimHost` + (isDirectFetch ? "Direct" : "");
+  }
+
+  private async incRateLimitInternal(
+    url: string,
+    rateLimitStatus: number,
+    ttl: number,
+    isDirectFetch: boolean,
+  ) {
+    const rateLimHostKey = this.getRateLimitHostKey(isDirectFetch);
+
+    const host = this.getHost(url);
+    await this.redis.hincrby(rateLimHostKey, host, 1);
+    await this.redis.hexpire(rateLimHostKey, ttl, "FIELDS", host);
 
     // track rate limit stats
-    await this.redis.hincrby(`${this.crawlId}:rateStats`, statVal, 1);
+    await this.redis.hincrby(
+      `${this.crawlId}:rateStats`,
+      rateLimitStatus + (isDirectFetch ? " d" : ""),
+      1,
+    );
+  }
 
-    const key = this.crawlId + (isDirectFetch ? ":rateDirect" : ":rate");
+  async incRateLimitDirectFetch(url: string, rateLimitStatus: number) {
+    if (rateLimitStatus < 400 || rateLimitStatus === 404) {
+      return;
+    }
 
+    await this.incRateLimitInternal(
+      url,
+      rateLimitStatus,
+      this.rateLimitTTL,
+      true,
+    );
+  }
+
+  async incRateLimitedHost(
+    url: string,
+    rateLimitStatus: number,
+    retryAfter = 0,
+  ) {
     if (retryAfter > 0) {
       logger.debug(
         "Rate limited with custom Retry-After",
@@ -1161,39 +1205,48 @@ return inx;
     } else {
       retryAfter = this.rateLimitTTL;
     }
-    const res = await this.redis.incrby(key, 1);
-    await this.redis.expire(key, retryAfter);
 
-    const isLimited =
+    await this.incRateLimitInternal(url, rateLimitStatus, retryAfter, false);
+  }
+
+  async isRateLimitedHost(url: string, isDirectFetch: boolean) {
+    const rateLimHostKey = this.getRateLimitHostKey(isDirectFetch);
+
+    const host = this.getHost(url);
+
+    const res = await this.redis.hget(rateLimHostKey, host);
+    return res && Number(res) >= this.rateLimitHostMax;
+  }
+
+  async incCrawlRateLimit() {
+    const key = this.crawlId + ":rate";
+
+    const res = await this.redis.incrby(key, 1);
+    await this.redis.expire(key, this.rateLimitTTL);
+
+    const shouldInterrupt =
       this.rateLimitInterruptCount > 0 && res >= this.rateLimitInterruptCount;
 
-    if (isLimited) {
-      const rateLimitKey = this.getRateLimitKey(isDirectFetch);
-      await this.redis.set(rateLimitKey, isLimited ? "1" : "");
-      await this.redis.expire(rateLimitKey, retryAfter);
+    if (shouldInterrupt) {
+      await this.redis.set(
+        this.rateLimitInterruptKey,
+        shouldInterrupt ? "1" : "",
+      );
+      await this.redis.expire(this.rateLimitInterruptKey, this.rateLimitTTL);
 
-      if (!isDirectFetch) {
-        logger.debug(
-          "Rate Limit Interrupt Count Reached, interrupting crawl on too many rate limited pages",
-          {
-            rateLimitCount: res,
-            interruptCount: this.rateLimitInterruptCount,
-          },
-          "state",
-        );
-      }
+      logger.debug(
+        "Rate Limit Interrupt Count Reached, interrupting crawl on too many rate limited pages",
+        {
+          rateLimitCount: res,
+          interruptCount: this.rateLimitInterruptCount,
+        },
+        "state",
+      );
     }
   }
 
-  getRateLimitKey(isDirectFetch: boolean) {
-    return (
-      this.crawlId + (isDirectFetch ? ":rateLimitedDirect" : ":rateLimited")
-    );
-  }
-
-  async isRateLimited(isDirectFetch: boolean) {
-    const rateLimitKey = this.getRateLimitKey(isDirectFetch);
-    const res = await this.redis.get(rateLimitKey);
+  async shouldRateLimitInterrupt() {
+    const res = await this.redis.get(this.rateLimitInterruptKey);
     return res === "1";
   }
 
@@ -1469,24 +1522,32 @@ return inx;
   }
 
   async nextFromQueue() {
-    const json = await this._getNext();
+    while (true) {
+      const json = await this._getNext();
 
-    if (!json) {
-      return null;
+      if (!json) {
+        return null;
+      }
+
+      let data;
+
+      try {
+        data = JSON.parse(json);
+      } catch (e) {
+        logger.error("Invalid queued json", json, "state");
+        return null;
+      }
+
+      await this.markStarted(data.url);
+
+      if (await this.isRateLimitedHost(data.url, false)) {
+        await this.markFailed(data.url, false, true);
+        await this.incCrawlRateLimit();
+        continue;
+      }
+
+      return new PageState(data);
     }
-
-    let data;
-
-    try {
-      data = JSON.parse(json);
-    } catch (e) {
-      logger.error("Invalid queued json", json, "state");
-      return null;
-    }
-
-    await this.markStarted(data.url);
-
-    return new PageState(data);
   }
 
   async has(url: string) {

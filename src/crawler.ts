@@ -406,6 +406,7 @@ export class Crawler {
       dedupeRedis,
       this.params.dedupeConcurrent,
       this.params.rateLimitTimeout,
+      this.params.rateLimitPerHostMax,
       this.params.rateLimitInterruptCount,
       this.params.rateLimitMaxRetries,
     );
@@ -1143,7 +1144,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (!recorder) {
         return false;
       }
-      if (await this.crawlState.isRateLimited(true)) {
+      if (await this.crawlState.isRateLimitedHost(url, true)) {
         logger.warn(
           "Direct fetch skipped, rate limited",
           { url, ...logDetails },
@@ -1204,7 +1205,7 @@ self.__bx_behaviors.selectMainBehavior();
           "fetch",
         );
         if (this.params.rateLimitStatusCodes.includes(status)) {
-          await this.crawlState.incRateLimited(status, 0, true);
+          await this.crawlState.incRateLimitDirectFetch(url, status);
         }
       }
 
@@ -1434,10 +1435,10 @@ self.__bx_behaviors.selectMainBehavior();
           this.healthChecker.incError();
         }
         if (pageRateLimited) {
-          await this.crawlState.incRateLimited(
+          await this.crawlState.incRateLimitedHost(
+            url,
             pageRateLimited,
             pageRateLimitedRetryAfter,
-            false,
           );
         }
 
@@ -1740,7 +1741,7 @@ self.__bx_behaviors.selectMainBehavior();
       return true;
     }
 
-    if (checkRateLimit && (await this.crawlState.isRateLimited(false))) {
+    if (checkRateLimit && (await this.crawlState.shouldRateLimitInterrupt())) {
       // don't set updateAndDelete local, as don't necessarily need to create WACZ yet
       this.gracefulFinishOnInterrupt(InterruptReason.RateLimited);
       return true;

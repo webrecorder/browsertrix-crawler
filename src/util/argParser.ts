@@ -23,6 +23,7 @@ import {
   RATE_LIMIT_TTL_SECS,
   RateLimitRule,
   ADD_REDIRECTED_SEEDS_OPTS,
+  DEFAULT_RATE_LIMIT_PER_HOST_MAX,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -792,6 +793,13 @@ class ArgParser {
             "If set >=0, number of times to retry rate limited pages before marking them as failed. If -1, retry indefinitely",
           type: "number",
           default: -1,
+        },
+
+        rateLimitPerHostMax: {
+          describe:
+            "Number of rate limited responses per host, before the host is skipped until reset",
+          type: "number",
+          default: DEFAULT_RATE_LIMIT_PER_HOST_MAX,
         },
 
         rateLimitInterruptCount: {

@@ -143,6 +143,8 @@ export const STATUS_UNKNOWN_ERROR = 999;
 // Rate Limit Constants
 export const RATE_LIMIT_TTL_SECS = 300;
 
+export const DEFAULT_RATE_LIMIT_PER_HOST_MAX = 6;
+
 export type RateLimitRule = {
   regex: RegExp;
   status: number;
