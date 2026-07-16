@@ -185,6 +185,30 @@ seeds:
   );
 });
 
+test("single page scope ignore www.", async () => {
+  const seeds = await getSeeds(`
+seeds:
+   - url: https://www.example.com/
+     scopeType: page
+`);
+
+  // matches with www
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // matches without
+  expect(
+    seeds[0].isIncluded({
+      url: "https://example.com/",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+});
+
 test("domain scope drop www.", async () => {
   const seeds = await getSeeds(`
 seeds:
@@ -328,12 +352,16 @@ exclude:
 
   expect(seeds[3].scopeType).toEqual("page");
   expect(seeds[3].url).toEqual("https://example.com/3");
-  expect(seeds[3].include).toEqual([]);
+  expect(seeds[3].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/3$/,
+  ]);
   expect(seeds[3].exclude).toEqual(excludeRxs);
 
   expect(seeds[4].scopeType).toEqual("page");
   expect(seeds[4].url).toEqual("https://example.com/4");
-  expect(seeds[4].include).toEqual([]);
+  expect(seeds[4].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/4$/,
+  ]);
   expect(seeds[4].exclude).toEqual([]);
 });
 
@@ -400,7 +428,9 @@ seeds:
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("page");
-  expect(seeds[0].include).toEqual([]);
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/page\?baz=qux&foo=bar$/,
+  ]);
   expect(seeds[0].maxDepth).toEqual(0);
   expect(seeds[0].maxExtraHops).toEqual(0);
 
@@ -419,6 +449,21 @@ seeds:
   });
   expect(result2).not.toBe(false);
   expect((result2 as Exclude<typeof result2, false>).isOOS).toBe(false);
+
+  // Test with www and reordered query parameters (should still match)
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/page?baz=qux&foo=bar",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/page?foo=bar&baz=qux",
+      depth: 0,
+    }),
+  ).not.toBe(false);
 });
 
 test("scopeType page should match URLs with double-encoded query parameters", async () => {
@@ -431,7 +476,9 @@ seeds:
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("page");
-  expect(seeds[0].include).toEqual([]);
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/page\?foo=%252fbar$/,
+  ]);
   expect(seeds[0].maxDepth).toEqual(0);
   expect(seeds[0].maxExtraHops).toEqual(0);
 
