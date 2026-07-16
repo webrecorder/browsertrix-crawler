@@ -794,8 +794,8 @@ export class Crawler {
     let inScope = false;
 
     for (const seed of this.seeds) {
-      const res = seed.isIncluded(link, logDetails)
-      if (!!res) {
+      const res = seed.isIncluded(link, logDetails);
+      if (res) {
         inScope = true;
       }
     }
@@ -805,7 +805,7 @@ export class Crawler {
       this.writeSkippedPage(url, seedId, depth, SkippedReason.OutOfScope);
     }
 
-    return !!inScope;
+    return inScope;
   }
 
   async setupPage(opts: WorkerState) {
