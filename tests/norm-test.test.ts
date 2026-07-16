@@ -56,3 +56,12 @@ test("same URL with same query args, but different sort order", async () => {
   // no other response records, (others are revisit, resource, etc..)
   expect(count).toBe(1);
 });
+
+test("single page www. URL crawled successfully", async () => {
+  // crawl should succeed
+  expect(() => {
+    execSync(
+      "docker run --rm -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://www.old.webrecorder.net/ --scopeType page",
+    );
+  }).not.toThrow();
+});

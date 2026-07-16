@@ -193,7 +193,7 @@ export class ScopedSeed {
 
     switch (scopeType) {
       case "page":
-        include = [];
+        include = [new RegExp("^" + urlRxEscape(parsedUrl.href) + "$")];
         break;
 
       case "page-spa":
