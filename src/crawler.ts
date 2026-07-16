@@ -791,20 +791,21 @@ export class Crawler {
       return true;
     }
 
-    const seed = await this.crawlState.getSeedAt(
-      this.seeds,
-      this.numOriginalSeeds,
-      seedId,
-    );
+    let inScope = false;
 
-    const res = seed.isIncluded(link, logDetails);
+    for (const seed of this.seeds) {
+      const res = seed.isIncluded(link, logDetails)
+      if (!!res) {
+        inScope = true;
+      }
+    }
 
-    if (!res) {
+    if (!inScope) {
       const { url, depth } = link;
       this.writeSkippedPage(url, seedId, depth, SkippedReason.OutOfScope);
     }
 
-    return !!res;
+    return !!inScope;
   }
 
   async setupPage(opts: WorkerState) {
