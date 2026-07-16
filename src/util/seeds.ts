@@ -226,7 +226,7 @@ export class ScopedSeed {
           new RegExp(
             "^" +
               urlRxEscape(parsedUrl.origin + "/").replace(
-                "\\/\\/",
+                "\\/\\/(www[\\d]*\\.)?",
                 "\\/\\/([^/]+\\.)*",
               ),
           ),

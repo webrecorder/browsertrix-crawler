@@ -163,9 +163,7 @@ seeds:
 
   expect(seeds.length).toEqual(2);
   expect(seeds[0].scopeType).toEqual("domain");
-  expect(seeds[0].include).toEqual([
-    /^https?:\/\/([^/]+\.)*(www[\d]*\.)?example\.com\//,
-  ]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/([^/]+\.)*example\.com\//]);
   expect(!!seeds[0].include[0].exec("https://example.com/")).toEqual(true);
   expect(!!seeds[0].include[0].exec("https://example.com/path")).toEqual(true);
   expect(!!seeds[0].include[0].exec("https://sub.example.com/path")).toEqual(
@@ -196,9 +194,7 @@ seeds:
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("domain");
-  expect(seeds[0].include).toEqual([
-    /^https?:\/\/([^/]+\.)*(www[\d]*\.)?example\.com\//,
-  ]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/([^/]+\.)*example\.com\//]);
 });
 
 test("custom scope", async () => {
