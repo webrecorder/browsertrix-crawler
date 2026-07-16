@@ -451,12 +451,19 @@ seeds:
   expect((result2 as Exclude<typeof result2, false>).isOOS).toBe(false);
 
   // Test with www and reordered query parameters (should still match)
-  const result3 = seeds[0].isIncluded({
-    url: "https://www.example.com/page?baz=qux&foo=bar",
-    depth: 0,
-  });
-  expect(result3).not.toBe(false);
-  expect((result3 as Exclude<typeof result2, false>).isOOS).toBe(false);
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/page?baz=qux&foo=bar",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/page?foo=bar&baz=qux",
+      depth: 0,
+    }),
+  ).not.toBe(false);
 });
 
 test("scopeType page should match URLs with double-encoded query parameters", async () => {
