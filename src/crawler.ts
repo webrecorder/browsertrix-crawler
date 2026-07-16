@@ -75,7 +75,6 @@ import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
-import { normalizedRedirectSeedUrl } from "./util/normalize.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -213,8 +212,6 @@ export class Crawler {
   recording: boolean;
   isExternalDedupeStore = false;
 
-  addRedirectedSeeds: string;
-
   constructor() {
     const args = this.parseArgs();
     this.params = args as CrawlerArgs;
@@ -295,9 +292,6 @@ export class Crawler {
       waitUntil: this.params.waitUntil,
       timeout: this.params.pageLoadTimeout * 1000,
     };
-
-    // Out Of Scope Redirects: Add Seeds Mode
-    this.addRedirectedSeeds = this.params.addRedirectedSeeds;
 
     // pages directory
     this.pagesDir = path.join(this.collDir, "pages");
@@ -2510,34 +2504,24 @@ self.__bx_behaviors.selectMainBehavior();
       const seedId = data.seedId;
 
       if (
-        this.addRedirectedSeeds === "always" ||
-        (this.addRedirectedSeeds === "strict" &&
-          normalizedRedirectSeedUrl(origUrl) ==
-            normalizedRedirectSeedUrl(newUrl))
-      ) {
-        data.seedId = await this.crawlState.addExtraSeed(
-          this.seeds,
-          this.numOriginalSeeds,
-          data.seedId,
-          respUrl,
-        );
-        logger.info(
-          "Seed page redirected out of scope, adding redirected seed",
-          {
-            origUrl,
-            newUrl,
-            seedId,
-            policy: this.addRedirectedSeeds,
-          },
-        );
-      } else if (
         !(await this.isInScope(seedId, { url: newUrl, depth, extraHops: 0 }))
       ) {
-        logger.info("Seed page redirected out of scope, not adding new seed", {
+        let msg = "";
+        if (this.params.addRedirectedSeeds) {
+          data.seedId = await this.crawlState.addExtraSeed(
+            this.seeds,
+            this.numOriginalSeeds,
+            data.seedId,
+            respUrl,
+          );
+          msg = "Seed page redirected out of scope, adding redirected seed";
+        } else {
+          msg = "Seed page redirected out of scope, not adding new seed";
+        }
+        logger.info(msg, {
           origUrl,
           newUrl,
           seedId,
-          policy: this.addRedirectedSeeds,
         });
       }
     }

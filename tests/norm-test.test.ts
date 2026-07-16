@@ -3,6 +3,8 @@ import fs from "fs";
 import path from "path";
 import { WARCParser } from "warcio";
 
+import { normalizeUrl } from "../src/util/normalize";
+
 function loadFirstWARC(name: string) {
   const archiveWarcLists = fs.readdirSync(
     `test-crawls/collections/${name}/archive`,
@@ -19,6 +21,12 @@ function loadFirstWARC(name: string) {
 
   return parser;
 }
+
+test("normalize url: normalize case and arg order", async () => {
+  expect(
+    normalizeUrl("https://WWW.example.com/path/somefile.html?B=2&A=1"),
+  ).toBe("https://www.example.com/path/somefile.html?A=1&B=2");
+});
 
 test("same URL with same query args, but different sort order", async () => {
   fs.rmSync("./test-crawls/collections/norm-test-1", {

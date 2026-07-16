@@ -24,7 +24,7 @@ To make this configuration as simple as possible, there are several predefined s
 
 - `custom` — crawl based on the `--include` regular expression rules.
 
-The scope settings for multi-page crawls (page-spa, prefix, host, domain) also include http/https versions, eg. given a prefix of `http://example.com/path/`, `https://example.com/path/` is also included.
+Note that the scope settings for multi-page crawls (page-spa, prefix, host, domain) are also affected by [URL Normalization](#url-normalization).
 
 ## Custom Scope Inclusion Rules
 
@@ -46,19 +46,31 @@ For example, this is most useful when crawling with a `host` or `prefix` scope, 
 
 The `--extraHops` setting can be set globally or per seed to allow expanding the current inclusion scope N 'hops' beyond the configured scope. Note that this mechanism only expands the inclusion scope, and any exclusion rules are still applied. If a URL is to be excluded via the exclusion rules, that will take precedence over the `--extraHops`.
 
-## Seed Redirects
+## URL Normalization
 
-Some seed URLs may redirect to a different URL that would be otherwise out of scope. The `--addRedirectedSeeds` setting can be used to specify how such redirects should be handled with regard to crawl scope.
+The crawler applies 'URL normalization' rules in a few places, 'normalizing' the URL to a slightly different
+format to treat similar URLs as the same and ignore insignificant differences.
 
-The default value `strict` will add the new URL as a seed to the crawl scope if it differs from the specified seed URL in its scheme (`http` vs. `https`) or `www.` subdomain (`example.com` vs `www.example.com`).
+- For `prefix`, `host` and `domain` scope types, the `www<optional number>.` prefix and `http` or `https` schemes
+are ignored. For example, given a seed with `prefix` scope of `http://example.com/path/`, URLs starting with `https://example.com/path/` and `https://www.example.com/path/` will also be included.
 
-The other available options are:
+- For all pages, the query arguments are sorted, so that URL `https://example.com/query?A=1&B=2` and `https://example.com/query?B=2&A=1` are considered the same URL and crawled only once.
 
-- `always` - always add the redirect URL as a new seed to the crawl scope
+## Seed Page Redirects
 
-- `never` - never add the redirect URL as a new seed to the crawl scope
+Given the URL normalization rules above, if a seed page redirects to another page that differs only by scheme or www prefix, e.g. if `https://example.com/` redirects to `http://example.com/` or `http://www.example.com/`, they are treated as the same seed, and no new seed is added.
 
-If the URL a seed redirects to is not added as a new seed due to the option chosen, only the immediate page that is redirected to will be included in the crawl.
+If the seed page redirects to another URL, e.g. `http://example.com/` to `https://example.org/`, the new page is *not*
+added as a new seed by default, but that immediate page is crawled (unless the page was explicitly excluded).
+
+The `--addRedirectedSeeds` flag can be used to always add the new redirected page URL as a seed, with the same scope as the original seed.
+
+Note that this can lead to potentially broader or narrower scope. For example, if the seed is `https://example.com/path/` and it redirects to `https://example.org/` with `scopeType: prefix`, the new seed added is `https://example.org/` with `scopeType: prefix` as well, but potentially expanding the size of the crawl.
+
+
+!!! note "Previous behavior"
+
+    Prior to the 1.14.0 release, the crawler would always add all redirected seeds as new seeds. The equivalent behavior can now be enabled with the `--addRedirectedSeeds` flag.
 
 ## Scope Rule Examples
 

@@ -22,7 +22,6 @@ import {
   DEFAULT_RATE_LIMIT_RULES,
   RATE_LIMIT_TTL_SECS,
   RateLimitRule,
-  ADD_REDIRECTED_SEEDS_OPTS,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -803,10 +802,9 @@ class ArgParser {
 
         addRedirectedSeeds: {
           describe:
-            "Policy for how to handle seeds that redirect to a URL out of scope. Default (strict): add the redirect URL as a seed only if it differs in scheme or www subdomain",
-          type: "string",
-          choices: ADD_REDIRECTED_SEEDS_OPTS,
-          default: "strict",
+            "If set, add redirected seeds as new seeds, otherwise do not. Changes in 'www.' prefix / scheme do not require a new seed and are always in scope",
+          type: "boolean",
+          default: false,
         },
       });
   }

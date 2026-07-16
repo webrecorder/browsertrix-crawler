@@ -89,6 +89,9 @@ export class ScopedSeed {
     }
     this.scopeType = scopeType;
 
+    // remove www<N>. here always, as we normalize it out
+    parsedUrl.hostname = parsedUrl.hostname.replace(/^www[\d]*\./, "");
+
     if (this.scopeType !== "custom") {
       const [includeNew, allowHashNew] = this.scopeFromType(
         this.scopeType,
@@ -195,9 +198,7 @@ export class ScopedSeed {
 
       case "page-spa":
         // allow scheme-agnostic URLS as likely redirects
-        include = [
-          new RegExp("^" + urlRxEscape(parsedUrl.href, parsedUrl) + "#.+"),
-        ];
+        include = [new RegExp("^" + urlRxEscape(parsedUrl.href) + "#.+")];
         allowHash = true;
         break;
 
@@ -211,27 +212,21 @@ export class ScopedSeed {
                     0,
                     parsedUrl.pathname.lastIndexOf("/") + 1,
                   ),
-                parsedUrl,
               ),
           ),
         ];
         break;
 
       case "host":
-        include = [
-          new RegExp("^" + urlRxEscape(parsedUrl.origin + "/", parsedUrl)),
-        ];
+        include = [new RegExp("^" + urlRxEscape(parsedUrl.origin + "/"))];
         break;
 
       case "domain":
-        if (parsedUrl.hostname.startsWith("www.")) {
-          parsedUrl.hostname = parsedUrl.hostname.replace("www.", "");
-        }
         include = [
           new RegExp(
             "^" +
-              urlRxEscape(parsedUrl.origin + "/", parsedUrl).replace(
-                "\\/\\/",
+              urlRxEscape(parsedUrl.origin + "/").replace(
+                "\\/\\/(www[\\d]*\\.)?",
                 "\\/\\/([^/]+\\.)*",
               ),
           ),
@@ -405,8 +400,12 @@ export function rxEscape(string: string) {
   return string.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 }
 
-export function urlRxEscape(url: string, parsedUrl: URL) {
-  return rxEscape(url).replace(parsedUrl.protocol, "https?:");
+export function urlRxEscape(url: string) {
+  // match either http/https and with or without www<N>.
+  return rxEscape(url).replace(
+    /^https?:\\\/\\\/(www[\d]*\\.)?/,
+    "https?:\\/\\/(www[\\d]*\\.)?",
+  );
 }
 
 export function parseRx(

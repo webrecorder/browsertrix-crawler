@@ -112,10 +112,8 @@ test("check parsing saved state + page done + queue present", () => {
   expect(numQueued > 0).toEqual(true);
   expect(numDone + numQueued).toEqual(10);
 
-  // ensure extra seeds also set
-  expect(state.extraSeeds).toEqual([
-    `{"origSeedId":0,"newUrl":"https://old.webrecorder.net/"}`,
-  ]);
+  // no extra seeds needed now
+  expect(state.extraSeeds).toEqual([]);
 });
 
 test("check crawl restarted with saved state", async () => {

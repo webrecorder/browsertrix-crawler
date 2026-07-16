@@ -24,9 +24,3 @@ export function normalizeUrl(url: string) {
     return url;
   }
 }
-
-// URL normalization for redirect seed
-// strip www. and set default protocol, but leave everything else unchanged
-export function normalizedRedirectSeedUrl(url: string) {
-  return url.replace(/^https?:\/\/(www[\d]*[.])?/, "");
-}

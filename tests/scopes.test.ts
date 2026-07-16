@@ -32,7 +32,7 @@ seeds:
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("prefix");
-  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/(www[\d]*\.)?example\.com\//]);
   expect(seeds[0].exclude).toEqual([]);
   expect(seeds[0].allowHash).toEqual(false);
 });
@@ -49,7 +49,7 @@ depth: 2
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("prefix");
-  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/(www[\d]*\.)?example\.com\//]);
   expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
 
   // included, in scope
@@ -114,7 +114,7 @@ exclude: "2022"
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("prefix");
-  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/(www[\d]*\.)?example\.com\//]);
   expect(seeds[0].exclude).toEqual([/2022/]);
 });
 
@@ -130,7 +130,7 @@ exclude: https://example.com/pathexclude
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("prefix");
-  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/(www[\d]*\.)?example\.com\//]);
   expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
 });
 
@@ -146,7 +146,7 @@ exclude: https://example.com/pathexclude
 
   expect(seeds.length).toEqual(1);
   expect(seeds[0].scopeType).toEqual("prefix");
-  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\//]);
+  expect(seeds[0].include).toEqual([/^https?:\/\/(www[\d]*\.)?example\.com\//]);
   expect(seeds[0].exclude).toEqual([/https:\/\/example.com\/pathexclude/]);
 });
 
@@ -177,7 +177,7 @@ seeds:
   ).toEqual(false);
 
   expect(seeds[1].scopeType).toEqual("host");
-  expect(seeds[1].include).toEqual([/^https?:\/\/example\.org\//]);
+  expect(seeds[1].include).toEqual([/^https?:\/\/(www[\d]*\.)?example\.org\//]);
   expect(!!seeds[1].include[0].exec("https://example.org/")).toEqual(true);
   expect(!!seeds[1].include[0].exec("https://example.org/path")).toEqual(true);
   expect(!!seeds[1].include[0].exec("https://sub.example.com/path")).toEqual(
@@ -267,7 +267,7 @@ include: https://example.com/onlythispath
   expect(seeds[2].scopeType).toEqual("prefix");
   expect(seeds[2].url).toEqual("https://example.com/subpath/file.html");
   expect(seeds[2].include).toEqual([
-    /^https?:\/\/example\.com\/subpath\//,
+    /^https?:\/\/(www[\d]*\.)?example\.com\/subpath\//,
     /https:\/\/example.com\/onlythispath/,
   ]);
   expect(seeds[2].exclude).toEqual([]);
@@ -309,12 +309,16 @@ exclude:
 
   expect(seeds[0].scopeType).toEqual("page-spa");
   expect(seeds[0].url).toEqual("https://example.com/1");
-  expect(seeds[0].include).toEqual([/^https?:\/\/example\.com\/1#.+/]);
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/1#.+/,
+  ]);
   expect(seeds[0].exclude).toEqual(excludeRxs);
 
   expect(seeds[1].scopeType).toEqual("prefix");
   expect(seeds[1].url).toEqual("https://example.com/subpath/file.html");
-  expect(seeds[1].include).toEqual([/^https?:\/\/example\.com\/subpath\//]);
+  expect(seeds[1].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/subpath\//,
+  ]);
   expect(seeds[1].exclude).toEqual(excludeRxs);
 
   expect(seeds[2].scopeType).toEqual("any");
@@ -370,7 +374,9 @@ seeds:
   expect(seeds.length).toEqual(10);
   for (let i = 0; i < 10; i++) {
     expect(seeds[i].scopeType).toEqual("prefix");
-    expect(seeds[i].include).toEqual([/^https?:\/\/example\.com\//]);
+    expect(seeds[i].include).toEqual([
+      /^https?:\/\/(www[\d]*\.)?example\.com\//,
+    ]);
   }
 
   expect(seeds[0].exclude).toEqual([/2023/]);
