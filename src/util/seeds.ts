@@ -193,12 +193,16 @@ export class ScopedSeed {
 
     switch (scopeType) {
       case "page":
-        include = [new RegExp("^" + urlRxEscape(parsedUrl.href) + "$")];
+        include = [
+          new RegExp("^" + urlRxEscape(normalizeUrl(parsedUrl.href)) + "$"),
+        ];
         break;
 
       case "page-spa":
         // allow scheme-agnostic URLS as likely redirects
-        include = [new RegExp("^" + urlRxEscape(parsedUrl.href) + "#.+")];
+        include = [
+          new RegExp("^" + urlRxEscape(normalizeUrl(parsedUrl.href)) + "#.+"),
+        ];
         allowHash = true;
         break;
 
