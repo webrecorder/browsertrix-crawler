@@ -1403,7 +1403,7 @@ self.__bx_behaviors.selectMainBehavior();
 
   async markExcluded(data: QueueEntry | PageState, skipReason: SkippedReason) {
     const { url, seedId, depth } = data;
-    await this.crawlState.markExcluded(url);
+    await this.crawlState.markExcluded(url, skipReason);
 
     this.writeSkippedPage(url, seedId, depth, skipReason);
   }
@@ -1448,7 +1448,7 @@ self.__bx_behaviors.selectMainBehavior();
         const retry = await this.crawlState.markFailed(
           url,
           noRetries,
-          !!pageRateLimited,
+          !!pageRateLimited && depth > 0,
         );
 
         if (this.healthChecker) {
