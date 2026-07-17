@@ -670,9 +670,11 @@ export class Crawler {
       const canceled = await this.crawlState.isCrawlCanceled();
       if (finished) {
         status = "done";
+        exitCode = ExitCodes.Success;
       } else if (stopped) {
         status = "done";
         logger.info("Crawl gracefully stopped on request");
+        exitCode = ExitCodes.Success;
       } else if (canceled) {
         status = "canceled";
         await this.cleanupOnCancel();
