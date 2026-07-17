@@ -2309,12 +2309,14 @@ self.__bx_behaviors.selectMainBehavior();
     const crawled = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
     const total = await this.crawlState.numFound();
+    const excluded = await this.crawlState.numExcluded();
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled,
       total,
       pending,
       failed,
+      excluded,
       limit,
       pendingPages,
     };
