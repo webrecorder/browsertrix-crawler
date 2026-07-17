@@ -659,46 +659,47 @@ export class Crawler {
   async run() {
     await this.bootstrap();
 
-    let status: CrawlStatus = "done";
-    let exitCode = ExitCodes.Success;
+    let status: CrawlStatus = "interrupted";
+    let exitCode = ExitCodes.GenericError;
 
     try {
       await this.crawl();
+
       const finished = await this.crawlState.isFinished();
       const stopped = await this.crawlState.isCrawlStopped();
       const canceled = await this.crawlState.isCrawlCanceled();
-      if (!finished) {
-        if (canceled) {
-          status = "canceled";
-          await this.cleanupOnCancel();
-        } else if (stopped) {
-          status = "done";
-          logger.info("Crawl gracefully stopped on request");
-        } else if (this.interruptReason) {
-          status = "interrupted";
-          switch (this.interruptReason) {
-            case InterruptReason.SizeLimit:
-              exitCode = ExitCodes.SizeLimit;
-              break;
-            case InterruptReason.BrowserCrashed:
-              exitCode = ExitCodes.BrowserCrashed;
-              break;
-            case InterruptReason.SignalInterrupted:
-              exitCode = ExitCodes.SignalInterrupted;
-              break;
-            case InterruptReason.DiskUtilization:
-              exitCode = ExitCodes.DiskUtilization;
-              break;
-            case InterruptReason.FailedLimit:
-              exitCode = ExitCodes.FailedLimit;
-              break;
-            case InterruptReason.TimeLimit:
-              exitCode = ExitCodes.TimeLimit;
-              break;
-            case InterruptReason.RateLimited:
-              exitCode = ExitCodes.RateLimited;
-              break;
-          }
+      if (finished) {
+        status = "done";
+      } else if (stopped) {
+        status = "done";
+        logger.info("Crawl gracefully stopped on request");
+      } else if (canceled) {
+        status = "canceled";
+        await this.cleanupOnCancel();
+      } else if (this.interruptReason) {
+        status = "interrupted";
+        switch (this.interruptReason) {
+          case InterruptReason.SizeLimit:
+            exitCode = ExitCodes.SizeLimit;
+            break;
+          case InterruptReason.BrowserCrashed:
+            exitCode = ExitCodes.BrowserCrashed;
+            break;
+          case InterruptReason.SignalInterrupted:
+            exitCode = ExitCodes.SignalInterrupted;
+            break;
+          case InterruptReason.DiskUtilization:
+            exitCode = ExitCodes.DiskUtilization;
+            break;
+          case InterruptReason.FailedLimit:
+            exitCode = ExitCodes.FailedLimit;
+            break;
+          case InterruptReason.TimeLimit:
+            exitCode = ExitCodes.TimeLimit;
+            break;
+          case InterruptReason.RateLimited:
+            exitCode = ExitCodes.RateLimited;
+            break;
         }
       }
       if (await this.crawlState.isFailed()) {

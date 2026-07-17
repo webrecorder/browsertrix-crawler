@@ -1207,7 +1207,11 @@ return inx;
   }
 
   async isFinished() {
-    return (await this.queueSize()) == 0 && (await this.numDone()) > 0;
+    return (
+      (await this.queueSize()) == 0 &&
+      (await this.numDone()) > 0 &&
+      (await this.numPending()) === 0
+    );
   }
 
   async isFailed() {
