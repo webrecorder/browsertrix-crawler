@@ -1130,11 +1130,11 @@ return inx;
     );
   }
 
-  async markExcluded(url: string) {
+  async markExcluded(url: string, skipReason: SkippedReason) {
     await this.redis.hdel(this.pkey, url);
     await this.redis.del(this.pkey + ":" + url);
 
-    await this.redis.sadd(this.exKey, url);
+    await this.redis.sadd(this.exKey, skipReason + " " + url);
   }
 
   async incRateLimited(
