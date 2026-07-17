@@ -561,7 +561,7 @@ export class Crawler {
     this.seeds = await parseSeeds(this.downloadsDir, this.params);
     this.numOriginalSeeds = this.seeds.length;
 
-    logger.info("Seeds", this.seeds);
+    logger.info("Num Original Seeds", { numSeeds: this.numOriginalSeeds });
 
     logger.info("Link Selectors", this.params.selectLinks);
 
@@ -659,46 +659,51 @@ export class Crawler {
   async run() {
     await this.bootstrap();
 
-    let status: CrawlStatus = "done";
-    let exitCode = ExitCodes.Success;
+    let status: CrawlStatus = "interrupted";
+    let exitCode = ExitCodes.GenericError;
 
     try {
       await this.crawl();
+
       const finished = await this.crawlState.isFinished();
       const stopped = await this.crawlState.isCrawlStopped();
       const canceled = await this.crawlState.isCrawlCanceled();
-      if (!finished) {
-        if (canceled) {
-          status = "canceled";
-          await this.cleanupOnCancel();
-        } else if (stopped) {
-          status = "done";
-          logger.info("Crawl gracefully stopped on request");
-        } else if (this.interruptReason) {
-          status = "interrupted";
-          switch (this.interruptReason) {
-            case InterruptReason.SizeLimit:
-              exitCode = ExitCodes.SizeLimit;
-              break;
-            case InterruptReason.BrowserCrashed:
-              exitCode = ExitCodes.BrowserCrashed;
-              break;
-            case InterruptReason.SignalInterrupted:
-              exitCode = ExitCodes.SignalInterrupted;
-              break;
-            case InterruptReason.DiskUtilization:
-              exitCode = ExitCodes.DiskUtilization;
-              break;
-            case InterruptReason.FailedLimit:
-              exitCode = ExitCodes.FailedLimit;
-              break;
-            case InterruptReason.TimeLimit:
-              exitCode = ExitCodes.TimeLimit;
-              break;
-            case InterruptReason.RateLimited:
-              exitCode = ExitCodes.RateLimited;
-              break;
-          }
+      if (finished) {
+        status = "done";
+      } else if (stopped) {
+        status = "done";
+        logger.info("Crawl gracefully stopped on request");
+      } else if (canceled) {
+        status = "canceled";
+        await this.cleanupOnCancel();
+      } else if (this.interruptReason) {
+        status = "interrupted";
+        switch (this.interruptReason) {
+          case InterruptReason.SizeLimit:
+            exitCode = ExitCodes.SizeLimit;
+            break;
+          case InterruptReason.BrowserCrashed:
+            exitCode = ExitCodes.BrowserCrashed;
+            break;
+          case InterruptReason.SignalInterrupted:
+            exitCode = ExitCodes.SignalInterrupted;
+            break;
+          case InterruptReason.DiskUtilization:
+            exitCode = ExitCodes.DiskUtilization;
+            break;
+          case InterruptReason.FailedLimit:
+            exitCode = ExitCodes.FailedLimit;
+            break;
+          case InterruptReason.TimeLimit:
+            exitCode = ExitCodes.TimeLimit;
+            break;
+          case InterruptReason.RateLimited:
+            exitCode = ExitCodes.RateLimited;
+            break;
+          case InterruptReason.CrawlPaused:
+            status = "done";
+            exitCode = ExitCodes.Success;
+            break;
         }
       }
       if (await this.crawlState.isFailed()) {
@@ -2263,6 +2268,8 @@ self.__bx_behaviors.selectMainBehavior();
         const targetFilename = await this.crawlState.getWACZFilename();
 
         await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
+
+        this.uploadAndDeleteLocal = true;
       }
       return wacz;
     } catch (e) {
@@ -2304,12 +2311,14 @@ self.__bx_behaviors.selectMainBehavior();
     const crawled = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
     const total = await this.crawlState.numFound();
+    const excluded = await this.crawlState.numExcluded();
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled,
       total,
       pending,
       failed,
+      excluded,
       limit,
       pendingPages,
     };
