@@ -561,7 +561,7 @@ export class Crawler {
     this.seeds = await parseSeeds(this.downloadsDir, this.params);
     this.numOriginalSeeds = this.seeds.length;
 
-    logger.info("Seeds", this.seeds);
+    logger.info("Num Original Seeds", { numSeeds: this.numOriginalSeeds });
 
     logger.info("Link Selectors", this.params.selectLinks);
 
@@ -1398,7 +1398,7 @@ self.__bx_behaviors.selectMainBehavior();
 
   async markExcluded(data: QueueEntry | PageState, skipReason: SkippedReason) {
     const { url, seedId, depth } = data;
-    await this.crawlState.markExcluded(url);
+    await this.crawlState.markExcluded(url, skipReason);
 
     this.writeSkippedPage(url, seedId, depth, skipReason);
   }
@@ -1443,7 +1443,7 @@ self.__bx_behaviors.selectMainBehavior();
         const retry = await this.crawlState.markFailed(
           url,
           noRetries,
-          !!pageRateLimited,
+          !!pageRateLimited && depth > 0,
         );
 
         if (this.healthChecker) {
@@ -2263,6 +2263,8 @@ self.__bx_behaviors.selectMainBehavior();
         const targetFilename = await this.crawlState.getWACZFilename();
 
         await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
+
+        this.uploadAndDeleteLocal = true;
       }
       return wacz;
     } catch (e) {
