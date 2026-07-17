@@ -1,17 +1,31 @@
-import { KNOWN_RATE_LIMIT_WAF_SIGNATURES } from "./ratelimitrules";
+//import { KNOWN_RATE_LIMIT_WAF_SIGNATURES } from "./ratelimitrules.js";
+
+const KNOWN_RATE_LIMIT_WAF_SIGNATURES = [
+  // CF
+  {
+    regex: /challenges.cloudflare.com.*id="challenge-error-text"/i,
+    statuses: [403],
+  },
+
+  // Incapsula
+  { regex: /'src="\/_Incapsula_Resource[?]/i, statuses: [200] },
+
+  // Other
+  {
+    regex: /Sorry, we need to verify that this request is legitimate/,
+    statuses: [403],
+  },
+  {
+    regex: /Your connection needs to be verified before you can proceed/,
+    statuses: [403],
+  },
+  { regex: /\(robot\)/, statuses: [403] },
+];
 
 // Rate Limit Constants
 export const RATE_LIMIT_TTL_SECS = 300;
 
 export const DEFAULT_RATE_LIMIT_STATUS_CODES = [429, 503];
-
-// default text matches to consider rate limit
-// export const DEFAULT_RATE_LIMIT_RULES = [
-//   // Cloudflare Challenges
-//   'challenges.cloudflare.com.*id="challenge-error-text":403',
-//   // Incapsula with 200
-//   'src="/_Incapsula_Resource?:200',
-// ];
 
 const rateLimitMap = new Map<number, RegExp[]>();
 

@@ -1,11 +1,11 @@
 export const KNOWN_RATE_LIMIT_WAF_SIGNATURES = [
   // Akamai
-  { regex: /Access Denied/i, statuses: [403] },
+  //{ regex: /Access Denied/i, statuses: [403] },
   { regex: /Reference #/i, statuses: [403] },
-  {
-    regex: /You don't have permission to access .* on this server\./i,
-    statuses: [403],
-  },
+  // {
+  //   regex: /You don't have permission to access .* on this server\./i,
+  //   statuses: [403],
+  // },
 
   // AWS WAF / CloudFront
   { regex: /Blocked by AWSWAF/i, statuses: [403, 429] },
@@ -44,6 +44,7 @@ export const KNOWN_RATE_LIMIT_WAF_SIGNATURES = [
   { regex: /Error 1020: Access Denied/i, statuses: [403] },
   { regex: /Performance & security by Cloudflare/i, statuses: [403, 503] },
   { regex: /Please wait while we verify\.\.\./i, statuses: [403, 503] },
+  { regex: /Performing security verification/i, statuses: [403] },
   {
     regex:
       /This website is using a security service to protect itself from online attacks\./i,
@@ -154,4 +155,15 @@ export const KNOWN_RATE_LIMIT_WAF_SIGNATURES = [
     regex: /Your access to this site has been limited by the site owner\./i,
     statuses: [403, 503],
   },
+
+  // Other
+  {
+    regex: /Sorry, we need to verify that this request is legitimate/,
+    statuses: [403],
+  },
+  {
+    regex: /Your connection needs to be verified before you can proceed/,
+    statuses: [403],
+  },
+  { regex: /\(robot\)/, statuses: [403] },
 ];
