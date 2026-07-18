@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "types": ["node", "jest"]
+  },
+  "include": ["**/*"],
+  "exclude": [
+    "custom-behaviors/**/*",
+    "fixtures/**/*",
+    "invalid-behaviors/**/*"
+  ]
+}
