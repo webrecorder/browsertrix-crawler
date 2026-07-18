@@ -182,6 +182,7 @@ export class Recorder extends EventEmitter {
   shouldSaveStorage = false;
 
   stopping = false;
+  finishingPage = false;
 
   rateLimitCustomRules: RateLimitRule[] = [];
   rateLimitStatusCodes: number[] = [];
@@ -958,7 +959,7 @@ export class Recorder extends EventEmitter {
           ? "document not loaded in browser, possibly other URLs missing"
           : "URL not loaded in browser";
 
-      logger.debug(msg, { url, resourceType, e }, "recorder");
+      logger.debug(msg, { url, networkId, resourceType, e }, "recorder");
     }
 
     return true;
@@ -1046,6 +1047,7 @@ export class Recorder extends EventEmitter {
     this.pageid = pageid;
     this.pageUrl = url;
     this.finalPageUrl = this.pageUrl;
+    this.finishingPage = false;
     this.lastErrorText = "";
     this.logDetails = { page: url, workerid: this.workerid };
     if (this.pendingRequests && this.pendingRequests.size) {
@@ -1126,9 +1128,12 @@ export class Recorder extends EventEmitter {
   }
 
   async awaitPageResources() {
+    // Prevent new requests from being added
+    this.finishingPage = true;
+
     // Check stale requests left in the pendingRequests list
     for (const [requestId, reqresp] of this.pendingRequests.entries()) {
-      // check if possibly being fetched, continue
+      // if being fetched, don't removed
       if (reqresp.asyncLoading || reqresp.intercepting) {
         continue;
       }
@@ -1138,8 +1143,9 @@ export class Recorder extends EventEmitter {
       if (reqresp.payload?.length) {
         this.removeReqResp(requestId);
         await this.serializeToWARC(reqresp);
-        // if no URL set, likely this has been abandoned, drop
-      } else if (!reqresp.url) {
+        // else, request likely has been sent but no request received
+        // drop it and don't wait any further
+      } else {
         logger.debug(
           "Removing empty request that was never fetched",
           { requestId, url: reqresp.url, ...this.logDetails },
@@ -1461,6 +1467,11 @@ export class Recorder extends EventEmitter {
   }
 
   pendingReqResp(requestId: string, reuseOnly = false) {
+    // don't record additional resources
+    if (this.finishingPage) {
+      return null;
+    }
+
     if (!this.pendingRequests.has(requestId)) {
       if (reuseOnly || !requestId) {
         return null;
@@ -1711,6 +1722,7 @@ export class Recorder extends EventEmitter {
       logger.debug(
         "Async fetch: streaming done",
         {
+          requestId: reqresp.requestId,
           size: reqresp.readSize,
           expected: reqresp.expectedSize,
           url,
