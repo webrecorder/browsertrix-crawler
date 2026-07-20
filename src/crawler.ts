@@ -561,7 +561,10 @@ export class Crawler {
     this.seeds = await parseSeeds(this.downloadsDir, this.params);
     this.numOriginalSeeds = this.seeds.length;
 
-    logger.info("Seeds", { seedCount: this.numOriginalSeeds });
+    logger.info("Seeds", {
+      firstSeed: this.seeds[0],
+      seedCount: this.numOriginalSeeds,
+    });
 
     logger.info("Link Selectors", this.params.selectLinks);
 
