@@ -1,7 +1,7 @@
 # Deduplication
 
 With version 1.12, the crawler includes full support for deduplication ("dedupe") of crawled content by content hash,
-avoiding saving the same content multuple times. When a duplicate is encountered, the crawler saves a reference to the original content, instead of the full response. The crawler supports deduplication in several ways.
+avoiding saving the same content multiple times. When a duplicate is encountered, the crawler saves a reference to the original content, instead of the full response. The crawler supports deduplication in several ways.
 
 ## Automatic deduplication within a single crawl
 
@@ -17,7 +17,7 @@ The crawler also supports content-based deduplication by content across multiple
 
 To enable, add `--redisDedupeUrl <redis url>` with a standard Redis format URL `redis://host:port/db`, e.g. `--redisDedupeUrl redis://my-dedupe-index:6379/0`.
 
-Unlike the internal Redis index which is designed for the lifetime of a single crawl, this index is expected to persist accross crawls and is expected to hold all the unique hashes across many crawls.
+Unlike the internal Redis index which is designed for the lifetime of a single crawl, this index is expected to persist across crawls and is expected to hold all the unique hashes across many crawls.
 
 When enabled, the external index will store the hashes of HTTP content that has previously been archived. For each URL crawled, it'll store the unique hash and first URL and timestamp of that URL in the index. If the hash has already
 been archived, it will not be saved again, instead a [`revisit` record will be created](#warc) instead.
@@ -122,7 +122,7 @@ To instead clean up the partially finished / interrupted crawls dedupe data, you
 docker run -it webrecorder/browsertrix-crawler indexer --cancelCrawlId <crawl-id> --redisDedupeUrl ...
 ```
 
-This operational is not required - the data from the interrupted crawl will not be used in further dedupe, it will
+This operation is not required - the data from the interrupted crawl will not be used in further dedupe, it will
 simply free up the data on the Redis.
 
 #### With concurrent crawl support
