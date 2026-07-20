@@ -561,7 +561,10 @@ export class Crawler {
     this.seeds = await parseSeeds(this.downloadsDir, this.params);
     this.numOriginalSeeds = this.seeds.length;
 
-    logger.info("Seeds", this.seeds);
+    logger.info("Seeds", {
+      firstSeed: this.seeds[0],
+      seedCount: this.numOriginalSeeds,
+    });
 
     logger.info("Link Selectors", this.params.selectLinks);
 
@@ -656,62 +659,74 @@ export class Crawler {
     return args;
   }
 
+  async getFinalCrawlState(): Promise<[ExitCodes, CrawlStatus]> {
+    // Precedence, if a crawl is in multiple states, prefer:
+    // 1. Finished
+    // 2. Stopped
+    // 3. Canceled
+    // 4. Interrupted, including paused
+    // 5. Failed
+    // e.g. if a crawl was stopped and canceled, and crawl managed to fully stop,
+    // consider it stopped
+    // if a crawl was canceled and also failed, consider it canceled
+    const finished = await this.crawlState.isFinished();
+    const stopped = await this.crawlState.isCrawlStopped();
+    const canceled = await this.crawlState.isCrawlCanceled();
+    if (finished) {
+      return [ExitCodes.Success, "done"];
+    } else if (stopped) {
+      logger.info("Crawl gracefully stopped on request");
+      return [ExitCodes.Success, "done"];
+    } else if (canceled) {
+      await this.cleanupOnCancel();
+      return [ExitCodes.Success, "canceled"];
+    } else if (this.interruptReason) {
+      switch (this.interruptReason) {
+        case InterruptReason.SizeLimit:
+          return [ExitCodes.SizeLimit, "interrupted"];
+
+        case InterruptReason.BrowserCrashed:
+          return [ExitCodes.BrowserCrashed, "interrupted"];
+
+        case InterruptReason.SignalInterrupted:
+          return [ExitCodes.SignalInterrupted, "interrupted"];
+
+        case InterruptReason.DiskUtilization:
+          return [ExitCodes.DiskUtilization, "interrupted"];
+
+        case InterruptReason.FailedLimit:
+          return [ExitCodes.FailedLimit, "interrupted"];
+
+        case InterruptReason.TimeLimit:
+          return [ExitCodes.TimeLimit, "interrupted"];
+
+        case InterruptReason.RateLimited:
+          return [ExitCodes.RateLimited, "interrupted"];
+
+        case InterruptReason.CrawlPaused:
+          // pause returns a done/success to exit the crawl
+          return [ExitCodes.Success, "done"];
+      }
+    } else if (await this.crawlState.isFailed()) {
+      logger.error("Crawl failed, no pages crawled successfully");
+      return [ExitCodes.Failed, "failed"];
+    } else {
+      // unknown error / interrupt
+      return [ExitCodes.GenericError, "interrupted"];
+    }
+  }
+
   async run() {
     await this.bootstrap();
 
-    let status: CrawlStatus = "done";
-    let exitCode = ExitCodes.Success;
-
     try {
       await this.crawl();
-      const finished = await this.crawlState.isFinished();
-      const stopped = await this.crawlState.isCrawlStopped();
-      const canceled = await this.crawlState.isCrawlCanceled();
-      if (!finished) {
-        if (canceled) {
-          status = "canceled";
-          await this.cleanupOnCancel();
-        } else if (stopped) {
-          status = "done";
-          logger.info("Crawl gracefully stopped on request");
-        } else if (this.interruptReason) {
-          status = "interrupted";
-          switch (this.interruptReason) {
-            case InterruptReason.SizeLimit:
-              exitCode = ExitCodes.SizeLimit;
-              break;
-            case InterruptReason.BrowserCrashed:
-              exitCode = ExitCodes.BrowserCrashed;
-              break;
-            case InterruptReason.SignalInterrupted:
-              exitCode = ExitCodes.SignalInterrupted;
-              break;
-            case InterruptReason.DiskUtilization:
-              exitCode = ExitCodes.DiskUtilization;
-              break;
-            case InterruptReason.FailedLimit:
-              exitCode = ExitCodes.FailedLimit;
-              break;
-            case InterruptReason.TimeLimit:
-              exitCode = ExitCodes.TimeLimit;
-              break;
-            case InterruptReason.RateLimited:
-              exitCode = ExitCodes.RateLimited;
-              break;
-          }
-        }
-      }
-      if (await this.crawlState.isFailed()) {
-        logger.error("Crawl failed, no pages crawled successfully");
-        status = "failed";
-        exitCode = ExitCodes.Failed;
-      }
+
+      const [exitCode, status] = await this.getFinalCrawlState();
+      await logger.setStatusAndExit(exitCode, status);
     } catch (e) {
       logger.error("Unexpected error, interrupting", e);
-      exitCode = ExitCodes.GenericError;
-      status = "interrupted";
-    } finally {
-      await logger.setStatusAndExit(exitCode, status);
+      await logger.setStatusAndExit(ExitCodes.GenericError, "interrupted");
     }
   }
 
@@ -2263,6 +2278,8 @@ self.__bx_behaviors.selectMainBehavior();
         const targetFilename = await this.crawlState.getWACZFilename();
 
         await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
+
+        this.uploadAndDeleteLocal = true;
       }
       return wacz;
     } catch (e) {
@@ -2304,12 +2321,14 @@ self.__bx_behaviors.selectMainBehavior();
     const crawled = await this.crawlState.numDone();
     const failed = await this.crawlState.numFailed();
     const total = await this.crawlState.numFound();
+    const excluded = await this.crawlState.numExcluded();
     const limit = { max: this.pageLimit || 0, hit: this.limitHit };
     const stats = {
       crawled,
       total,
       pending,
       failed,
+      excluded,
       limit,
       pendingPages,
     };
