@@ -1133,7 +1133,7 @@ export class Recorder extends EventEmitter {
 
     // Check stale requests left in the pendingRequests list
     for (const [requestId, reqresp] of this.pendingRequests.entries()) {
-      // if being fetched, don't removed
+      // if being fetched, don't remove
       if (reqresp.asyncLoading || reqresp.intercepting) {
         continue;
       }
