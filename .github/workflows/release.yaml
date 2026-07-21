@@ -18,6 +18,7 @@ jobs:
           images: webrecorder/browsertrix-crawler
           tags: |
             type=semver,pattern={{version}}
+            type=raw,pattern=edge
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
