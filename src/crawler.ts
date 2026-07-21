@@ -2133,6 +2133,8 @@ self.__bx_behaviors.selectMainBehavior();
       );
     }
 
+    let doDeleteDir = false;
+
     if (this.params.generateWACZ && generateFiles) {
       const wacz = await this.generateWACZ();
 
@@ -2144,16 +2146,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
 
         if (this.storage && this.uploadAndDeleteLocal) {
-          await this.crawlState.setArchiveSize(0);
-
-          logger.info(
-            `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
-          );
-          try {
-            fs.rmSync(this.collDir, { recursive: true, force: true });
-          } catch (e) {
-            logger.warn(`Unable to clear ${this.collDir} before exit`, e);
-          }
+          doDeleteDir = true;
         }
       }
     }
@@ -2180,6 +2173,21 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
+    // this should second-to-last
+    if (doDeleteDir) {
+      await this.crawlState.setArchiveSize(0);
+
+      logger.info(
+        `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
+      );
+      try {
+        fs.rmSync(this.collDir, { recursive: true, force: true });
+      } catch (e) {
+        logger.warn(`Unable to clear ${this.collDir} before exit`, e);
+      }
+    }
+
+    // this should be last
     if (this.params.waitOnDone) {
       this.done = true;
       logger.info("All done, waiting for signal...");
@@ -2278,8 +2286,6 @@ self.__bx_behaviors.selectMainBehavior();
         const targetFilename = await this.crawlState.getWACZFilename();
 
         await this.storage.uploadCollWACZ(wacz, targetFilename, isFinished);
-
-        this.uploadAndDeleteLocal = true;
       }
       return wacz;
     } catch (e) {
