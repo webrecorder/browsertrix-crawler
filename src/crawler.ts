@@ -2487,6 +2487,7 @@ self.__bx_behaviors.selectMainBehavior();
               data,
             );
           } else if (
+            loadState === LoadState.FAILED ||
             msg.startsWith("net::ERR_HTTP2_PROTOCOL_ERROR") ||
             msg.startsWith("net::ERR_CONNECTION_TIMED_OUT")
           ) {
