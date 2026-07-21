@@ -2470,7 +2470,8 @@ self.__bx_behaviors.selectMainBehavior();
             );
           } else if (
             msg.startsWith("net::ERR_HTTP2_PROTOCOL_ERROR") ||
-            msg.startsWith("net::ERR_CONNECTION_TIMED_OUT")
+            msg.startsWith("net::ERR_CONNECTION_TIMED_OUT") ||
+            loadState == LoadState.FAILED
           ) {
             // treat as rate limit, page blocked
             data.pageRateLimited = STATUS_CONNECTION_ERROR;
