@@ -32,7 +32,7 @@ import {
   RateLimitRule,
   SkippedReason,
   STATUS_IS_HTML_NO_DIRECT_FETCH,
-  STATUS_UNKNOWN_ERROR,
+  STATUS_CONNECTION_ERROR,
   WARC_REFERS_TO_CONTAINER,
 } from "./constants.js";
 import { Readable } from "stream";
@@ -1541,7 +1541,7 @@ export class Recorder extends EventEmitter {
     });
 
     if (!(await fetcher.loadHeaders())) {
-      return STATUS_UNKNOWN_ERROR;
+      return STATUS_CONNECTION_ERROR;
     }
 
     const mime = reqresp.getMimeType() || "";
