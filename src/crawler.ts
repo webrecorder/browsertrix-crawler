@@ -704,8 +704,8 @@ export class Crawler {
           return [ExitCodes.RateLimited, "interrupted"];
 
         case InterruptReason.CrawlPaused:
-          // pause returns a done/success to exit the crawl
-          return [ExitCodes.Success, "done"];
+          // pause returns success to avoid restarting, but sets state to interrupted
+          return [ExitCodes.Success, "interrupted"];
       }
     } else if (await this.crawlState.isFailed()) {
       logger.error("Crawl failed, no pages crawled successfully");
