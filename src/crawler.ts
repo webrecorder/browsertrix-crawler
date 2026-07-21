@@ -51,7 +51,7 @@ import {
   BxFunctionBindings,
   MAX_JS_DIALOG_PER_PAGE,
   CrawlStatus,
-  STATUS_UNKNOWN_ERROR,
+  STATUS_CONNECTION_ERROR,
   STATUS_IS_HTML_NO_DIRECT_FETCH,
 } from "./util/constants.js";
 
@@ -1193,7 +1193,7 @@ self.__bx_behaviors.selectMainBehavior();
           "fetch",
         );
         // indicate this was some other error
-        status = STATUS_UNKNOWN_ERROR;
+        status = STATUS_CONNECTION_ERROR;
       }
 
       // direct fetch succeeded
@@ -1215,7 +1215,10 @@ self.__bx_behaviors.selectMainBehavior();
           { status, ...logDetails },
           "fetch",
         );
-        if (this.params.rateLimitStatusCodes.includes(status)) {
+        if (
+          status === STATUS_CONNECTION_ERROR ||
+          this.params.rateLimitStatusCodes.includes(status)
+        ) {
           await this.crawlState.incRateLimited(status, 0, true);
         }
       }
@@ -2465,9 +2468,12 @@ self.__bx_behaviors.selectMainBehavior();
               { msg },
               data,
             );
-          } else if (msg.startsWith("net::ERR_HTTP2_PROTOCOL_ERROR")) {
+          } else if (
+            msg.startsWith("net::ERR_HTTP2_PROTOCOL_ERROR") ||
+            msg.startsWith("net::ERR_CONNECTION_TIMED_OUT")
+          ) {
             // treat as rate limit, page blocked
-            data.pageRateLimited = STATUS_UNKNOWN_ERROR;
+            data.pageRateLimited = STATUS_CONNECTION_ERROR;
             logger.warn(
               "Page load interrupted, possibly rate limited",
               { url, msg, ...logDetails },
