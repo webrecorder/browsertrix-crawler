@@ -1101,6 +1101,10 @@ export class Recorder extends EventEmitter {
     }
   }
 
+  addPageFailedRecord(status: number, error: string) {
+    this.pageInfo.urls[this.pageInfo.url] = { status, error };
+  }
+
   writePageInfoRecord() {
     if (this.skipPageInfo || this.skipRecordingPage) {
       logger.debug(

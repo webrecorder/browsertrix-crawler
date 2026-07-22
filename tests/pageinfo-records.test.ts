@@ -182,7 +182,6 @@ function validateResourcesInvalid(json: Record<string, unknown>) {
   expect(json.urls).toEqual({
     "https://invalid.invalid/": {
       status: 0,
-      type: "document",
       error: "net::ERR_NAME_NOT_RESOLVED",
     },
   });
