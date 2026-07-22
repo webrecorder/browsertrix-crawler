@@ -1235,11 +1235,6 @@ self.__bx_behaviors.selectMainBehavior();
         ) {
           await this.crawlState.incRateLimited(status, 0, true);
         }
-
-        // skip any further loading
-        if (status === STATUS_DNS_ERROR) {
-          data.rateLimitStatus = STATUS_DNS_ERROR;
-        }
       }
 
       return false;
@@ -1248,12 +1243,6 @@ self.__bx_behaviors.selectMainBehavior();
     if (recorder && (await doDirectFetch())) {
       // return if direct fetch succeeds
       await this.awaitPageExtraDelay(opts);
-      return;
-    }
-
-    // if it was a DNS error, fail page
-    if (data.rateLimitStatus === STATUS_DNS_ERROR) {
-      this.pageFailed("Page Load Aborted: DNS Error", data.retry, logDetails);
       return;
     }
 
@@ -2506,7 +2495,10 @@ self.__bx_behaviors.selectMainBehavior();
             );
           } else {
             // treat as rate limit, page blocked
-            data.rateLimitStatus = STATUS_CONNECTION_ERROR;
+            data.rateLimitStatus =
+              msg === "net::ERR_NAME_NOT_RESOLVED"
+                ? STATUS_DNS_ERROR
+                : STATUS_CONNECTION_ERROR;
 
             return this.pageFailed("Page Load Failed", retry, {
               msg,
