@@ -53,6 +53,7 @@ import {
   CrawlStatus,
   STATUS_CONNECTION_ERROR,
   STATUS_IS_HTML_NO_DIRECT_FETCH,
+  STATUS_DNS_ERROR,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -561,7 +562,10 @@ export class Crawler {
     this.seeds = await parseSeeds(this.downloadsDir, this.params);
     this.numOriginalSeeds = this.seeds.length;
 
-    logger.info("Num Original Seeds", { numSeeds: this.numOriginalSeeds });
+    logger.info("Seeds", {
+      firstSeed: this.seeds[0],
+      seedCount: this.numOriginalSeeds,
+    });
 
     logger.info("Link Selectors", this.params.selectLinks);
 
@@ -656,65 +660,74 @@ export class Crawler {
     return args;
   }
 
+  async getFinalCrawlState(): Promise<[ExitCodes, CrawlStatus]> {
+    // Precedence, if a crawl is in multiple states, prefer:
+    // 1. Finished
+    // 2. Stopped
+    // 3. Canceled
+    // 4. Interrupted, including paused
+    // 5. Failed
+    // e.g. if a crawl was stopped and canceled, and crawl managed to fully stop,
+    // consider it stopped
+    // if a crawl was canceled and also failed, consider it canceled
+    const finished = await this.crawlState.isFinished();
+    const stopped = await this.crawlState.isCrawlStopped();
+    const canceled = await this.crawlState.isCrawlCanceled();
+    if (finished) {
+      return [ExitCodes.Success, "done"];
+    } else if (stopped) {
+      logger.info("Crawl gracefully stopped on request");
+      return [ExitCodes.Success, "done"];
+    } else if (canceled) {
+      await this.cleanupOnCancel();
+      return [ExitCodes.Success, "canceled"];
+    } else if (this.interruptReason) {
+      switch (this.interruptReason) {
+        case InterruptReason.SizeLimit:
+          return [ExitCodes.SizeLimit, "interrupted"];
+
+        case InterruptReason.BrowserCrashed:
+          return [ExitCodes.BrowserCrashed, "interrupted"];
+
+        case InterruptReason.SignalInterrupted:
+          return [ExitCodes.SignalInterrupted, "interrupted"];
+
+        case InterruptReason.DiskUtilization:
+          return [ExitCodes.DiskUtilization, "interrupted"];
+
+        case InterruptReason.FailedLimit:
+          return [ExitCodes.FailedLimit, "interrupted"];
+
+        case InterruptReason.TimeLimit:
+          return [ExitCodes.TimeLimit, "interrupted"];
+
+        case InterruptReason.RateLimited:
+          return [ExitCodes.RateLimited, "interrupted"];
+
+        case InterruptReason.CrawlPaused:
+          // pause returns success to avoid restarting, but sets state to interrupted
+          return [ExitCodes.Success, "interrupted"];
+      }
+    } else if (await this.crawlState.isFailed()) {
+      logger.error("Crawl failed, no pages crawled successfully");
+      return [ExitCodes.Failed, "failed"];
+    } else {
+      // unknown error / interrupt
+      return [ExitCodes.GenericError, "interrupted"];
+    }
+  }
+
   async run() {
     await this.bootstrap();
-
-    let status: CrawlStatus = "interrupted";
-    let exitCode = ExitCodes.GenericError;
 
     try {
       await this.crawl();
 
-      const finished = await this.crawlState.isFinished();
-      const stopped = await this.crawlState.isCrawlStopped();
-      const canceled = await this.crawlState.isCrawlCanceled();
-      if (finished) {
-        status = "done";
-        exitCode = ExitCodes.Success;
-      } else if (stopped) {
-        status = "done";
-        logger.info("Crawl gracefully stopped on request");
-        exitCode = ExitCodes.Success;
-      } else if (canceled) {
-        status = "canceled";
-        await this.cleanupOnCancel();
-      } else if (this.interruptReason) {
-        status = "interrupted";
-        switch (this.interruptReason) {
-          case InterruptReason.SizeLimit:
-            exitCode = ExitCodes.SizeLimit;
-            break;
-          case InterruptReason.BrowserCrashed:
-            exitCode = ExitCodes.BrowserCrashed;
-            break;
-          case InterruptReason.SignalInterrupted:
-            exitCode = ExitCodes.SignalInterrupted;
-            break;
-          case InterruptReason.DiskUtilization:
-            exitCode = ExitCodes.DiskUtilization;
-            break;
-          case InterruptReason.FailedLimit:
-            exitCode = ExitCodes.FailedLimit;
-            break;
-          case InterruptReason.TimeLimit:
-            exitCode = ExitCodes.TimeLimit;
-            break;
-          case InterruptReason.RateLimited:
-            exitCode = ExitCodes.RateLimited;
-            break;
-        }
-      }
-      if (await this.crawlState.isFailed()) {
-        logger.error("Crawl failed, no pages crawled successfully");
-        status = "failed";
-        exitCode = ExitCodes.Failed;
-      }
+      const [exitCode, status] = await this.getFinalCrawlState();
+      await logger.setStatusAndExit(exitCode, status);
     } catch (e) {
       logger.error("Unexpected error, interrupting", e);
-      exitCode = ExitCodes.GenericError;
-      status = "interrupted";
-    } finally {
-      await logger.setStatusAndExit(exitCode, status);
+      await logger.setStatusAndExit(ExitCodes.GenericError, "interrupted");
     }
   }
 
@@ -1217,6 +1230,7 @@ self.__bx_behaviors.selectMainBehavior();
         );
         if (
           status === STATUS_CONNECTION_ERROR ||
+          status === STATUS_DNS_ERROR ||
           this.params.rateLimitStatusCodes.includes(status)
         ) {
           await this.crawlState.incRateLimited(status, 0, true);
@@ -1418,8 +1432,8 @@ self.__bx_behaviors.selectMainBehavior();
       depth,
       url,
       pageSkipped,
-      pageRateLimited,
-      pageRateLimitedRetryAfter,
+      rateLimitStatus,
+      rateLimitedRetryAfter,
       noRetries,
     } = data;
 
@@ -1446,19 +1460,24 @@ self.__bx_behaviors.selectMainBehavior();
 
         this.limitHit = false;
       } else {
+        const useRateLimitRetries =
+          !!rateLimitStatus &&
+          rateLimitStatus !== STATUS_CONNECTION_ERROR &&
+          rateLimitStatus !== STATUS_DNS_ERROR;
+
         const retry = await this.crawlState.markFailed(
           url,
           noRetries,
-          !!pageRateLimited && depth > 0,
+          useRateLimitRetries,
         );
 
         if (this.healthChecker) {
           this.healthChecker.incError();
         }
-        if (pageRateLimited) {
+        if (rateLimitStatus) {
           await this.crawlState.incRateLimited(
-            pageRateLimited,
-            pageRateLimitedRetryAfter,
+            rateLimitStatus,
+            rateLimitedRetryAfter,
             false,
           );
         }
@@ -2124,6 +2143,8 @@ self.__bx_behaviors.selectMainBehavior();
       );
     }
 
+    let doDeleteDir = false;
+
     if (this.params.generateWACZ && generateFiles) {
       const wacz = await this.generateWACZ();
 
@@ -2135,16 +2156,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
 
         if (this.storage && this.uploadAndDeleteLocal) {
-          await this.crawlState.setArchiveSize(0);
-
-          logger.info(
-            `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
-          );
-          try {
-            fs.rmSync(this.collDir, { recursive: true, force: true });
-          } catch (e) {
-            logger.warn(`Unable to clear ${this.collDir} before exit`, e);
-          }
+          doDeleteDir = true;
         }
       }
     }
@@ -2171,6 +2183,21 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
+    // this should second-to-last
+    if (doDeleteDir) {
+      await this.crawlState.setArchiveSize(0);
+
+      logger.info(
+        `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
+      );
+      try {
+        fs.rmSync(this.collDir, { recursive: true, force: true });
+      } catch (e) {
+        logger.warn(`Unable to clear ${this.collDir} before exit`, e);
+      }
+    }
+
+    // this should be last
     if (this.params.waitOnDone) {
       this.done = true;
       logger.info("All done, waiting for signal...");
@@ -2353,18 +2380,18 @@ self.__bx_behaviors.selectMainBehavior();
     throw new Error("logged");
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  pageFailed(msg: string, retry: number, msgData: any) {
-    if (retry < this.params.maxPageRetries) {
+  pageFailed(msg: string, retry: number, msgData: LogDetails) {
+    const retries = this.params.maxPageRetries;
+    if (retry < retries) {
       logger.warn(
         msg + ": will retry",
-        { retry, retries: this.params.maxPageRetries, ...msgData },
+        { retry, retries, ...msgData },
         "pageStatus",
       );
     } else {
       logger.error(
         msg + ": retry limit reached",
-        { retry, retries: this.params.maxPageRetries, ...msgData },
+        { retry, retries, ...msgData },
         "pageStatus",
       );
     }
@@ -2468,20 +2495,13 @@ self.__bx_behaviors.selectMainBehavior();
               { msg },
               data,
             );
-          } else if (
-            msg.startsWith("net::ERR_HTTP2_PROTOCOL_ERROR") ||
-            msg.startsWith("net::ERR_CONNECTION_TIMED_OUT") ||
-            loadState == LoadState.FAILED
-          ) {
-            // treat as rate limit, page blocked
-            data.pageRateLimited = STATUS_CONNECTION_ERROR;
-            logger.warn(
-              "Page load interrupted, possibly rate limited",
-              { url, msg, ...logDetails },
-              "pageStatus",
-            );
-            throw new Error("logged");
           } else {
+            // treat as rate limit, page blocked
+            data.rateLimitStatus =
+              msg === "net::ERR_NAME_NOT_RESOLVED"
+                ? STATUS_DNS_ERROR
+                : STATUS_CONNECTION_ERROR;
+
             return this.pageFailed("Page Load Failed", retry, {
               msg,
               url,
@@ -2543,7 +2563,7 @@ self.__bx_behaviors.selectMainBehavior();
     const status = resp.status();
     data.status = status;
 
-    if (!isChromeError && data.pageRateLimited) {
+    if (!isChromeError && data.rateLimitStatus) {
       logger.warn(
         "Page possibly rate limited, retrying",
         { url, status, ...logDetails },

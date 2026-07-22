@@ -140,6 +140,9 @@ export const STATUS_IS_HTML_NO_DIRECT_FETCH = 600;
 // Connection Error -- unable to connect to site
 export const STATUS_CONNECTION_ERROR = 999;
 
+// DNS Error -- unable to resolve hostname
+export const STATUS_DNS_ERROR = 899;
+
 // ============================================================================
 // Rate Limit Constants
 export const RATE_LIMIT_TTL_SECS = 300;

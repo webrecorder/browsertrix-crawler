@@ -2031,10 +2031,10 @@ browserslist@^4.24.0:
     node-releases "^2.0.18"
     update-browserslist-db "^1.1.1"
 
-browsertrix-behaviors@^0.12.1:
-  version "0.12.1"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.12.1.tgz#65e5ac2bbcecdb0392c84972cbe8ec14ebd4adf8"
-  integrity sha512-Vudm3K5dK9Lv0zCYVSTTjoQsBUDEJD87OQQktLVfp4n4hNLaVB1VHG3sidKyRpqSPivh717DFhLu9nwcwzWs3Q==
+browsertrix-behaviors@^0.12.2:
+  version "0.12.2"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.12.2.tgz#8feafe1ed695ae48046de7af316404e8e71629fc"
+  integrity sha512-pVM+axbFsyistgmkdIHqXNpK7i1MRy439jONRQDrPgpV1J+JsY4t2iI0D2+AkCb/6VvCcP+u4fABt01jh7j/YQ==
   dependencies:
     query-selector-shadow-dom "^1.0.1"
 
@@ -4341,10 +4341,10 @@ js-yaml@^3.13.1:
     argparse "^1.0.7"
     esprima "^4.0.0"
 
-js-yaml@^4.1.0, js-yaml@^4.1.1:
-  version "4.2.0"
-  resolved "https://registry.yarnpkg.com/js-yaml/-/js-yaml-4.2.0.tgz#2bd9e85682dd91bd469afb809d816043b3d49524"
-  integrity sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==
+js-yaml@^4.1.0, js-yaml@^4.1.1, js-yaml@^4.3.0:
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/js-yaml/-/js-yaml-4.3.0.tgz#d1900572a7f7cf0b5f540c83673e60bad3436592"
+  integrity sha512-1td788aAnnZ5qs7V2QIRl1owjtYpbKt749Y3xauqQgwIIGF/xXWz1wMTEBx5O3LK3lXLVuqXPdPxj2BoFHaW9Q==
   dependencies:
     argparse "^2.0.1"
 
