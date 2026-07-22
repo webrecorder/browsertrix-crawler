@@ -2175,6 +2175,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     // from here, actions that should happen on final crawler exit (not temp interrupt)
     if (!this.finalExit) {
+      if (doDeleteDir) {
+        await this.doDeleteDir();
+      }
       return;
     }
 
@@ -2197,16 +2200,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // this should second-to-last
     if (doDeleteDir) {
-      await this.crawlState.setArchiveSize(0);
-
-      logger.info(
-        `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
-      );
-      try {
-        fs.rmSync(this.collDir, { recursive: true, force: true });
-      } catch (e) {
-        logger.warn(`Unable to clear ${this.collDir} before exit`, e);
-      }
+      await this.doDeleteDir();
     }
 
     // this should be last
@@ -2217,6 +2211,19 @@ self.__bx_behaviors.selectMainBehavior();
 
       // wait forever until signal
       await new Promise(() => {});
+    }
+  }
+
+  async doDeleteDir() {
+    await this.crawlState.setArchiveSize(0);
+
+    logger.info(
+      `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
+    );
+    try {
+      fs.rmSync(this.collDir, { recursive: true, force: true });
+    } catch (e) {
+      logger.warn(`Unable to clear ${this.collDir} before exit`, e);
     }
   }
 
