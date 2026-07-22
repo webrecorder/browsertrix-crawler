@@ -1546,7 +1546,9 @@ export class Recorder extends EventEmitter {
     });
 
     if (!(await fetcher.loadHeaders())) {
-      return fetcher.dnsError ? STATUS_DNS_ERROR : STATUS_CONNECTION_ERROR;
+      return fetcher.lastError === "ENOTFOUND"
+        ? STATUS_DNS_ERROR
+        : STATUS_CONNECTION_ERROR;
     }
 
     const mime = reqresp.getMimeType() || "";
@@ -1983,7 +1985,7 @@ class AsyncFetcher {
 
   maxRetries = DEFAULT_MAX_RETRIES;
 
-  dnsError = false;
+  lastError = "";
 
   constructor({
     reqresp,
@@ -2050,9 +2052,7 @@ class AsyncFetcher {
         success = await this.loadHeadersFetch();
       }
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === "ENOTFOUND") {
-        this.dnsError = true;
-      }
+      this.lastError = (e as NodeJS.ErrnoException).code ?? "";
       logger.warn(
         "Async load headers failed",
         { ...formatErr(e), url: this.reqresp.url, ...this.recorder.logDetails },
