@@ -1235,6 +1235,11 @@ self.__bx_behaviors.selectMainBehavior();
         ) {
           await this.crawlState.incRateLimited(status, 0, true);
         }
+
+        // skip any further loading
+        if (status === STATUS_DNS_ERROR) {
+          data.rateLimitStatus = STATUS_DNS_ERROR;
+        }
       }
 
       return false;
