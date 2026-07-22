@@ -34,6 +34,7 @@ import {
   STATUS_IS_HTML_NO_DIRECT_FETCH,
   STATUS_CONNECTION_ERROR,
   WARC_REFERS_TO_CONTAINER,
+  STATUS_DNS_ERROR,
 } from "./constants.js";
 import { Readable } from "stream";
 import { createHash } from "crypto";
@@ -1077,9 +1078,9 @@ export class Recorder extends EventEmitter {
   markRateLimited(status: number, retryAfterHeader: string | null) {
     this.skipRecordingPage = true;
     if (this.state) {
-      this.state.pageRateLimited = status;
+      this.state.rateLimitStatus = status;
       if (retryAfterHeader) {
-        this.state.pageRateLimitedRetryAfter = parseInt(retryAfterHeader) || 0;
+        this.state.rateLimitedRetryAfter = parseInt(retryAfterHeader) || 0;
       }
     }
   }
@@ -1541,7 +1542,7 @@ export class Recorder extends EventEmitter {
     });
 
     if (!(await fetcher.loadHeaders())) {
-      return STATUS_CONNECTION_ERROR;
+      return fetcher.dnsError ? STATUS_DNS_ERROR : STATUS_CONNECTION_ERROR;
     }
 
     const mime = reqresp.getMimeType() || "";
@@ -1978,6 +1979,8 @@ class AsyncFetcher {
 
   maxRetries = DEFAULT_MAX_RETRIES;
 
+  dnsError = false;
+
   constructor({
     reqresp,
     expectedSize = -1,
@@ -2043,6 +2046,9 @@ class AsyncFetcher {
         success = await this.loadHeadersFetch();
       }
     } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOTFOUND") {
+        this.dnsError = true;
+      }
       logger.warn(
         "Async load headers failed",
         { ...formatErr(e), url: this.reqresp.url, ...this.recorder.logDetails },
