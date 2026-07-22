@@ -1246,6 +1246,13 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
+    // if it was a DNS error, fail page
+    if (data.rateLimitStatus === STATUS_DNS_ERROR) {
+      recorder?.addPageFailedRecord(0, "net::ERR_NAME_NOT_RESOLVED");
+      this.pageFailed("Page Load Aborted: DNS Error", data.retry, logDetails);
+      return;
+    }
+
     opts.markPageUsed();
     opts.pageBlockUnload = false;
 
