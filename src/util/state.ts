@@ -104,8 +104,8 @@ export class PageState {
   skipBehaviors = false;
   pageSkipped = false;
   pageSkipReason: SkippedReason | null = null;
-  pageRateLimited = 0;
-  pageRateLimitedRetryAfter = 0;
+  rateLimitStatus = 0;
+  rateLimitedRetryAfter = 0;
   noRetries = false;
 
   isDirectFetched = false;

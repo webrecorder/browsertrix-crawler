@@ -51,8 +51,9 @@ import {
   BxFunctionBindings,
   MAX_JS_DIALOG_PER_PAGE,
   CrawlStatus,
-  STATUS_UNKNOWN_ERROR,
+  STATUS_CONNECTION_ERROR,
   STATUS_IS_HTML_NO_DIRECT_FETCH,
+  STATUS_DNS_ERROR,
 } from "./util/constants.js";
 
 import { AdBlockRules, BlockRuleDecl, BlockRules } from "./util/blockrules.js";
@@ -1205,7 +1206,7 @@ self.__bx_behaviors.selectMainBehavior();
           "fetch",
         );
         // indicate this was some other error
-        status = STATUS_UNKNOWN_ERROR;
+        status = STATUS_CONNECTION_ERROR;
       }
 
       // direct fetch succeeded
@@ -1227,8 +1228,17 @@ self.__bx_behaviors.selectMainBehavior();
           { status, ...logDetails },
           "fetch",
         );
-        if (this.params.rateLimitStatusCodes.includes(status)) {
+        if (
+          status === STATUS_CONNECTION_ERROR ||
+          status === STATUS_DNS_ERROR ||
+          this.params.rateLimitStatusCodes.includes(status)
+        ) {
           await this.crawlState.incRateLimited(status, 0, true);
+        }
+
+        // skip any further loading
+        if (status === STATUS_DNS_ERROR) {
+          data.rateLimitStatus = STATUS_DNS_ERROR;
         }
       }
 
@@ -1238,6 +1248,13 @@ self.__bx_behaviors.selectMainBehavior();
     if (recorder && (await doDirectFetch())) {
       // return if direct fetch succeeds
       await this.awaitPageExtraDelay(opts);
+      return;
+    }
+
+    // if it was a DNS error, fail page
+    if (data.rateLimitStatus === STATUS_DNS_ERROR) {
+      recorder?.addPageFailedRecord(0, "net::ERR_NAME_NOT_RESOLVED");
+      this.pageFailed("Page Load Aborted: DNS Error", data.retry, logDetails);
       return;
     }
 
@@ -1427,8 +1444,8 @@ self.__bx_behaviors.selectMainBehavior();
       depth,
       url,
       pageSkipped,
-      pageRateLimited,
-      pageRateLimitedRetryAfter,
+      rateLimitStatus,
+      rateLimitedRetryAfter,
       noRetries,
     } = data;
 
@@ -1455,19 +1472,24 @@ self.__bx_behaviors.selectMainBehavior();
 
         this.limitHit = false;
       } else {
+        const useRateLimitRetries =
+          !!rateLimitStatus &&
+          rateLimitStatus !== STATUS_CONNECTION_ERROR &&
+          rateLimitStatus !== STATUS_DNS_ERROR;
+
         const retry = await this.crawlState.markFailed(
           url,
           noRetries,
-          !!pageRateLimited,
+          useRateLimitRetries,
         );
 
         if (this.healthChecker) {
           this.healthChecker.incError();
         }
-        if (pageRateLimited) {
+        if (rateLimitStatus) {
           await this.crawlState.incRateLimited(
-            pageRateLimited,
-            pageRateLimitedRetryAfter,
+            rateLimitStatus,
+            rateLimitedRetryAfter,
             false,
           );
         }
@@ -2368,18 +2390,18 @@ self.__bx_behaviors.selectMainBehavior();
     throw new Error("logged");
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  pageFailed(msg: string, retry: number, msgData: any) {
-    if (retry < this.params.maxPageRetries) {
+  pageFailed(msg: string, retry: number, msgData: LogDetails) {
+    const retries = this.params.maxPageRetries;
+    if (retry < retries) {
       logger.warn(
         msg + ": will retry",
-        { retry, retries: this.params.maxPageRetries, ...msgData },
+        { retry, retries, ...msgData },
         "pageStatus",
       );
     } else {
       logger.error(
         msg + ": retry limit reached",
-        { retry, retries: this.params.maxPageRetries, ...msgData },
+        { retry, retries, ...msgData },
         "pageStatus",
       );
     }
@@ -2483,16 +2505,10 @@ self.__bx_behaviors.selectMainBehavior();
               { msg },
               data,
             );
-          } else if (msg.startsWith("net::ERR_HTTP2_PROTOCOL_ERROR")) {
-            // treat as rate limit, page blocked
-            data.pageRateLimited = STATUS_UNKNOWN_ERROR;
-            logger.warn(
-              "Page load interrupted, possibly rate limited",
-              { url, msg, ...logDetails },
-              "pageStatus",
-            );
-            throw new Error("logged");
           } else {
+            // treat as rate limit, page blocked
+            data.rateLimitStatus = STATUS_CONNECTION_ERROR;
+
             return this.pageFailed("Page Load Failed", retry, {
               msg,
               url,
@@ -2554,7 +2570,7 @@ self.__bx_behaviors.selectMainBehavior();
     const status = resp.status();
     data.status = status;
 
-    if (!isChromeError && data.pageRateLimited) {
+    if (!isChromeError && data.rateLimitStatus) {
       logger.warn(
         "Page possibly rate limited, retrying",
         { url, status, ...logDetails },

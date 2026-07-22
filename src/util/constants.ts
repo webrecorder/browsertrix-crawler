@@ -137,7 +137,11 @@ export enum SkippedReason {
 // Direct Fetch Error Constants
 export const STATUS_IS_HTML_NO_DIRECT_FETCH = 600;
 
-export const STATUS_UNKNOWN_ERROR = 999;
+// Connection Error -- unable to connect to site
+export const STATUS_CONNECTION_ERROR = 999;
+
+// DNS Error -- unable to resolve hostname
+export const STATUS_DNS_ERROR = 899;
 
 // ============================================================================
 // Rate Limit Constants

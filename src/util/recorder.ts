@@ -32,8 +32,9 @@ import {
   RateLimitRule,
   SkippedReason,
   STATUS_IS_HTML_NO_DIRECT_FETCH,
-  STATUS_UNKNOWN_ERROR,
+  STATUS_CONNECTION_ERROR,
   WARC_REFERS_TO_CONTAINER,
+  STATUS_DNS_ERROR,
 } from "./constants.js";
 import { Readable } from "stream";
 import { createHash } from "crypto";
@@ -1077,9 +1078,9 @@ export class Recorder extends EventEmitter {
   markRateLimited(status: number, retryAfterHeader: string | null) {
     this.skipRecordingPage = true;
     if (this.state) {
-      this.state.pageRateLimited = status;
+      this.state.rateLimitStatus = status;
       if (retryAfterHeader) {
-        this.state.pageRateLimitedRetryAfter = parseInt(retryAfterHeader) || 0;
+        this.state.rateLimitedRetryAfter = parseInt(retryAfterHeader) || 0;
       }
     }
   }
@@ -1098,6 +1099,10 @@ export class Recorder extends EventEmitter {
       // }
       this.pageInfo.urls[reqresp.getCanonURL()] = info;
     }
+  }
+
+  addPageFailedRecord(status: number, error: string) {
+    this.pageInfo.urls[this.pageInfo.url] = { status, error };
   }
 
   writePageInfoRecord() {
@@ -1541,7 +1546,9 @@ export class Recorder extends EventEmitter {
     });
 
     if (!(await fetcher.loadHeaders())) {
-      return STATUS_UNKNOWN_ERROR;
+      return fetcher.lastError === "ENOTFOUND"
+        ? STATUS_DNS_ERROR
+        : STATUS_CONNECTION_ERROR;
     }
 
     const mime = reqresp.getMimeType() || "";
@@ -1978,6 +1985,8 @@ class AsyncFetcher {
 
   maxRetries = DEFAULT_MAX_RETRIES;
 
+  lastError = "";
+
   constructor({
     reqresp,
     expectedSize = -1,
@@ -2043,6 +2052,7 @@ class AsyncFetcher {
         success = await this.loadHeadersFetch();
       }
     } catch (e) {
+      this.lastError = (e as NodeJS.ErrnoException).code ?? "";
       logger.warn(
         "Async load headers failed",
         { ...formatErr(e), url: this.reqresp.url, ...this.recorder.logDetails },
