@@ -2168,6 +2168,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
 
         if (this.storage && this.uploadAndDeleteLocal) {
+          // set to delete before exit, but after uploading profile, if saving profile
           doDeleteDir = true;
         }
       }
@@ -2175,6 +2176,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // from here, actions that should happen on final crawler exit (not temp interrupt)
     if (!this.finalExit) {
+      // if doDeleteDir is set, need to delete before exiting
       if (doDeleteDir) {
         await this.doDeleteDir();
       }
@@ -2187,6 +2189,7 @@ self.__bx_behaviors.selectMainBehavior();
       await this.crawlState.commitDedupeDone();
     }
 
+    // need to do this before deletion
     if (this.params.saveProfile && generateFiles) {
       const resource = await this.browser.saveProfile(
         this.params.saveProfile,
