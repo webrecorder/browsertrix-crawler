@@ -2168,6 +2168,7 @@ self.__bx_behaviors.selectMainBehavior();
         }
 
         if (this.storage && this.uploadAndDeleteLocal) {
+          // set to delete before exit, but after uploading profile, if saving profile
           doDeleteDir = true;
         }
       }
@@ -2175,6 +2176,10 @@ self.__bx_behaviors.selectMainBehavior();
 
     // from here, actions that should happen on final crawler exit (not temp interrupt)
     if (!this.finalExit) {
+      // if doDeleteDir is set, need to delete before exiting
+      if (doDeleteDir) {
+        await this.doDeleteDir();
+      }
       return;
     }
 
@@ -2184,6 +2189,7 @@ self.__bx_behaviors.selectMainBehavior();
       await this.crawlState.commitDedupeDone();
     }
 
+    // need to do this before deletion
     if (this.params.saveProfile && generateFiles) {
       const resource = await this.browser.saveProfile(
         this.params.saveProfile,
@@ -2197,16 +2203,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // this should second-to-last
     if (doDeleteDir) {
-      await this.crawlState.setArchiveSize(0);
-
-      logger.info(
-        `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
-      );
-      try {
-        fs.rmSync(this.collDir, { recursive: true, force: true });
-      } catch (e) {
-        logger.warn(`Unable to clear ${this.collDir} before exit`, e);
-      }
+      await this.doDeleteDir();
     }
 
     // this should be last
@@ -2217,6 +2214,19 @@ self.__bx_behaviors.selectMainBehavior();
 
       // wait forever until signal
       await new Promise(() => {});
+    }
+  }
+
+  async doDeleteDir() {
+    await this.crawlState.setArchiveSize(0);
+
+    logger.info(
+      `Uploaded WACZ, deleting local data to free up space: ${this.collDir}`,
+    );
+    try {
+      fs.rmSync(this.collDir, { recursive: true, force: true });
+    } catch (e) {
+      logger.warn(`Unable to clear ${this.collDir} before exit`, e);
     }
   }
 
