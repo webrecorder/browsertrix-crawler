@@ -1933,6 +1933,10 @@ export class Recorder extends EventEmitter {
     }
 
     if (Object.keys(reqresp.extraOpts).length) {
+      logger.info("Writing to WARC-JSON-Metadata (serializeToWARC)", {
+        extraOpts: reqresp.extraOpts,
+        url: reqresp.url,
+      });
       responseRecord.warcHeaders.headers.set(
         "WARC-JSON-Metadata",
         JSON.stringify(reqresp.extraOpts),
@@ -2320,6 +2324,10 @@ function createResponse(
   }
 
   if (Object.keys(reqresp.extraOpts).length) {
+    logger.info("Writing to WARC-JSON-Metadata (createResponse)", {
+      extraOpts: reqresp.extraOpts,
+      url: reqresp.url,
+    });
     warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
   }
 
