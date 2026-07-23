@@ -286,10 +286,10 @@ async function automatedProfile(
 
   try {
     u = await page.waitForSelector(
-      "input[name='user'],input[name='username'],input[name='email']",
+      "input[name='user'],input[name='username'],input[name='email'],input#user,input#username,input#email",
     );
     p = await page.waitForSelector(
-      "input[type='password'].input[name='pass'],input[name='password']",
+      "input[type='password'],input[name='pass'],input[name='password'],input#pass,input#password",
     );
   } catch (e) {
     if (params.debugScreenshot) {
