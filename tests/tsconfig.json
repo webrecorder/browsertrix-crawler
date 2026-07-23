@@ -1,11 +1,11 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "rootDir": ".",
+    "rootDir": "../",
     "noEmit": true,
     "types": ["node", "jest"]
   },
-  "include": ["**/*"],
+  "include": ["../src/**/*", "**/*"],
   "exclude": [
     "custom-behaviors/**/*",
     "fixtures/**/*",
