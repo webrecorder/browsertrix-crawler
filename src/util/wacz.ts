@@ -326,7 +326,7 @@ export async function mergeCDXJ(
   indexesDir: string,
   zipped: boolean | null = null,
 ) {
-  // most used for testing
+  // added as env vars as really just used for testing
   const zipLinesPerBlock =
     parseInt(process.env.ZIP_LINES_PER_BLOCK || "") || LINES_PER_BLOCK;
   const zipCdxMinSize =
