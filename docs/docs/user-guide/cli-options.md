@@ -371,10 +371,10 @@ Options:
       --rateLimitTimeout                    Time in seconds to track rate limite
                                             d count for before resetting
                                                          [number] [default: 300]
-      --rateLimitMaxRetries, --retries      If set >=0, number of times to retry
+      --rateLimitMaxRetries                 If set >=0, number of times to retry
                                              rate limited pages before marking t
                                             hem as failed. If -1, retry indefini
-                                            tely          [number] [default: -1]
+                                            tely           [number] [default: 4]
       --rateLimitInterruptCount             If >0, threshold for number of rate
                                             limited pages before crawl is consid
                                             ered rate limited and is interrupted
