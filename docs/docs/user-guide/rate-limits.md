@@ -27,10 +27,10 @@ If a site provides a `Retry-After` header, for example with a 429 response, the 
 
 ## Rate Limit Retry Count
 
-By default, rate limited pages are retried indefinitely, allowing the crawl to possibly complete but at a much slower pace. If the pages are blocked due to auth requirements it may be possible to add a browser profile and restart the crawl, allowing for previously flagged pages to be captured successfully.
+By default, rate limited pages are retried 4 times, allowing the crawl to possibly complete but at a much slower pace. If the pages are blocked due to auth requirements it may be possible to add a browser profile and restart the crawl, allowing for previously flagged pages to be captured successfully.
 
-However, it may be desirable to set a total number of retries for pages flagged as rate limited, which can be done
-by setting `--rateLimitMaxRetries` to a value >= 0, where 0 implies no retries at all.
+It may be desirable to set a total number of retries for pages flagged as rate limited higher or lower, which can be done
+by setting `--rateLimitMaxRetries` to a value >= 0, where 0 implies no retries at all, while -1 means retry indefinitely.
 
 ## Interrupting Crawl on Rate Limit Threshold
 

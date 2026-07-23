@@ -147,6 +147,8 @@ export const STATUS_DNS_ERROR = 899;
 // Rate Limit Constants
 export const RATE_LIMIT_TTL_SECS = 300;
 
+export const DEFAULT_MAX_RATE_LIMIT_RETRIES = 4;
+
 export type RateLimitRule = {
   regex: RegExp;
   status: number;

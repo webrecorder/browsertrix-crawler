@@ -22,6 +22,7 @@ import {
   DEFAULT_RATE_LIMIT_RULES,
   RATE_LIMIT_TTL_SECS,
   RateLimitRule,
+  DEFAULT_MAX_RATE_LIMIT_RETRIES,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -790,7 +791,7 @@ class ArgParser {
           describe:
             "If set >=0, number of times to retry rate limited pages before marking them as failed. If -1, retry indefinitely",
           type: "number",
-          default: -1,
+          default: DEFAULT_MAX_RATE_LIMIT_RETRIES,
         },
 
         rateLimitInterruptCount: {
