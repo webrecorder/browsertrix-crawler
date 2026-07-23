@@ -326,6 +326,12 @@ export async function mergeCDXJ(
   indexesDir: string,
   zipped: boolean | null = null,
 ) {
+  // added as env vars as really just used for testing
+  const zipLinesPerBlock =
+    parseInt(process.env.ZIP_LINES_PER_BLOCK || "") || LINES_PER_BLOCK;
+  const zipCdxMinSize =
+    parseInt(process.env.ZIP_CDX_MIN_SIZE || "") || ZIP_CDX_MIN_SIZE;
+
   async function* readLinesFrom(stdout: Readable): AsyncGenerator<string> {
     for await (const line of readline.createInterface({ input: stdout })) {
       yield line + "\n";
@@ -335,6 +341,7 @@ export async function mergeCDXJ(
   async function* generateCompressed(
     reader: AsyncGenerator<string>,
     idxFile: Writable,
+    zipLinesPerBlock: number,
   ) {
     let offset = 0;
 
@@ -345,7 +352,6 @@ export async function mergeCDXJ(
     let cdxLines: string[] = [];
 
     let key = "";
-    let count = 0;
 
     idxFile.write(
       `!meta 0 ${JSON.stringify({
@@ -374,7 +380,6 @@ export async function mergeCDXJ(
 
       offset += length;
 
-      count = 1;
       key = "";
       cdxLines = [];
 
@@ -386,10 +391,11 @@ export async function mergeCDXJ(
         key = cdx.split(" {", 1)[0];
       }
 
-      if (++count === LINES_PER_BLOCK) {
+      cdxLines.push(cdx);
+
+      if (cdxLines.length === zipLinesPerBlock) {
         yield await finishChunk();
       }
-      cdxLines.push(cdx);
     }
 
     if (key) {
@@ -418,7 +424,7 @@ export async function mergeCDXJ(
     const tempCdxSize = await getDirSize(warcCdxDir);
 
     // if CDX size is at least this size, use compressed version
-    zipped = tempCdxSize >= ZIP_CDX_MIN_SIZE;
+    zipped = tempCdxSize >= zipCdxMinSize;
   }
 
   const proc = child_process.spawn("sort", cdxFiles, {
@@ -440,7 +446,13 @@ export async function mergeCDXJ(
     });
 
     await pipeline(
-      Readable.from(generateCompressed(readLinesFrom(proc.stdout), outputIdx)),
+      Readable.from(
+        generateCompressed(
+          readLinesFrom(proc.stdout),
+          outputIdx,
+          zipLinesPerBlock,
+        ),
+      ),
       output,
     );
 
