@@ -41,7 +41,7 @@ module.exports = {
         jest: true,
       },
       parserOptions: {
-        project: ["./tsconfig.test.json"],
+        project: ["./tests/tsconfig.json"],
       },
       rules: {
         "@typescript-eslint/no-floating-promises": "off",

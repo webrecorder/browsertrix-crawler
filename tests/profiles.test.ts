@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 const exec = promisify(execCallback);
 
 test("run with invalid profile, fail", async () => {
-  let status: number | undefined = 0;
+  let status: ExecException["code"] = 0;
   try {
     await exec(
       "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection profile-0 --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --limit 1 --profile /tests/fixtures/invalid.tar.gz",
@@ -18,7 +18,7 @@ test("run with invalid profile, fail", async () => {
 });
 
 test("start with no profile", async () => {
-  let status: number | undefined = 0;
+  let status: ExecException["code"] = 0;
   try {
     await exec(
       "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection profile-1 --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --limit 1",
@@ -31,7 +31,7 @@ test("start with no profile", async () => {
 });
 
 test("resume same crawl, but with invalid profile, not valid as no previous valid profile", async () => {
-  let status: number | undefined = 0;
+  let status: ExecException["code"] = 0;
   try {
     await exec(
       "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection profile-1 --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --limit 1 --profile /tests/fixtures/invalid.tar.gz",
@@ -44,7 +44,7 @@ test("resume same crawl, but with invalid profile, not valid as no previous vali
 });
 
 test("start with valid profile", async () => {
-  let status: number | undefined = 0;
+  let status: ExecException["code"] = 0;
   try {
     await exec(
       "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection profile-2 --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --limit 1 --scopeType page --profile /tests/fixtures/sample-profile.tar.gz",
@@ -65,7 +65,7 @@ test("start with valid profile", async () => {
 });
 
 test("resume same crawl, ignore invalid profile, use existing, finish crawl", async () => {
-  let status: number | undefined = 0;
+  let status: ExecException["code"] = 0;
   try {
     await exec(
       "docker run -v $PWD/test-crawls:/crawls -v $PWD/tests/fixtures:/tests/fixtures webrecorder/browsertrix-crawler crawl --collection profile-2 --url https://example-com.webrecorder.net/ --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --scopeType page --profile /tests/fixtures/invalid.tar.gz",
