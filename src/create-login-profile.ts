@@ -17,7 +17,7 @@ import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
 import { getInfoString } from "./util/file_reader.js";
 import { DISPLAY, ExitCodes } from "./util/constants.js";
 import { initProxy, loadProxyConfig } from "./util/proxy.js";
-//import { sleep } from "./util/timing.js";
+import { sleep } from "./util/timing.js";
 
 const profileHTML = fs.readFileSync(
   new URL("../html/createProfile.html", import.meta.url),
@@ -95,6 +95,13 @@ function initArgs() {
           "Shutdown browser in interactive after this many seconds, if no pings received",
         type: "number",
         default: 0,
+      },
+
+      postLoadDelay: {
+        describe:
+          "If >0, amount of time to sleep (in seconds) after page has loaded (only in automated mode)",
+        default: 0,
+        type: "number",
       },
 
       profile: {
@@ -282,6 +289,8 @@ async function automatedProfile(
     logger.error("Page Load Failed/Interrupted", e);
   }
 
+  await awaitPostLoad(params.postLoadDelay);
+
   logger.debug("Looking for username and password entry fields on page...");
 
   try {
@@ -310,6 +319,8 @@ async function automatedProfile(
     page.waitForNavigation({ waitUntil }),
   ]);
 
+  await awaitPostLoad(params.postLoadDelay);
+
   if (params.debugScreenshot) {
     await page.screenshot({ path: params.debugScreenshot });
   }
@@ -336,6 +347,13 @@ async function createProfile(
   const storage = initStorage();
 
   return await browser.saveProfile(localFilename, storage, remoteFilename);
+}
+
+async function awaitPostLoad(postLoadDelay: number) {
+  if (postLoadDelay) {
+    logger.info("Awaiting post load delay", { seconds: postLoadDelay });
+    await sleep(postLoadDelay);
+  }
 }
 
 function promptInput(msg: string, hidden = false) {
