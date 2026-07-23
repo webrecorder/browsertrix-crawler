@@ -428,32 +428,38 @@ export class Recorder extends EventEmitter {
 
     reqresp.fillResponse(redirectResponse, type);
 
+    const { url, status } = reqresp;
+
     if (reqresp.isSelfRedirect()) {
       logger.warn(
         "Skipping self redirect",
-        { url: reqresp.url, status: reqresp.status, ...this.logDetails },
+        { url, status, ...this.logDetails },
         "recorder",
       );
       return;
     }
 
     try {
-      new URL(reqresp.url);
+      new URL(url);
     } catch (e) {
       logger.warn(
         "Skipping invalid URL from redirect",
-        { url: reqresp.url, status: reqresp.status, ...this.logDetails },
+        { url, status, ...this.logDetails },
         "recorder",
       );
       return;
     }
 
-    if (reqresp.url === this.finalPageUrl) {
+    if (url === this.finalPageUrl) {
       this.finalPageUrl = reqresp.getRedirectUrl();
     }
 
     this.serializeToWARC(reqresp).catch((e) =>
-      logger.warn("Error Serializing to WARC", e, "recorder"),
+      logger.warn(
+        "Error Serializing to WARC",
+        { url, ...formatErr(e) },
+        "recorder",
+      ),
     );
   }
 
@@ -494,7 +500,11 @@ export class Recorder extends EventEmitter {
         ) {
           this.removeReqResp(requestId);
           return this.serializeToWARC(reqresp).catch((e) =>
-            logger.warn("Error Serializing to WARC", e, "recorder"),
+            logger.warn(
+              "Error Serializing to WARC",
+              { url, ...formatErr(e) },
+              "recorder",
+            ),
           );
         } else if (url && reqresp.requestHeaders && type === "Media") {
           this.removeReqResp(requestId);
@@ -526,7 +536,11 @@ export class Recorder extends EventEmitter {
           ...this.logDetails,
         });
         return this.serializeToWARC(reqresp).catch((e) =>
-          logger.warn("Error Serializing to WARC", e, "recorder"),
+          logger.warn(
+            "Error Serializing to WARC",
+            { url, ...formatErr(e) },
+            "recorder",
+          ),
         );
 
       default:
@@ -577,7 +591,11 @@ export class Recorder extends EventEmitter {
     try {
       await this.serializeToWARC(reqresp);
     } catch (e) {
-      logger.warn("Error Serializing to WARC", e, "recorder");
+      logger.warn(
+        "Error Serializing to WARC",
+        { url, ...formatErr(e) },
+        "recorder",
+      );
     }
   }
 
@@ -1613,7 +1631,11 @@ export class Recorder extends EventEmitter {
           return false;
         }
       } catch (e) {
-        logger.warn("Error Serializing to WARC", e, "recorder");
+        logger.warn(
+          "Error Serializing to WARC",
+          { url, ...formatErr(e) },
+          "recorder",
+        );
         return false;
       }
       return true;
