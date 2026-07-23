@@ -70,7 +70,7 @@ test("verify that index entries are as expected", async () => {
 
   // each line count is equal to number of lines per block, except last one
   for (let i = 0; i < blockLineCounts.length - 1; i++) {
-    expect(blockLineCounts[0]).toBe(LINES_PER_BLOCK);
+    expect(blockLineCounts[i]).toBe(LINES_PER_BLOCK);
   }
 
   const remainder = allCdxLines.length % LINES_PER_BLOCK;
