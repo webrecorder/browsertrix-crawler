@@ -42,7 +42,7 @@ test("verify that index entries are as expected", async () => {
     if (line.startsWith("!meta 0")) {
       continue;
     }
-    // parse index line in format <surt> <ts> <json>, e.g. 
+    // parse index line in format <surt> <ts> <json>, e.g.
     // com,example)/ 20261226010203 {...}
     const prefixIndex = line.indexOf(" ");
     // surt key prefix
