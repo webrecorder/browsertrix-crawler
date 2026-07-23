@@ -6039,10 +6039,10 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.4.10:
-  version "2.4.10"
-  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.10.tgz#1d873b9c469a331441919776c2cad84dece878c3"
-  integrity sha512-jaqgnavBT//6scEMUGqi5eK2NXIZ8Tp8LJOY+oa07k7JpIt/BwQLJL3dQca/SgPHaW0yspQmi1IeF0p1wrUcaA==
+warcio@^2.4.10, warcio@^2.4.11:
+  version "2.4.11"
+  resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.11.tgz#1ef9c33f37b0ab17662d7821dce718e385afdbd7"
+  integrity sha512-EXcT5+GepqtUBmFpwxcRm7uEbhrtYKhWVIVzAxgO/PZt84KLl3eZLlGsa4DwQCAWCK8b4nyjqBlyKfKhT1Govg==
   dependencies:
     "@types/pako" "^1.0.7"
     "@types/stream-buffers" "^3.0.7"
