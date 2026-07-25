@@ -170,28 +170,33 @@ export class WACZ {
     async function* iterWACZ(wacz: WACZ): AsyncIterable<Uint8Array> {
       let currFile: CurrZipFileMarker | null = null;
 
-      for await (const chunk of zip) {
-        if (chunk instanceof CurrZipFileMarker) {
-          currFile = chunk;
-        } else if (chunk instanceof EndOfZipFileMarker) {
-          if (currFile) {
-            // Frictionless data validation requires this to be lowercase
-            const name = basename(currFile.filename).toLowerCase();
-            const path = currFile.zipPath;
-            const bytes = currFile.size;
-            const hash = "sha256:" + currFile.hasher.digest("hex");
-            resources.push({ name, path, bytes, hash });
-            logger.debug("Added file to WACZ", { path, bytes, hash }, "wacz");
+      try {
+        for await (const chunk of zip) {
+          if (chunk instanceof CurrZipFileMarker) {
+            currFile = chunk;
+          } else if (chunk instanceof EndOfZipFileMarker) {
+            if (currFile) {
+              // Frictionless data validation requires this to be lowercase
+              const name = basename(currFile.filename).toLowerCase();
+              const path = currFile.zipPath;
+              const bytes = currFile.size;
+              const hash = "sha256:" + currFile.hasher.digest("hex");
+              resources.push({ name, path, bytes, hash });
+              logger.debug("Added file to WACZ", { path, bytes, hash }, "wacz");
+            }
+            currFile = null;
+          } else {
+            yield chunk;
+            if (currFile) {
+              currFile.hasher.update(chunk);
+            }
+            hasher.update(chunk);
+            size += chunk.length;
           }
-          currFile = null;
-        } else {
-          yield chunk;
-          if (currFile) {
-            currFile.hasher.update(chunk);
-          }
-          hasher.update(chunk);
-          size += chunk.length;
         }
+      } catch (e) {
+        logger.error("Error iterating through WACZ", e, "wacz");
+        throw e;
       }
 
       wacz.hash = hasher.digest("hex");
@@ -236,18 +241,27 @@ export class WACZ {
     }
 
     for (const filename of files) {
-      const input = fs.createReadStream(filename);
+      try {
+        const input = fs.createReadStream(filename);
 
-      const stat = await fsp.stat(filename);
-      const lastModified = stat.mtime;
-      const size = stat.size;
+        const stat = await fsp.stat(filename);
+        const lastModified = stat.mtime;
+        const size = stat.size;
 
-      const nameStr = filename.slice(this.collDir.length + 1);
-      const name = encoder.encode(nameStr);
+        const nameStr = filename.slice(this.collDir.length + 1);
+        const name = encoder.encode(nameStr);
 
-      const currFile = new CurrZipFileMarker(filename, nameStr, size);
+        const currFile = new CurrZipFileMarker(filename, nameStr, size);
 
-      yield { input: wrapMarkers(currFile, input), lastModified, name, size };
+        yield { input: wrapMarkers(currFile, input), lastModified, name, size };
+      } catch (e) {
+        logger.error(
+          "Error reading file for WACZ",
+          { filename, ...formatErr(e) },
+          "wacz",
+        );
+        throw e;
+      }
     }
 
     // datapackage.json
@@ -333,8 +347,13 @@ export async function mergeCDXJ(
     parseInt(process.env.ZIP_CDX_MIN_SIZE || "") || ZIP_CDX_MIN_SIZE;
 
   async function* readLinesFrom(stdout: Readable): AsyncGenerator<string> {
-    for await (const line of readline.createInterface({ input: stdout })) {
-      yield line + "\n";
+    try {
+      for await (const line of readline.createInterface({ input: stdout })) {
+        yield line + "\n";
+      }
+    } catch (e) {
+      logger.error("Error iterating CDX", e, "wacz");
+      throw e;
     }
   }
 
@@ -343,63 +362,67 @@ export async function mergeCDXJ(
     idxFile: Writable,
     zipLinesPerBlock: number,
   ) {
-    let offset = 0;
+    try {
+      let offset = 0;
 
-    const encoder = new TextEncoder();
+      const encoder = new TextEncoder();
 
-    const filename = INDEX_CDX_GZ;
+      const filename = INDEX_CDX_GZ;
 
-    let cdxLines: string[] = [];
+      let cdxLines: string[] = [];
 
-    let key = "";
+      let key = "";
 
-    idxFile.write(
-      `!meta 0 ${JSON.stringify({
-        format: "cdxj-gzip-1.0",
-        filename: INDEX_CDX_GZ,
-      })}\n`,
-    );
+      idxFile.write(
+        `!meta 0 ${JSON.stringify({
+          format: "cdxj-gzip-1.0",
+          filename: INDEX_CDX_GZ,
+        })}\n`,
+      );
 
-    const finishChunk = async () => {
-      const compressed = await new Promise<Uint8Array>((resolve) => {
-        gzip(encoder.encode(cdxLines.join("")), (_, result) => {
-          if (result) {
-            resolve(result);
-          }
+      const finishChunk = async () => {
+        const compressed = await new Promise<Uint8Array>((resolve) => {
+          gzip(encoder.encode(cdxLines.join("")), (_, result) => {
+            if (result) {
+              resolve(result);
+            }
+          });
         });
-      });
 
-      const length = compressed.length;
-      const digest =
-        "sha256:" + createHash("sha256").update(compressed).digest("hex");
+        const length = compressed.length;
+        const digest =
+          "sha256:" + createHash("sha256").update(compressed).digest("hex");
 
-      const idx =
-        key + " " + JSON.stringify({ offset, length, digest, filename });
+        const idx =
+          key + " " + JSON.stringify({ offset, length, digest, filename });
 
-      idxFile.write(idx + "\n");
+        idxFile.write(idx + "\n");
 
-      offset += length;
+        offset += length;
 
-      key = "";
-      cdxLines = [];
+        key = "";
+        cdxLines = [];
 
-      return compressed;
-    };
+        return compressed;
+      };
 
-    for await (const cdx of reader) {
-      if (!key) {
-        key = cdx.split(" {", 1)[0];
+      for await (const cdx of reader) {
+        if (!key) {
+          key = cdx.split(" {", 1)[0];
+        }
+
+        cdxLines.push(cdx);
+
+        if (cdxLines.length === zipLinesPerBlock) {
+          yield await finishChunk();
+        }
       }
 
-      cdxLines.push(cdx);
-
-      if (cdxLines.length === zipLinesPerBlock) {
+      if (key) {
         yield await finishChunk();
       }
-    }
-
-    if (key) {
-      yield await finishChunk();
+    } catch (e) {
+      logger.error("Error in generateCompressed", e, "wacz");
     }
   }
 
