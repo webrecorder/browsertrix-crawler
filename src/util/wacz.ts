@@ -423,6 +423,7 @@ export async function mergeCDXJ(
       }
     } catch (e) {
       logger.error("Error in generateCompressed", e, "wacz");
+      throw e;
     }
   }
 
