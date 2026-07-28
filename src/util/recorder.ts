@@ -1563,31 +1563,39 @@ export class Recorder extends EventEmitter {
       cdp,
     });
 
-    if (!(await fetcher.loadHeaders())) {
-      return fetcher.lastError === "ENOTFOUND"
-        ? STATUS_DNS_ERROR
-        : STATUS_CONNECTION_ERROR;
-    }
+    try {
+      if (!(await fetcher.loadHeaders())) {
+        return fetcher.lastError === "ENOTFOUND"
+          ? STATUS_DNS_ERROR
+          : STATUS_CONNECTION_ERROR;
+      }
 
-    const mime = reqresp.getMimeType() || "";
-    // cancel if not 200 or mime is html
-    if (reqresp.status !== 200) {
-      await fetcher.doCancel();
-      return reqresp.status;
-    }
-    if (isHTMLMime(mime)) {
-      // custom value to indicate direct fetch is skipped
-      // since this is an HTML page
-      return STATUS_IS_HTML_NO_DIRECT_FETCH;
-    }
-    if (!this.stopping) {
+      const mime = reqresp.getMimeType() || "";
+      // cancel if not 200 or mime is html
+      if (reqresp.status !== 200) {
+        return reqresp.status;
+      }
+      if (isHTMLMime(mime)) {
+        // custom value to indicate direct fetch is skipped
+        // since this is an HTML page
+        return STATUS_IS_HTML_NO_DIRECT_FETCH;
+      }
+
+      // don't actually fetch if already stopping
+      if (this.stopping) {
+        return reqresp.status;
+      }
+
       // todo: revisit async queuing at a later time
       //state.isDirectFetched = true;
       //void this.asyncFetchQ.add(() => fetcher.loadDirectPage(state, crawler));
       // load immediately for now
       await fetcher.loadDirectPage(state);
+      return reqresp.status;
+    } finally {
+      // if not fully loaded, cancel
+      await fetcher.doCancel();
     }
-    return reqresp.status;
   }
 
   async getCookieString(cdp: CDPSession, url: string): Promise<string> {
@@ -2107,6 +2115,10 @@ class AsyncFetcher {
 
       if (res == SerializeRes.SkippedNoWrite || res === SerializeRes.Aborted) {
         await this.doCancel();
+      } else {
+        // clear body and stream now that we've succeeded
+        this.body = undefined;
+        this.stream = null;
       }
       return res;
     } catch (e) {
@@ -2115,6 +2127,7 @@ class AsyncFetcher {
         { ...formatErr(e), ...this.recorder.logDetails },
         "fetch",
       );
+      await this.doCancel();
       return SerializeRes.Aborted;
     }
   }
