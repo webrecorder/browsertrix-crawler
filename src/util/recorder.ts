@@ -1558,6 +1558,7 @@ export class Recorder extends EventEmitter {
     if (isHTMLMime(mime)) {
       // custom value to indicate direct fetch is skipped
       // since this is an HTML page
+      await fetcher.doCancel();
       return STATUS_IS_HTML_NO_DIRECT_FETCH;
     }
     if (!this.stopping) {
