@@ -199,10 +199,13 @@ export class ScopedSeed {
         break;
 
       case "page-spa":
-        // allow scheme-agnostic URLS as likely redirects
+        parsedUrl.hash = "";
         include = [
-          new RegExp("^" + urlRxEscape(normalizeUrl(parsedUrl.href)) + "#.+"),
+          new RegExp(
+            "^" + urlRxEscape(normalizeUrl(parsedUrl.href)) + "($|#.*)",
+          ),
         ];
+        console.log(include);
         allowHash = true;
         break;
 
