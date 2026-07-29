@@ -7,6 +7,7 @@ The crawler uses following exit codes to indicate crawl result.
 | 0 | Success | Crawl completed normally |
 | 1 | GenericError | Unspecified error, check logs for more details |
 | 3 | OutOfSpace | Disk is already full |
+| 8 | RedisUnavailable | Could not connect to the Redis instance for managing queues or deduplication |
 | 9 | Failed | Crawl failed unexpectedly, might be worth retrying |
 | 10 | BrowserCrashed | Browser used to fetch pages has crashed |
 | 11 | SignalInterrupted | Crawl stopped gracefully in response to SIGINT signal |
@@ -16,4 +17,6 @@ The crawler uses following exit codes to indicate crawl result.
 | 15 | TimeLimit | Limit on maximum crawl duration, configured with `--timeLimit`, has been reached |
 | 16 | DiskUtilization | Limit on maximum disk usage, configured with `--diskUtilization`, has been reached |
 | 17 | Fatal | A fatal (non-retryable) error occured |
+| 18 | RateLimited | Maximum number of rate-limited responses, configured with `--rateLimitInterruptCount`, have been received |
 | 21 | ProxyError | Unable to establish connection with proxy |
+| 22 | UploadFailed | Could not write a WACZ file, if configured with `--generateWACZ`, to disk or remote storage |

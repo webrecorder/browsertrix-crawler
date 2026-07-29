@@ -36,7 +36,7 @@ by setting `--rateLimitMaxRetries` to a value >= 0, where 0 implies no retries a
 
 By default, the crawler will continue, skipping rate limited pages and retrying them indefinitely, to match existing behavior.
 
-If the `--rateLimitInterruptCount M` flag is set, the crawler will exit with a rate limit exit code (exit code 21) after M rate limited pages within the N seconds, configured via `--rateLimitTimeout`.
+If the `--rateLimitInterruptCount M` flag is set, the crawler will exit with a rate limit exit code (exit code 18) after M rate limited pages within the N seconds, configured via `--rateLimitTimeout`.
 
 This can allow a job runner or other system that starts and monitors the crawler container to implement an exponential backoff system if the crawler repeatedly exits due to being rate limited.
 The Browsertrix application provides this through built-in exponential backoff available in Kubernetes, where the system
