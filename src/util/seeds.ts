@@ -196,6 +196,7 @@ export class ScopedSeed {
         include = [
           new RegExp("^" + urlRxEscape(normalizeUrl(parsedUrl.href)) + "$"),
         ];
+        allowHash = true;
         break;
 
       case "page-spa":
@@ -205,7 +206,6 @@ export class ScopedSeed {
             "^" + urlRxEscape(normalizeUrl(parsedUrl.href)) + "($|#.*)",
           ),
         ];
-        console.log(include);
         allowHash = true;
         break;
 
