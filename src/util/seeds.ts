@@ -200,6 +200,7 @@ export class ScopedSeed {
         break;
 
       case "page-spa":
+        // modifying here to remove # (to be refactored into internal function later)
         parsedUrl.hash = "";
         include = [
           new RegExp(
