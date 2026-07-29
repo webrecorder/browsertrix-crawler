@@ -334,7 +334,7 @@ exclude:
   expect(seeds[0].scopeType).toEqual("page-spa");
   expect(seeds[0].url).toEqual("https://example.com/1");
   expect(seeds[0].include).toEqual([
-    /^https?:\/\/(www[\d]*\.)?example\.com\/1#.+/,
+    /^https?:\/\/(www[\d]*\.)?example\.com\/1($|#.*)/,
   ]);
   expect(seeds[0].exclude).toEqual(excludeRxs);
 
@@ -574,4 +574,302 @@ scopeType: prefix
   expect((result3 as Exclude<typeof result1, false>).url).toBe(
     "https://example.com/abc",
   );
+});
+
+test("hashtag seed + page scope", async () => {
+  const seeds = await getSeeds(`
+seeds:
+   - url: https://example.com/#abc
+     scopeType: page
+     depth: 0
+
+`);
+
+  // include, hashtag included for exact match
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/#abc$/,
+  ]);
+
+  // exact URL, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#abc",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // different www. / scheme, included
+  expect(
+    seeds[0].isIncluded({
+      url: "http://example.com/#abc",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // different hashtag, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#xyz",
+      depth: 0,
+    }),
+  ).toBe(false);
+
+  // different hashtag, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://example.com/#xyz",
+      depth: 0,
+    }),
+  ).toBe(false);
+
+  // depth > 0, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#xyz",
+      depth: 1,
+    }),
+  ).toBe(false);
+
+  // different page, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/xyz",
+      depth: 0,
+    }),
+  ).toBe(false);
+
+  // empty hashtag, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#",
+      depth: 0,
+    }),
+  ).toBe(false);
+
+  // no hashtag, not included, must be exact
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/",
+      depth: 0,
+    }),
+  ).toBe(false);
+});
+
+test("www hashtag seed + page scope", async () => {
+  const seeds = await getSeeds(`
+seeds:
+   - url: https://www.example.com/#abc
+     scopeType: page
+     depth: 0
+
+`);
+
+  // include, hashtag included for exact match
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/#abc$/,
+  ]);
+
+  // exact URL, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#abc",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // different www. / scheme, included
+  expect(
+    seeds[0].isIncluded({
+      url: "http://example.com/#abc",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // different hashtag, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#xyz",
+      depth: 0,
+    }),
+  ).toBe(false);
+
+  // different hashtag, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://example.com/#xyz",
+      depth: 0,
+    }),
+  ).toBe(false);
+
+  // depth > 0,not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#xyz",
+      depth: 1,
+    }),
+  ).toBe(false);
+
+  // different page, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/xyz",
+      depth: 0,
+    }),
+  ).toBe(false);
+
+  // empty hashtag, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#",
+      depth: 0,
+    }),
+  ).toBe(false);
+
+  // no hashtag, not included, must be exact
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/",
+      depth: 0,
+    }),
+  ).toBe(false);
+});
+
+test("hashtag seed + single-page spa", async () => {
+  const seeds = await getSeeds(`
+seeds:
+   - url: https://example.com/#abc
+     scopeType: page-spa
+     depth: 0
+`);
+
+  // include, hashtag omitted to match any
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/($|#.*)/,
+  ]);
+
+  // exact URL, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#abc",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // different www. / scheme, included
+  expect(
+    seeds[0].isIncluded({
+      url: "http://example.com/#abc",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // different hashtag, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#xyz",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // depth > 0, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#xyz",
+      depth: 1,
+    }),
+  ).toBe(false);
+
+  // different page, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/abc",
+      depth: 0,
+    }),
+  ).toBe(false);
+
+  // empty hashtag, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // no hashtag, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+});
+
+test("www hashtag seed + single-page spa", async () => {
+  const seeds = await getSeeds(`
+seeds:
+   - url: https://www.example.com/#abc
+     scopeType: page-spa
+     depth: 1
+`);
+
+  // include, hashtag omitted to match any
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/($|#.*)/,
+  ]);
+
+  // exact URL, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#abc",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // different www. / scheme, included
+  expect(
+    seeds[0].isIncluded({
+      url: "http://example.com/#abc",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // different hashtag, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#xyz",
+      depth: 1,
+    }),
+  ).not.toBe(false);
+
+  // depth > 1, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#xyz",
+      depth: 2,
+    }),
+  ).toBe(false);
+
+  // different page, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/abc",
+      depth: 1,
+    }),
+  ).toBe(false);
+
+  // empty hashtag, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // no hashtag, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/",
+      depth: 0,
+    }),
+  ).not.toBe(false);
 });
