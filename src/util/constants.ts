@@ -95,6 +95,7 @@ export enum ExitCodes {
   RateLimited = 18,
   ProxyError = 21,
   UploadFailed = 22,
+  InvalidConfig = 30,
 }
 
 export enum InterruptReason {

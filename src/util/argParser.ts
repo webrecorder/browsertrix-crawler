@@ -15,6 +15,7 @@ import {
   SERVICE_WORKER_OPTS,
   DEFAULT_SELECTORS,
   BEHAVIOR_TYPES,
+  ExitCodes,
   ExtractSelector,
   DEFAULT_MAX_RETRIES,
   BxFunctionBindings,
@@ -877,6 +878,11 @@ class ArgParser {
         try {
           parser(argv.clickSelector);
         } catch (e) {
+          // Try to avoid triggering a restart since this is unrecoverable
+          // without changing the config.
+          if (argv.restartsOnError) {
+            logger.setOverrideFatalExitCode(ExitCodes.InvalidConfig);
+          }
           void logger.fatal("Invalid Autoclick CSS Selector", {
             selector: argv.clickSelector,
           });
