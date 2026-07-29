@@ -16,4 +16,5 @@ The crawler uses following exit codes to indicate crawl result.
 | 15 | TimeLimit | Limit on maximum crawl duration, configured with `--timeLimit`, has been reached |
 | 16 | DiskUtilization | Limit on maximum disk usage, configured with `--diskUtilization`, has been reached |
 | 17 | Fatal | A fatal (non-retryable) error occured |
+| 18 | RateLimited | Maximum number of rate-limited responses, configured with `--rateLimitInterruptCount`, have been received |
 | 21 | ProxyError | Unable to establish connection with proxy |
