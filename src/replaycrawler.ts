@@ -225,7 +225,11 @@ export class ReplayCrawler extends Crawler {
         }
       }
     } catch (e) {
-      logger.warn("No extraPages.jsonl found, ignoring", {}, "replay");
+      logger.warn(
+        "No extraPages.jsonl found or error reading extraPages, ignoring",
+        e,
+        "replay",
+      );
     }
   }
 
