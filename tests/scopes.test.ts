@@ -645,6 +645,14 @@ seeds:
       depth: 0,
     }),
   ).toBe(false);
+
+  // no hashtag, not included, must be exact
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/",
+      depth: 0,
+    }),
+  ).toBe(false);
 });
 
 test("www hashtag seed + page scope", async () => {
@@ -716,6 +724,14 @@ seeds:
       depth: 0,
     }),
   ).toBe(false);
+
+  // no hashtag, not included, must be exact
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/",
+      depth: 0,
+    }),
+  ).toBe(false);
 });
 
 test("hashtag seed + single-page spa", async () => {
@@ -778,6 +794,14 @@ seeds:
       depth: 0,
     }),
   ).not.toBe(false);
+
+  // no hashtag, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/",
+      depth: 0,
+    }),
+  ).not.toBe(false);
 });
 
 test("www hashtag seed + single-page spa", async () => {
@@ -837,6 +861,14 @@ seeds:
   expect(
     seeds[0].isIncluded({
       url: "https://www.example.com/#",
+      depth: 0,
+    }),
+  ).not.toBe(false);
+
+  // no hashtag, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/",
       depth: 0,
     }),
   ).not.toBe(false);
