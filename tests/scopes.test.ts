@@ -585,6 +585,11 @@ seeds:
 
 `);
 
+  // include, hashtag included for exact match
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/#abc$/,
+  ]);
+
   // exact URL, included
   expect(
     seeds[0].isIncluded({
@@ -632,6 +637,14 @@ seeds:
       depth: 0,
     }),
   ).toBe(false);
+
+  // empty hashtag, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#",
+      depth: 0,
+    }),
+  ).not.toBe(false);
 });
 
 test("www hashtag seed + page scope", async () => {
@@ -642,6 +655,11 @@ seeds:
      depth: 0
 
 `);
+
+  // include, hashtag included for exact match
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/#abc$/,
+  ]);
 
   // exact URL, included
   expect(
@@ -690,6 +708,14 @@ seeds:
       depth: 0,
     }),
   ).toBe(false);
+
+  // empty hashtag, not included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#",
+      depth: 0,
+    }),
+  ).toBe(false);
 });
 
 test("hashtag seed + single-page spa", async () => {
@@ -699,6 +725,11 @@ seeds:
      scopeType: page-spa
      depth: 0
 `);
+
+  // include, hashtag omitted to match any
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/($|#.*)/,
+  ]);
 
   // exact URL, included
   expect(
@@ -739,6 +770,14 @@ seeds:
       depth: 0,
     }),
   ).toBe(false);
+
+  // empty hashtag, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#",
+      depth: 0,
+    }),
+  ).not.toBe(false);
 });
 
 test("www hashtag seed + single-page spa", async () => {
@@ -748,6 +787,11 @@ seeds:
      scopeType: page-spa
      depth: 1
 `);
+
+  // include, hashtag omitted to match any
+  expect(seeds[0].include).toEqual([
+    /^https?:\/\/(www[\d]*\.)?example\.com\/($|#.*)/,
+  ]);
 
   // exact URL, included
   expect(
@@ -788,4 +832,12 @@ seeds:
       depth: 1,
     }),
   ).toBe(false);
+
+  // empty hashtag, included
+  expect(
+    seeds[0].isIncluded({
+      url: "https://www.example.com/#",
+      depth: 0,
+    }),
+  ).not.toBe(false);
 });
