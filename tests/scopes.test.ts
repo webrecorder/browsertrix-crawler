@@ -644,7 +644,7 @@ seeds:
       url: "https://www.example.com/#",
       depth: 0,
     }),
-  ).not.toBe(false);
+  ).toBe(false);
 });
 
 test("www hashtag seed + page scope", async () => {
