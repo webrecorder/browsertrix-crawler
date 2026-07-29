@@ -213,15 +213,23 @@ export class ReplayCrawler extends Crawler {
       }
     }
 
-    const extraPagesReader = await loader.loadFile("pages/extraPages.jsonl");
+    try {
+      const extraPagesReader = await loader.loadFile("pages/extraPages.jsonl");
 
-    if (extraPagesReader) {
-      for await (const buff of extraPagesReader.iterLines()) {
-        await this.addPage(buff, count++);
-        if (this.limitHit) {
-          break;
+      if (extraPagesReader) {
+        for await (const buff of extraPagesReader.iterLines()) {
+          await this.addPage(buff, count++);
+          if (this.limitHit) {
+            break;
+          }
         }
       }
+    } catch (e) {
+      logger.warn(
+        "No extraPages.jsonl found or error reading extraPages, ignoring",
+        e,
+        "replay",
+      );
     }
   }
 

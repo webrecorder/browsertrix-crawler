@@ -139,7 +139,7 @@ export class ReplayServer {
       opts.end = parseInt(array[2]);
       // negative value, subtract from end
       if (isNaN(opts.start) && !isNaN(opts.end)) {
-        opts.start = total - opts.end;
+        opts.start = Math.max(0, total - opts.end);
         opts.end = total - 1;
       } else if (isNaN(opts.end)) {
         opts.end = total - 1;
