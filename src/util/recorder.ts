@@ -1538,6 +1538,8 @@ export class Recorder extends EventEmitter {
     cdp,
     state,
   }: DirectFetchRequest): Promise<number> {
+    return STATUS_IS_HTML_NO_DIRECT_FETCH;
+
     const reqresp = new RequestResponseInfo("0");
     const ts = new Date();
 
