@@ -844,6 +844,27 @@ export class Crawler {
       });
     };
 
+    const addLinkBatch = async (
+      urls: Set<string>,
+      alwaysObeyScope: boolean = false,
+    ) => {
+      const { seedId, depth, extraHops = 0, logDetails } = opts.data;
+
+      // if not always obeying scope and allowed to ignore scope, set to true
+      const ignoreScope =
+        !alwaysObeyScope && this.params.alwaysAddBehaviorLinks;
+
+      await this.queueInScopeUrls({
+        seedId,
+        urls: Array.from(urls),
+        depth,
+        extraHops,
+        pageUrl: page.url(),
+        logDetails,
+        ignoreScope,
+      });
+    };
+
     await this.browser.setupPage({ page, cdp });
 
     await this.setupExecContextEvents(cdp, frameIdToExecId);
@@ -894,6 +915,10 @@ export class Crawler {
     }
 
     await page.exposeFunction(BxFunctionBindings.AddLinkFunc, addLink);
+    await page.exposeFunction(
+      BxFunctionBindings.AddLinkBatchFunc,
+      addLinkBatch,
+    );
 
     // used for both behaviors and link extraction now
     await this.browser.addInitScript(page, btrixBehaviors);
