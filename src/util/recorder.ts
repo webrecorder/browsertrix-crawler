@@ -1473,7 +1473,7 @@ export class Recorder extends EventEmitter {
 
   pendingReqResp(requestId: string, reuseOnly = false) {
     // don't record additional resources
-    if (this.finishingPage) {
+    if (this.finishingPage || this.skipRecordingPage) {
       return null;
     }
 
