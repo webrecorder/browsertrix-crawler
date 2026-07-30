@@ -848,10 +848,12 @@ export class Crawler {
     };
 
     const addLinkBatch = async (
-      urls: Set<string>,
+      urls: string,
       alwaysObeyScope: boolean = false,
     ) => {
       const { seedId, depth, extraHops = 0, logDetails } = opts.data;
+
+      const urlsSplit = urls.split("\n\n");
 
       // if not always obeying scope and allowed to ignore scope, set to true
       const ignoreScope =
@@ -859,7 +861,7 @@ export class Crawler {
 
       await this.queueInScopeUrls({
         seedId,
-        urls: Array.from(urls),
+        urls: urlsSplit,
         depth,
         extraHops,
         pageUrl: page.url(),
