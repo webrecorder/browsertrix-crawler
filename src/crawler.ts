@@ -1428,11 +1428,15 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async markExcluded(data: QueueEntry | PageState, skipReason: SkippedReason) {
+  async markExcluded(
+    data: QueueEntry | PageState,
+    skipReason: SkippedReason,
+    ifNotPending = false,
+  ) {
     const { url, seedId, depth } = data;
-    await this.crawlState.markExcluded(url);
-
-    this.writeSkippedPage(url, seedId, depth, skipReason);
+    if (await this.crawlState.markExcluded(url, ifNotPending)) {
+      this.writeSkippedPage(url, seedId, depth, skipReason);
+    }
   }
 
   async pageFinished(data: PageState, lastErrorText = "") {

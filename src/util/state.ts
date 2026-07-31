@@ -1129,11 +1129,18 @@ return inx;
     );
   }
 
-  async markExcluded(url: string) {
-    await this.redis.hdel(this.pkey, url);
-    await this.redis.del(this.pkey + ":" + url);
+  async markExcluded(url: string, ifNotPending = false) {
+    // if expecting URL to not be pending, the del should return 0 (not removed), otherwise 1 (was pending)
+    const expectedPending = ifNotPending ? 0 : 1;
+    if ((await this.redis.hdel(this.pkey, url)) === expectedPending) {
+      await this.redis.del(this.pkey + ":" + url);
 
-    await this.redis.sadd(this.exKey, url);
+      await this.redis.sadd(this.exKey, url);
+
+      return true;
+    }
+
+    return false;
   }
 
   async incRateLimited(
