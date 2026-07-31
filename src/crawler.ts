@@ -374,6 +374,9 @@ export class Crawler {
     if (!redisUrl.startsWith("redis://")) {
       await logger.fatal(
         "stateStoreUrl must start with redis:// -- Only redis-based store currently supported",
+        {},
+        "config",
+        ExitCodes.InvalidConfig,
       );
     }
 

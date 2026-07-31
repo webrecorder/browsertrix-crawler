@@ -60,8 +60,8 @@ test("test invalid selector, crawl fails", async () => {
     status = (e as ErrorWithStatus).status;
   }
 
-  // logger fatal exit code
-  expect(status).toBe(17);
+  // logger invalid config exit code
+  expect(status).toBe(4);
 });
 
 test("test valid autoclick selector passes validation", async () => {
@@ -90,6 +90,6 @@ test("test invalid autoclick selector fails validation, crawl fails", async () =
     status = (e as ErrorWithStatus).status;
   }
 
-  // logger fatal exit code
-  expect(status).toBe(17);
+  // logger invalid config exit code
+  expect(status).toBe(4);
 });

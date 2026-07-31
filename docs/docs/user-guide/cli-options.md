@@ -113,7 +113,7 @@ Options:
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
    atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope",
-                                               "robots", "dedupe"] [default: []]
+                                     "robots", "dedupe", "config"] [default: []]
       --logExcludeContext                   Comma-separated list of contexts to
                                             NOT include in logs
   [array] [choices: "general", "worker", "recorder", "recorderNetwork", "writer"
@@ -121,7 +121,8 @@ Options:
   ", "originOverride", "healthcheck", "browser", "blocking", "behavior", "behavi
   orScript", "behaviorScriptCustom", "jsError", "fetch", "pageStatus", "memorySt
    atus", "crawlStatus", "links", "sitemap", "wacz", "replay", "proxy", "scope",
-       "robots", "dedupe"] [default: ["recorderNetwork","jsError","screencast"]]
+  "robots", "dedupe", "config"] [default: ["recorderNetwork","jsError","screenca
+                                                                           st"]]
       --text                                Extract initial (default) or final t
                                             ext to pages.jsonl or WARC resource
                                             record(s)
@@ -411,6 +412,9 @@ Options:
                                                       [boolean] [default: false]
   --shutdownWait            Shutdown browser in interactive after this many seco
                             nds, if no pings received      [number] [default: 0]
+  --postLoadDelay           If >0, amount of time to sleep (in seconds) after pa
+                            ge has loaded (only in automated mode)
+                                                           [number] [default: 0]
   --profile                 Path or HTTP(S) URL to tar.gz file which contains th
                             e browser profile directory   [string] [default: ""]
   --windowSize              Browser window dimensions, specified as: width,heigh

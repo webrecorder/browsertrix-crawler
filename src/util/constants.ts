@@ -82,6 +82,7 @@ export enum ExitCodes {
   Success = 0,
   GenericError = 1,
   OutOfSpace = 3,
+  InvalidConfig = 4,
   RedisUnavailable = 8,
   Failed = 9,
   BrowserCrashed = 10,
