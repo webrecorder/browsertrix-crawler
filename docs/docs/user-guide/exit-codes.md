@@ -7,6 +7,7 @@ The crawler uses following exit codes to indicate crawl result.
 | 0 | Success | Crawl completed normally |
 | 1 | GenericError | Unspecified error, check logs for more details |
 | 3 | OutOfSpace | Disk is already full |
+| 4 | InvalidConfig | A CLI argument or YAML config options is invalid, fatal (non-retryable) |
 | 8 | RedisUnavailable | Could not connect to the Redis instance for managing queues or deduplication |
 | 9 | Failed | Crawl failed unexpectedly, might be worth retrying |
 | 10 | BrowserCrashed | Browser used to fetch pages has crashed |
