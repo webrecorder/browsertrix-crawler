@@ -10,7 +10,7 @@ test("run crawl with invalid lang", () => {
   } catch (e) {
     status = (e as ErrorWithStatus).status;
   }
-  expect(status).toBe(17);
+  expect(status).toBe(4);
 });
 
 test("run crawl with valid lang", () => {

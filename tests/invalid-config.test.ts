@@ -1,30 +1,32 @@
 import { execSync } from "node:child_process";
+import { ErrorWithStatus } from "./utils";
 
 const INVALID_CONFIG = 4;
+
+// Note other invalid config options are tested in lang-code.test.ts and custom_selector.test.ts
 
 function runGetError(cmd: string) {
   let error = 0;
   try {
     execSync(cmd);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (e: any) {
-    error = e.status || 999;
+  } catch (e) {
+    error = (e as ErrorWithStatus).status;
   }
   return error;
 }
 
-test("invalid css selector ", async () => {
+test("invalid collection name ", async () => {
   expect(
     runGetError(
-      "docker run --rm webrecorder/browsertrix-crawler crawl --url https://example.com/ --selectLinks 'div[2]->body'",
+      "docker run --rm webrecorder/browsertrix-crawler crawl --url https://example.com/ --collection %foo#",
     ),
   ).toBe(INVALID_CONFIG);
 });
 
-test("click selector + restartsOnError not applicable here ", async () => {
+test("invalid device + restartsOnError not applicable here ", async () => {
   expect(
     runGetError(
-      "docker run --rm webrecorder/browsertrix-crawler crawl --url https://example.com/ --clickSelector 'div[3]' --restartsOnError",
+      "docker run --rm webrecorder/browsertrix-crawler crawl --url https://example.com/ --mobileDevice blah --restartsOnError",
     ),
   ).toBe(INVALID_CONFIG);
 });
