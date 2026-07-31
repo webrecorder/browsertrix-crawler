@@ -23,6 +23,7 @@ import {
   RATE_LIMIT_TTL_SECS,
   RateLimitRule,
   DEFAULT_MAX_RATE_LIMIT_RETRIES,
+  ExitCodes,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -867,6 +868,9 @@ class ArgParser {
     if (argv.collection.search(/^[\w][\w-]*$/) === -1) {
       void logger.fatal(
         `\n${argv.collection} is an invalid collection name. Please supply a collection name only using alphanumeric characters and the following characters [_ - ]\n`,
+        {},
+        "config",
+        ExitCodes.InvalidConfig,
       );
     }
 
@@ -877,9 +881,14 @@ class ArgParser {
         try {
           parser(argv.clickSelector);
         } catch (e) {
-          void logger.fatal("Invalid Autoclick CSS Selector", {
-            selector: argv.clickSelector,
-          });
+          void logger.fatal(
+            "Invalid Autoclick CSS Selector",
+            {
+              selector: argv.clickSelector,
+            },
+            "config",
+            ExitCodes.InvalidConfig,
+          );
         }
       }
 
@@ -910,7 +919,12 @@ class ArgParser {
         argv.mobileDevice.replace("-", " ")
       ];
       if (!argv.emulateDevice) {
-        void logger.fatal("Unknown device: " + argv.mobileDevice);
+        void logger.fatal(
+          "Unknown device: " + argv.mobileDevice,
+          {},
+          "config",
+          ExitCodes.InvalidConfig,
+        );
       }
     } else {
       argv.emulateDevice = { viewport: null };
@@ -922,6 +936,9 @@ class ArgParser {
       if (!ISO6391.validate(argv.lang)) {
         void logger.fatal(
           "Invalid ISO-639-1 country code for --lang: " + argv.lang,
+          {},
+          "config",
+          ExitCodes.InvalidConfig,
         );
       }
     }
@@ -938,9 +955,14 @@ class ArgParser {
         try {
           parser(selector);
         } catch (e) {
-          void logger.fatal("Invalid Link Extraction CSS Selector", {
-            selector,
-          });
+          void logger.fatal(
+            "Invalid Link Extraction CSS Selector",
+            {
+              selector,
+            },
+            "config",
+            ExitCodes.InvalidConfig,
+          );
         }
         return { selector, extract, isAttribute };
       });
@@ -951,7 +973,12 @@ class ArgParser {
     argv.selectLinks = selectLinks;
 
     if (isQA && !argv.qaSource) {
-      void logger.fatal("--qaSource required for QA mode");
+      void logger.fatal(
+        "--qaSource required for QA mode",
+        {},
+        "config",
+        ExitCodes.InvalidConfig,
+      );
     }
 
     // Resolve statsFilename
