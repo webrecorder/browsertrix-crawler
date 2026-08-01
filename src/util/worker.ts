@@ -349,9 +349,15 @@ export class PageWorker {
     let loggedWaiting = false;
 
     while (await this.crawler.isCrawlRunning()) {
-      await crawlState.processMessage(this.crawler.seeds, (data: QueueEntry) =>
-        this.crawler.markExcluded(data, SkippedReason.ExcludedMidCrawl, true),
-      );
+      crawlState
+        .processMessage(this.crawler.seeds, (data: QueueEntry) =>
+          this.crawler.markExcluded(data, SkippedReason.ExcludedMidCrawl, true),
+        )
+        .catch(() =>
+          logger.debug(
+            "Error processing redis messages, will try again next time",
+          ),
+        );
 
       const data = await crawlState.nextFromQueue();
 
