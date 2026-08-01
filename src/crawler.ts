@@ -2023,7 +2023,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     // If any redis messages exist (eg. new exclusions to add/remove), process before starting crawl
     await this.crawlState.processMessage(this.seeds, (data: QueueEntry) =>
-      this.markExcluded(data, SkippedReason.ExcludedMidCrawl, true),
+      this.markExcluded(data, SkippedReason.ExcludedMidCrawl),
     );
 
     // --------------

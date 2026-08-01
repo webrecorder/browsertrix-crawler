@@ -351,7 +351,7 @@ export class PageWorker {
     while (await this.crawler.isCrawlRunning()) {
       crawlState
         .processMessage(this.crawler.seeds, (data: QueueEntry) =>
-          this.crawler.markExcluded(data, SkippedReason.ExcludedMidCrawl, true),
+          this.crawler.markExcluded(data, SkippedReason.ExcludedMidCrawl),
         )
         .catch(() =>
           logger.debug(
