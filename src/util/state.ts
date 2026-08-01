@@ -1367,7 +1367,7 @@ return inx;
             try {
               await this.filterQueue(regex, markExcluded);
               // should be at front of list and deleted right away
-              await this.redis.lrem(`${this.uid}:msg`, result, 1);
+              await this.redis.lrem(`${this.uid}:msg`, 1, result);
               logger.debug(
                 "Done filtering queue for exclusion",
                 { type, regex },
