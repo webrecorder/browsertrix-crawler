@@ -1347,8 +1347,7 @@ return inx;
     markExcluded: (data: QueueEntry) => Promise<void>,
   ) {
     while (true) {
-      // peek at first element
-      const result = await this.redis.lindex(`${this.uid}:msg`, 0);
+      const result = await this.redis.lpop(`${this.uid}:msg`);
       if (!result) {
         return;
       }
@@ -1371,15 +1370,14 @@ return inx;
                 { type, regex },
                 "exclusion",
               );
-              break;
             } catch (e) {
               logger.warn(
                 "filtering queue error, exclusion not removed",
                 e,
                 "exclusion",
               );
-              break;
             }
+            break;
 
           case "removeExclusion":
             logger.debug("Remove Exclusion", { type, regex }, "exclusion");
@@ -1391,8 +1389,6 @@ return inx;
             }
             break;
         }
-        // should be at front of list and deleted right away
-        await this.redis.lrem(`${this.uid}:msg`, 1, result);
       } catch (e) {
         logger.warn("Error processing message", e, "redis");
       }
