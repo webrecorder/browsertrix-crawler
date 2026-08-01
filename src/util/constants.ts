@@ -31,6 +31,7 @@ export const DUPE_CANCELED_CRAWLS = "canceledcrawls";
 export enum BxFunctionBindings {
   BehaviorLogFunc = "__bx_log",
   AddLinkFunc = "__bx_addLink",
+  AddLinkBatchFunc = "__bx_addLinkBatch",
   FetchFunc = "__bx_fetch",
   AddToSeenSet = "__bx_addSet",
 
