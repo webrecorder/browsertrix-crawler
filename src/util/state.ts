@@ -1347,7 +1347,8 @@ return inx;
     markExcluded: (data: QueueEntry) => Promise<void>,
   ) {
     while (true) {
-      const result = await this.redis.lpop(`${this.uid}:msg`);
+      // peek at first element
+      const result = await this.redis.lindex(`${this.uid}:msg`, 0);
       if (!result) {
         return;
       }
@@ -1362,13 +1363,25 @@ return inx;
             for (const seed of seeds) {
               seed.addExclusion(regex);
             }
-            // can happen async w/o slowing down crawling
-            // each page is still checked if in scope before crawling, even while
-            // queue is being filtered
-            this.filterQueue(regex, markExcluded).catch((e) =>
-              logger.warn("filtering queue error", e, "exclusion"),
-            );
-            break;
+
+            try {
+              await this.filterQueue(regex, markExcluded);
+              // should be at front of list and deleted right away
+              await this.redis.lrem(`${this.uid}:msg`, result, 1);
+              logger.debug(
+                "Done filtering queue for exclusion",
+                { type, regex },
+                "exclusion",
+              );
+              break;
+            } catch (e) {
+              logger.warn(
+                "filtering queue error, exclusion not removed",
+                e,
+                "exclusion",
+              );
+              return;
+            }
 
           case "removeExclusion":
             logger.debug("Remove Exclusion", { type, regex }, "exclusion");
