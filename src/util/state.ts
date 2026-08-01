@@ -1378,7 +1378,7 @@ return inx;
                 e,
                 "exclusion",
               );
-              return;
+              break;
             }
 
           case "removeExclusion":
