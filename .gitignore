@@ -10,3 +10,4 @@ dist
 scratch/
 venv/
 docs/venv/
+/.yarn/install-state.gz
