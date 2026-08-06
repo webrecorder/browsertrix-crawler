@@ -1198,11 +1198,16 @@ return inx;
   }
 
   recheckScope(data: QueueEntry, seeds: ScopedSeed[]) {
-    const seed = seeds[data.seedId];
-
     const { url, depth, extraHops } = data;
 
-    return seed.isIncluded({ url, depth, extraHops });
+    for (const seed of seeds) {
+      const res = seed.isIncluded({ url, depth, extraHops });
+      if (res) {
+        return res;
+      }
+    }
+
+    return false;
   }
 
   async isFinished() {

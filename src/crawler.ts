@@ -796,7 +796,19 @@ export class Crawler {
   }
 
   protected getScope(seedId: number, link: LinkEntry, logDetails: LogDetails) {
-    return this.seeds[seedId].isIncluded(link, logDetails);
+    // Try this particular seed first
+    const res = this.seeds[seedId].isIncluded(link, logDetails);
+    if (res) {
+      return res;
+    }
+    // If no match, check if link is in scope for any seed in the crawl
+    for (const seed of this.seeds) {
+      const res = seed.isIncluded(link, logDetails);
+      if (res) {
+        return res;
+      }
+    }
+    return false;
   }
 
   async isInScope(
