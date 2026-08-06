@@ -859,6 +859,11 @@ export class Crawler {
       const ignoreScope =
         !alwaysObeyScope && this.params.alwaysAddBehaviorLinks;
 
+      logger.info("Adding URLs as a batch", {
+        urls: urlsSplit,
+        pageUrl: page.url(),
+      });
+
       await this.queueInScopeUrls({
         seedId,
         urls: urlsSplit,
