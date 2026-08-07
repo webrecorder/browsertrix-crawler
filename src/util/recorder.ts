@@ -584,8 +584,11 @@ export class Recorder extends EventEmitter {
       return;
     }
 
-    if (this.shouldSaveStorage && url === this.finalPageUrl) {
-      await this.saveStorage(reqresp, cdp);
+    if (url === this.finalPageUrl) {
+      if (this.shouldSaveStorage) {
+        await this.saveStorage(reqresp, cdp);
+      }
+      await this.saveDetectedContentType(reqresp, cdp);
     }
 
     try {
@@ -596,6 +599,25 @@ export class Recorder extends EventEmitter {
         { url, ...formatErr(e) },
         "recorder",
       );
+    }
+  }
+
+  async saveDetectedContentType(reqresp: RequestResponseInfo, cdp: CDPSession) {
+    try {
+      const { result } = await cdp.send("Runtime.evaluate", {
+        expression:
+          '`${document.contentType}; charset="${document.characterSet}"`',
+        returnByValue: true,
+      });
+
+      const contentType = result.value;
+
+      // only save charset if its not the default UTF-8
+      if (contentType && contentType !== 'text/html; charset="UTF-8"') {
+        reqresp.detectedCT = contentType;
+      }
+    } catch (e) {
+      logger.warn("Error getting detected content-type", e, "recorder");
     }
   }
 
@@ -1970,6 +1992,13 @@ export class Recorder extends EventEmitter {
       modified = true;
     }
 
+    if (reqresp.detectedCT) {
+      responseRecord.warcHeaders.headers.set(
+        "WARC-Identified-Payload-Type",
+        reqresp.detectedCT,
+      );
+    }
+
     if (modified) {
       serializer.warcHeadersBuff = encoder.encode(
         responseRecord.warcHeaders.toString(),
@@ -2356,6 +2385,10 @@ function createResponse(
 
   if (Object.keys(reqresp.extraOpts).length) {
     warcHeaders["WARC-JSON-Metadata"] = JSON.stringify(reqresp.extraOpts);
+  }
+
+  if (reqresp.detectedCT) {
+    warcHeaders["WARC-Identified-Payload-Type"] = reqresp.detectedCT;
   }
 
   if (!contentIter) {
