@@ -1,7 +1,7 @@
 import { Redis, Result, Callback, type ChainableCommander } from "ioredis";
 import { v4 as uuidv4 } from "uuid";
 
-import { logger } from "./logger.js";
+import { formatErr, logger } from "./logger.js";
 
 import {
   MAX_DEPTH,
@@ -299,11 +299,21 @@ export class RedisDedupeIndex {
         index,
       );
       if (!waczdata) {
+        logger.warn(
+          "Invalid WACZ index, WARC-Refers-To-Container will not be set",
+          { crawlId, index },
+          "state",
+        );
         return "";
       }
       const { filename } = JSON.parse(waczdata);
       return filename;
-    } catch (_) {
+    } catch (e) {
+      logger.warn(
+        "Error getting WACZ index, WARC-Refers-To-Container will not be set",
+        { crawlId, index, ...formatErr(e) },
+        "state",
+      );
       return "";
     }
   }
