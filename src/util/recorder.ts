@@ -606,14 +606,14 @@ export class Recorder extends EventEmitter {
     try {
       const { result } = await cdp.send("Runtime.evaluate", {
         expression:
-          '`${document.contentType}; charset="${document.characterSet}"`',
+          "`${document.contentType}; charset=${document.characterSet}`",
         returnByValue: true,
       });
 
       const contentType = result.value;
 
       // only save charset if its not the default UTF-8
-      if (contentType && contentType !== 'text/html; charset="UTF-8"') {
+      if (contentType && contentType !== "text/html; charset=UTF-8") {
         reqresp.detectedCT = contentType;
       }
     } catch (e) {
