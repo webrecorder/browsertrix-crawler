@@ -1,7 +1,7 @@
 import child_process from "child_process";
 import fs from "fs";
 import path from "path";
-import { WARCParser } from "warcio";
+import { WARCParser, WARCRecord } from "warcio";
 
 const PDF = "https://specs.webrecorder.net/wacz/1.1.1/wacz-2021.pdf";
 const PDF_HTTP = PDF.replace("https", "http");
@@ -169,4 +169,36 @@ test("XML: check that CDX contains one xml 200, one 301 and one 200, two pageinf
 
   expect(cdxj[5].url).toBe("urn:pageinfo:" + XML_REDIR);
   expect(cdxj[5].mime).toBe("application/json");
+});
+
+// the revisit record is after a redirect in browser, so is loaded in browser, and will have the
+// WARC-Identified-Payload-Type, while the original was loaded directly
+test("XML: check that revisit record has WARC-Identified-Payload-Type", async () => {
+  const archiveWarcLists = fs.readdirSync(
+    "test-crawls/collections/crawl-xml/archive",
+  );
+
+  const warcName = path.join(
+    "test-crawls/collections/crawl-xml/archive",
+    archiveWarcLists[0],
+  );
+
+  const nodeStream = fs.createReadStream(warcName);
+
+  const parser = new WARCParser(nodeStream);
+
+  let matchedRecord: WARCRecord | null = null;
+
+  for await (const record of parser) {
+    if (record.warcType === "revisit") {
+      matchedRecord = record;
+      break;
+    }
+  }
+
+  expect(matchedRecord).not.toBeNull();
+  expect(matchedRecord!.warcTargetURI).toBe(XML);
+  expect(matchedRecord!.warcHeader("WARC-Identified-Payload-Type")).toBe(
+    "application/rss+xml; charset=UTF-8",
+  );
 });
