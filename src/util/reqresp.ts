@@ -34,6 +34,7 @@ export class RequestResponseInfo {
   protocols: string[] = [];
 
   mimeType?: string;
+  detectedCT?: string;
 
   // request data
   requestHeaders?: Record<string, string>;
