@@ -1284,6 +1284,7 @@ return inx;
         "state",
       );
     } else {
+      await this.addSourceWACZForDedupe(this.waczFilename);
       logger.debug(
         "Using New WACZ Filename",
         { filename: this.waczFilename },

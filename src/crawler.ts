@@ -1929,10 +1929,7 @@ self.__bx_behaviors.selectMainBehavior();
       this.params.generateWACZ &&
       (this.storage || this.isExternalDedupeStore)
     ) {
-      const filename = await this.crawlState.setWACZFilename();
-      if (this.isExternalDedupeStore) {
-        await this.crawlState.addSourceWACZForDedupe(filename);
-      }
+      await this.crawlState.setWACZFilename();
     }
     if (this.isExternalDedupeStore) {
       await this.crawlState.addCrawlForDedupe();
