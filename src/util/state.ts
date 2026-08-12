@@ -1,7 +1,7 @@
 import { Redis, Result, Callback, type ChainableCommander } from "ioredis";
 import { v4 as uuidv4 } from "uuid";
 
-import { logger } from "./logger.js";
+import { formatErr, logger } from "./logger.js";
 
 import {
   MAX_DEPTH,
@@ -299,11 +299,21 @@ export class RedisDedupeIndex {
         index,
       );
       if (!waczdata) {
+        logger.warn(
+          "Invalid WACZ index, WARC-Refers-To-Container will not be set",
+          { crawlId, index },
+          "state",
+        );
         return "";
       }
       const { filename } = JSON.parse(waczdata);
       return filename;
-    } catch (_) {
+    } catch (e) {
+      logger.warn(
+        "Error getting WACZ index, WARC-Refers-To-Container will not be set",
+        { crawlId, index, ...formatErr(e) },
+        "state",
+      );
       return "";
     }
   }
@@ -854,8 +864,6 @@ export class RedisCrawlState extends RedisDedupeIndex {
 
   sitemapDoneKey: string;
 
-  waczFilename: string | null = null;
-
   includedCrawls: Set<string> = new Set<string>();
 
   rateLimitTTL: number;
@@ -1265,44 +1273,50 @@ return inx;
   }
 
   async setWACZFilename(): Promise<string> {
-    const filename = process.env.STORE_FILENAME || "@ts-@id.wacz";
-    this.waczFilename = interpolateFilename(filename, this.crawlId);
-    if (
-      !(await this.redis.hsetnx(
-        `${this.crawlId}:nextWacz`,
-        this.uid,
-        this.waczFilename,
-      ))
-    ) {
-      this.waczFilename = await this.redis.hget(
-        `${this.crawlId}:nextWacz`,
-        this.uid,
+    const filenameTemplate = process.env.STORE_FILENAME || "@ts-@id.wacz";
+    const crawlId = this.crawlId;
+    const filename = interpolateFilename(filenameTemplate, crawlId);
+    if (!(await this.redis.hsetnx(`${crawlId}:nextWacz`, this.uid, filename))) {
+      this.dedupeCurrFilename =
+        (await this.redis.hget(`${crawlId}:nextWacz`, this.uid)) || "";
+
+      this.dedupeKeyIndex = Number(
+        (await this.redis.hget(`${crawlId}:nextWaczIndex`, this.uid)) || 0,
       );
+
       logger.debug(
         "Keeping WACZ Filename",
-        { filename: this.waczFilename },
+        { filename, index: this.dedupeKeyIndex },
         "state",
       );
     } else {
+      await this.addSourceWACZForDedupe(filename);
+
+      await this.redis.hset(
+        `${crawlId}:nextWaczIndex`,
+        this.uid,
+        this.dedupeKeyIndex,
+      );
+
       logger.debug(
         "Using New WACZ Filename",
-        { filename: this.waczFilename },
+        { filename, index: this.dedupeKeyIndex },
         "state",
       );
     }
-    return this.waczFilename!;
+    return filename;
   }
 
   async getWACZFilename(): Promise<string> {
-    if (!this.waczFilename) {
+    if (!this.dedupeCurrFilename) {
       return await this.setWACZFilename();
     }
-    return this.waczFilename;
+    return this.dedupeCurrFilename;
   }
 
   async clearWACZFilename(): Promise<void> {
     await this.redis.hdel(`${this.crawlId}:nextWacz`, this.uid);
-    this.waczFilename = null;
+    this.dedupeCurrFilename = "";
 
     await this.redis.del(`${this.uid}:duperef`);
   }
