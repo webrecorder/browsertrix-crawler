@@ -2161,11 +2161,11 @@ self.__bx_behaviors.selectMainBehavior();
       const wacz = await this.generateWACZ();
 
       if (wacz) {
-        await this.crawlState.clearWACZFilename();
-
         if (this.isExternalDedupeStore) {
           await this.crawlState.updateDedupeSourceWACZ(wacz);
         }
+
+        await this.crawlState.clearWACZFilename();
 
         if (this.storage && this.uploadAndDeleteLocal) {
           // set to delete before exit, but after uploading profile, if saving profile
