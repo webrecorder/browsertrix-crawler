@@ -88,7 +88,7 @@ function loadDataPackageRelated(name: string) {
   return dataPackageJSON.relation;
 }
 
-async function redisGetHash(key: string, db = 0) {
+async function initRedis(db = 0) {
   const redis = new Redis(`redis://127.0.0.1:37379/${db}`, {
     lazyConnect: true,
     retryStrategy: () => null,
@@ -98,16 +98,16 @@ async function redisGetHash(key: string, db = 0) {
 
   await redis.connect();
 
-  return await redis.hgetall(key);
+  return redis;
 }
 
 async function checkSizeStats(
+  redis: Redis,
   numUniq: number,
   key: string,
-  db: number,
   minSize: number,
 ) {
-  const result = await redisGetHash(key, db);
+  const result = await redis.hgetall(key);
   console.log(result);
   expect(numUniq).toBeLessThan(Number(result.totalUrls));
 
@@ -162,7 +162,9 @@ test("check revisit records written on duplicate crawl, same collection, no wacz
 
   numResponses = response;
 
-  await checkSizeStats(numResponses, "allcounts", 0, 77000);
+  const redis = await initRedis(0);
+
+  await checkSizeStats(redis, numResponses, "allcounts", 77000);
 });
 
 test("dedupe same collection, with wacz, no external waczs referenced", async () => {
@@ -173,6 +175,16 @@ test("dedupe same collection, with wacz, no external waczs referenced", async ()
   const related = loadDataPackageRelated(collName);
 
   expect(related).toBe(undefined);
+
+  const redis = await initRedis(0);
+
+  const waczList = await redis.lrange(`c:${collName}:wacz`, 0, -1);
+  expect(waczList.length).toBe(1);
+
+  const parts = JSON.parse(waczList[0]);
+  expect(parts.filename).toBe("dedupe-test-same-coll.wacz");
+  expect(parts.hash).toBeDefined();
+  expect(parts.size).toBeInstanceOf(Number);
 });
 
 test("check revisit records written on duplicate crawl, different collections, with wacz", async () => {
@@ -219,7 +231,9 @@ test("check revisit records written on duplicate crawl, different collections, w
 
   numResponses = response;
 
-  sizeSaved = await checkSizeStats(numResponses, "allcounts", 1, 48400000);
+  const redis = await initRedis(1);
+
+  sizeSaved = await checkSizeStats(redis, numResponses, "allcounts", 48400000);
 });
 
 test("import dupe index, orig then revisits, from single wacz", async () => {
@@ -227,14 +241,7 @@ test("import dupe index, orig then revisits, from single wacz", async () => {
     `docker run -v $PWD/test-crawls:/crawls --network=dedupe webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedupe-test-orig/dedupe-test-orig.wacz --sourceCrawlId dedupe-test-orig --redisDedupeUrl redis://dedupe-redis:6379/2`,
   );
 
-  const redis = new Redis("redis://127.0.0.1:37379/2", {
-    lazyConnect: true,
-    retryStrategy: () => null,
-  });
-
-  redis.options.maxRetriesPerRequest = 50;
-
-  await redis.connect();
+  await initRedis(2);
 });
 
 test("verify new crawl against imported dupe index has same dupes as dedupe against original", async () => {
@@ -260,7 +267,9 @@ test("verify new crawl against imported dupe index has same dupes as dedupe agai
   // matches same number of revisits as original
   expect(revisit).toBe(numResponses);
 
-  await checkSizeStats(numResponses, "allcounts", 2, 48400000);
+  const redis = await initRedis(2);
+
+  await checkSizeStats(redis, numResponses, "allcounts", 48400000);
 });
 
 test("import dupe index from json, reverse, revisits than orig, from wacz", async () => {
@@ -294,21 +303,14 @@ test("import dupe index from json, reverse, revisits than orig, from wacz", asyn
     `docker run -v $PWD/test-crawls:/crawls --network=dedupe webrecorder/browsertrix-crawler indexer --sourceUrl /crawls/collections/dedupe-test-dupe/import-1.json --redisDedupeUrl redis://dedupe-redis:6379/3`,
   );
 
-  const redis = new Redis("redis://127.0.0.1:37379/3", {
-    lazyConnect: true,
-    retryStrategy: () => null,
-  });
-
-  redis.options.maxRetriesPerRequest = 50;
-
-  await redis.connect();
+  const redis = await initRedis(3);
 
   expect(await redis.hlen("alldupes")).toBe(numResponses);
 
   const sizeSavedImport = await checkSizeStats(
+    redis,
     numResponses,
     "allcounts",
-    3,
     48400000,
   );
 
