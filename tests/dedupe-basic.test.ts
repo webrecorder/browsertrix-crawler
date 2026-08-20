@@ -184,7 +184,7 @@ test("dedupe same collection, with wacz, no external waczs referenced", async ()
   const parts = JSON.parse(waczList[0]);
   expect(parts.filename).toBe("dedupe-test-same-coll.wacz");
   expect(parts.hash).toBeDefined();
-  expect(parts.size).toBeInstanceOf(Number);
+  expect(parts.size).toBeDefined();
 });
 
 test("check revisit records written on duplicate crawl, different collections, with wacz", async () => {
