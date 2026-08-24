@@ -7,6 +7,13 @@
         flex-direction: row;
         flex-wrap: wrap;
       }
+      #currentUrl {
+        margin: 1rem 2rem 0;
+        font: 14px sans-serif;
+      }
+      #currentUrl a {
+        word-break: break-all;
+      }
       #content img {
         width: 640px;
         height: 480px;
@@ -37,6 +44,7 @@
             break;
 
           case "screencast":
+            setCurrentUrl(resp.url);
             img = createImage(resp.id);
             if (resp.data) {
               setImageData(img, resp.data);
@@ -52,6 +60,23 @@
       function setImageData(img, data) {
         //img.style.display = "";
         img.src = "data:image/png;base64," + data;
+      }
+
+      function setCurrentUrl(url) {
+        const elem = document.getElementById("currentUrl");
+        if (!elem) {
+          return;
+        }
+        elem.replaceChildren();
+        if (!url) {
+          return;
+        }
+        const link = document.createElement("a");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = url;
+        elem.appendChild(link);
       }
 
       function createImage(id) {
@@ -83,6 +108,7 @@
     </script>
     <head>
       <body>
+        <div id="currentUrl"></div>
         <div id="content"></div>
       </body>
     </head>
