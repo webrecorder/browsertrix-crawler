@@ -35,8 +35,11 @@
           case "init":
             if (resp.width && resp.height) {
               try {
-                self.document.styleSheets[0].rules[1].style.width = resp.width + "px";
-                self.document.styleSheets[0].rules[1].style.height = resp.height + "px";
+                const contentImgRule = Array.from(self.document.styleSheets[0].cssRules).find((rule) => rule.selectorText === "#content img");
+                if (contentImgRule) {
+                  contentImgRule.style.width = resp.width + "px";
+                  contentImgRule.style.height = resp.height + "px";
+                }
               } catch (e) {
                 console.log("Error adjusting stylesheet: ", e);
               }
