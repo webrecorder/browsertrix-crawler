@@ -1,7 +1,8 @@
 import fs from "fs";
 import { ExecException, execSync } from "child_process";
 
-// disable pending brave issue
+// disable pending brave issue: https://github.com/brave/brave-browser/issues/58320
+// will reenable if/when that is resolved, unless current behavior is by design going forward
 
 xtest("check that gclid query URL is automatically redirected to remove it", async () => {
   try {
@@ -41,5 +42,6 @@ xtest("check that gclid query URL is automatically redirected to remove it", asy
     }
   }
 
-  expect(redirectFound && responseFound).toBe(true);
+  expect(redirectFound).toBe(true);
+  expect(responseFound).toBe(true);
 });
