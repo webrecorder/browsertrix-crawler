@@ -1807,7 +1807,9 @@ self.__bx_behaviors.selectMainBehavior();
 
   gracefulFinishOnInterrupt(interruptReason: InterruptReason) {
     this.interruptReason = interruptReason;
-    logger.info("Crawler interrupted, gracefully finishing current pages");
+    logger.info(
+      `Crawler interrupted: (reason: ${interruptReason}), gracefully finishing current pages`,
+    );
     if (!this.params.waitOnDone && !this.params.restartsOnError) {
       this.finalExit = true;
     }
