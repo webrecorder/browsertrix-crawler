@@ -232,7 +232,10 @@ export class Recorder extends EventEmitter {
     });
 
     await cdp.send("Fetch.enable", {
-      patterns: [{ urlPattern: "*", requestStage: "Response" }],
+      patterns: [
+        { urlPattern: "*", requestStage: "Response" },
+        { requestStage: "Request", resourceType: "Fetch" },
+      ],
     });
 
     // Response
@@ -668,6 +671,14 @@ export class Recorder extends EventEmitter {
 
     let continued = false;
 
+    // response is either responseStatusCode or responseErrorReason are set
+    const isResponse = responseStatusCode || responseErrorReason;
+
+    if (!isResponse && networkId) {
+      await this.handleFetchRequest(networkId, requestId, cdp);
+      return;
+    }
+
     try {
       if (
         responseStatusCode &&
@@ -707,6 +718,37 @@ export class Recorder extends EventEmitter {
         );
       }
     }
+  }
+
+  async handleFetchRequest(
+    networkId: string,
+    requestId: string,
+    cdp: CDPSession,
+  ) {
+    const reqresp = this.pendingReqResp(networkId, true);
+
+    if (
+      reqresp &&
+      reqresp.priority === "Low" &&
+      reqresp.resourceType === "fetch"
+    ) {
+      if (await this.isDupeFetch(reqresp)) {
+        this.removeReqResp(networkId);
+        await cdp.send("Fetch.failRequest", {
+          requestId,
+          errorReason: "Aborted",
+        });
+        logger.debug(
+          "Aborted dupe low-priority fetch in request phase",
+          { url: reqresp.url },
+          "recorder",
+        );
+        return false;
+      }
+    }
+
+    await cdp.send("Fetch.continueRequest", { requestId });
+    return true;
   }
 
   async handleFetchResponse(

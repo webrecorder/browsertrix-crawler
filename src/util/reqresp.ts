@@ -43,6 +43,8 @@ export class RequestResponseInfo {
   postData?: string;
   hasPostData: boolean = false;
 
+  priority?: string;
+
   // content-encoding is preserved, eg. payload is still encoded
   cePreserved = false;
 
@@ -127,6 +129,7 @@ export class RequestResponseInfo {
     if (resourceType) {
       this.resourceType = resourceType.toLowerCase();
     }
+    this.priority = request.initialPriority;
   }
 
   fillResponse(response: Protocol.Network.Response, resourceType?: string) {
