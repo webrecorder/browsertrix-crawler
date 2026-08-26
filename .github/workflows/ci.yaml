@@ -54,7 +54,9 @@ jobs:
           python-version: 3.x
 
       - name: install requirements
-        run: sudo yarn install
+        run: |
+          yarn config set enableGlobalCache true
+          sudo yarn install
 
       - name: build js
         run: sudo yarn run tsc
