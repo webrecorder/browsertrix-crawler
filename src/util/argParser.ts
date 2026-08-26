@@ -904,7 +904,6 @@ class ArgParser {
         }
       });
       behaviorOpts.log = BxFunctionBindings.BehaviorLogFunc;
-      behaviorOpts.startEarly = true;
       behaviorOpts.clickSelector = argv.clickSelector;
       argv.behaviorOpts = JSON.stringify(behaviorOpts);
     } else {
