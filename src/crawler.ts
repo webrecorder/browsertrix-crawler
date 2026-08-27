@@ -18,6 +18,7 @@ import { CrawlerArgs, parseArgs } from "./util/argParser.js";
 import yaml from "js-yaml";
 
 import { WACZ, WACZInitOpts, mergeCDXJ } from "./util/wacz.js";
+import Redis from "ioredis";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
@@ -200,6 +201,8 @@ export class Crawler {
   proxyServer?: string;
   proxyPacUrl?: string;
 
+  redis: Redis | null = null;
+
   driver:
     | ((opts: {
         page: Page;
@@ -380,7 +383,7 @@ export class Crawler {
       );
     }
 
-    const redis = await initRedisWaitForSuccess(redisUrl);
+    this.redis = await initRedisWaitForSuccess(redisUrl);
 
     logger.debug(
       `Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`,
@@ -388,7 +391,7 @@ export class Crawler {
       "state",
     );
 
-    let dedupeRedis = redis;
+    let dedupeRedis = this.redis;
 
     if (redisUrl !== dedupeRedisUrl) {
       dedupeRedis = await initRedisWaitForSuccess(dedupeRedisUrl);
@@ -397,7 +400,7 @@ export class Crawler {
     logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
 
     this.crawlState = new RedisCrawlState(
-      redis,
+      this.redis,
       this.crawlId,
       this.maxPageTime,
       os.hostname(),
@@ -506,6 +509,13 @@ export class Crawler {
       stdio: redisStdio,
       detached: RUN_DETACHED,
     });
+  }
+
+  protected getRedis(): Redis {
+    if (!this.redis) {
+      throw new Error("Redis not initialized");
+    }
+    return this.redis;
   }
 
   async bootstrap() {
