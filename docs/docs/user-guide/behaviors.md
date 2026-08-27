@@ -236,7 +236,7 @@ class MyBehavior
   // if defined, the crawler will await 'awaitPageLoad()' before moving on to
   // post-crawl processing operations, including link extraction, screenshots,
   // and running main behavior
-  async awaitPageLoad() {
+  async awaitPageLoad(ctx) {
 
   }
 
