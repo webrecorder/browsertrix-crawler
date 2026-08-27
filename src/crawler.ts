@@ -18,7 +18,7 @@ import { CrawlerArgs, parseArgs } from "./util/argParser.js";
 import yaml from "js-yaml";
 
 import { WACZ, WACZInitOpts, mergeCDXJ } from "./util/wacz.js";
-import Redis from 'ioredis';
+import Redis from "ioredis";
 
 import { HealthChecker } from "./util/healthcheck.js";
 import { TextExtractViaSnapshot } from "./util/textextract.js";
@@ -200,7 +200,7 @@ export class Crawler {
 
   proxyServer?: string;
   proxyPacUrl?: string;
-  
+
   redis: Redis | null = null;
 
   driver:
@@ -510,13 +510,13 @@ export class Crawler {
       detached: RUN_DETACHED,
     });
   }
-  
+
   protected getRedis(): Redis {
-      if (!this.redis) {
-        throw new Error("Redis not initialized");
-      }
-      return this.redis;
+    if (!this.redis) {
+      throw new Error("Redis not initialized");
     }
+    return this.redis;
+  }
 
   async bootstrap() {
     // check first before disk space check, in case this clears up disk space
