@@ -2030,6 +2030,7 @@ self.__bx_behaviors.selectMainBehavior();
       headless: this.params.headless,
       emulateDevice: this.emulateDevice,
       swOpt: this.params.serviceWorker,
+      browserStartTimeout: this.params.browserStartTimeout,
       chromeOptions: {
         proxyServer: this.proxyServer,
         proxyPacUrl: this.proxyPacUrl,

@@ -48,6 +48,11 @@ export const FETCH_HEADERS_TIMEOUT_SECS = 30;
 export const PAGE_OP_TIMEOUT_SECS = 5;
 export const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
 
+// time to wait (in seconds) for the browser process to start and the
+// devtools connection to be established before puppeteer.launch() times out.
+// can be raised via --browserStartTimeout on hosts where browser startup is slow.
+export const BROWSER_STARTUP_TIMEOUT_SECS = 30;
+
 export const ROBOTS_CACHE_LIMIT = 100;
 
 // max JS dialogs (alert/prompt) to allow per page
