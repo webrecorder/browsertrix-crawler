@@ -1590,9 +1590,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     const details: LogDetails = { frameUrl, isTopFrame, ...logDetails };
 
-    if (!frameUrl || frame.detached) {
+    if (!frameUrl || frame.detached || frameUrl.startsWith("chrome-error://")) {
       logger.debug(
-        "Run Behaviors Skipped, frame no longer attached or has no URL",
+        "Run Behaviors Skipped, frame no longer attached or has no valid URL",
         details,
       );
       return false;
@@ -1638,8 +1638,16 @@ self.__bx_behaviors.selectMainBehavior();
     frames: Frame[],
     logDetails: LogDetails,
   ) {
+    const newFrames: Promise<boolean>[] = [];
+
+    const attachIframe = (frame: Frame) => {
+      newFrames.push(this.runBehaviorsInFrame(frame, logDetails));
+    };
+
     try {
       frames = frames || page.frames();
+
+      page.on("framenavigated", attachIframe);
 
       logger.debug(
         "Running behaviors",
@@ -1651,22 +1659,21 @@ self.__bx_behaviors.selectMainBehavior();
         "behavior",
       );
 
-      const newFrames: Promise<boolean>[] = [];
-
-      const attachIframe = (frame: Frame) => {
-        newFrames.push(this.runBehaviorsInFrame(frame, logDetails));
-      };
-
-      page.on("framenavigated", attachIframe);
-
       let results = await Promise.allSettled(
         frames.map((frame) => this.runBehaviorsInFrame(frame, logDetails)),
       );
 
-      page.off("framenavigated", attachIframe);
+      let newFrameResults: PromiseSettledResult<boolean>[] = [];
+      let lastNewFrameResults = 0;
 
-      if (newFrames.length) {
-        results = [...results, ...(await Promise.allSettled(newFrames))];
+      // if new frames have been found, ensure all promises resolve
+      while (lastNewFrameResults < newFrames.length) {
+        newFrameResults = await Promise.allSettled(newFrames);
+        lastNewFrameResults = newFrameResults.length;
+      }
+
+      if (newFrameResults.length) {
+        results = [...results, ...newFrameResults];
       }
 
       for (const res of results) {
@@ -1693,6 +1700,8 @@ self.__bx_behaviors.selectMainBehavior();
         "behavior",
       );
       return false;
+    } finally {
+      page.off("framenavigated", attachIframe);
     }
   }
 
