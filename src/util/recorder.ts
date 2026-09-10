@@ -35,6 +35,7 @@ import {
   STATUS_CONNECTION_ERROR,
   WARC_REFERS_TO_CONTAINER,
   STATUS_DNS_ERROR,
+  PAGE_OP_TIMEOUT_SECS,
 } from "./constants.js";
 import { Readable } from "stream";
 import { createHash } from "crypto";
@@ -1231,8 +1232,11 @@ export class Recorder extends EventEmitter {
         this.removeReqResp(requestId);
         await this.serializeToWARC(reqresp);
         // else, request likely has been sent but no request received
-        // drop it and don't wait any further
-      } else {
+        // drop it and don't wait any further if request is at least 10 seconds old
+      } else if (
+        Date.now() - reqresp.ts.getTime() >
+        PAGE_OP_TIMEOUT_SECS * 2 * 1000
+      ) {
         logger.debug(
           "Removing empty request that was never fetched",
           { requestId, url: reqresp.url, ...this.logDetails },
@@ -1252,6 +1256,7 @@ export class Recorder extends EventEmitter {
     ) {
       const pending = [];
       for (const [requestId, reqresp] of this.pendingRequests.entries()) {
+        pending.push(reqresp.toJSON());
         if (reqresp.unchangedSizeCount() >= PENDING_UNCHANGED_COUNT) {
           if (reqresp.currSize) {
             logger.debug(
@@ -1266,7 +1271,6 @@ export class Recorder extends EventEmitter {
           }
           this.removeReqResp(requestId);
         }
-        pending.push(reqresp.toJSON());
       }
 
       logger.debug(
@@ -1274,7 +1278,7 @@ export class Recorder extends EventEmitter {
         { numPending, pending, ...this.logDetails },
         "recorder",
       );
-      await sleep(5.0);
+      await sleep(PAGE_OP_TIMEOUT_SECS);
       numPending = this.pendingRequests.size;
     }
 
