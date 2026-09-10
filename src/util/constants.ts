@@ -39,6 +39,8 @@ export enum BxFunctionBindings {
   NextFlowStep = "__bx_nextFlowStep",
 
   ContentCheckFailed = "__bx_contentCheckFailed",
+
+  RegisterFrame = "__bx_registerFrame",
 }
 
 export const MAX_DEPTH = 1000000;

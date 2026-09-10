@@ -462,7 +462,7 @@ export class ReplayCrawler extends Crawler {
 
     data.isHTMLPage = true;
 
-    data.filteredFrames = page.frames().slice(SKIP_FRAMES);
+    //data.filteredFrames = page.frames().slice(SKIP_FRAMES);
 
     try {
       data.title = await replayFrame.title();
