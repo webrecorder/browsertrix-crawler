@@ -110,7 +110,10 @@ export class PageState {
   isDirectFetched = false;
 
   //filteredFrames: Frame[] = [];
-  behaviorContexts: Set<number> = new Set<number>();
+  iframeContexts: Set<number> = new Set<number>();
+  linksStarted = false;
+  behaviorsStarted = false;
+
   loadState: LoadState = LoadState.FAILED;
   contentCheckAllowed = false;
 

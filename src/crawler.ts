@@ -878,8 +878,46 @@ export class Crawler {
     });
 
     cdp.on("Runtime.bindingCalled", (event) => {
+      const execId = event.executionContextId;
+      const { linksStarted, behaviorsStarted, iframeContexts, url } = opts.data;
+      const { workerid } = opts;
+
       if (event.name === BxFunctionBindings.RegisterFrame) {
-        opts.data.behaviorContexts.add(event.executionContextId);
+        iframeContexts.add(execId);
+      }
+
+      if (linksStarted || behaviorsStarted) {
+        const processNewIframe = async () => {
+          const newSet = new Set<number>([execId]);
+          const logDetails = { pageUrl: url, workerid };
+
+          if (linksStarted) {
+            const selectLinks = this.params.selectLinks;
+            try {
+              await this.extractLinks(cdp, newSet, selectLinks, logDetails);
+            } catch (e) {
+              logger.debug(
+                "Dynamically added iframe link extraction failed",
+                e,
+                "links",
+              );
+            }
+          }
+
+          if (behaviorsStarted) {
+            try {
+              await this.runBehaviors(cdp, newSet, logDetails);
+            } catch (e) {
+              logger.debug(
+                "Dynamically added iframe behaviors failed",
+                e,
+                "behavior",
+              );
+            }
+          }
+        };
+
+        void processNewIframe();
       }
     });
 
@@ -1134,7 +1172,7 @@ self.__bx_behaviors.selectMainBehavior();
             break;
           }
         }
-        opts.data.behaviorContexts.delete(executionContextId);
+        opts.data.iframeContexts.delete(executionContextId);
       },
     );
 
@@ -1414,8 +1452,10 @@ self.__bx_behaviors.selectMainBehavior();
         // allow failing crawl via script from within behaviors also
         data.contentCheckAllowed = true;
 
+        data.behaviorsStarted = true;
+
         const res = await timedRun(
-          this.runBehaviors(page, cdp, data.behaviorContexts, logDetails),
+          this.runBehaviors(cdp, data.iframeContexts, logDetails),
           this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
@@ -1643,9 +1683,8 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async runBehaviors(
-    page: Page,
     cdp: CDPSession,
-    behaviorContexts: Set<number>,
+    iframeContexts: Set<number>,
     logDetails: LogDetails,
   ) {
     const RUN_BEHAVIORS = `
@@ -1657,7 +1696,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     try {
       const results = await Promise.allSettled(
-        Array.from(behaviorContexts, (ctx) =>
+        Array.from(iframeContexts, (ctx) =>
           this.runInExecContext(
             RUN_BEHAVIORS,
             cdp,
@@ -2474,7 +2513,7 @@ self.__bx_behaviors.selectMainBehavior();
     seed: ScopedSeed,
     cdp: CDPSession,
   ) {
-    const { url, depth, retry, behaviorContexts } = data;
+    const { url, depth, retry, iframeContexts } = data;
 
     const logDetails = data.logDetails;
 
@@ -2743,10 +2782,11 @@ self.__bx_behaviors.selectMainBehavior();
       "links",
     );
 
+    data.linksStarted = true;
+
     await this.extractLinks(
-      page,
       cdp,
-      behaviorContexts,
+      iframeContexts,
       this.params.selectLinks,
       logDetails,
     );
@@ -2796,9 +2836,8 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async extractLinks(
-    page: Page,
     cdp: CDPSession,
-    behaviorContexts: Set<number>,
+    iframeContexts: Set<number>,
     selectors: ExtractSelector[],
     logDetails: LogDetails,
   ) {
@@ -2810,7 +2849,7 @@ self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
         )}, ${attrOnly});\
 `;
         const results = await Promise.allSettled(
-          Array.from(behaviorContexts, (ctx) =>
+          Array.from(iframeContexts, (ctx) =>
             this.runInExecContext(
               expression,
               cdp,
