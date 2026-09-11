@@ -878,17 +878,20 @@ export class Crawler {
     });
 
     cdp.on("Runtime.bindingCalled", (event) => {
-      const execId = event.executionContextId;
+      // only handling registerFrame here
+      if (event.name !== BxFunctionBindings.RegisterFrame) {
+        return;
+      }
+
+      const contextId = event.executionContextId;
       const { linksStarted, behaviorsStarted, iframeContexts, url } = opts.data;
       const { workerid } = opts;
 
-      if (event.name === BxFunctionBindings.RegisterFrame) {
-        iframeContexts.add(execId);
-      }
+      iframeContexts.add(contextId);
 
       if (linksStarted || behaviorsStarted) {
         const processNewIframe = async () => {
-          const newSet = new Set<number>([execId]);
+          const newSet = new Set<number>([contextId]);
           const logDetails = { pageUrl: url, workerid };
 
           if (linksStarted) {
@@ -1166,8 +1169,8 @@ self.__bx_behaviors.selectMainBehavior();
       "Runtime.executionContextDestroyed",
       (params: Protocol.Runtime.ExecutionContextDestroyedEvent) => {
         const { executionContextId } = params;
-        for (const [frameId, execId] of frameIdToExecId.entries()) {
-          if (execId === executionContextId) {
+        for (const [frameId, contextId] of frameIdToExecId.entries()) {
+          if (contextId === executionContextId) {
             frameIdToExecId.delete(frameId);
             break;
           }
@@ -1637,14 +1640,14 @@ self.__bx_behaviors.selectMainBehavior();
   async runInExecContext(
     expression: string,
     cdp: CDPSession,
-    execId: number,
+    contextId: number,
     desc: string,
     logDetails: LogDetails,
     logContext: LogContext,
   ) {
-    const url = await this.shouldIncludeExecId(
+    const url = await this.shouldIncludeFrameContext(
       cdp,
-      execId,
+      contextId,
       logDetails,
       logContext,
     );
@@ -1654,14 +1657,14 @@ self.__bx_behaviors.selectMainBehavior();
 
     logger.debug(
       `Run ${desc} in frame context`,
-      { url, execId, ...logDetails },
+      { url, contextId, ...logDetails },
       logContext,
     );
 
     try {
       const res = await cdp.send("Runtime.evaluate", {
         expression,
-        contextId: execId,
+        contextId,
         awaitPromise: true,
         returnByValue: true,
         allowUnsafeEvalBlockedByCSP: true,
@@ -1735,9 +1738,9 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async shouldIncludeExecId(
+  async shouldIncludeFrameContext(
     cdp: CDPSession,
-    execId: number,
+    contextId: number,
     logDetails: LogDetails,
     context: LogContext,
   ): Promise<string> {
@@ -1753,7 +1756,7 @@ self.__bx_behaviors.selectMainBehavior();
         cdp.send("Runtime.evaluate", {
           expression,
           returnByValue: true,
-          contextId: execId,
+          contextId,
         }),
         PAGE_OP_TIMEOUT_SECS,
         "Frame check timed out",
