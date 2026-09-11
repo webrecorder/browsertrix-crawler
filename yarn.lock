@@ -2152,10 +2152,10 @@ browserslist@^4.24.0:
     node-releases "^2.0.18"
     update-browserslist-db "^1.1.1"
 
-browsertrix-behaviors@^0.14.0:
-  version "0.14.0"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.14.0.tgz#aa0a92be0169cfc05c73a64e174585f71714172c"
-  integrity sha512-M0+NByVNrFx6r9SWb2ezq6E3dhSPcocb8I6BBD3vP/L7lEHBCAz0bosQLPPPSExSX0twsFb6k3ChK2gupPG1yQ==
+browsertrix-behaviors@^0.14.1:
+  version "0.14.1"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.14.1.tgz#d840b04dfc6d625ff609c3afb2c66d98c0478ca5"
+  integrity sha512-UJX7a65ZB8UZ9T7Axk02SQkGBj9iibf01e5dMoGVC4uzC/BAjpmJvLENlzWKjQSlEcg2d8rVXKHhyrM5IhqalQ==
   dependencies:
     query-selector-shadow-dom "^1.0.1"
 
