@@ -1772,18 +1772,18 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@webrecorder/wabac@^2.26.6":
-  version "2.26.6"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.26.6.tgz#3e7e715bdcb897f1df3eaf928ce43aba7e955833"
-  integrity sha512-2+vEgfHDQfXobiE6m+Hqu+T+/12lUFs0ucVxfCVWLoBRVjz5QyNkQSoKkOOoUHQH3SxSM+qmCX1/2WGJIqlXeQ==
+"@webrecorder/wabac@^2.27.3":
+  version "2.27.3"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.27.3.tgz#193c10e5b8b9dd6164f2a8d98f7eea0d3c4149bc"
+  integrity sha512-i00+HSdwOdHRPeJU8g3LMOAHT4J+yX+dJdTEboTiI9YjWY5jYxUGqOgDuZ3xmPBzGAfYjfwoFTIaCB9lUBuNhA==
   dependencies:
     "@peculiar/asn1-ecc" "^2.3.4"
     "@peculiar/asn1-schema" "^2.3.3"
     "@peculiar/x509" "^1.9.2"
     "@types/js-levenshtein" "^1.1.3"
-    "@webrecorder/wombat" "^3.10.6"
+    "@webrecorder/wombat" "^3.10.8"
     acorn "^8.15.0"
-    auto-js-ipfs "^2.1.1"
+    auto-js-ipfs "^2.3.0"
     base64-js "^1.5.1"
     brotli "^1.3.3"
     buffer "^6.0.3"
@@ -1792,7 +1792,7 @@
     http-status-codes "^2.1.4"
     idb "^7.1.1"
     js-levenshtein "^1.1.6"
-    js-yaml "^4.2.0"
+    js-yaml "^4.3.1"
     mime "^4.1.0"
     pako "^1.0.11"
     parse5-html-rewriting-stream "^7.0.0"
@@ -1800,14 +1800,14 @@
     path-parser "^6.1.0"
     process "^0.11.10"
     stream-browserify "^3.0.0"
-    warcio "^2.4.11"
+    warcio "^2.4.12"
 
-"@webrecorder/wombat@^3.10.6":
-  version "3.10.6"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.10.6.tgz#0a33f5a3a1789b7d4e28f25a7b5fe43122d6ab21"
-  integrity sha512-YzpGipRw8dTsVD/DoXOmJ6fIVDnsGJV+/s8IJo3KOBl9D8pvQbG4GGyzcYPeVOnZ01qulSlSVFexs2EwvDxYXA==
+"@webrecorder/wombat@^3.10.8":
+  version "3.10.8"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.10.8.tgz#2423eee49c3ff3af0ab49d12802eb7c14b672165"
+  integrity sha512-PhbCRlMNQHY6hn0QlIW9QxQpkV07A+gFJn9zyOY+DckYQk7IXJshJicFveq1JlfwBZGdYPGQ+bk5/Cc4DwKcng==
   dependencies:
-    warcio "^2.4.10"
+    warcio "^2.4.11"
 
 acorn-jsx@^5.3.2:
   version "5.3.2"
@@ -2004,7 +2004,7 @@ async@^2.6.4:
   dependencies:
     lodash "^4.17.14"
 
-auto-js-ipfs@^2.1.1:
+auto-js-ipfs@^2.3.0:
   version "2.3.0"
   resolved "https://registry.yarnpkg.com/auto-js-ipfs/-/auto-js-ipfs-2.3.0.tgz#2c2684074cdaa2eb579345c4f86420d7635956c8"
   integrity sha512-gUg2+lJqcbBUDgimlOVqWWBVl/8Avs9JMIjEpIk4liho+5hFGrCXvj1ydj5GGxpOXUGkR0H9eVxTXwu+xvQgIg==
@@ -2152,10 +2152,10 @@ browserslist@^4.24.0:
     node-releases "^2.0.18"
     update-browserslist-db "^1.1.1"
 
-browsertrix-behaviors@^0.13.1:
-  version "0.13.1"
-  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.13.1.tgz#f90d5366143df211b044cc5e8ab187d7091acd73"
-  integrity sha512-jGx1oo4ekNlJzXyvY3pvYVSAH8v8boLO4Lif8vzKiALgjCV6ZgCJgvnjJnhng4XIU29PigffGTKlOfp1Ig/Nlg==
+browsertrix-behaviors@^0.14.0:
+  version "0.14.0"
+  resolved "https://registry.yarnpkg.com/browsertrix-behaviors/-/browsertrix-behaviors-0.14.0.tgz#aa0a92be0169cfc05c73a64e174585f71714172c"
+  integrity sha512-M0+NByVNrFx6r9SWb2ezq6E3dhSPcocb8I6BBD3vP/L7lEHBCAz0bosQLPPPSExSX0twsFb6k3ChK2gupPG1yQ==
   dependencies:
     query-selector-shadow-dom "^1.0.1"
 
@@ -4384,7 +4384,7 @@ js-yaml@^3.13.1:
     argparse "^1.0.7"
     esprima "^4.0.0"
 
-js-yaml@^4.1.0, js-yaml@^4.2.0, js-yaml@^4.3.1:
+js-yaml@^4.1.0, js-yaml@^4.3.1:
   version "4.3.1"
   resolved "https://registry.yarnpkg.com/js-yaml/-/js-yaml-4.3.1.tgz#01216c001d67f48e2cd560d708c7af21090a3848"
   integrity sha512-CY6crGq313MX8GkwvB7tzgp99vjQxY1++5y10/BKN/GUfHqWaOGQMNZkBvqSzsZKWk/ijwHlWzzkLulsGHhjWQ==
@@ -5942,7 +5942,7 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warcio@^2.4.10, warcio@^2.4.11:
+warcio@^2.4.11, warcio@^2.4.12:
   version "2.4.11"
   resolved "https://registry.yarnpkg.com/warcio/-/warcio-2.4.11.tgz#1ef9c33f37b0ab17662d7821dce718e385afdbd7"
   integrity sha512-EXcT5+GepqtUBmFpwxcRm7uEbhrtYKhWVIVzAxgO/PZt84KLl3eZLlGsa4DwQCAWCK8b4nyjqBlyKfKhT1Govg==
