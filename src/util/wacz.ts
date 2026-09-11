@@ -182,7 +182,8 @@ export class WACZ {
             const bytes = currFile.size;
             const hash = "sha256:" + currFile.hasher.digest("hex");
             const resource: WACZResourceEntry = { name, path, bytes, hash };
-            if (name.endsWith(".jsonl") && path.startsWith("pages/")) {
+            // ensure format set as text to any JSONL files not in pages/
+            if (name.endsWith(".jsonl") && !path.startsWith("pages/")) {
               resource.format = "text";
             }
             resources.push(resource);
