@@ -39,9 +39,7 @@ class WSTransport {
     this.httpServer.on(
       "upgrade",
       (request: IncomingMessage, socket: Duplex, head: Buffer) => {
-        const pathname = new URL(request.url || "").pathname;
-
-        if (pathname === "/ws") {
+        if (request.url === "/ws" && request.method === "GET") {
           this.wss.handleUpgrade(request, socket, head, (ws) => {
             this.wss.emit("connection", ws, request);
           });
@@ -53,12 +51,10 @@ class WSTransport {
   }
 
   async handleRequest(req: IncomingMessage, res: ServerResponse) {
-    const pathname = new URL(req.url || "").pathname;
-    switch (pathname) {
-      case "/":
-        res.writeHead(200, { "Content-Type": "text/html" });
-        res.end(indexHTML);
-        return;
+    if (req.url === "/" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(indexHTML);
+      return;
     }
 
     res.writeHead(404, { "Content-Type": "text/html" });
