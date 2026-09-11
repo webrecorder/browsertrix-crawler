@@ -1,5 +1,4 @@
 import http from "http";
-import url from "url";
 import { logger } from "./logger.js";
 import { Browser } from "./browser.js";
 
@@ -34,7 +33,7 @@ export class HealthChecker {
   }
 
   async healthCheck(req: http.IncomingMessage, res: http.ServerResponse) {
-    const pathname = req.url ? url.parse(req.url).pathname : "";
+    const pathname = req.url ? new URL(req.url).pathname : "";
     switch (pathname) {
       case "/healthz":
         if (this.errorCount < this.errorThreshold && !this.browser.crashed) {

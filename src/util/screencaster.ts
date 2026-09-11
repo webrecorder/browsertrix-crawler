@@ -4,7 +4,6 @@ import http, {
   type Server,
   type ServerResponse,
 } from "http";
-import url from "url";
 import fs from "fs";
 
 import { initRedis } from "./redis.js";
@@ -40,7 +39,7 @@ class WSTransport {
     this.httpServer.on(
       "upgrade",
       (request: IncomingMessage, socket: Duplex, head: Buffer) => {
-        const pathname = url.parse(request.url || "").pathname;
+        const pathname = new URL(request.url || "").pathname;
 
         if (pathname === "/ws") {
           this.wss.handleUpgrade(request, socket, head, (ws) => {
@@ -54,7 +53,7 @@ class WSTransport {
   }
 
   async handleRequest(req: IncomingMessage, res: ServerResponse) {
-    const pathname = url.parse(req.url || "").pathname;
+    const pathname = new URL(req.url || "").pathname;
     switch (pathname) {
       case "/":
         res.writeHead(200, { "Content-Type": "text/html" });
