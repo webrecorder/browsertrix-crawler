@@ -2221,7 +2221,12 @@ class AsyncFetcher {
 
     const headers = reqresp.getRequestHeadersDict();
 
-    let dispatcher = getProxyDispatcher(url, !this.manualRedirect, false);
+    let dispatcher = getProxyDispatcher(
+      url,
+      !this.manualRedirect,
+      false,
+      (remoteAddress) => reqresp.setRemoteIPAddress(remoteAddress),
+    );
 
     dispatcher = dispatcher.compose((dispatch) => {
       return (opts, handler) => {
@@ -2414,6 +2419,10 @@ function createResponse(
     "WARC-Page-ID": pageid,
   };
 
+  if (reqresp.remoteIPAddress) {
+    warcHeaders["WARC-IP-Address"] = reqresp.remoteIPAddress;
+  }
+
   if (reqresp.protocols.length) {
     warcHeaders["WARC-Protocol"] = multiValueHeader(
       "WARC-Protocol",
@@ -2454,6 +2463,7 @@ function createResponse(
 // =================================================================
 const REVISIT_COPY_HEADERS = [
   "WARC-Page-ID",
+  "WARC-IP-Address",
   "WARC-Protocol",
   "WARC-Resource-Type",
   "WARC-JSON-Metadata",
@@ -2533,6 +2543,10 @@ function createRequest(
     "WARC-Concurrent-To": responseRecord.warcHeader("WARC-Record-ID")!,
     "WARC-Page-ID": pageid,
   };
+
+  if (reqresp.remoteIPAddress) {
+    warcHeaders["WARC-IP-Address"] = reqresp.remoteIPAddress;
+  }
 
   if (reqresp.resourceType) {
     warcHeaders["WARC-Resource-Type"] = reqresp.resourceType;
