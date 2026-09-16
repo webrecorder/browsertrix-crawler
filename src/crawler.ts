@@ -877,7 +877,7 @@ export class Crawler {
       name: BxFunctionBindings.RegisterFrame,
     });
 
-    cdp.on("Runtime.bindingCalled", (event) => {
+    cdp.on("Runtime.bindingCalled", async (event) => {
       // only handling registerFrame here
       if (event.name !== BxFunctionBindings.RegisterFrame) {
         return;
@@ -920,7 +920,7 @@ export class Crawler {
           }
         };
 
-        void processNewIframe();
+        await processNewIframe();
       }
     });
 
