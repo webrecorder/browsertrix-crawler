@@ -462,8 +462,6 @@ export class ReplayCrawler extends Crawler {
 
     data.isHTMLPage = true;
 
-    //data.filteredFrames = page.frames().slice(SKIP_FRAMES);
-
     try {
       data.title = await replayFrame.title();
     } catch (e) {
@@ -483,6 +481,13 @@ export class ReplayCrawler extends Crawler {
     await this.compareResources(page, data, url, date);
 
     await this.processPageInfo(page, data);
+  }
+
+  override shouldIncludeFrameUrl(frameUrl: string, isTop: boolean) {
+    if (isTop || frameUrl.startsWith(REPLAY_SOURCE)) {
+      return false;
+    }
+    return true;
   }
 
   async compareScreenshots(

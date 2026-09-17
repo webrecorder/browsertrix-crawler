@@ -1777,7 +1777,7 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (isTop) {
-      return frameUrl;
+      return this.shouldIncludeFrameUrl(frameUrl, isTop) ? frameUrl : "";
     }
 
     // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
@@ -1801,7 +1801,8 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     const includeFrame =
-      this.adBlockRules && !this.adBlockRules.isAdUrl(frameUrl);
+      this.shouldIncludeFrameUrl(frameUrl, isTop) &&
+      (!this.adBlockRules || !this.adBlockRules.isAdUrl(frameUrl));
 
     if (!includeFrame) {
       logger.debug(
@@ -1813,6 +1814,10 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     return frameUrl;
+  }
+
+  shouldIncludeFrameUrl(_frameUrl: string, _isTop: boolean) {
+    return true;
   }
 
   async updateCurrSize(): Promise<number> {
@@ -2742,8 +2747,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (!data.isHTMLPage) {
-      //data.filteredFrames = [];
-
       logger.info(
         "Non-HTML Page URL, skipping all post-crawl actions",
         { isDownload: !!downloadResponse, mime: data.mime, ...logDetails },
