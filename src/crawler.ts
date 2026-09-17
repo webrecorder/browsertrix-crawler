@@ -76,6 +76,7 @@ import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
+import { saveSnapshot } from "./util/domsnapshot.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -169,6 +170,7 @@ export class Crawler {
 
   screenshotWriter: WARCWriter | null;
   textWriter: WARCWriter | null;
+  domSnapshotWriter: WARCWriter | null;
 
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
@@ -323,6 +325,7 @@ export class Crawler {
 
     this.screenshotWriter = null;
     this.textWriter = null;
+    this.domSnapshotWriter = null;
 
     this.blockRules = null;
     this.adBlockRules = null;
@@ -632,6 +635,10 @@ export class Crawler {
     }
     if (this.params.text && !this.params.dryRun) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
+    }
+    if (this.params.domSnapshot && !this.params.dryRun) {
+      this.domSnapshotWriter =
+        this.createExtraResourceWarcWriter("domsnapshot");
     }
 
     await this.loadCrawlState();
@@ -1400,7 +1407,7 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async doPostLoadActions(opts: WorkerState, saveOutput = false) {
-    const { page, cdp, data, workerid, recorder } = opts;
+    const { page, cdp, data, workerid } = opts;
     const { url } = data;
 
     if (!data.isHTMLPage) {
@@ -1429,7 +1436,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     let textextract = null;
 
-    if (data.isHTMLPage && this.textWriter) {
+    if (this.textWriter) {
       textextract = new TextExtractViaSnapshot(cdp, {
         writer: this.textWriter,
         url,
@@ -1441,7 +1448,7 @@ self.__bx_behaviors.selectMainBehavior();
         this.params.text.includes("to-warc"),
       );
 
-      if (text && (this.textInPages || saveOutput)) {
+      if (text !== null && (this.textInPages || saveOutput)) {
         data.text = text;
       }
     }
@@ -1503,8 +1510,8 @@ self.__bx_behaviors.selectMainBehavior();
       }
     }
 
-    if (this.params.domSnapshot && recorder) {
-      await recorder.addDOMSnapshot(cdp);
+    if (this.domSnapshotWriter) {
+      await saveSnapshot(cdp, url, this.domSnapshotWriter);
     }
   }
 
@@ -3549,18 +3556,14 @@ self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
       id: id.toString(),
     });
 
-    const recorder = new Recorder({
+    const res = new Recorder({
       workerid: id,
       crawler: this,
       writer,
     });
 
-    if (this.params.domSnapshot) {
-      recorder.useDomSnapshot = true;
-    }
-
-    this.browser.recorders.push(recorder);
-    return recorder;
+    this.browser.recorders.push(res);
+    return res;
   }
 }
 

@@ -1,11 +1,41 @@
-import { Protocol } from "puppeteer-core";
+import { CDPSession, Protocol } from "puppeteer-core";
 import { JSDOM } from "jsdom";
+import { WARCWriter } from "./warcwriter";
 
 type Snapshot = {
   doc: Document;
   nodes: (Node | null)[];
   doctype: string;
 };
+
+export async function saveSnapshot(
+  cdp: CDPSession,
+  url: string,
+  writer: WARCWriter,
+) {
+  const snapshot = await getDOMSnapshot(cdp);
+
+  const dom = snapshotToDom(snapshot);
+
+  writer.writeNewResourceRecord(
+    {
+      buffer: new TextEncoder().encode(dom),
+      resourceType: "domsnapshot",
+      contentType: "text/html",
+      url,
+      date: new Date(),
+    },
+    { url, resourceType: "domsnapshot" },
+    "recorder",
+  );
+}
+
+export async function getDOMSnapshot(cdp: CDPSession) {
+  const snapshot = await cdp.send("DOMSnapshot.captureSnapshot", {
+    computedStyles: [],
+  });
+  return snapshot;
+}
 
 export function snapshotToDom(
   response: Protocol.DOMSnapshot.CaptureSnapshotResponse,

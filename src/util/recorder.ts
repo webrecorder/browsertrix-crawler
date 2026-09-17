@@ -167,7 +167,6 @@ export class Recorder extends EventEmitter {
   pageFinished = false;
 
   lastErrorText = "";
-  useDomSnapshot = false;
 
   gzip = true;
 
@@ -1223,8 +1222,6 @@ export class Recorder extends EventEmitter {
       this.logDetails,
       "recorder",
     );
-
-    await this.crawlState.addIfNoDupe(WRITE_DUPE_KEY, url, 200);
   }
 
   writePageInfoRecord() {
