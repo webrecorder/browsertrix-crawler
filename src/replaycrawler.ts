@@ -484,6 +484,8 @@ export class ReplayCrawler extends Crawler {
   }
 
   override shouldIncludeFrameUrl(frameUrl: string, isTop: boolean) {
+    // since this is replay, the top frame and the one after that are part of
+    // replayweb.page, so we skip them for any link extraction/behaviors
     if (isTop || frameUrl.startsWith(REPLAY_SOURCE)) {
       return false;
     }
