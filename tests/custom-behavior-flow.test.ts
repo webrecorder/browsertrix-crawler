@@ -47,6 +47,7 @@ test("test pushing behavior logs to redis", async () => {
     }
   }
 
-  expect(customLogLineCount).toEqual(4);
+  // 4 from the flow, +1 from YT embed behavior
+  expect(customLogLineCount).toEqual(5);
   expect(done).toBe(true);
 });

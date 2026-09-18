@@ -207,6 +207,7 @@ export class Crawler {
         seed: ScopedSeed;
         // eslint-disable-next-line no-use-before-define
         crawler: Crawler;
+        cdp: CDPSession;
       }) => Promise<void>)
     | null = null;
 
@@ -872,7 +873,58 @@ export class Crawler {
 
     await this.browser.setupPage({ page, cdp });
 
-    await this.setupExecContextEvents(cdp, frameIdToExecId);
+    await cdp.send("Runtime.addBinding", {
+      name: BxFunctionBindings.RegisterFrame,
+    });
+
+    cdp.on("Runtime.bindingCalled", async (event) => {
+      // only handling registerFrame here
+      if (event.name !== BxFunctionBindings.RegisterFrame) {
+        return;
+      }
+
+      const contextId = event.executionContextId;
+      const { linksStarted, behaviorsStarted, iframeContexts, url } = opts.data;
+      const { workerid } = opts;
+
+      iframeContexts.add(contextId);
+
+      if (linksStarted || behaviorsStarted) {
+        const processNewIframe = async () => {
+          const newSet = new Set<number>([contextId]);
+          const logDetails = { pageUrl: url, workerid };
+
+          if (linksStarted) {
+            const selectLinks = this.params.selectLinks;
+            try {
+              await this.extractLinks(cdp, newSet, selectLinks, logDetails);
+            } catch (e) {
+              logger.debug(
+                "Dynamically added iframe link extraction failed",
+                e,
+                "links",
+              );
+            }
+          }
+
+          if (behaviorsStarted) {
+            try {
+              await this.runBehaviors(cdp, newSet, logDetails);
+            } catch (e) {
+              logger.debug(
+                "Dynamically added iframe behaviors failed",
+                e,
+                "behavior",
+              );
+            }
+          }
+        };
+
+        await processNewIframe();
+      }
+    });
+
+    await this.setupExecContextEvents(cdp, frameIdToExecId, opts);
 
     if (
       (this.adBlockRules && this.params.blockAds) ||
@@ -998,11 +1050,12 @@ self.__bx_behaviors.selectMainBehavior();
     });
 
     // only add if running with autoclick behavior
-    if (this.params.behaviors.includes("autoclick")) {
+    const isAutoclick = this.params.behaviors.includes("autoclick");
+    if (isAutoclick) {
       // Close any windows opened during navigation from autoclick
       await cdp.send("Target.setDiscoverTargets", { discover: true });
 
-      cdp.on("Target.targetCreated", async (params) => {
+      cdp.on("Target.attachedToTarget", async (params) => {
         const { targetInfo } = params;
         const { type, openerFrameId, targetId } = targetInfo;
 
@@ -1016,17 +1069,23 @@ self.__bx_behaviors.selectMainBehavior();
           } else {
             logger.warn("Extra target not closed", { targetInfo });
           }
-
-          await cdp.send("Runtime.runIfWaitingForDebugger");
         } catch (e) {
           // target likely already closed
+        }
+
+        if (params.waitingForDebugger) {
+          try {
+            await cdp.send("Runtime.runIfWaitingForDebugger");
+          } catch (e) {
+            // closed
+          }
         }
       });
 
       void cdp.send("Target.setAutoAttach", {
         autoAttach: true,
         waitForDebuggerOnStart: true,
-        flatten: false,
+        flatten: true,
       });
 
       if (this.recording) {
@@ -1092,6 +1151,7 @@ self.__bx_behaviors.selectMainBehavior();
   async setupExecContextEvents(
     cdp: CDPSession,
     frameIdToExecId: Map<string, number>,
+    opts: WorkerState,
   ) {
     await cdp.send("Runtime.enable");
 
@@ -1109,12 +1169,13 @@ self.__bx_behaviors.selectMainBehavior();
       "Runtime.executionContextDestroyed",
       (params: Protocol.Runtime.ExecutionContextDestroyedEvent) => {
         const { executionContextId } = params;
-        for (const [frameId, execId] of frameIdToExecId.entries()) {
-          if (execId === executionContextId) {
+        for (const [frameId, contextId] of frameIdToExecId.entries()) {
+          if (contextId === executionContextId) {
             frameIdToExecId.delete(frameId);
             break;
           }
         }
+        opts.data.iframeContexts.delete(executionContextId);
       },
     );
 
@@ -1311,9 +1372,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     // run custom driver here, if any
     if (this.driver) {
-      await this.driver({ page, data, crawler: this, seed });
+      await this.driver({ page, data, crawler: this, seed, cdp: opts.cdp });
     } else {
-      await this.loadPage(page, data, seed);
+      await this.loadPage(page, data, seed, opts.cdp);
     }
 
     data.title = await timedRun(
@@ -1394,8 +1455,10 @@ self.__bx_behaviors.selectMainBehavior();
         // allow failing crawl via script from within behaviors also
         data.contentCheckAllowed = true;
 
+        data.behaviorsStarted = true;
+
         const res = await timedRun(
-          this.runBehaviors(page, cdp, data.filteredFrames, logDetails),
+          this.runBehaviors(cdp, data.iframeContexts, logDetails),
           this.params.behaviorTimeout,
           "Behaviors timed out",
           logDetails,
@@ -1574,10 +1637,59 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async runBehaviorsInFrame(
-    frame: Frame,
+  async runInExecContext(
+    expression: string,
+    cdp: CDPSession,
+    contextId: number,
+    desc: string,
     logDetails: LogDetails,
-  ): Promise<boolean> {
+    logContext: LogContext,
+  ) {
+    const url = await this.shouldIncludeFrameContext(
+      cdp,
+      contextId,
+      logDetails,
+      logContext,
+    );
+    if (!url) {
+      return false;
+    }
+
+    logger.debug(
+      `Run ${desc} in frame context`,
+      { url, contextId, ...logDetails },
+      logContext,
+    );
+
+    try {
+      const res = await cdp.send("Runtime.evaluate", {
+        expression,
+        contextId,
+        awaitPromise: true,
+        returnByValue: true,
+        allowUnsafeEvalBlockedByCSP: true,
+        includeCommandLineAPI: true,
+      });
+      if (res.exceptionDetails) {
+        logger.debug(
+          "Run in frame failed",
+          { url, details: res.exceptionDetails },
+          logContext,
+        );
+        return false;
+      }
+      return true;
+    } catch (e) {
+      logger.debug("Run in frame failed", { url, ...formatErr(e) }, logContext);
+      return false;
+    }
+  }
+
+  async runBehaviors(
+    cdp: CDPSession,
+    iframeContexts: Set<number>,
+    logDetails: LogDetails,
+  ) {
     const RUN_BEHAVIORS = `
       if (!self.__bx_behaviors) {
         console.error("__bx_behaviors missing, can't run behaviors");
@@ -1585,89 +1697,19 @@ self.__bx_behaviors.selectMainBehavior();
         self.__bx_behaviors.run();
       }`;
 
-    const frameUrl = frame.url();
-    const isTopFrame = !frame.parentFrame();
-
-    const details: LogDetails = { frameUrl, isTopFrame, ...logDetails };
-
-    if (!frameUrl || frame.detached) {
-      logger.debug(
-        "Run Behaviors Skipped, frame no longer attached or has no URL",
-        details,
-      );
-      return false;
-    }
-
-    if (isTopFrame) {
-      logger.debug("Run Behaviors Started", details, "behavior");
-    } else {
-      logger.debug("Run Behaviors Started in iframe", details, "behavior");
-    }
-
     try {
-      await frame.evaluate(RUN_BEHAVIORS);
-      return true;
-    } catch (e) {
-      const msg = (e as Error).message;
-      if (
-        msg.indexOf("Target closed") >= 0 ||
-        msg.indexOf("Execution context was destroyed") >= 0
-      ) {
-        // only warn for top-frame, expected that iframes may be created/removed frequently
-        if (isTopFrame) {
-          logger.warn(
-            "Run Behaviors Interrupted, navigated away",
-            details,
+      const results = await Promise.allSettled(
+        Array.from(iframeContexts, (ctx) =>
+          this.runInExecContext(
+            RUN_BEHAVIORS,
+            cdp,
+            ctx,
+            "behaviors",
+            logDetails,
             "behavior",
-          );
-        }
-      } else {
-        logger.error(
-          "Run Behaviors Failed",
-          { ...details, ...formatErr(e) },
-          "behavior",
-        );
-      }
-    }
-    return false;
-  }
-
-  async runBehaviors(
-    page: Page,
-    cdp: CDPSession,
-    frames: Frame[],
-    logDetails: LogDetails,
-  ) {
-    try {
-      frames = frames || page.frames();
-
-      logger.debug(
-        "Running behaviors",
-        {
-          frames: frames.length,
-          frameUrls: frames.map((frame) => frame.url()),
-          ...logDetails,
-        },
-        "behavior",
+          ),
+        ),
       );
-
-      const newFrames: Promise<boolean>[] = [];
-
-      const attachIframe = (frame: Frame) => {
-        newFrames.push(this.runBehaviorsInFrame(frame, logDetails));
-      };
-
-      page.on("framenavigated", attachIframe);
-
-      let results = await Promise.allSettled(
-        frames.map((frame) => this.runBehaviorsInFrame(frame, logDetails)),
-      );
-
-      page.off("framenavigated", attachIframe);
-
-      if (newFrames.length) {
-        results = [...results, ...(await Promise.allSettled(newFrames))];
-      }
 
       for (const res of results) {
         const { status, reason }: { status: string; reason?: unknown } = res;
@@ -1696,60 +1738,86 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async shouldIncludeFrame(frame: Frame, logDetails: LogDetails) {
-    if (!frame.parentFrame()) {
-      return frame;
-    }
-
-    const frameUrl = frame.url();
-
-    if (!frameUrl) {
-      return null;
-    }
-
-    // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
-    // if there's no tag or an iframe tag, then assume its a regular frame
+  async shouldIncludeFrameContext(
+    cdp: CDPSession,
+    contextId: number,
+    logDetails: LogDetails,
+    context: LogContext,
+  ): Promise<string> {
     let tagName = "";
+    let frameUrl = "";
+    let isTop = false;
+
+    const expression =
+      "({tag: self?.frameElement?.tagName, loc: (self && self?.location?.href), isTop: (self === top)})";
 
     try {
-      tagName = await timedRun(
-        frame.evaluate(
-          "self && self.frameElement && self.frameElement.tagName",
-        ),
+      const res = await timedRun(
+        cdp.send("Runtime.evaluate", {
+          expression,
+          returnByValue: true,
+          contextId,
+        }),
         PAGE_OP_TIMEOUT_SECS,
         "Frame check timed out",
         logDetails,
       );
+      if (res.result && res.result.type === "object") {
+        const value = res.result.value;
+        tagName = value.tag;
+        frameUrl = value.loc;
+        isTop = value.isTop;
+      } else {
+        logger.debug("Error checking iframe", res, context);
+        return "";
+      }
     } catch (e) {
-      // ignore
+      logger.debug("Error executing frame check", e, context);
+      return "";
     }
 
+    if (isTop) {
+      return this.shouldIncludeFrameUrl(frameUrl, isTop) ? frameUrl : "";
+    }
+
+    // this is all designed to detect and skip PDFs, and other frames that are actually EMBEDs
+    // if there's no tag or an iframe tag, then assume its a regular frame
     if (tagName && tagName !== "IFRAME" && tagName !== "FRAME") {
       logger.debug(
         "Skipping processing non-frame object",
         { tagName, frameUrl, ...logDetails },
-        "behavior",
+        context,
       );
-      return null;
+      return "";
     }
 
-    let res;
-
-    if (frameUrl === "about:blank") {
-      res = false;
-    } else {
-      res = this.adBlockRules && !this.adBlockRules.isAdUrl(frameUrl);
+    if (!frameUrl || frameUrl === "about:blank") {
+      logger.debug(
+        "Skipping processing about:blank or empty frame",
+        { frameUrl, ...logDetails },
+        context,
+      );
+      return "";
     }
 
-    if (!res) {
+    const includeFrame =
+      this.shouldIncludeFrameUrl(frameUrl, isTop) &&
+      (!this.adBlockRules || !this.adBlockRules.isAdUrl(frameUrl));
+
+    if (!includeFrame) {
       logger.debug(
         "Skipping processing frame",
         { frameUrl, ...logDetails },
-        "behavior",
+        context,
       );
+      return "";
     }
 
-    return res ? frame : null;
+    return frameUrl;
+  }
+
+  shouldIncludeFrameUrl(_frameUrl: string, _isTop: boolean) {
+    return true;
   }
 
   async updateCurrSize(): Promise<number> {
@@ -2447,8 +2515,13 @@ self.__bx_behaviors.selectMainBehavior();
     throw new Error("logged");
   }
 
-  async loadPage(page: Page, data: PageState, seed: ScopedSeed) {
-    const { url, depth, retry } = data;
+  async loadPage(
+    page: Page,
+    data: PageState,
+    seed: ScopedSeed,
+    cdp: CDPSession,
+  ) {
+    const { url, depth, retry, iframeContexts } = data;
 
     const logDetails = data.logDetails;
 
@@ -2674,8 +2747,6 @@ self.__bx_behaviors.selectMainBehavior();
     }
 
     if (!data.isHTMLPage) {
-      data.filteredFrames = [];
-
       logger.info(
         "Non-HTML Page URL, skipping all post-crawl actions",
         { isDownload: !!downloadResponse, mime: data.mime, ...logDetails },
@@ -2683,28 +2754,6 @@ self.__bx_behaviors.selectMainBehavior();
       );
       return;
     }
-
-    // HTML Pages Only here
-    const frames = page.frames();
-
-    const filteredFrames = await Promise.allSettled(
-      frames.map((frame) => this.shouldIncludeFrame(frame, logDetails)),
-    );
-
-    data.filteredFrames = filteredFrames
-      .filter((x: PromiseSettledResult<Frame | null>) => {
-        if (x.status === "fulfilled") {
-          return !!x.value;
-        }
-        logger.warn("Error in iframe check", {
-          reason: x.reason,
-          ...logDetails,
-        });
-        return false;
-      })
-      .map((x) => (x as PromiseFulfilledResult<Frame>).value);
-
-    //data.filteredFrames = await page.frames().filter(frame => this.shouldIncludeFrame(frame, logDetails));
 
     const { seedId, extraHops } = data;
 
@@ -2739,7 +2788,14 @@ self.__bx_behaviors.selectMainBehavior();
       "links",
     );
 
-    await this.extractLinks(page, data, this.params.selectLinks, logDetails);
+    data.linksStarted = true;
+
+    await this.extractLinks(
+      cdp,
+      iframeContexts,
+      this.params.selectLinks,
+      logDetails,
+    );
   }
 
   async netIdle(page: Page, details: LogDetails) {
@@ -2786,41 +2842,41 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async extractLinks(
-    page: Page,
-    data: PageState,
+    cdp: CDPSession,
+    iframeContexts: Set<number>,
     selectors: ExtractSelector[],
     logDetails: LogDetails,
   ) {
-    const { filteredFrames } = data;
-
-    const frames = filteredFrames || page.frames();
-
     try {
       for (const { selector, extract, attrOnly } of selectors) {
-        await Promise.allSettled(
-          frames.map((frame) => {
-            const getLinks = frame
-              .evaluate(
-                `self.__bx_behaviors.extractLinks(${JSON.stringify(
-                  selector,
-                )}, ${JSON.stringify(extract)}, ${attrOnly})`,
-              )
-              .catch((e) =>
-                logger.warn("Link Extraction failed in frame", {
-                  frameUrl: frame.url,
-                  ...logDetails,
-                  ...formatErr(e),
-                }),
-              );
-
-            return timedRun(
-              getLinks,
-              PAGE_OP_TIMEOUT_SECS,
-              "Link extraction timed out",
+        const expression = `
+self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
+          extract,
+        )}, ${attrOnly});\
+`;
+        const results = await Promise.allSettled(
+          Array.from(iframeContexts, (ctx) =>
+            this.runInExecContext(
+              expression,
+              cdp,
+              ctx,
+              "link extraction",
               logDetails,
-            );
-          }),
+              "links",
+            ),
+          ),
         );
+
+        for (const res of results) {
+          const { status, reason }: { status: string; reason?: unknown } = res;
+          if (status === "rejected") {
+            logger.warn(
+              "Link extraction partially failed",
+              { reason: formatErr(reason), ...logDetails },
+              "behavior",
+            );
+          }
+        }
       }
     } catch (e) {
       logger.warn("Link Extraction failed", e, "links");

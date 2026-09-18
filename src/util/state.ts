@@ -17,7 +17,6 @@ import {
   RATE_LIMIT_TTL_SECS,
 } from "./constants.js";
 import { ScopedSeed } from "./seeds.js";
-import { Frame } from "puppeteer-core";
 import { interpolateFilename, UploadResult } from "./storage.js";
 import { normalizeUrl } from "./normalize.js";
 import { WACZ } from "./wacz.js";
@@ -110,7 +109,10 @@ export class PageState {
 
   isDirectFetched = false;
 
-  filteredFrames: Frame[] = [];
+  iframeContexts: Set<number> = new Set<number>();
+  linksStarted = false;
+  behaviorsStarted = false;
+
   loadState: LoadState = LoadState.FAILED;
   contentCheckAllowed = false;
 
