@@ -55,6 +55,7 @@ export type WACZResourceEntry = {
   path: string;
   hash: string;
   bytes: number;
+  format?: string;
 };
 
 export type WACZDataPackage = {
@@ -180,7 +181,12 @@ export class WACZ {
             const path = currFile.zipPath;
             const bytes = currFile.size;
             const hash = "sha256:" + currFile.hasher.digest("hex");
-            resources.push({ name, path, bytes, hash });
+            const resource: WACZResourceEntry = { name, path, bytes, hash };
+            // ensure format set as text to any JSONL files not in pages/
+            if (name.endsWith(".jsonl") && !path.startsWith("pages/")) {
+              resource.format = "text";
+            }
+            resources.push(resource);
             logger.debug("Added file to WACZ", { path, bytes, hash }, "wacz");
           }
           currFile = null;
