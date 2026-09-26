@@ -174,6 +174,11 @@ Options:
       --profile, --loadProfile              Path or HTTP(S) URL to tar.gz file w
                                             hich contains the browser profile di
                                             rectory                     [string]
+      --browserStartTimeout                 Timeout (in seconds) for the browser
+                                             process to start and connect. Raise
+                                             this on hosts under high load where
+                                            browser startup is slow.
+                                                          [number] [default: 30]
       --saveProfile                         If set, save profile if crawl succee
                                             ded successfully. If no value provid
                                             ed, save back to save location as sp
@@ -419,6 +424,10 @@ Options:
                             e browser profile directory   [string] [default: ""]
   --windowSize              Browser window dimensions, specified as: width,heigh
                             t                    [string] [default: "1360,1020"]
+  --browserStartTimeout     Timeout (in seconds) for the browser process to star
+                            t and connect. Raise this on hosts under high load w
+                            here browser startup is slow.
+                                                          [number] [default: 30]
   --cookieDays              If >0, set all cookies, including session cookies, t
                             o have this duration in days before saving profile
                                                            [number] [default: 7]

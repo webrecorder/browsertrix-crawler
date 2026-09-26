@@ -16,6 +16,7 @@ import { initStorage, S3StorageSync, UploadResult } from "./storage.js";
 import {
   DISPLAY,
   PAGE_OP_TIMEOUT_SECS,
+  BROWSER_STARTUP_TIMEOUT_SECS,
   type ServiceWorkerOpt,
 } from "./constants.js";
 
@@ -29,6 +30,7 @@ import puppeteer, {
   CDPSession,
   Target,
   Browser as PptrBrowser,
+  TimeoutError,
 } from "puppeteer-core";
 import { Recorder } from "./recorder.js";
 import { timedRun } from "./timing.js";
@@ -53,6 +55,9 @@ type LaunchOpts = {
   ondisconnect?: ((err: unknown) => NonNullable<unknown>) | null;
 
   swOpt?: ServiceWorkerOpt;
+
+  // timeout (in seconds) for browser process startup / devtools connection
+  browserStartTimeout?: number;
 
   recording: boolean;
 };
@@ -110,6 +115,7 @@ export class Browser {
     emulateDevice = {},
     swOpt = "disabled",
     ondisconnect = null,
+    browserStartTimeout,
     recording = true,
   }: LaunchOpts) {
     if (this.isLaunched()) {
@@ -140,6 +146,9 @@ export class Browser {
       height: this.screenHeight - (recording ? 0 : BROWSER_HEIGHT_OFFSET),
     };
 
+    const startTimeoutSecs =
+      browserStartTimeout ?? BROWSER_STARTUP_TIMEOUT_SECS;
+
     const launchOpts: LaunchOptions = {
       args,
       headless,
@@ -150,6 +159,9 @@ export class Browser {
       handleSIGINT: signals,
       handleSIGTERM: signals,
       protocolTimeout: 0,
+      // puppeteer's own default here is 30000ms, which is too short on hosts
+      // under high load where the browser process is slow to start
+      timeout: startTimeoutSecs * 1000,
 
       defaultViewport,
       waitForInitialPage: false,
@@ -158,7 +170,7 @@ export class Browser {
         ? undefined
         : (target) => this.targetFilter(target),
     };
-    await this._init(launchOpts, recording, ondisconnect);
+    await this._init(launchOpts, recording, ondisconnect, startTimeoutSecs);
   }
 
   targetFilter(target: Target) {
@@ -524,8 +536,21 @@ export class Browser {
     recording: boolean,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     ondisconnect: Function | null = null,
+    startTimeoutSecs = BROWSER_STARTUP_TIMEOUT_SECS,
   ) {
-    this.browser = await puppeteer.launch(launchOpts);
+    try {
+      this.browser = await puppeteer.launch(launchOpts);
+    } catch (e) {
+      if (e instanceof TimeoutError || (e as Error).name === "TimeoutError") {
+        await logger.fatal(
+          "Browser did not start within the configured startup timeout. " +
+            "On hosts under high load, raise --browserStartTimeout.",
+          { startTimeoutSecs, ...formatErr(e) },
+          "browser",
+        );
+      }
+      throw e;
+    }
 
     const target = this.browser.target();
 
