@@ -24,6 +24,7 @@ import {
   RateLimitRule,
   DEFAULT_MAX_RATE_LIMIT_RETRIES,
   ExitCodes,
+  BROWSER_STARTUP_TIMEOUT_SECS,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -422,6 +423,13 @@ class ArgParser {
           describe:
             "Path or HTTP(S) URL to tar.gz file which contains the browser profile directory",
           type: "string",
+        },
+
+        browserStartTimeout: {
+          describe:
+            "Timeout (in seconds) for the browser process to start and connect. Raise this on hosts under high load where browser startup is slow.",
+          default: BROWSER_STARTUP_TIMEOUT_SECS,
+          type: "number",
         },
 
         saveProfile: {
@@ -987,6 +995,18 @@ class ArgParser {
 
     if (argv.diskUtilization < 0 || argv.diskUtilization > 99) {
       argv.diskUtilization = 90;
+    }
+
+    if (!(argv.browserStartTimeout > 0)) {
+      logger.warn(
+        "Invalid --browserStartTimeout, using default",
+        {
+          value: argv.browserStartTimeout,
+          default: BROWSER_STARTUP_TIMEOUT_SECS,
+        },
+        "general",
+      );
+      argv.browserStartTimeout = BROWSER_STARTUP_TIMEOUT_SECS;
     }
 
     if (argv.saveStorage) {

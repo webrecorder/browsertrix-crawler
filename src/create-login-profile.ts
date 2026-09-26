@@ -15,7 +15,11 @@ import { Browser } from "./util/browser.js";
 import { initStorage } from "./util/storage.js";
 import { CDPSession, Page, PuppeteerLifeCycleEvent } from "puppeteer-core";
 import { getInfoString } from "./util/file_reader.js";
-import { DISPLAY, ExitCodes } from "./util/constants.js";
+import {
+  DISPLAY,
+  ExitCodes,
+  BROWSER_STARTUP_TIMEOUT_SECS,
+} from "./util/constants.js";
 import { initProxy, loadProxyConfig } from "./util/proxy.js";
 import { sleep } from "./util/timing.js";
 
@@ -117,6 +121,13 @@ function initArgs() {
         default: getDefaultWindowSize(),
       },
 
+      browserStartTimeout: {
+        describe:
+          "Timeout (in seconds) for the browser process to start and connect. Raise this on hosts under high load where browser startup is slow.",
+        type: "number",
+        default: BROWSER_STARTUP_TIMEOUT_SECS,
+      },
+
       cookieDays: {
         describe:
           "If >0, set all cookies, including session cookies, to have this duration in days before saving profile",
@@ -208,6 +219,7 @@ async function main() {
     profileUrl: params.profile,
     headless: params.headless,
     signals: false,
+    browserStartTimeout: params.browserStartTimeout,
     chromeOptions: {
       proxyServer,
       proxyPacUrl,
