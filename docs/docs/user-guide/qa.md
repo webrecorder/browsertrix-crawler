@@ -92,7 +92,7 @@ You can use the following CLI arguments for this:
 
   - `qaPolicy`: can be one of `linear`, `regex` or `random`.
   - `qaRegex`: if `qaPolicy` is `regex`, then you can define your regular expression here.
-  - `qaProbability`: if `qaPolicy` is `random`, you can define your per-page QA probability here. This is a floating-point number between 0 and 1.
+  - `qaPagePercentage`: if `qaPolicy` is `random`, you can define the percentage of pages to select at random. This is a floating-point number between 0 and 1.
   - `pageLimit`: the maximum number of pages to perform QA on (same argument as for a regular crawl)
 
 ### QA Policy: `linear`
@@ -111,17 +111,16 @@ This will match all english Wikipedia articles that start with `R`.
 
 ### QA policy: `random`
 
-In this QA mode, pages will be scanned with a probability equal to `qaProbability`. This is a floating-point number between `0` and `1`. Example:
+This policy allows for performing QA on a random sampling of pages defined by either
+percentage or total page limit. The pages will be selected at random, up to `qaPagePercentage`% of pages, or up to the pageLimit, whichever is smaller. The `qaPagePercentage`, if specified, should be between 0 and 1.
 
-    # with a crawl of 100 pages, will include a sample of approximately 30 pages
-    --qaPolicy "random" --qaProbability 0.3
-
-    # with a crawl of 100 pages, will include at most 10
-    --qaPolicy "random" --qaProbability 0.3 --pageLimit 10
-
-This policy allows for performing QA on a random sampling of pages, with approximately qaProbability of the
-pages included. Note that pageLimit, if provided, is always enforced, and will not be exceeded.
-
+    # with a crawl of 100 pages, will include a sample of 30 pages
+    --qaPolicy "random" --qaPagePercentage 0.3
+    
+    # with a crawl of 100 pages, will include at most 10, since pageLimit is smaller
+    --qaPolicy "random" --qaPagePercentage 0.3 --pageLimit 10
+    
+    
 ### Maximum number of pages to scan
 
 In every case mentioned above, the number of pages that will be queued for scanning will be at most `pageLimit`.

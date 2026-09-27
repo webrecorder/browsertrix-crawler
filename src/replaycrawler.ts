@@ -74,10 +74,12 @@ export class ReplayCrawler extends Crawler {
   // QA policies
   qaPolicy: string = "";
   qaRegex: RegExp = new RegExp("^https?:\\/\\/\\S+$");
-  qaProbability: number = 0.3;
+  qaPagePercentage: number = 0;
 
   // for qaDebugImageDiff incremental file output
   counter: number = 0;
+
+  totalPages = 0;
 
   constructor() {
     super();
@@ -118,8 +120,8 @@ export class ReplayCrawler extends Crawler {
     if (this.params.qaRegex) {
       this.qaRegex = new RegExp(this.params.qaRegex);
     }
-    if (this.params.qaProbability) {
-      this.qaProbability = this.params.qaProbability;
+    if (this.params.qaPagePercentage) {
+      this.qaPagePercentage = this.params.qaPagePercentage;
     }
   }
 
@@ -247,6 +249,8 @@ export class ReplayCrawler extends Crawler {
         "replay",
       );
     }
+
+    await this.updatePageCount(count);
   }
 
   async _addPageIfInScope({ url, ts, id, mime }: ReplayPage, depth: number) {
@@ -276,36 +280,31 @@ export class ReplayCrawler extends Crawler {
       }
     }
 
-    // Apply the chosen auto-QA policy
-    // Have we reached the maximum amount of pages allowed?
-    let shouldQueue = false;
-
-    switch (this.qaPolicy) {
-      case "regex":
-        shouldQueue = this.qaRegex.test(url);
-        break;
-
-      case "random":
-        shouldQueue = Math.random() < this.qaProbability;
-        break;
-
-      case "linear":
-      default:
-        // Default is identical to "linear"
-        shouldQueue = true;
-        break;
+    // If regex provided, filter out URL if no match
+    if (this.qaRegex && !this.qaRegex.test(url)) {
+      return;
     }
 
-    if (shouldQueue) {
-      // Queue it!
-      await this.queueUrl({
-        seedId: 0,
-        url,
-        depth,
-        extraHops: 0,
-        ts,
-        pageid: id,
-      });
+    let score = undefined;
+
+    if (this.qaPolicy === "random") {
+      score = Math.random();
+    }
+
+    const entry = {
+      seedId: 0,
+      url,
+      depth,
+      extraHops: 0,
+      ts,
+      pageid: id,
+      score,
+    };
+
+    if (this.qaPolicy === "random") {
+      await this.crawlState.addToRandomSampleSet(entry);
+    } else {
+      await this.queueUrl(entry);
     }
   }
 
@@ -319,6 +318,21 @@ export class ReplayCrawler extends Crawler {
         break;
       }
       await this._addPageIfInScope(entry, depth++);
+    }
+
+    await this.updatePageCount(pages.length);
+  }
+
+  async updatePageCount(count: number) {
+    this.totalPages += count;
+    if (this.qaPolicy === "random") {
+      const limit =
+        this.qaPagePercentage > 0
+          ? Math.round(this.qaPagePercentage * this.totalPages)
+          : this.pageLimit;
+      if (limit > 0) {
+        await this.crawlState.addRandomSample(limit);
+      }
     }
   }
 

@@ -62,6 +62,7 @@ export type QueueEntry = {
   pageid?: string;
   retry?: number;
   ignoreScope?: boolean;
+  score?: number;
 };
 
 // ============================================================================
@@ -1448,6 +1449,32 @@ return inx;
     });
   }
 
+  async addToRandomSampleSet(entry: QueueEntry) {
+    const key = `${this.uid}:qaSample`;
+    await this.redis.sadd(key, JSON.stringify(entry));
+  }
+
+  async addRandomSample(count: number) {
+    const key = `${this.uid}:qaSample`;
+    let added = 0;
+    try {
+      for (let i = 0; i < count; i++) {
+        const res = await this.redis.spop(key);
+        if (!res) {
+          await this.redis.del();
+          return added;
+        }
+
+        const data: QueueEntry = JSON.parse(res);
+        await this.addToQueue(data);
+        added++;
+      }
+      return added;
+    } finally {
+      await this.redis.del(key);
+    }
+  }
+
   async addToQueue(
     {
       url,
@@ -1457,6 +1484,7 @@ return inx;
       ts = 0,
       pageid = undefined,
       ignoreScope = undefined,
+      score = undefined,
     }: QueueEntry,
     limit = 0,
   ) {
@@ -1487,7 +1515,7 @@ return inx;
       this.esKey,
       this.exKey,
       url,
-      this._getScore(data),
+      score ?? this._getScore(data),
       JSON.stringify(data),
       limit,
     );
@@ -1998,4 +2026,6 @@ return inx;
     }
     return crawlIds;
   }
+
+  async incrQAPageCount() {}
 }

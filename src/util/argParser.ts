@@ -747,9 +747,9 @@ class ArgParser {
           type: "string",
         },
 
-        qaProbability: {
+        qaPagePercentage: {
           describe:
-            "if the QA policy is 'random', then the probability of processing a URL is specified here",
+            "if the QA policy is 'random', percentage of pages to QA, if no pageLimit is provided",
           type: "number",
         },
 
