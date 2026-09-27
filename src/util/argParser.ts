@@ -136,7 +136,7 @@ class ArgParser {
 
         maxPageLimit: {
           describe:
-            "Maximum pages to crawl, overriding  pageLimit if both are set",
+            "Maximum pages to crawl, overriding pageLimit if both are set",
           default: 0,
           type: "number",
         },
@@ -725,12 +725,6 @@ class ArgParser {
           describe:
             "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
           type: "boolean",
-        },
-
-        qaMaxUrls: {
-          describe:
-            "if specified, will set the maximum number of pages to include in the QA process",
-          type: "number",
         },
 
         qaPolicy: {
