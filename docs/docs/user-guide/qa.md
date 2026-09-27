@@ -90,22 +90,22 @@ These algorithms are: *linear* (first come first serve), *regex* (define a regul
 
 You can use the following CLI arguments for this:
 
-  - `qaMaxUrls`: the maximum number of pages to perform QA on.
   - `qaPolicy`: can be one of `linear`, `regex` or `random`.
   - `qaRegex`: if `qaPolicy` is `regex`, then you can define your regular expression here.
   - `qaProbability`: if `qaPolicy` is `random`, you can define your per-page QA probability here. This is a floating-point number between 0 and 1.
+  - `pageLimit`: the maximum number of pages to perform QA on (same argument as for a regular crawl)
   
 ### QA Policy: `linear`
 
-In this QA mode, the first `qaMaxUrls` pages in the `pages.jsonl` file(s) will be scanned. Example:
+In this QA mode, the first `pageLimit` pages in the `pages.jsonl` file(s) will be scanned. Example:
 
-    --qaPolicy "linear" --qaMaxUrls 50
+    --qaPolicy "linear" --pageLimit 50
     
 ### QA Policy: `regex`
 
 In this QA mode, only the pages that match the regular expression in `qaRegex` will be scanned. Example:
 
-    --qaPolicy "regex" --qaRegex='^https:\/\/en\.wikipedia\.org\/wiki\/R.*$' --qaMaxUrls 50
+    --qaPolicy "regex" --qaRegex='^https:\/\/en\.wikipedia\.org\/wiki\/R.*$' --pageLimit 50
     
 This will match all english Wikipedia articles that start with `R`.
 
@@ -113,13 +113,18 @@ This will match all english Wikipedia articles that start with `R`.
 
 In this QA mode, pages will be scanned with a probability equal to `qaProbability`. This is a floating-point number between `0` and `1`. Example:
 
-    --qaPolicy "random" --qaProbability 0.3 --qaMaxUrls 50
+    # with a crawl of 100 pages, will include a sample of approximately 30 pages
+    --qaPolicy "random" --qaProbability 0.3
     
-This policy allows to get a good overall impression of a harvest by scanning a random sample of it.
+    # with a crawl of 100 pages, will include at most 10
+    --qaPolicy "random" --qaProbability 0.3 --pageLimit 10
+    
+This policy allows for performing QA on a random sampling of pages, with approximately qaProbability of the
+pages included. Note that pageLimit, if provided, is always enforced, and will not be exceeded.
     
 ### Maximum number of pages to scan
 
-In every case mentioned above, the number of pages that will be queued for scanning will be at most `qaMaxUrls`.
+In every case mentioned above, the number of pages that will be queued for scanning will be at most `pageLimit`.
 
 ## Usage with the Browsertrix UI
 

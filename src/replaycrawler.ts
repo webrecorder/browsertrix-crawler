@@ -72,7 +72,6 @@ export class ReplayCrawler extends Crawler {
   excludeRx: RegExp[];
 
   // QA policies
-  qaMaxUrls: number = Number.MAX_SAFE_INTEGER;
   qaPolicy: string = "";
   qaRegex: RegExp = new RegExp("^https?:\\/\\/\\S+$");
   qaProbability: number = 0.3;
@@ -113,9 +112,6 @@ export class ReplayCrawler extends Crawler {
     this.excludeRx = parseRx(this.params.scopeExcludeRx);
 
     // Set the QA policies
-    if (this.params.qaMaxUrls) {
-      this.qaMaxUrls = this.params.qaMaxUrls;
-    }
     if (this.params.qaPolicy) {
       this.qaPolicy = this.params.qaPolicy;
     }
@@ -285,10 +281,6 @@ export class ReplayCrawler extends Crawler {
     let shouldQueue = false;
 
     switch (this.qaPolicy) {
-      case "linear":
-        shouldQueue = true;
-        break;
-
       case "regex":
         shouldQueue = this.qaRegex.test(url);
         break;
@@ -297,6 +289,7 @@ export class ReplayCrawler extends Crawler {
         shouldQueue = Math.random() < this.qaProbability;
         break;
 
+      case "linear":
       default:
         // Default is identical to "linear"
         shouldQueue = true;
@@ -304,14 +297,6 @@ export class ReplayCrawler extends Crawler {
     }
 
     if (shouldQueue) {
-      // Have we reached the maximum amount of pages allowed?
-      const count = await this.getRedis().incr(`qaPageCount-${this.crawlId}`);
-      if (count > this.qaMaxUrls) {
-        // Rollback
-        await this.getRedis().decr(`qaPageCount-${this.crawlId}`);
-        return;
-      }
-
       // Queue it!
       await this.queueUrl({
         seedId: 0,
