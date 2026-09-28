@@ -1,0 +1,12 @@
+docker run --rm \
+  -v "$PWD/crawl-config.yaml:/app/crawl-config.yaml:ro" \
+  -v "$PWD/crawls:/crawls" \
+  -v "$PWD/crawls/age_form.js:/custom-behaviors/age_form.js:ro" \
+  webrecorder/browsertrix-crawler crawl \
+  --config /app/crawl-config.yaml \
+  --customBehaviors /custom-behaviors/age_form.js \
+  --limit 51 \
+  --depth 1 \
+  --workers 1 \
+  --collection co_base \
+  --generateWACZ

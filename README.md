@@ -6,6 +6,20 @@ For information on how to use and develop Browsertrix Crawler, see the hosted [B
 
 For information on how to build the docs locally, see the [docs page](docs/docs/develop/docs.md).
 
+## Agent-assisted crawling example
+
+This branch adds a custom behavior for pages where normal crawling may be blocked by an interactive gate. At a high level, the behavior checks whether agent assistance is needed, requests suggested actions from a local listener, executes those actions, and then reevaluates the page. Without the custom behavior, a crawl of the included age-gate examples captures only the gate; with it enabled, the crawler can reach and capture the content behind the gate.
+
+The example seeds are listed in `crawl-config.yaml`. From the repository root, run:
+
+```sh
+python listener.py
+# In another terminal:
+bash dkr_cmd.txt
+```
+
+The Docker command uses `$PWD`, so it does not depend on a particular user's home-directory path. The listener expects the Codex CLI to be installed and authenticated on the host.
+
 
 ## Support
 Initial support for 0.x version of Browsertrix Crawler, was provided by [Kiwix](https://kiwix.org/). The initial functionality for Browsertrix Crawler was developed to support the [zimit](https://github.com/openzim/zimit) project in a collaboration between Webrecorder and Kiwix, and this project has been split off from Zimit into a core component of Webrecorder.

@@ -76,6 +76,8 @@ import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
+import { agentBridge, BrowserObservation } from "./util/agentBridge.js";
+import { executeAgentAction, type AgentAction } from "./util/agentAction.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -897,6 +899,12 @@ export class Crawler {
     }
 
     await page.exposeFunction(BxFunctionBindings.AddLinkFunc, addLink);
+    await page.exposeFunction(BxFunctionBindings.agentBridge, (observation: BrowserObservation, listenerUrl: string) =>
+      agentBridge(page, observation, listenerUrl),);
+    await page.exposeFunction(
+      BxFunctionBindings.ExecuteAgentAction,
+      (action: AgentAction) => executeAgentAction(page, action),
+    );
 
     // used for both behaviors and link extraction now
     await this.browser.addInitScript(page, btrixBehaviors);

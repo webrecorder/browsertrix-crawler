@@ -38,6 +38,8 @@ export enum BxFunctionBindings {
   NextFlowStep = "__bx_nextFlowStep",
 
   ContentCheckFailed = "__bx_contentCheckFailed",
+  agentBridge = "__bx_agentBridge",
+  ExecuteAgentAction = "__bx_executeAgentAction"
 }
 
 export const MAX_DEPTH = 1000000;
