@@ -2990,7 +2990,6 @@ self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
     ts = 0,
     pageid = undefined,
     ignoreScope = false,
-    score = undefined,
   }: {
     seedId: number;
     url: string;
@@ -3000,7 +2999,6 @@ self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
     ts?: number;
     pageid?: string;
     ignoreScope?: boolean;
-    score?: number;
   }) {
     if (this.limitHit) {
       logger.debug(
@@ -3026,7 +3024,7 @@ self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
     }
 
     const result = await this.crawlState.addToQueue(
-      { url, seedId, depth, extraHops, ts, pageid, ignoreScope, score },
+      { url, seedId, depth, extraHops, ts, pageid, ignoreScope },
       this.queuePageLimit,
     );
 

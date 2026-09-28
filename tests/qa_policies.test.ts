@@ -63,7 +63,7 @@ test("run initial crawl with text and screenshots to prepare for QA", async () =
 });
 
 test("QA policy: first 3 pages", () => {
-  runCrawl("qa-policy-linear-3-pages", "--limit 3 --qaPolicy linear");
+  runCrawl("qa-policy-linear-3-pages", "--limit 3");
 
   const pages = readPages("qa-policy-linear-3-pages");
   expect(pages.length).toBe(3);
@@ -71,10 +71,7 @@ test("QA policy: first 3 pages", () => {
 });
 
 test("QA policy: regex match ", () => {
-  runCrawl(
-    "qa-policy-regex-match",
-    "--qaPolicy regex --qaRegex /2024/ --limit 2",
-  );
+  runCrawl("qa-policy-regex-match", "--qaRegex /2024/ --limit 2");
 
   const pages = readPages("qa-policy-regex-match");
   expect(pages.length).toBe(2);
@@ -83,17 +80,8 @@ test("QA policy: regex match ", () => {
   }
 });
 
-test("QA policy: random sample with probability ", () => {
-  runCrawl("qa-random-sample-prob", "--qaPolicy random --qaPagePercentage 0.2");
-
-  const pages = readPages("qa-random-sample-prob");
-  expect(pages.length).toBe(2);
-
-  notDeepEqual(pages, allPages.slice(0, 2));
-});
-
-test("QA policy: random sample pageLimit", () => {
-  runCrawl("qa-random-sample-limit", "--qaPolicy random --limit 3");
+test("QA policy: random sample pageLimit 3", () => {
+  runCrawl("qa-random-sample-limit", "--qaRandom --limit 3");
 
   const pages = readPages("qa-random-sample-limit");
   expect(pages.length).toBe(3);
@@ -101,12 +89,11 @@ test("QA policy: random sample pageLimit", () => {
   notDeepEqual(pages, allPages.slice(0, 3));
 });
 
-test("QA policy: random sample + pageLimit ", () => {
-  runCrawl(
-    "qa-policy-random-sample-2",
-    "--qaPolicy random --qaProbability 0.5 --pageLimit 3",
-  );
+test("QA policy: random sample pageLimit 5", () => {
+  runCrawl("qa-random-sample-limit-2", "--qaRandom --limit 5");
 
-  const pages = readPages("qa-policy-random-sample-2");
-  expect(pages.length).toBeLessThanOrEqual(3);
+  const pages = readPages("qa-random-sample-limit-2");
+  expect(pages.length).toBe(5);
+
+  notDeepEqual(pages, allPages.slice(0, 5));
 });

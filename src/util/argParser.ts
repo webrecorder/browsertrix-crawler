@@ -54,6 +54,8 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   exclude: string[];
   sitemap: boolean;
 
+  qaRegex: string[];
+
   crawlId: string;
 
   saveProfile?: string;
@@ -735,21 +737,20 @@ class ArgParser {
           type: "boolean",
         },
 
-        qaPolicy: {
+        qaRandom: {
           describe:
-            "defines the kind of QA to perform, can be one of 'linear', 'regex' or 'random'",
-          type: "string",
+            "if set, QA a random sample of pages. Must be paired with --qaPercent or --pageLimit",
+          type: "boolean",
         },
 
         qaRegex: {
-          describe:
-            "if the QA policy is 'regex', then the regular expression is specified here",
-          type: "string",
+          describe: "Only QA pages that match specified regex",
+          type: "array",
+          default: [],
         },
 
-        qaPagePercentage: {
-          describe:
-            "if the QA policy is 'random', percentage of pages to QA, if no pageLimit is provided",
+        qaPercent: {
+          describe: "if random sampling, aim for fixed percent of total pages",
           type: "number",
         },
 

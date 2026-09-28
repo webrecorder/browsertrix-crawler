@@ -62,7 +62,6 @@ export type QueueEntry = {
   pageid?: string;
   retry?: number;
   ignoreScope?: boolean;
-  score?: number;
 };
 
 // ============================================================================
@@ -205,6 +204,14 @@ declare module "ioredis" {
       skey: string,
       url: string,
       seedData: string,
+    ): Result<number, Context>;
+
+    addtoreservoir(
+      setKey: string,
+      incrKey: string,
+      value: string,
+      limit: number,
+      random: number,
     ): Result<number, Context>;
   }
 }
@@ -1088,6 +1095,21 @@ redis.call('sadd', KEYS[3], ARGV[2]);
 return inx;
 `,
     });
+
+    redis.defineCommand("addtoreservoir", {
+      numberOfKeys: 2,
+      lua: `
+  local k = tonumber(ARGV[2]);
+  local N = redis.call('incr', KEYS[2]);
+
+  if N <= k then
+      redis.call('sadd', KEYS[1], ARGV[1]);
+  elseif tonumber(ARGV[3]) < (k / N) then
+      redis.call('spop', KEYS[1]);
+      redis.call('sadd', KEYS[1], ARGV[1]);
+  end
+      `,
+    });
   }
 
   async _getNext() {
@@ -1449,29 +1471,28 @@ return inx;
     });
   }
 
-  async addToRandomSampleSet(entry: QueueEntry) {
-    const key = `${this.uid}:qaSample`;
-    await this.redis.sadd(key, JSON.stringify(entry));
+  async addToReservoir(entry: QueueEntry, limit: number) {
+    const key = `${this.crawlId}:qaReservoir`;
+    const value = JSON.stringify(entry);
+
+    await this.redis.addtoreservoir(
+      key,
+      key + ":c",
+      value,
+      limit,
+      Math.random(),
+    );
   }
 
-  async addRandomSample(count: number) {
-    const key = `${this.uid}:qaSample`;
-    let added = 0;
-    try {
-      for (let i = 0; i < count; i++) {
-        const res = await this.redis.spop(key);
-        if (!res) {
-          await this.redis.del();
-          return added;
-        }
-
-        const data: QueueEntry = JSON.parse(res);
-        await this.addToQueue(data);
-        added++;
+  async queueReservoir() {
+    const key = `${this.crawlId}:qaReservoir`;
+    while (true) {
+      const res = await this.redis.spop(key);
+      if (!res) {
+        break;
       }
-      return added;
-    } finally {
-      await this.redis.del(key);
+      const data: QueueEntry = JSON.parse(res);
+      await this.addToQueue(data);
     }
   }
 
@@ -1484,7 +1505,6 @@ return inx;
       ts = 0,
       pageid = undefined,
       ignoreScope = undefined,
-      score = undefined,
     }: QueueEntry,
     limit = 0,
   ) {
@@ -1515,7 +1535,7 @@ return inx;
       this.esKey,
       this.exKey,
       url,
-      score ?? this._getScore(data),
+      this._getScore(data),
       JSON.stringify(data),
       limit,
     );
@@ -2026,6 +2046,4 @@ return inx;
     }
     return crawlIds;
   }
-
-  async incrQAPageCount() {}
 }

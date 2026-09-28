@@ -72,9 +72,9 @@ export class ReplayCrawler extends Crawler {
   excludeRx: RegExp[];
 
   // QA policies
-  qaPolicy: string = "";
-  qaRegex: RegExp = new RegExp("^https?:\\/\\/\\S+$");
-  qaPagePercentage: number = 0;
+  qaRandom = false;
+  qaRegex: RegExp[];
+  qaPercent: number;
 
   // for qaDebugImageDiff incremental file output
   counter: number = 0;
@@ -114,15 +114,9 @@ export class ReplayCrawler extends Crawler {
     this.excludeRx = parseRx(this.params.scopeExcludeRx);
 
     // Set the QA policies
-    if (this.params.qaPolicy) {
-      this.qaPolicy = this.params.qaPolicy;
-    }
-    if (this.params.qaRegex) {
-      this.qaRegex = new RegExp(this.params.qaRegex);
-    }
-    if (this.params.qaPagePercentage) {
-      this.qaPagePercentage = this.params.qaPagePercentage;
-    }
+    this.qaRandom = this.params.qaRandom ?? false;
+    this.qaRegex = this.params.qaRegex.map((x) => new RegExp(x));
+    this.qaPercent = this.params.qaPercent ?? 0;
   }
 
   async bootstrap(): Promise<void> {
@@ -175,6 +169,10 @@ export class ReplayCrawler extends Crawler {
 
   protected async _addInitialSeeds() {
     await this.loadPages(this.qaSource);
+
+    if (this.qaRandom && this.pageLimit > 0) {
+      await this.crawlState.queueReservoir();
+    }
   }
 
   async isInScope() {
@@ -249,8 +247,6 @@ export class ReplayCrawler extends Crawler {
         "replay",
       );
     }
-
-    await this.updatePageCount(count);
   }
 
   async _addPageIfInScope({ url, ts, id, mime }: ReplayPage, depth: number) {
@@ -281,14 +277,26 @@ export class ReplayCrawler extends Crawler {
     }
 
     // If regex provided, filter out URL if no match
-    if (this.qaRegex && !this.qaRegex.test(url)) {
-      return;
+    if (this.qaRegex.length) {
+      let matched = false;
+      for (const r of this.qaRegex) {
+        if (r.test(url)) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        return;
+      }
     }
 
-    let score = undefined;
-
-    if (this.qaPolicy === "random") {
-      score = Math.random();
+    if (
+      this.qaRandom &&
+      !this.pageLimit &&
+      this.qaPercent > 0 &&
+      Math.random() >= this.qaPercent
+    ) {
+      return;
     }
 
     const entry = {
@@ -298,11 +306,10 @@ export class ReplayCrawler extends Crawler {
       extraHops: 0,
       ts,
       pageid: id,
-      score,
     };
 
-    if (this.qaPolicy === "random") {
-      await this.crawlState.addToRandomSampleSet(entry);
+    if (this.qaRandom && this.pageLimit > 0) {
+      await this.crawlState.addToReservoir(entry, this.pageLimit);
     } else {
       await this.queueUrl(entry);
     }
@@ -318,21 +325,6 @@ export class ReplayCrawler extends Crawler {
         break;
       }
       await this._addPageIfInScope(entry, depth++);
-    }
-
-    await this.updatePageCount(pages.length);
-  }
-
-  async updatePageCount(count: number) {
-    this.totalPages += count;
-    if (this.qaPolicy === "random") {
-      const limit =
-        this.qaPagePercentage > 0
-          ? Math.round(this.qaPagePercentage * this.totalPages)
-          : this.pageLimit;
-      if (limit > 0) {
-        await this.crawlState.addRandomSample(limit);
-      }
     }
   }
 
