@@ -24,6 +24,7 @@ import {
   RateLimitRule,
   DEFAULT_MAX_RATE_LIMIT_RETRIES,
   ExitCodes,
+  BROWSER_STARTUP_TIMEOUT_SECS,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -424,6 +425,13 @@ class ArgParser {
           type: "string",
         },
 
+        browserStartTimeout: {
+          describe:
+            "Timeout (in seconds) for the browser process to start and connect. Raise this on hosts under high load where browser startup is slow.",
+          default: BROWSER_STARTUP_TIMEOUT_SECS,
+          type: "number",
+        },
+
         saveProfile: {
           describe:
             "If set, save profile if crawl succeeded successfully. If no value provided, save back to save location as specified in --profile",
@@ -764,7 +772,7 @@ class ArgParser {
           describe:
             "If set, write information about URLs encountered but not queued to reports/skippedPages.jsonl",
           type: "boolean",
-          default: false,
+          default: true,
         },
 
         rateLimitStatusCodes: {
@@ -904,7 +912,6 @@ class ArgParser {
         }
       });
       behaviorOpts.log = BxFunctionBindings.BehaviorLogFunc;
-      behaviorOpts.startEarly = true;
       behaviorOpts.clickSelector = argv.clickSelector;
       argv.behaviorOpts = JSON.stringify(behaviorOpts);
     } else {
@@ -988,6 +995,18 @@ class ArgParser {
 
     if (argv.diskUtilization < 0 || argv.diskUtilization > 99) {
       argv.diskUtilization = 90;
+    }
+
+    if (!(argv.browserStartTimeout > 0)) {
+      logger.warn(
+        "Invalid --browserStartTimeout, using default",
+        {
+          value: argv.browserStartTimeout,
+          default: BROWSER_STARTUP_TIMEOUT_SECS,
+        },
+        "general",
+      );
+      argv.browserStartTimeout = BROWSER_STARTUP_TIMEOUT_SECS;
     }
 
     if (argv.saveStorage) {

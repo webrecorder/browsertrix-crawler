@@ -34,6 +34,30 @@ function connectAndReadFirstMessage(url: string) {
   });
 }
 
+function connectAndReadFirstScreencast(url: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return new Promise<any>((resolve, reject) => {
+    const sock = new WebSocket(url);
+    const timer = setTimeout(() => {
+      sock.terminate();
+      reject(new Error("timed out waiting for screencast frame"));
+    }, 10000);
+    sock.on("message", (data) => {
+      const parsed = JSON.parse(data.toString());
+      if (parsed.msg !== "screencast" || !parsed.url) {
+        return;
+      }
+      clearTimeout(timer);
+      sock.close();
+      resolve(parsed);
+    });
+    sock.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
 test("screencast server sends init message to websocket client during crawl", async () => {
   containerId = child_process
     .execSync(
@@ -66,4 +90,9 @@ test("screencast server sends init message to websocket client during crawl", as
   expect(firstMessage.browsers).toBe(1);
   expect(firstMessage.width).toBeGreaterThan(0);
   expect(firstMessage.height).toBeGreaterThan(0);
+
+  const screencastMessage = await connectAndReadFirstScreencast(
+    "ws://localhost:39037/ws",
+  );
+  expect(screencastMessage.url).toContain("example-com.webrecorder.net");
 }, 120000);

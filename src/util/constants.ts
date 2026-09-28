@@ -31,6 +31,7 @@ export const DUPE_CANCELED_CRAWLS = "canceledcrawls";
 export enum BxFunctionBindings {
   BehaviorLogFunc = "__bx_log",
   AddLinkFunc = "__bx_addLink",
+  AddLinkBatchFunc = "__bx_addLinkBatch",
   FetchFunc = "__bx_fetch",
   AddToSeenSet = "__bx_addSet",
 
@@ -40,6 +41,8 @@ export enum BxFunctionBindings {
   ContentCheckFailed = "__bx_contentCheckFailed",
   agentBridge = "__bx_agentBridge",
   ExecuteAgentAction = "__bx_executeAgentAction"
+
+  RegisterFrame = "__bx_registerFrame",
 }
 
 export const MAX_DEPTH = 1000000;
@@ -48,6 +51,11 @@ export const DEFAULT_MAX_RETRIES = 2;
 export const FETCH_HEADERS_TIMEOUT_SECS = 30;
 export const PAGE_OP_TIMEOUT_SECS = 5;
 export const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
+
+// time to wait (in seconds) for the browser process to start and the
+// devtools connection to be established before puppeteer.launch() times out.
+// can be raised via --browserStartTimeout on hosts where browser startup is slow.
+export const BROWSER_STARTUP_TIMEOUT_SECS = 30;
 
 export const ROBOTS_CACHE_LIMIT = 100;
 
