@@ -974,11 +974,15 @@ export class Crawler {
     }
 
     await page.exposeFunction(BxFunctionBindings.AddLinkFunc, addLink);
-    await page.exposeFunction(BxFunctionBindings.agentBridge, (observation: BrowserObservation, listenerUrl: string) =>
-      agentBridge(page, observation, listenerUrl),);
+    await page.exposeFunction(
+      BxFunctionBindings.agentBridge,
+      (observation: BrowserObservation, listenerUrl: string) =>
+        agentBridge(page, observation, listenerUrl),
+    );
     await page.exposeFunction(
       BxFunctionBindings.ExecuteAgentAction,
       (action: AgentAction) => executeAgentAction(page, action),
+    );
     await page.exposeFunction(
       BxFunctionBindings.AddLinkBatchFunc,
       addLinkBatch,
