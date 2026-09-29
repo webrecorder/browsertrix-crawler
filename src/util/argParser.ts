@@ -137,7 +137,7 @@ class ArgParser {
 
         maxPageLimit: {
           describe:
-            "Maximum pages to crawl, overriding  pageLimit if both are set",
+            "Maximum pages to crawl, overriding pageLimit if both are set",
           default: 0,
           type: "number",
         },
@@ -733,6 +733,24 @@ class ArgParser {
           describe:
             "if specified, will write crawl.png, replay.png and diff.png for each page where they're different",
           type: "boolean",
+        },
+
+        qaPolicy: {
+          describe:
+            "defines the kind of QA to perform, can be one of 'linear', 'regex' or 'random'",
+          type: "string",
+        },
+
+        qaRegex: {
+          describe:
+            "if the QA policy is 'regex', then the regular expression is specified here",
+          type: "string",
+        },
+
+        qaProbability: {
+          describe:
+            "if the QA policy is 'random', then the probability of processing a URL is specified here",
+          type: "number",
         },
 
         sshProxyPrivateKeyFile: {

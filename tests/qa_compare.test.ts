@@ -4,7 +4,10 @@ import { Redis } from "ioredis";
 import { sleep } from "./utils";
 
 test("run initial crawl with text and screenshots to prepare for QA", async () => {
-  fs.rmSync("./test-crawls/qa-wr-net", { recursive: true, force: true });
+  fs.rmSync("./test-crawls/collections/qa-wr-net", {
+    recursive: true,
+    force: true,
+  });
 
   child_process.execSync(
     "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --url https://old.webrecorder.net/ --url https://old.webrecorder.net/about --url https://archiveweb.page/ --url https://old.webrecorder.net/contact --scopeType page --collection qa-wr-net --text to-warc --screenshot view --generateWACZ",
@@ -16,7 +19,10 @@ test("run initial crawl with text and screenshots to prepare for QA", async () =
 });
 
 test("run QA comparison, with write pages to redis", async () => {
-  fs.rmSync("./test-crawls/qa-wr-net-replay", { recursive: true, force: true });
+  fs.rmSync("./test-crawls/collections/qa-wr-net-replay", {
+    recursive: true,
+    force: true,
+  });
 
   const child = child_process.exec(
     "docker run -p 36380:6379 -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler qa --qaSource /crawls/collections/qa-wr-net/qa-wr-net.wacz --collection qa-wr-net-replay --crawlId test --qaDebugImageDiff --writePagesToRedis --debugAccessRedis --exclude contact",
