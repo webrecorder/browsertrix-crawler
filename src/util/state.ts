@@ -1099,14 +1099,17 @@ return inx;
     redis.defineCommand("addtoreservoir", {
       numberOfKeys: 2,
       lua: `
-  local k = tonumber(ARGV[2]);
+  if redis.call('sadd', KEYS[1], ARGV[1]) == 0 then:
+    return 0
+  end
+
+  local T = tonumber(ARGV[2]);
   local N = redis.call('incr', KEYS[2]);
 
-  if N <= k then
-      redis.call('sadd', KEYS[1], ARGV[1]);
-  elseif tonumber(ARGV[3]) < (k / N) then
-      redis.call('spop', KEYS[1]);
-      redis.call('sadd', KEYS[1], ARGV[1]);
+  if N <= T then
+    return
+  elseif tonumber(ARGV[3]) < (T / N) then
+    redis.call('pop', KEYS[1]);
   end
       `,
     });
@@ -2045,5 +2048,14 @@ return inx;
       }
     }
     return crawlIds;
+  }
+
+  async isQAQueueDone() {
+    return (await this.redis.get(`${this.crawlId}:qaQ`)) == "1";
+  }
+
+  async markQAQueueDone() {
+    await this.queueReservoir();
+    await this.redis.set(`${this.crawlId}:qaQ`, "1");
   }
 }

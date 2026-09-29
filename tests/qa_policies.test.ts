@@ -2,8 +2,6 @@ import { deepEqual, notDeepEqual } from "assert";
 import child_process from "child_process";
 import fs from "fs";
 
-//const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
 let allPages: string[] = [];
 
 function readPageUrls(filename: string): string[] {
@@ -89,11 +87,6 @@ test("QA policy: random sample pageLimit 3", () => {
   notDeepEqual(pages, allPages.slice(0, 3));
 });
 
-test("QA policy: random sample pageLimit 5", () => {
-  runCrawl("qa-random-sample-limit-2", "--qaRandom --limit 5");
-
-  const pages = readPages("qa-random-sample-limit-2");
-  expect(pages.length).toBe(5);
-
-  notDeepEqual(pages, allPages.slice(0, 5));
+test("error: random with no page limit", () => {
+  expect(() => runCrawl("qa-random-sample-error", "--qaRandom")).toThrow();
 });

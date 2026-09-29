@@ -739,7 +739,7 @@ class ArgParser {
 
         qaRandom: {
           describe:
-            "if set, QA a random sample of pages. Must be paired with --qaPercent or --pageLimit",
+            "if set, QA a random sample of pages. Must be paired with --pageLimit",
           type: "boolean",
         },
 
@@ -747,11 +747,6 @@ class ArgParser {
           describe: "Only QA pages that match specified regex",
           type: "array",
           default: [],
-        },
-
-        qaPercent: {
-          describe: "if random sampling, aim for fixed percent of total pages",
-          type: "number",
         },
 
         sshProxyPrivateKeyFile: {

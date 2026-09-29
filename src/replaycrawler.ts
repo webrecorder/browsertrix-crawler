@@ -21,6 +21,7 @@ import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
 import { getFileOrUrlJson } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
+import { ExitCodes } from "./util/constants.js";
 
 // RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
@@ -74,7 +75,6 @@ export class ReplayCrawler extends Crawler {
   // QA policies
   qaRandom = false;
   qaRegex: RegExp[];
-  qaPercent: number;
 
   // for qaDebugImageDiff incremental file output
   counter: number = 0;
@@ -116,7 +116,15 @@ export class ReplayCrawler extends Crawler {
     // Set the QA policies
     this.qaRandom = this.params.qaRandom ?? false;
     this.qaRegex = this.params.qaRegex.map((x) => new RegExp(x));
-    this.qaPercent = this.params.qaPercent ?? 0;
+
+    if (this.qaRandom && !this.pageLimit) {
+      void logger.fatal(
+        "No pageLimit specified: Using qaRandom requires a fixed number of pages with pageLimit",
+        {},
+        "config",
+        ExitCodes.InvalidConfig,
+      );
+    }
   }
 
   async bootstrap(): Promise<void> {
@@ -168,11 +176,14 @@ export class ReplayCrawler extends Crawler {
   }
 
   protected async _addInitialSeeds() {
+    if (await this.crawlState.isQAQueueDone()) {
+      logger.info("QA pages already queued, skipping page load", "replay");
+      return;
+    }
+
     await this.loadPages(this.qaSource);
 
-    if (this.qaRandom && this.pageLimit > 0) {
-      await this.crawlState.queueReservoir();
-    }
+    await this.crawlState.markQAQueueDone();
   }
 
   async isInScope() {
@@ -288,15 +299,6 @@ export class ReplayCrawler extends Crawler {
       if (!matched) {
         return;
       }
-    }
-
-    if (
-      this.qaRandom &&
-      !this.pageLimit &&
-      this.qaPercent > 0 &&
-      Math.random() >= this.qaPercent
-    ) {
-      return;
     }
 
     const entry = {
