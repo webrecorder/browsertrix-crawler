@@ -977,6 +977,13 @@ export class Crawler {
       addLinkBatch,
     );
 
+    // Forcibly disable media source extensions
+    await this.browser.addInitScript(
+      page,
+      `;Object.defineProperty(MediaSource, "isTypeSupported",\
+  {value: () => false, configurable: false, writable: false});`,
+    );
+
     // used for both behaviors and link extraction now
     await this.browser.addInitScript(page, btrixBehaviors);
 
