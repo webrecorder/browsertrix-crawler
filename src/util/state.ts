@@ -1099,7 +1099,7 @@ return inx;
     redis.defineCommand("addtoreservoir", {
       numberOfKeys: 2,
       lua: `
-  if redis.call('sadd', KEYS[1], ARGV[1]) == 0 then:
+  if redis.call('sismember', KEYS[1], ARGV[1]) == 1 then
     return 0
   end
 
@@ -1107,9 +1107,12 @@ return inx;
   local N = redis.call('incr', KEYS[2]);
 
   if N <= T then
-    return
+    redis.call('sadd', KEYS[1], ARGV[1]);
+    return 1;
   elseif tonumber(ARGV[3]) < (T / N) then
-    redis.call('pop', KEYS[1]);
+    redis.call('spop', KEYS[1]);
+    redis.call('sadd', KEYS[1], ARGV[1]);
+    return 2;
   end
       `,
     });
