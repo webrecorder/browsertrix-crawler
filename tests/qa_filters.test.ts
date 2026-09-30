@@ -39,6 +39,8 @@ function runCrawl(coll: string, extraOpts = "") {
   child_process.execSync(
     `docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler qa --qaSource /crawls/collections/wr-sample-for-qa/wr-sample-for-qa.wacz --collection ${coll} --qaDebugImageDiff ${extraOpts}`,
   );
+
+  return readPages(coll);
 }
 
 test("run initial crawl with text and screenshots to prepare for QA", async () => {
@@ -60,28 +62,25 @@ test("run initial crawl with text and screenshots to prepare for QA", async () =
   allPages = readPages("wr-sample-for-qa");
 });
 
-test("QA policy: first 3 pages", () => {
-  runCrawl("qa-policy-linear-3-pages", "--limit 3");
+test("QA: first 3 pages", () => {
+  const pages = runCrawl("qa-first-3-pages", "--limit 3");
 
-  const pages = readPages("qa-policy-linear-3-pages");
   expect(pages.length).toBe(3);
   deepEqual(pages, allPages.slice(0, 3));
 });
 
-test("QA policy: regex match ", () => {
-  runCrawl("qa-policy-regex-match", "--qaRegex /2024/ --limit 2");
+test("QA: regex match ", () => {
+  const pages = runCrawl("qa-regex-match", "--qaRegex /2024/ --limit 2");
 
-  const pages = readPages("qa-policy-regex-match");
   expect(pages.length).toBe(2);
   for (const page of pages) {
     expect(page.indexOf("/2024/")).toBeGreaterThan(-1);
   }
 });
 
-test("QA policy: random sample pageLimit 3", () => {
-  runCrawl("qa-random-sample-limit", "--qaRandom --limit 3");
+test("QA: random sample pageLimit 3", () => {
+  const pages = runCrawl("qa-random-sample-limit", "--qaRandom --limit 3");
 
-  const pages = readPages("qa-random-sample-limit");
   expect(pages.length).toBe(3);
 
   notDeepEqual(pages, allPages.slice(0, 3));
@@ -89,4 +88,19 @@ test("QA policy: random sample pageLimit 3", () => {
 
 test("error: random with no page limit", () => {
   expect(() => runCrawl("qa-random-sample-error", "--qaRandom")).toThrow();
+});
+
+test("QA: random sample + regex --limit 3", () => {
+  const pages = runCrawl(
+    "qa-random-sample-regex",
+    "--qaRandom --qaRegex 202 --qaRegex about --limit 3",
+  );
+
+  expect(pages.length).toBe(3);
+
+  notDeepEqual(pages, allPages.slice(0, 3));
+
+  for (const page of pages) {
+    expect(page.indexOf("/202") > 0 || page.indexOf("/about") > 0).toBe(true);
+  }
 });
