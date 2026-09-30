@@ -72,9 +72,7 @@ export class ReplayCrawler extends Crawler {
   includeRx: RegExp[];
   excludeRx: RegExp[];
 
-  // QA policies
   qaRandom = false;
-  qaRegex: RegExp[];
 
   // for qaDebugImageDiff incremental file output
   counter: number = 0;
@@ -113,9 +111,7 @@ export class ReplayCrawler extends Crawler {
     this.includeRx = parseRx(this.params.scopeIncludeRx);
     this.excludeRx = parseRx(this.params.scopeExcludeRx);
 
-    // Set the QA policies
     this.qaRandom = this.params.qaRandom ?? false;
-    this.qaRegex = this.params.qaRegex.map((x) => new RegExp(x));
 
     if (this.qaRandom && !this.pageLimit) {
       void logger.fatal(
@@ -283,20 +279,6 @@ export class ReplayCrawler extends Crawler {
     for (const s of this.excludeRx) {
       if (s.test(url)) {
         logger.info("Skipping excluded page", { url }, "replay");
-        return;
-      }
-    }
-
-    // If regex provided, filter out URL if no match
-    if (this.qaRegex.length) {
-      let matched = false;
-      for (const r of this.qaRegex) {
-        if (r.test(url)) {
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) {
         return;
       }
     }

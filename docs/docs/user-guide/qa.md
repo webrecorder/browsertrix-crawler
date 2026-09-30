@@ -81,12 +81,12 @@ This data indicates that:
 
 ## QA Filtering and Sampling
 
-A few additional options exist in order to fine-tune the QA process. These include the ability to:
+Additional crawler flags can be used to further customize the QA process. These includes the ability to:
 - set total number of pages to QA
 - randomly sample pages to QA instead of loading pages in order they were captured.
 - filtering pages to QA by regex(s)
 
-### Limiting pages
+### Limiting Pages to QA
 
 By using the `--pageLimit N` option, the QA run will be limited to the first N pages, in the order
 the pages were crawled. To QA first 10 pages, use:
@@ -106,21 +106,19 @@ Using `--qaRandom` without specifying how many pages to sample will result in an
 
 ### Filtering pages
 
-Using one more `--qaRegex` will filter which pages to QA to only those that match one or more regexes.
+Existing crawler scoping options, `--scopeIncludeRx`/`--include` and `--scopeIncludeRx`/`--exclude` can be used
+to only include or exclude certain pages from the QA process.
+
 For example, the following will match pages from the crawl that start contain `example.com/R` or `example.org/S`:
 
-    --qaRegex=example.com/R --qaRegex=example.org/S
+    --include=example.com/R --include=example.org/S
 
-This regex filter can also combined with `--pageLimit` and `--qaRandom` to filter from the random selection of pages.
+These options can also combined with `--pageLimit` and `--qaRandom` to filter from the random selection of pages.
 To filter the pages by regex, and select at most 10 at random from the matching list, use.
 
-    --qaRegex=example.com/R --qaRegex=example.org/S --qaRandom --pageLimit 10
+    --include=example.com/R --include=example.org/S --qaRandom --pageLimit 10
 
-Note that pages are filtered by regex first, and the selected (either in order or randomly).
-    
-### Maximum number of pages to scan
-
-In every case mentioned above, the number of pages that will be queued for scanning will be at most `pageLimit`.
+Note that pages are filtered by inclusion/exclusion regexes first, and the selected (either in order or randomly).
 
 ## Usage with the Browsertrix UI
 

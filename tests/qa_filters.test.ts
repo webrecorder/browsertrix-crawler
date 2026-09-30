@@ -70,7 +70,7 @@ test("QA: first 3 pages", () => {
 });
 
 test("QA: regex match ", () => {
-  const pages = runCrawl("qa-regex-match", "--qaRegex /2024/ --limit 2");
+  const pages = runCrawl("qa-regex-match", "--include /2024/ --limit 2");
 
   expect(pages.length).toBe(2);
   for (const page of pages) {
@@ -93,7 +93,7 @@ test("error: random with no page limit", () => {
 test("QA: random sample + regex --limit 3", () => {
   const pages = runCrawl(
     "qa-random-sample-regex",
-    "--qaRandom --qaRegex 202 --qaRegex about --limit 3",
+    "--qaRandom --include 202 --include about --limit 3",
   );
 
   expect(pages.length).toBe(3);
