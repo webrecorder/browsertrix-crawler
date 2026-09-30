@@ -79,47 +79,44 @@ This data indicates that:
 - When comparing `urn:text:<url>` records from crawl and replay WACZs, the text is 90% similar.
 - When comparing `urn:pageinfo:<url>` resource entries from crawl and replay, the crawl record had 10 good responses (2xx/3xx status code) and 0 bad responses (4xx/5xx status code), while replay had 9 good and 1 bad.
 
-## QA Policies and Additional Options
+## QA Filtering and Sampling
 
-A few additional options and policies exist in order to fine-tune the QA process. These are:
+A few additional options exist in order to fine-tune the QA process. These include the ability to:
+- set total number of pages to QA
+- randomly sample pages to QA instead of loading pages in order they were captured.
+- filtering pages to QA by regex(s)
 
-- The ability to set a maximum page count for the QA run.
-- The ability to choose between 3 different QA algorithms.
+### Limiting pages
 
-These algorithms are: *linear* (first come first serve), *regex* (define a regular expression to perform QA only on URLs that match it), and *random* (define a probability for each page to be QA'd).
+By using the `--pageLimit N` option, the QA run will be limited to the first N pages, in the order
+the pages were crawled. To QA first 10 pages, use:
 
-You can use the following CLI arguments for this:
+    --pageLimit 10
 
-  - `qaPolicy`: can be one of `linear`, `regex` or `random`.
-  - `qaRegex`: if `qaPolicy` is `regex`, then you can define your regular expression here.
-  - `qaPagePercentage`: if `qaPolicy` is `random`, you can define the percentage of pages to select at random. This is a floating-point number between 0 and 1.
-  - `pageLimit`: the maximum number of pages to perform QA on (same argument as for a regular crawl)
+### Random Sampling pages
 
-### QA Policy: `linear`
+By using `--qaRandom` along with `--pageLimit`, it is possible to specify a random sample of N
+pages from the entire crawl. Each page has an equal chance of being selected.
+To QA 10 *randomly selected* pages from a crawl, use:
 
-In this QA mode, the first `pageLimit` pages in the `pages.jsonl` file(s) will be scanned. Example:
+    --qaRandom --pageLimit 10
 
-    --qaPolicy "linear" --pageLimit 50
+The random selection uses reservoir sampling to select exactly N pages.
+Using `--qaRandom` without specifying how many pages to sample will result in an immediate error.
 
-### QA Policy: `regex`
+### Filtering pages
 
-In this QA mode, only the pages that match the regular expression in `qaRegex` will be scanned. Example:
+Using one more `--qaRegex` will filter which pages to QA to only those that match one or more regexes.
+For example, the following will match pages from the crawl that start contain `example.com/R` or `example.org/S`:
 
-    --qaPolicy "regex" --qaRegex='^https:\/\/en\.wikipedia\.org\/wiki\/R.*$' --pageLimit 50
+    --qaRegex=example.com/R --qaRegex=example.org/S
 
-This will match all english Wikipedia articles that start with `R`.
+This regex filter can also combined with `--pageLimit` and `--qaRandom` to filter from the random selection of pages.
+To filter the pages by regex, and select at most 10 at random from the matching list, use.
 
-### QA policy: `random`
+    --qaRegex=example.com/R --qaRegex=example.org/S --qaRandom --pageLimit 10
 
-This policy allows for performing QA on a random sampling of pages defined by either
-percentage or total page limit. The pages will be selected at random, up to `qaPagePercentage`% of pages, or up to the pageLimit, whichever is smaller. The `qaPagePercentage`, if specified, should be between 0 and 1.
-
-    # with a crawl of 100 pages, will include a sample of 30 pages
-    --qaPolicy "random" --qaPagePercentage 0.3
-    
-    # with a crawl of 100 pages, will include at most 10, since pageLimit is smaller
-    --qaPolicy "random" --qaPagePercentage 0.3 --pageLimit 10
-    
+Note that pages are filtered by regex first, and the selected (either in order or randomly).
     
 ### Maximum number of pages to scan
 
@@ -132,7 +129,7 @@ A future release of [Browsertrix](https://github.com/webrecorder/browsertrix) wi
   1. Build the crawler Docker image as usual.
   2. Tag it as you wish and push it to local registry.
   3. Adapt the `crawler_channels` in your deployment's `local-config.yaml` file so that it points to the crawler in your registry.
-  4. Add your QA policy and other parameters to the `crawler_extra_args` variable.
+  4. Add additional QA options and any other parameters to the `crawler_extra_args` variable.
   5. (optional) Clear your Kubernetes/microk8s cache with `microk8s ctr images rm localhost:32000/<your-crawler-image>`.
   6. Reload your deployment.
 
