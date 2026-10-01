@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "properties": {
+    "actions": {
+      "type": "array",
+      "description": "An ordered sequence of browser actions to execute.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "click",
+              "type",
+              "select"
+            ]
+          },
+          "selector": {
+            "type": "string",
+            "pattern": "^control-[0-9]+$"
+          },
+          "value": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "selector",
+          "value",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "actions"
+  ],
+  "additionalProperties": false
+}

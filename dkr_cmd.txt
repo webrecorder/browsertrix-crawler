@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+docker run --rm \
+  -v "$project_dir/crawl-config.yaml:/app/crawl-config.yaml:ro" \
+  -v "$project_dir/crawls:/crawls" \
+  -v "$project_dir/crawls/agent_support.js:/custom-behaviors/agent_support.js:ro" \
+  webrecorder/browsertrix-crawler crawl \
+  --config /app/crawl-config.yaml \
+  --customBehaviors /custom-behaviors/agent_support.js \
+  --limit 51 \
+  --depth 1 \
+  --workers 1 \
+  --collection co_base \
+  --generateWACZ
