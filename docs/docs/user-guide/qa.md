@@ -127,7 +127,7 @@ A future release of [Browsertrix](https://github.com/webrecorder/browsertrix) wi
   1. Build the crawler Docker image as usual.
   2. Tag it as you wish and push it to local registry.
   3. Adapt the `crawler_channels` in your deployment's `local-config.yaml` file so that it points to the crawler in your registry.
-  4. Add additional QA options and any other parameters to the `qa_crawler_extra_args` variable.
+  4. Add any QA-specific options to the `qa_crawler_extra_args` helm chart value.
   5. (optional) Clear your Kubernetes/microk8s cache with `microk8s ctr images rm localhost:32000/<your-crawler-image>`.
   6. Reload your deployment.
 
