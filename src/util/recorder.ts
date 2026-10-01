@@ -728,28 +728,41 @@ export class Recorder extends EventEmitter {
   ) {
     const reqresp = this.pendingReqResp(networkId, true);
 
-    if (
-      reqresp &&
-      reqresp.priority === "Low" &&
-      reqresp.resourceType === "fetch"
-    ) {
-      if (await this.isDupeFetch(reqresp)) {
-        this.removeReqResp(networkId);
-        await cdp.send("Fetch.failRequest", {
-          requestId,
-          errorReason: "Aborted",
-        });
-        logger.debug(
-          "Aborted dupe low-priority fetch in request phase",
-          { url: reqresp.url },
-          "recorder",
-        );
-        return false;
-      }
-    }
+    try {
+      if (
+        reqresp &&
+        reqresp.priority === "Low" &&
+        reqresp.resourceType === "fetch"
+      ) {
+        if (await this.isDupeFetch(reqresp)) {
+          this.removeReqResp(networkId);
 
-    await cdp.send("Fetch.continueRequest", { requestId });
-    return true;
+          await cdp.send("Fetch.failRequest", {
+            requestId,
+            errorReason: "Aborted",
+          });
+
+          logger.debug(
+            "Aborted dupe low-priority fetch in request phase",
+            { url: reqresp.url },
+            "recorder",
+          );
+
+          return false;
+        }
+      }
+
+      await cdp.send("Fetch.continueRequest", { requestId });
+      return true;
+    } catch (e) {
+      this.removeReqResp(networkId);
+      logger.debug(
+        "Error continuing low-priority fetch in request phase",
+        e,
+        "recorder",
+      );
+      return false;
+    }
   }
 
   async handleFetchResponse(
