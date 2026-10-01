@@ -137,7 +137,7 @@ class ArgParser {
 
         maxPageLimit: {
           describe:
-            "Maximum pages to crawl, overriding  pageLimit if both are set",
+            "Maximum pages to crawl, overriding pageLimit if both are set",
           default: 0,
           type: "number",
         },
