@@ -32,8 +32,8 @@ Options:
                                                            [number] [default: 0]
       --pageLimit, --limit                  Limit crawl to this number of pages
                                                            [number] [default: 0]
-      --maxPageLimit                        Maximum pages to crawl, overriding
-                                            pageLimit if both are set
+      --maxPageLimit                        Maximum pages to crawl, overriding p
+                                            ageLimit if both are set
                                                            [number] [default: 0]
       --pageLoadTimeout, --timeout          Timeout for each page to load (in se
                                             conds)        [number] [default: 90]
