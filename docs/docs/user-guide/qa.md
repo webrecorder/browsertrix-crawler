@@ -127,8 +127,15 @@ A future release of [Browsertrix](https://github.com/webrecorder/browsertrix) wi
   1. Build the crawler Docker image as usual.
   2. Tag it as you wish and push it to local registry.
   3. Adapt the `crawler_channels` in your deployment's `local-config.yaml` file so that it points to the crawler in your registry.
-  4. Add additional QA options and any other parameters to the `crawler_extra_args` variable.
+  4. Add additional QA options and any other parameters to the `qa_crawler_extra_args` variable.
   5. (optional) Clear your Kubernetes/microk8s cache with `microk8s ctr images rm localhost:32000/<your-crawler-image>`.
   6. Reload your deployment.
 
-Now whenever you will start a new QA workflow from the Browsertrix Cloud interface, the crawler instance that will be spawned will already be running the new QA workflow with your specified parameters.
+For example, to limit Browsertrix QA to 10 random pages, in your local helm chart `local-config.yaml`, set:
+
+    qa_crawler_extra_args: --qaRandom --pagelimit 10
+
+Now, whenever you start a new QA workflow from the Browsertrix interface, the QA run crawler instance will be started
+with these additional parameters.
+
+Note: This feature requires available Browsertrix 1.26+.
