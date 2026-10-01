@@ -54,8 +54,6 @@ export type CrawlerArgs = ReturnType<typeof parseArgs> & {
   exclude: string[];
   sitemap: boolean;
 
-  qaRegex: string[];
-
   crawlId: string;
 
   saveProfile?: string;
@@ -139,7 +137,7 @@ class ArgParser {
 
         maxPageLimit: {
           describe:
-            "Maximum pages to crawl, overriding pageLimit if both are set",
+            "Maximum pages to crawl, overriding  pageLimit if both are set",
           default: 0,
           type: "number",
         },
@@ -741,12 +739,6 @@ class ArgParser {
           describe:
             "if set, QA a random sample of pages. Must be paired with --pageLimit",
           type: "boolean",
-        },
-
-        qaRegex: {
-          describe: "Only QA pages that match specified regex",
-          type: "array",
-          default: [],
         },
 
         sshProxyPrivateKeyFile: {
