@@ -138,4 +138,4 @@ For example, to limit Browsertrix QA to 10 random pages, in your local helm char
 Now, whenever you start a new QA workflow from the Browsertrix interface, the QA run crawler instance will be started
 with these additional parameters.
 
-Note: This feature requires available Browsertrix 1.26+.
+Note: The `qa_crawler_extra_args` option requires Browsertrix 1.26+.
