@@ -1,8 +1,6 @@
-import { deepEqual } from "assert";
+import { deepEqual, notDeepEqual } from "assert";
 import child_process from "child_process";
 import fs from "fs";
-
-//const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 let allPages: string[] = [];
 
@@ -32,6 +30,19 @@ function readPages(coll: string) {
   return pages;
 }
 
+function runCrawl(coll: string, extraOpts = "") {
+  fs.rmSync(`./test-crawls/collections/${coll}`, {
+    recursive: true,
+    force: true,
+  });
+
+  child_process.execSync(
+    `docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler qa --qaSource /crawls/collections/wr-sample-for-qa/wr-sample-for-qa.wacz --collection ${coll} --qaDebugImageDiff ${extraOpts}`,
+  );
+
+  return readPages(coll);
+}
+
 test("run initial crawl with text and screenshots to prepare for QA", async () => {
   fs.rmSync("./test-crawls/collections/wr-sample-for-qa", {
     recursive: true,
@@ -51,51 +62,45 @@ test("run initial crawl with text and screenshots to prepare for QA", async () =
   allPages = readPages("wr-sample-for-qa");
 });
 
-function runCrawl(coll: string, extraOpts = "") {
-  fs.rmSync(`./test-crawls/collections/${coll}`, {
-    recursive: true,
-    force: true,
-  });
+test("QA: first 3 pages", () => {
+  const pages = runCrawl("qa-first-3-pages", "--limit 3");
 
-  child_process.execSync(
-    `docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler qa --qaSource /crawls/collections/wr-sample-for-qa/wr-sample-for-qa.wacz --collection ${coll} --qaDebugImageDiff ${extraOpts}`,
-  );
-}
-
-test("QA policy: first 3 pages", () => {
-  runCrawl("qa-policy-linear-3-pages", "--limit 3 --qaPolicy linear");
-
-  const pages = readPages("qa-policy-linear-3-pages");
   expect(pages.length).toBe(3);
   deepEqual(pages, allPages.slice(0, 3));
 });
 
-test("QA policy: regex match ", () => {
-  runCrawl(
-    "qa-policy-regex-match",
-    "--qaPolicy regex --qaRegex /2024/ --limit 2",
-  );
+test("QA: regex match ", () => {
+  const pages = runCrawl("qa-regex-match", "--include /2024/ --limit 2");
 
-  const pages = readPages("qa-policy-regex-match");
   expect(pages.length).toBe(2);
   for (const page of pages) {
     expect(page.indexOf("/2024/")).toBeGreaterThan(-1);
   }
 });
 
-test("QA policy: random sample ", () => {
-  runCrawl("qa-policy-random-sample", "--qaPolicy random --qaProbability 0.5");
+test("QA: random sample pageLimit 3", () => {
+  const pages = runCrawl("qa-random-sample-limit", "--qaRandom --limit 3");
 
-  const pages = readPages("qa-policy-random-sample");
-  expect(pages.length).toBeLessThanOrEqual(5);
+  expect(pages.length).toBe(3);
+
+  notDeepEqual(pages, allPages.slice(0, 3));
 });
 
-test("QA policy: random sample + pageLimit ", () => {
-  runCrawl(
-    "qa-policy-random-sample-2",
-    "--qaPolicy random --qaProbability 0.5 --pageLimit 3",
+test("error: random with no page limit", () => {
+  expect(() => runCrawl("qa-random-sample-error", "--qaRandom")).toThrow();
+});
+
+test("QA: random sample + regex --limit 3", () => {
+  const pages = runCrawl(
+    "qa-random-sample-regex",
+    "--qaRandom --include 202 --include about --limit 3",
   );
 
-  const pages = readPages("qa-policy-random-sample-2");
-  expect(pages.length).toBeLessThanOrEqual(3);
+  expect(pages.length).toBe(3);
+
+  notDeepEqual(pages, allPages.slice(0, 3));
+
+  for (const page of pages) {
+    expect(page.indexOf("/202") > 0 || page.indexOf("/about") > 0).toBe(true);
+  }
 });

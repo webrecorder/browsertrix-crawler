@@ -79,52 +79,46 @@ This data indicates that:
 - When comparing `urn:text:<url>` records from crawl and replay WACZs, the text is 90% similar.
 - When comparing `urn:pageinfo:<url>` resource entries from crawl and replay, the crawl record had 10 good responses (2xx/3xx status code) and 0 bad responses (4xx/5xx status code), while replay had 9 good and 1 bad.
 
-## QA Policies and Additional Options
+## QA Filtering and Sampling
 
-A few additional options and policies exist in order to fine-tune the QA process. These are:
+Additional crawler flags can be used to further customize the QA process. These includes the ability to:
+- set total number of pages to QA
+- randomly sample pages to QA instead of loading pages in order they were captured.
+- filtering pages to QA by regex(s)
 
-- The ability to set a maximum page count for the QA run.
-- The ability to choose between 3 different QA algorithms.
+### Limiting Pages to QA
 
-These algorithms are: *linear* (first come first serve), *regex* (define a regular expression to perform QA only on URLs that match it), and *random* (define a probability for each page to be QA'd).
+By using the `--pageLimit N` option, the QA run will be limited to the first N pages, in the order
+the pages were crawled. To QA first 10 pages, use:
 
-You can use the following CLI arguments for this:
+    --pageLimit 10
 
-  - `qaPolicy`: can be one of `linear`, `regex` or `random`.
-  - `qaRegex`: if `qaPolicy` is `regex`, then you can define your regular expression here.
-  - `qaProbability`: if `qaPolicy` is `random`, you can define your per-page QA probability here. This is a floating-point number between 0 and 1.
-  - `pageLimit`: the maximum number of pages to perform QA on (same argument as for a regular crawl)
+### Random Sampling pages
 
-### QA Policy: `linear`
+By using `--qaRandom` along with `--pageLimit`, it is possible to specify a random sample of N
+pages from the entire crawl. Each page has an equal chance of being selected.
+To QA 10 *randomly selected* pages from a crawl, use:
 
-In this QA mode, the first `pageLimit` pages in the `pages.jsonl` file(s) will be scanned. Example:
+    --qaRandom --pageLimit 10
 
-    --qaPolicy "linear" --pageLimit 50
+The random selection uses reservoir sampling to select exactly N pages.
+Using `--qaRandom` without specifying how many pages to sample will result in an immediate error.
 
-### QA Policy: `regex`
+### Filtering pages
 
-In this QA mode, only the pages that match the regular expression in `qaRegex` will be scanned. Example:
+Existing crawler scoping options, `--scopeIncludeRx`/`--include` and `--scopeIncludeRx`/`--exclude` can be used
+to only include or exclude certain pages from the QA process.
 
-    --qaPolicy "regex" --qaRegex='^https:\/\/en\.wikipedia\.org\/wiki\/R.*$' --pageLimit 50
+For example, the following will match pages from the crawl that start contain `example.com/R` or `example.org/S`:
 
-This will match all english Wikipedia articles that start with `R`.
+    --include=example.com/R --include=example.org/S
 
-### QA policy: `random`
+These options can also combined with `--pageLimit` and `--qaRandom` to filter from the random selection of pages.
+To filter the pages by regex, and select at most 10 at random from the matching list, use.
 
-In this QA mode, pages will be scanned with a probability equal to `qaProbability`. This is a floating-point number between `0` and `1`. Example:
+    --include=example.com/R --include=example.org/S --qaRandom --pageLimit 10
 
-    # with a crawl of 100 pages, will include a sample of approximately 30 pages
-    --qaPolicy "random" --qaProbability 0.3
-
-    # with a crawl of 100 pages, will include at most 10
-    --qaPolicy "random" --qaProbability 0.3 --pageLimit 10
-
-This policy allows for performing QA on a random sampling of pages, with approximately qaProbability of the
-pages included. Note that pageLimit, if provided, is always enforced, and will not be exceeded.
-
-### Maximum number of pages to scan
-
-In every case mentioned above, the number of pages that will be queued for scanning will be at most `pageLimit`.
+Note that pages are filtered by inclusion/exclusion regexes first, and the selected (either in order or randomly).
 
 ## Usage with the Browsertrix UI
 
@@ -133,8 +127,15 @@ A future release of [Browsertrix](https://github.com/webrecorder/browsertrix) wi
   1. Build the crawler Docker image as usual.
   2. Tag it as you wish and push it to local registry.
   3. Adapt the `crawler_channels` in your deployment's `local-config.yaml` file so that it points to the crawler in your registry.
-  4. Add your QA policy and other parameters to the `crawler_extra_args` variable.
+  4. Add any QA-specific options to the `qa_crawler_extra_args` helm chart value.
   5. (optional) Clear your Kubernetes/microk8s cache with `microk8s ctr images rm localhost:32000/<your-crawler-image>`.
   6. Reload your deployment.
 
-Now whenever you will start a new QA workflow from the Browsertrix Cloud interface, the crawler instance that will be spawned will already be running the new QA workflow with your specified parameters.
+For example, to limit Browsertrix QA to 10 random pages, in your local helm chart `local-config.yaml`, set:
+
+    qa_crawler_extra_args: --qaRandom --pagelimit 10
+
+Now, whenever you start a new QA workflow from the Browsertrix interface, the QA run crawler instance will be started
+with these additional parameters.
+
+Note: The `qa_crawler_extra_args` option requires Browsertrix 1.26+.

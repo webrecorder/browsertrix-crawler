@@ -32,8 +32,8 @@ Options:
                                                            [number] [default: 0]
       --pageLimit, --limit                  Limit crawl to this number of pages
                                                            [number] [default: 0]
-      --maxPageLimit                        Maximum pages to crawl, overriding
-                                            pageLimit if both are set
+      --maxPageLimit                        Maximum pages to crawl, overriding p
+                                            ageLimit if both are set
                                                            [number] [default: 0]
       --pageLoadTimeout, --timeout          Timeout for each page to load (in se
                                             conds)        [number] [default: 90]
@@ -177,7 +177,7 @@ Options:
       --browserStartTimeout                 Timeout (in seconds) for the browser
                                              process to start and connect. Raise
                                              this on hosts under high load where
-                                            browser startup is slow.
+                                             browser startup is slow.
                                                           [number] [default: 30]
       --saveProfile                         If set, save profile if crawl succee
                                             ded successfully. If no value provid
@@ -344,6 +344,9 @@ Options:
       --qaDebugImageDiff                    if specified, will write crawl.png,
                                             replay.png and diff.png for each pag
                                             e where they're different  [boolean]
+      --qaRandom                            if set, QA a random sample of pages.
+                                             Must be paired with --pageLimit
+                                                                       [boolean]
       --sshProxyPrivateKeyFile              path to SSH private key for SOCKS5 o
                                             ver SSH proxy connection    [string]
       --sshProxyKnownHostsFile              path to SSH known hosts file for SOC
@@ -362,7 +365,7 @@ Options:
       --reportSkipped                       If set, write information about URLs
                                              encountered but not queued to repor
                                             ts/skippedPages.jsonl
-                                                      [boolean] [default: false]
+                                                       [boolean] [default: true]
       --rateLimitStatusCodes                Consider responses with these status
                                              codes to be treated as rate-limited
                                             /blocked responses
@@ -426,8 +429,7 @@ Options:
                             t                    [string] [default: "1360,1020"]
   --browserStartTimeout     Timeout (in seconds) for the browser process to star
                             t and connect. Raise this on hosts under high load w
-                            here browser startup is slow.
-                                                          [number] [default: 30]
+                            here browser startup is slow. [number] [default: 30]
   --cookieDays              If >0, set all cookies, including session cookies, t
                             o have this duration in days before saving profile
                                                            [number] [default: 7]

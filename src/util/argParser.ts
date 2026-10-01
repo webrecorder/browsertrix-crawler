@@ -735,22 +735,10 @@ class ArgParser {
           type: "boolean",
         },
 
-        qaPolicy: {
+        qaRandom: {
           describe:
-            "defines the kind of QA to perform, can be one of 'linear', 'regex' or 'random'",
-          type: "string",
-        },
-
-        qaRegex: {
-          describe:
-            "if the QA policy is 'regex', then the regular expression is specified here",
-          type: "string",
-        },
-
-        qaProbability: {
-          describe:
-            "if the QA policy is 'random', then the probability of processing a URL is specified here",
-          type: "number",
+            "if set, QA a random sample of pages. Must be paired with --pageLimit",
+          type: "boolean",
         },
 
         sshProxyPrivateKeyFile: {

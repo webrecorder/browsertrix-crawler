@@ -21,6 +21,7 @@ import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
 import { getFileOrUrlJson } from "./util/file_reader.js";
 import { WACZLoader } from "./util/wacz.js";
+import { ExitCodes } from "./util/constants.js";
 
 // RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
@@ -71,13 +72,12 @@ export class ReplayCrawler extends Crawler {
   includeRx: RegExp[];
   excludeRx: RegExp[];
 
-  // QA policies
-  qaPolicy: string = "";
-  qaRegex: RegExp = new RegExp("^https?:\\/\\/\\S+$");
-  qaProbability: number = 0.3;
+  qaRandom = false;
 
   // for qaDebugImageDiff incremental file output
   counter: number = 0;
+
+  totalPages = 0;
 
   constructor() {
     super();
@@ -111,15 +111,15 @@ export class ReplayCrawler extends Crawler {
     this.includeRx = parseRx(this.params.scopeIncludeRx);
     this.excludeRx = parseRx(this.params.scopeExcludeRx);
 
-    // Set the QA policies
-    if (this.params.qaPolicy) {
-      this.qaPolicy = this.params.qaPolicy;
-    }
-    if (this.params.qaRegex) {
-      this.qaRegex = new RegExp(this.params.qaRegex);
-    }
-    if (this.params.qaProbability) {
-      this.qaProbability = this.params.qaProbability;
+    this.qaRandom = this.params.qaRandom ?? false;
+
+    if (this.qaRandom && !this.pageLimit) {
+      void logger.fatal(
+        "No pageLimit specified: Using qaRandom requires a fixed number of pages with pageLimit",
+        {},
+        "config",
+        ExitCodes.InvalidConfig,
+      );
     }
   }
 
@@ -172,7 +172,14 @@ export class ReplayCrawler extends Crawler {
   }
 
   protected async _addInitialSeeds() {
+    if (await this.crawlState.isQAQueueDone()) {
+      logger.info("QA pages already queued, skipping page load", "replay");
+      return;
+    }
+
     await this.loadPages(this.qaSource);
+
+    await this.crawlState.markQAQueueDone();
   }
 
   async isInScope() {
@@ -276,36 +283,19 @@ export class ReplayCrawler extends Crawler {
       }
     }
 
-    // Apply the chosen auto-QA policy
-    // Have we reached the maximum amount of pages allowed?
-    let shouldQueue = false;
+    const entry = {
+      seedId: 0,
+      url,
+      depth,
+      extraHops: 0,
+      ts,
+      pageid: id,
+    };
 
-    switch (this.qaPolicy) {
-      case "regex":
-        shouldQueue = this.qaRegex.test(url);
-        break;
-
-      case "random":
-        shouldQueue = Math.random() < this.qaProbability;
-        break;
-
-      case "linear":
-      default:
-        // Default is identical to "linear"
-        shouldQueue = true;
-        break;
-    }
-
-    if (shouldQueue) {
-      // Queue it!
-      await this.queueUrl({
-        seedId: 0,
-        url,
-        depth,
-        extraHops: 0,
-        ts,
-        pageid: id,
-      });
+    if (this.qaRandom && this.pageLimit > 0) {
+      await this.crawlState.addToReservoir(entry, this.pageLimit);
+    } else {
+      await this.queueUrl(entry);
     }
   }
 

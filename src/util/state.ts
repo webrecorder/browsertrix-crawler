@@ -205,6 +205,14 @@ declare module "ioredis" {
       url: string,
       seedData: string,
     ): Result<number, Context>;
+
+    addtoreservoir(
+      setKey: string,
+      incrKey: string,
+      value: string,
+      limit: number,
+      random: number,
+    ): Result<number, Context>;
   }
 }
 
@@ -1087,6 +1095,27 @@ redis.call('sadd', KEYS[3], ARGV[2]);
 return inx;
 `,
     });
+
+    redis.defineCommand("addtoreservoir", {
+      numberOfKeys: 2,
+      lua: `
+  if redis.call('sismember', KEYS[1], ARGV[1]) == 1 then
+    return 0
+  end
+
+  local T = tonumber(ARGV[2]);
+  local N = redis.call('incr', KEYS[2]);
+
+  if N <= T then
+    redis.call('sadd', KEYS[1], ARGV[1]);
+    return 1;
+  elseif tonumber(ARGV[3]) < (T / N) then
+    redis.call('spop', KEYS[1]);
+    redis.call('sadd', KEYS[1], ARGV[1]);
+    return 2;
+  end
+      `,
+    });
   }
 
   async _getNext() {
@@ -1446,6 +1475,31 @@ return inx;
         resolve();
       });
     });
+  }
+
+  async addToReservoir(entry: QueueEntry, limit: number) {
+    const key = `${this.crawlId}:qaReservoir`;
+    const value = JSON.stringify(entry);
+
+    await this.redis.addtoreservoir(
+      key,
+      key + ":c",
+      value,
+      limit,
+      Math.random(),
+    );
+  }
+
+  async queueReservoir() {
+    const key = `${this.crawlId}:qaReservoir`;
+    while (true) {
+      const res = await this.redis.spop(key);
+      if (!res) {
+        break;
+      }
+      const data: QueueEntry = JSON.parse(res);
+      await this.addToQueue(data);
+    }
   }
 
   async addToQueue(
@@ -1997,5 +2051,14 @@ return inx;
       }
     }
     return crawlIds;
+  }
+
+  async isQAQueueDone() {
+    return (await this.redis.get(`${this.crawlId}:qaQ`)) == "1";
+  }
+
+  async markQAQueueDone() {
+    await this.queueReservoir();
+    await this.redis.set(`${this.crawlId}:qaQ`, "1");
   }
 }
