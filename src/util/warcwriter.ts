@@ -231,7 +231,18 @@ export class WARCWriter implements IndexerOffsetLength {
       this.fh = await this.initFH();
     }
 
-    const opts = { gzip: this.gzip };
+    const opts = this.useSHA1
+      ? {
+          gzip: this.gzip,
+          digest: {
+            algo: "sha-1",
+            prefix: "sha1:",
+            base32: true,
+          },
+        }
+      : {
+          gzip: this.gzip,
+        };
 
     const requestSerializer = new WARCSerializer(record, opts);
 

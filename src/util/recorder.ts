@@ -1941,6 +1941,15 @@ export class Recorder extends EventEmitter {
     let serializer = new WARCSerializer(responseRecord, {
       gzip,
       maxMemSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
+      ...(this.writer.useSHA1
+        ? {
+            digest: {
+              algo: "sha-1",
+              prefix: "sha1:",
+              base32: true,
+            },
+          }
+        : {}),
     });
 
     if (iter) {
@@ -2026,6 +2035,7 @@ export class Recorder extends EventEmitter {
           origUrl,
           date,
           externalWACZ,
+          this.writer.useSHA1,
         ));
         await this.crawlState.addDupeCrawlDependency(crawlId, index);
       } else {
@@ -2484,6 +2494,7 @@ async function createRevisitForResponse(
   refersToUrl: string,
   refersToDate: string,
   externalWACZ: string,
+  useSHA1: boolean,
 ) {
   const payloadDigestForRevisit = responseRecord.warcPayloadDigest || "";
 
@@ -2516,6 +2527,15 @@ async function createRevisitForResponse(
   serializer = new WARCSerializer(revisitRecord, {
     gzip: true,
     maxMemSize: MAX_BROWSER_DEFAULT_FETCH_SIZE,
+    ...(useSHA1
+      ? {
+          digest: {
+            algo: "sha-1",
+            prefix: "sha1:",
+            base32: true,
+          },
+        }
+      : {}),
   });
 
   await serializer.digestRecord({ payloadDigestForRevisit });
