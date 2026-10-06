@@ -3,6 +3,9 @@ ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERS
 
 FROM ${BROWSER_IMAGE_BASE}
 
+ARG TARGETARCH
+ENV YTDLP_VERSION=2026.08.19
+
 LABEL org.opencontainers.image.vendor="Webrecorder <https://webrecorder.net/>"
 LABEL org.opencontainers.image.documentation="https://crawler.docs.browsertrix.com/"
 
@@ -79,6 +82,9 @@ WORKDIR /crawls
 # add brave/chromium group policies
 RUN mkdir -p /etc/brave/policies/managed/
 ADD config/policies /etc/brave/policies/managed/
+
+ADD ./scripts/install-ytdlp.sh /tmp/install-ytdlp.sh
+RUN /tmp/install-ytdlp.sh "$TARGETARCH" "$YTDLP_VERSION"
 
 ADD docker-entrypoint.sh /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
