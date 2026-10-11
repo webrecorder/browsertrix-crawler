@@ -39,6 +39,8 @@ export enum BxFunctionBindings {
   NextFlowStep = "__bx_nextFlowStep",
 
   ContentCheckFailed = "__bx_contentCheckFailed",
+  agentBridge = "__bx_agentBridge",
+  ExecuteAgentAction = "__bx_executeAgentAction",
 
   RegisterFrame = "__bx_registerFrame",
 }
