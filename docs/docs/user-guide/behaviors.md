@@ -68,7 +68,7 @@ The TikTok behavior is designed to expand comment threads when viewing single vi
 
 ### Twitter/X
 
-The Facebook behavior is able to automate the following features:
+The Twitter/X behavior is able to automate the following features:
 
 - Viewing a timeline
 - Viewing a specific profile
@@ -76,13 +76,18 @@ The Facebook behavior is able to automate the following features:
 - Clicking through "view sensitive" buttons to ensure content is captured (requires a logged-in profile)
 - Viewing full-size images, audio and video
 - Viewing quoted posts
+- Viewing media tabs (both photos and videos)
+- Following external links from within tweets
 
 ### YouTube
 
 The YouTube behavior is able to automate the following features:
 
+- Viewing all videos from a channel
+- Viewing all shorts from a channel
+- Viewing all playlists from a channel
 - Selecting a video format that the crawler will be able to replay correctly. Currently, this will be a .mp4 at 360p resolution due to YouTube limitations.
-- Ensuring that video playback has started
+- Ensuring that video playback has started.
 
 ## Enabling Behaviors
 
