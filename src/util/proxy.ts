@@ -10,6 +10,7 @@ import { logger } from "./logger.js";
 import { socksDispatcher } from "fetch-socks";
 import type { SocksProxyType } from "socks/typings/common/constants.js";
 import { ExitCodes, FETCH_HEADERS_TIMEOUT_SECS } from "./constants.js";
+import { trackRemoteIPAddress } from "./undici-ip.js";
 
 import http, { IncomingMessage, ServerResponse } from "http";
 
@@ -305,6 +306,7 @@ export function getProxyDispatcher(
   url: string,
   withRedirect = true,
   withDecompression = true,
+  onRemoteAddress?: (remoteAddress?: string) => void,
 ) {
   let proxyEntry: ProxyEntry | null = null;
 
@@ -315,8 +317,29 @@ export function getProxyDispatcher(
     }
   }
 
-  const { dispatcher, redirectDispatcher, decompressRedirectDispatcher } =
-    proxyEntry || defaultProxyEntry || globalDispatchers;
+  const selectedEntry = proxyEntry || defaultProxyEntry || globalDispatchers;
+  const {
+    dispatcher,
+    redirectDispatcher,
+    decompressRedirectDispatcher,
+    proxyUrl,
+  } = selectedEntry;
+
+  // A proxied socket's peer is generally the proxy, not the target host.
+  // Omit WARC-IP-Address rather than recording a misleading target address.
+  if (onRemoteAddress && !proxyUrl) {
+    let trackedDispatcher: Dispatcher = trackRemoteIPAddress(
+      dispatcher,
+      onRemoteAddress,
+    );
+    if (withRedirect) {
+      trackedDispatcher = addRedirectInterceptor(trackedDispatcher);
+    }
+    if (withDecompression) {
+      trackedDispatcher = addDecompressInterceptor(trackedDispatcher);
+    }
+    return trackedDispatcher;
+  }
 
   // if default proxy set, return dispatcher from default proxy, otherwise a default dispatcher
   if (withDecompression && withRedirect) {
