@@ -20,7 +20,7 @@
     "@aws-sdk/lib-storage": "^3.964.0",
     "@novnc/novnc": "1.7.0",
     "@puppeteer/replay": "^3.1.3",
-    "@webrecorder/wabac": "^2.27.3",
+    "@webrecorder/wabac": "^2.27.4",
     "browsertrix-behaviors": "^0.15.1",
     "client-zip": "^2.4.5",
     "css-selector-parser": "^3.0.5",
@@ -42,7 +42,7 @@
     "tsc": "^2.0.4",
     "undici": "^7.29.0",
     "uuid": "^14.0.0",
-    "warcio": "^2.4.11",
+    "warcio": "^2.4.12",
     "ws": "^8.20.1",
     "yargs": "^17.7.2"
   },
@@ -72,7 +72,7 @@
   },
   "resolutions": {
     "wrap-ansi": "7.0.0",
-    "warcio": "^2.4.11",
+    "warcio": "^2.4.12",
     "@novnc/novnc": "1.7.0"
   }
 }
