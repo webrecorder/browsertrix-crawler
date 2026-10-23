@@ -19,6 +19,7 @@ export const SERVICE_WORKER_OPTS = [
 export type ServiceWorkerOpt = (typeof SERVICE_WORKER_OPTS)[number];
 
 export const DETECT_SITEMAP = "<detect>";
+export const DEFAULT_SITEMAP_WORKERS = 5;
 
 export const EXTRACT_TEXT_TYPES = ["to-pages", "to-warc", "final-to-warc"];
 
