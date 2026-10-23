@@ -5,13 +5,11 @@ import sax from "sax";
 import PQueue from "p-queue";
 
 import { logger, formatErr } from "./logger.js";
-import { DETECT_SITEMAP } from "./constants.js";
+import { DETECT_SITEMAP, DEFAULT_SITEMAP_WORKERS } from "./constants.js";
 import { sleep } from "./timing.js";
 
 import { Dispatcher, request } from "undici";
 import { getProxyDispatcher } from "./proxy.js";
-
-const SITEMAP_CONCURRENCY = 3;
 
 const TEXT_CONTENT_TYPE = ["text/plain"];
 const XML_CONTENT_TYPES = ["text/xml", "application/xml"];
@@ -23,6 +21,8 @@ export type SitemapOpts = {
   toDate?: Date;
 
   limit?: number;
+
+  workers?: number;
 };
 
 export class SitemapReader extends EventEmitter {
@@ -39,11 +39,15 @@ export class SitemapReader extends EventEmitter {
   count = 0;
   limit: number;
 
+  done = false;
+
   constructor(opts: SitemapOpts) {
     super();
     this.headers = opts.headers;
 
-    this.queue = new PQueue({ concurrency: SITEMAP_CONCURRENCY });
+    this.queue = new PQueue({
+      concurrency: opts.workers || DEFAULT_SITEMAP_WORKERS,
+    });
 
     this.fromDate = opts.fromDate;
     this.toDate = opts.toDate;
@@ -104,7 +108,7 @@ export class SitemapReader extends EventEmitter {
     }
   }
 
-  async parse(sitemap: string, seedUrl: string) {
+  async parse(sitemap: string, seedUrl: string, seedId: number) {
     let found = false;
 
     if (sitemap === DETECT_SITEMAP) {
@@ -113,12 +117,12 @@ export class SitemapReader extends EventEmitter {
       // 2. if not found, check /sitemap.xml
       logger.debug("Detecting sitemap for seed", { seedUrl }, "sitemap");
       const robotsUrl = new URL("/robots.txt", seedUrl).href;
-      found = await this.parseRobotsForSitemap(robotsUrl);
+      found = await this.parseRobotsForSitemap(robotsUrl, seedId);
 
       const sitemapUrl = new URL("/sitemap.xml", seedUrl).href;
 
       if (!found) {
-        found = await this.parseSitemap(sitemapUrl);
+        found = await this.parseSitemap(sitemapUrl, seedId);
       }
       if (!found) {
         logger.debug(
@@ -131,9 +135,9 @@ export class SitemapReader extends EventEmitter {
       // if specific URL provided, check if its a .xml file or a robots.txt file
       const fullUrl = new URL(sitemap, seedUrl).href;
       if (fullUrl.endsWith(".xml") || fullUrl.endsWith(".xml.gz")) {
-        found = await this.parseSitemap(fullUrl);
+        found = await this.parseSitemap(fullUrl, seedId);
       } else if (fullUrl.endsWith(".txt")) {
-        found = await this.parseRobotsForSitemap(fullUrl);
+        found = await this.parseRobotsForSitemap(fullUrl, seedId);
       } else {
         logger.debug(
           "URL provided must be a sitemap XML or robots TXT file",
@@ -146,7 +150,7 @@ export class SitemapReader extends EventEmitter {
     return found;
   }
 
-  private async parseRobotsForSitemap(robotsUrl: string) {
+  private async parseRobotsForSitemap(robotsUrl: string, seedId: number) {
     let sitemapFound = false;
     try {
       logger.debug(
@@ -167,7 +171,7 @@ export class SitemapReader extends EventEmitter {
         try {
           const url = new URL(urlStr, robotsUrl).href;
           logger.debug("Sitemap: Added from robots", { url }, "sitemap");
-          this.addNewSitemap(url, null);
+          this.addNewSitemap(url, seedId, null);
           sitemapFound = true;
         } catch (e) {
           // ignore invalid
@@ -180,7 +184,7 @@ export class SitemapReader extends EventEmitter {
     return sitemapFound;
   }
 
-  async parseSitemap(url: string) {
+  async parseSitemap(url: string, seedId: number) {
     try {
       this.seenSitemapSet.add(url);
 
@@ -191,7 +195,7 @@ export class SitemapReader extends EventEmitter {
         return false;
       }
 
-      await this.parseSitemapFromResponse(url, resp);
+      await this.parseSitemapFromResponse(url, seedId, resp);
 
       return true;
     } catch (e) {
@@ -202,8 +206,13 @@ export class SitemapReader extends EventEmitter {
     }
   }
 
+  isDone() {
+    return this.done;
+  }
+
   private async parseSitemapFromResponse(
     url: string,
+    seedId: number,
     resp: Dispatcher.ResponseData,
   ) {
     let resolve: () => void;
@@ -217,7 +226,7 @@ export class SitemapReader extends EventEmitter {
     this.pending++;
 
     try {
-      this.doParseSitemapFromResponse(url, resp, resolve!, reject!);
+      this.doParseSitemapFromResponse(url, seedId, resp, resolve!, reject!);
 
       await promise;
     } finally {
@@ -225,12 +234,13 @@ export class SitemapReader extends EventEmitter {
     }
   }
 
-  async checkIfDone() {
+  private async checkIfDone() {
     if (!this.pending) {
       // this needs to happen async since if its in the current task,
       // queue won't be idle until this completes
       setTimeout(async () => {
         await this.queue.onIdle();
+        this.done = true;
         this.emit("end");
       }, 100);
     }
@@ -238,6 +248,7 @@ export class SitemapReader extends EventEmitter {
 
   private doParseSitemapFromResponse(
     url: string,
+    seedId: number,
     resp: Dispatcher.ResponseData,
     resolve: () => void,
     reject: () => void,
@@ -254,11 +265,12 @@ export class SitemapReader extends EventEmitter {
       reject();
     });
 
-    this.initSaxParser(url, body, resolve, reject);
+    this.initSaxParser(url, seedId, body, resolve, reject);
   }
 
   private initSaxParser(
     url: string,
+    seedId: number,
     sourceStream: Readable,
     resolve: () => void,
     reject: () => void,
@@ -345,7 +357,7 @@ export class SitemapReader extends EventEmitter {
       switch (tagName) {
         // Single Sitemap
         case "url":
-          this.emitEntry(currUrl, lastmod);
+          this.emitEntry(currUrl, seedId, lastmod);
           if (this.atLimit()) {
             parserStream._parser.close();
           }
@@ -373,7 +385,7 @@ export class SitemapReader extends EventEmitter {
 
         case "sitemap":
           if (currUrl) {
-            this.addNewSitemap(currUrl, lastmod);
+            this.addNewSitemap(currUrl, seedId, lastmod);
           }
           currUrl = null;
           lastmod = null;
@@ -440,7 +452,7 @@ export class SitemapReader extends EventEmitter {
     return true;
   }
 
-  addNewSitemap(url: string, lastmod: Date | null) {
+  addNewSitemap(url: string, seedId: number, lastmod: Date | null) {
     if (this.seenSitemapSet.has(url)) {
       return;
     }
@@ -453,10 +465,10 @@ export class SitemapReader extends EventEmitter {
       return;
     }
 
-    void this.queue.add(() => this.parseSitemap(url));
+    void this.queue.add(() => this.parseSitemap(url, seedId));
   }
 
-  emitEntry(url: string | null, lastmod: Date | null) {
+  emitEntry(url: string | null, seedId: number, lastmod: Date | null) {
     if (!url) {
       return;
     }
@@ -470,7 +482,7 @@ export class SitemapReader extends EventEmitter {
       return;
     }
 
-    this.emit("url", { url, lastmod });
+    this.emit("url", { url, lastmod, seedId });
 
     this.count++;
   }
