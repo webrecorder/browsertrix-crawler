@@ -11,7 +11,7 @@ import { sleep } from "./timing.js";
 import { Dispatcher, request } from "undici";
 import { getProxyDispatcher } from "./proxy.js";
 
-const SITEMAP_CONCURRENCY = 5;
+const SITEMAP_CONCURRENCY = 3;
 
 const TEXT_CONTENT_TYPE = ["text/plain"];
 const XML_CONTENT_TYPES = ["text/xml", "application/xml"];

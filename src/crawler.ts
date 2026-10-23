@@ -2091,8 +2091,6 @@ self.__bx_behaviors.selectMainBehavior();
       );
     }
 
-    await this._addInitialSeeds();
-
     await this.browser.launch({
       profileUrl: this.params.profile,
       headless: this.params.headless,
@@ -2118,6 +2116,8 @@ self.__bx_behaviors.selectMainBehavior();
       recording: this.recording,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
+
+    await this._addInitialSeeds();
 
     // --------------
     // Run Crawl Here!
