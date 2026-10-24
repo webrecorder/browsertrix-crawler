@@ -3,7 +3,8 @@ __pycache__
 *.egg-info/
 collections/
 node_modules/
-crawls/
+crawls/*
+!crawls/agent_support.js
 test-crawls/
 .DS_Store
 dist
