@@ -102,13 +102,18 @@ function createNode(
   switch (nodeType) {
     case doc.ELEMENT_NODE:
       {
-        if (nodeName === "SCRIPT" || nodeName.startsWith("::")) {
+        // skip pseudo-elements
+        if (nodeName.startsWith("::")) {
           node = null;
           break;
         }
+
         if (nodeName === "STYLE") {
           nodeName = "STYLEX";
+        } else if (nodeName === "SCRIPT") {
+          nodeName = "SCRIPT-DISABLED";
         }
+
         const elem = doc.createElement(nodeName);
         for (let i = 0; i < attrs.length; i += 2) {
           elem.setAttribute(attrs[i], attrs[i + 1]);

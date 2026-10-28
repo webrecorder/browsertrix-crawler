@@ -2207,6 +2207,9 @@ self.__bx_behaviors.selectMainBehavior();
     if (this.screenshotWriter) {
       await this.screenshotWriter.flush();
     }
+    if (this.domSnapshotWriter) {
+      await this.domSnapshotWriter.flush();
+    }
   }
 
   protected async _addInitialSeeds() {
