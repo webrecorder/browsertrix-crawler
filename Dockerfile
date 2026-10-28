@@ -4,7 +4,7 @@ ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERS
 FROM ${BROWSER_IMAGE_BASE}
 
 ARG TARGETARCH
-ENV YTDLP_VERSION=2026.08.19
+ENV YTDLP_VERSION=2026.10.26
 
 LABEL org.opencontainers.image.vendor="Webrecorder <https://webrecorder.net/>"
 LABEL org.opencontainers.image.documentation="https://crawler.docs.browsertrix.com/"
