@@ -385,7 +385,7 @@ class ArgParser {
         },
 
         sitemapWorkers: {
-          describe: "Number of parallel sitemap workers to run in parallel",
+          describe: "Number of sitemap workers to run in parallel",
           type: "number",
           default: DEFAULT_SITEMAP_WORKERS,
         },
