@@ -152,6 +152,8 @@ Options:
                                             ovided ISO Date string (YYYY-MM-DD o
                                             r YYYY-MM-DDTHH:MM:SS or partial dat
                                             e)                          [string]
+      --sitemapWorkers                      Number of sitemap workers to run in
+                                            parallel       [number] [default: 5]
       --statsFilename                       If set, output stats as JSON to this
                                              file. (Relative filename resolves t
                                             o crawl working directory)  [string]
