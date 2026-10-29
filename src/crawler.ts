@@ -1258,7 +1258,7 @@ self.__bx_behaviors.selectMainBehavior();
       urls,
       depth: 0,
       extraHops: 0,
-      noOOS: true,
+      noOOS: this.params.alwaysAddBehaviorLinks,
     });
   }
 
