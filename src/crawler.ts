@@ -76,6 +76,7 @@ import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
+import { saveSnapshot } from "./util/domsnapshot.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -169,6 +170,7 @@ export class Crawler {
 
   screenshotWriter: WARCWriter | null;
   textWriter: WARCWriter | null;
+  domSnapshotWriter: WARCWriter | null;
 
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
@@ -323,6 +325,7 @@ export class Crawler {
 
     this.screenshotWriter = null;
     this.textWriter = null;
+    this.domSnapshotWriter = null;
 
     this.blockRules = null;
     this.adBlockRules = null;
@@ -632,6 +635,10 @@ export class Crawler {
     }
     if (this.params.text && !this.params.dryRun) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
+    }
+    if (this.params.domSnapshot && !this.params.dryRun) {
+      this.domSnapshotWriter =
+        this.createExtraResourceWarcWriter("domsnapshot");
     }
 
     await this.loadCrawlState();
@@ -1502,6 +1509,10 @@ self.__bx_behaviors.selectMainBehavior();
         }
       }
     }
+
+    if (this.domSnapshotWriter) {
+      await saveSnapshot(cdp, url, this.domSnapshotWriter);
+    }
   }
 
   async awaitPageExtraDelay(opts: WorkerState) {
@@ -2197,6 +2208,9 @@ self.__bx_behaviors.selectMainBehavior();
     }
     if (this.screenshotWriter) {
       await this.screenshotWriter.flush();
+    }
+    if (this.domSnapshotWriter) {
+      await this.domSnapshotWriter.flush();
     }
   }
 

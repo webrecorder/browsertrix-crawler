@@ -276,7 +276,7 @@ export class WARCWriter implements IndexerOffsetLength {
     async function* content() {
       yield buffer;
     }
-    const resourceUrl = `urn:${resourceType}:${url}`;
+    const resourceUrl = resourceType ? `urn:${resourceType}:${url}` : url;
 
     if (!date) {
       date = new Date();
