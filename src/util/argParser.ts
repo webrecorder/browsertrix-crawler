@@ -25,6 +25,7 @@ import {
   DEFAULT_MAX_RATE_LIMIT_RETRIES,
   ExitCodes,
   BROWSER_STARTUP_TIMEOUT_SECS,
+  DEFAULT_SITEMAP_WORKERS,
 } from "./constants.js";
 import { interpolateFilename } from "./storage.js";
 import { screenshotTypes } from "./screenshots.js";
@@ -381,6 +382,12 @@ class ArgParser {
           describe:
             "If set, filter URLs from sitemaps to those less than or equal to (<=) provided ISO Date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS or partial date)",
           type: "string",
+        },
+
+        sitemapWorkers: {
+          describe: "Number of sitemap workers to run in parallel",
+          type: "number",
+          default: DEFAULT_SITEMAP_WORKERS,
         },
 
         statsFilename: {
