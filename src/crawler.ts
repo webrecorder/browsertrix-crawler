@@ -3,6 +3,7 @@ import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp from "fs/promises";
+import util from "util";
 
 import {
   RedisCrawlState,
@@ -77,6 +78,8 @@ import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
 
+const execFile = util.promisify(child_process.execFile);
+
 const btrixBehaviors = fs.readFileSync(
   new URL(
     "../node_modules/browsertrix-behaviors/dist/behaviors.js",
@@ -106,6 +109,16 @@ type PageEntry = {
   ts?: string;
   status?: number;
   depth?: number;
+};
+
+type YtdlpFormat = {
+  protocol: string;
+  format: string;
+  url: string;
+};
+
+type YtdlpResponse = {
+  formats: YtdlpFormat[];
 };
 
 // ============================================================================
@@ -1235,6 +1248,24 @@ self.__bx_behaviors.selectMainBehavior();
     return "";
   }
 
+  async queueYoutubeMedia(seedId: number, metadata: YtdlpResponse) {
+    const urls = metadata.formats
+      .filter((format) => {
+        return format.protocol === "https";
+      })
+      .map((format) => format.url);
+
+    logger.info(`Queueing YouTube URLs: ${urls.join(", ")}`);
+
+    await this.queueInScopeUrls({
+      seedId,
+      urls,
+      depth: 0,
+      extraHops: 0,
+      noOOS: true,
+    });
+  }
+
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
@@ -1249,6 +1280,13 @@ self.__bx_behaviors.selectMainBehavior();
         seedId,
         seedUrl: this.seeds[seedId].url,
       });
+    }
+
+    if (isYoutubeWatchPage(url)) {
+      const metadata = await ytdlpInfo(url);
+      if (metadata) {
+        await this.queueYoutubeMedia(seedId, metadata);
+      }
     }
 
     const logDetails = { page: url, workerid };
@@ -3590,4 +3628,46 @@ function getDownloadResponse(req: HTTPRequest) {
   }
 
   return null;
+}
+
+function isYoutubeWatchPage(url: string) {
+  const parsed = new URL(url);
+  if (parsed.host.match(/(www.)?youtu.be/)) {
+    return true;
+  }
+  if (parsed.host.match(/(www.)?(youtube.com|youtube-nocookie.com)/)) {
+    return (
+      parsed.pathname === "/watch" || parsed.pathname.startsWith("/shorts")
+    );
+  }
+  return false;
+}
+
+async function ytdlpInfo(url: string): Promise<YtdlpResponse | undefined> {
+  let subprocess;
+  try {
+    subprocess = await execFile("yt-dlp", [
+      // --no-js-runtimes followed by --js-runtimes is so that we
+      // can skip the default deno runtime and force the use of node.
+      "--no-js-runtimes",
+      "--js-runtimes",
+      "node",
+      // dumps to stdout, as opposed to --write-info-json,
+      // which writes to disk.
+      "--dump-json",
+      // --skip-download ensures we only fetch metadata.
+      "--skip-download",
+      url,
+    ]);
+  } catch (e) {
+    logger.error(`Unable to fetch metadata for video at URL ${url}`, e);
+    return;
+  }
+
+  try {
+    return JSON.parse(subprocess.stdout);
+  } catch (e) {
+    logger.error(`yt-dlp returned invalid JSON for video at url ${url}`, e);
+    return;
+  }
 }
