@@ -5,6 +5,8 @@ import os from "os";
 import fsp from "fs/promises";
 import util from "util";
 
+import { WARCRecord } from "warcio";
+
 import {
   RedisCrawlState,
   LoadState,
@@ -1262,6 +1264,57 @@ self.__bx_behaviors.selectMainBehavior();
     });
   }
 
+  async downloadYoutubeMP4(seedId: number, url: string) {
+    const videoId = youtubeId(url);
+    if (videoId === undefined) {
+      logger.info(
+        `Unable to identify video ID for video at URL ${url}; not capturing`,
+      );
+      return;
+    }
+
+    try {
+      await execFile("yt-dlp", [
+        // --no-js-runtimes followed by --js-runtimes is so that we
+        // can skip the default deno runtime and force the use of node.
+        "--no-js-runtimes",
+        "--js-runtimes",
+        "node",
+        "--preset-alias",
+        // Downloads best MP4-compatible audio/video and remuxes into
+        // a single MP4 file
+        "mp4",
+        url,
+        // Output to a known path
+        "--output",
+        "/tmp/video.mp4",
+      ]);
+    } catch (e) {
+      logger.error(`Failed to download video at URL ${url}`, e);
+      return;
+    }
+
+    const reader = fs.createReadStream("/tmp/video.mp4");
+    const record = WARCRecord.create(
+      {
+        url: `https://youtube.fuzzy.replayweb.page/?id=${videoId}`,
+        date: new Date().toISOString(),
+        type: "resource",
+        warcHeaders: { "Content-Type": "video/mp4" },
+      },
+      reader,
+    );
+    const writer = this.browser.recorders[0].writer;
+    writer.writeSingleRecord(record);
+
+    // writer.writeNewResourceRecord({
+    //   buffer: fs.readFileSync("/tmp/video.mp4"),
+    //   resourceType: "media",
+    //   contentType: "video/mp4",
+    //   url: `https://youtube.fuzzy.replayweb.page/?id=${videoId}`,
+    // }, {type: "youtube", url: url, videoId: videoId}, "writer");
+  }
+
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
@@ -1283,6 +1336,7 @@ self.__bx_behaviors.selectMainBehavior();
       if (metadata) {
         await this.queueYoutubeMedia(seedId, metadata);
       }
+      await this.downloadYoutubeMP4(seedId, url);
     }
 
     const logDetails = { page: url, workerid };
@@ -3648,5 +3702,26 @@ async function ytdlpInfo(url: string): Promise<YtdlpResponse | undefined> {
   } catch (e) {
     logger.error(`yt-dlp returned invalid JSON for video at url ${url}`, e);
     return;
+  }
+}
+
+function youtubeId(url: string): string | undefined {
+  const parsed = URL.parse(url);
+  if (!parsed) {
+    return;
+  }
+  // https://youtu.be/videoid
+  if (parsed.hostname.match(/(www.?)youtu.be/)) {
+    return parsed.pathname.replace(/^\//, "");
+  }
+  if (parsed.hostname.match(/(www.)youtube.com/)) {
+    // https://www.youtube.com/watch?v=videoid
+    if (parsed.pathname === "/watch") {
+      return parsed.searchParams.get("v") || undefined;
+    }
+    // https://www.youtube.com/embed/videoid
+    if (parsed.pathname.startsWith("/embed")) {
+      return parsed.pathname.replace(/^\/embed\//, "");
+    }
   }
 }
