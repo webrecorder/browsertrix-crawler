@@ -530,6 +530,12 @@ class ArgParser {
           default: 0,
         },
 
+        skipDiskUtilizationCheck: {
+          describe: "If set, skips the disk utilization startup check",
+          type: "boolean",
+          default: false,
+        },
+
         diskUtilization: {
           describe:
             "If set, save state and exit if disk utilization exceeds this percentage value",
