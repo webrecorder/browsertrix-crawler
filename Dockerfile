@@ -86,6 +86,12 @@ ADD config/policies /etc/brave/policies/managed/
 ADD ./scripts/install-ytdlp.sh /tmp/install-ytdlp.sh
 RUN /tmp/install-ytdlp.sh "$TARGETARCH" "$YTDLP_VERSION"
 
+# Needed for yt-dlp to get the best media
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get purge -y --auto-remove \
+    && rm -rf /var/lib/apt/lists/*
+
 ADD docker-entrypoint.sh /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
