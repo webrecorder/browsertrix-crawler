@@ -521,7 +521,7 @@ export class Crawler {
     }
 
     if (
-      !this.params.skipDiskUtilizationCheck &&
+      this.params.diskUtilization != 0 &&
       (await isDiskFull(this.params.cwd))
     ) {
       await logger.interrupt(
