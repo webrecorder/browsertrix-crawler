@@ -1272,6 +1272,7 @@ self.__bx_behaviors.selectMainBehavior();
       );
       return;
     }
+    const videoPath = `${this.downloadsDir}/${videoId}.mp4`;
 
     try {
       await execFile("yt-dlp", [
@@ -1287,14 +1288,14 @@ self.__bx_behaviors.selectMainBehavior();
         url,
         // Output to a known path
         "--output",
-        "/tmp/video.mp4",
+        videoPath,
       ]);
     } catch (e) {
       logger.error(`Failed to download video at URL ${url}`, e);
       return;
     }
 
-    const reader = fs.createReadStream("/tmp/video.mp4");
+    const reader = fs.createReadStream(videoPath);
     const record = WARCRecord.create(
       {
         url: `https://youtube.fuzzy.replayweb.page/?id=${videoId}`,
@@ -1305,14 +1306,7 @@ self.__bx_behaviors.selectMainBehavior();
       reader,
     );
     const writer = this.browser.recorders[0].writer;
-    writer.writeSingleRecord(record);
-
-    // writer.writeNewResourceRecord({
-    //   buffer: fs.readFileSync("/tmp/video.mp4"),
-    //   resourceType: "media",
-    //   contentType: "video/mp4",
-    //   url: `https://youtube.fuzzy.replayweb.page/?id=${videoId}`,
-    // }, {type: "youtube", url: url, videoId: videoId}, "writer");
+    writer.writeSingleRecord(record, () => fs.rmSync(videoPath));
   }
 
   async crawlPage(opts: WorkerState): Promise<void> {
