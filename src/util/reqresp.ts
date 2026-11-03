@@ -58,6 +58,8 @@ export class RequestResponseInfo {
   responseHeadersList?: { name: string; value: string }[];
   responseHeadersText?: string;
 
+  darkColorSchemePreferred?: boolean | undefined;
+
   payload?: Uint8Array;
   isRemoveRange = false;
 
