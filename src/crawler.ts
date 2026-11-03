@@ -1298,7 +1298,7 @@ self.__bx_behaviors.selectMainBehavior();
     const reader = fs.createReadStream(videoPath);
     const record = WARCRecord.create(
       {
-        url: `https://youtube.fuzzy.replayweb.page/?id=${videoId}`,
+        url: `https://youtube.fuzzy.replayweb.page/videoplayback?id=${videoId}`,
         date: new Date().toISOString(),
         type: "resource",
         warcHeaders: { "Content-Type": "video/mp4" },
