@@ -520,7 +520,10 @@ export class Crawler {
       }
     }
 
-    if (await isDiskFull(this.params.cwd)) {
+    if (
+      this.params.diskUtilization != 0 &&
+      (await isDiskFull(this.params.cwd))
+    ) {
       await logger.interrupt(
         "Out of disk space, exiting",
         {},
