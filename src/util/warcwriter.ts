@@ -138,7 +138,7 @@ export class WARCWriter implements IndexerOffsetLength {
     responseRecord: WARCRecord,
     requestRecord: WARCRecord,
     responseSerializer: WARCSerializer | undefined = undefined,
-    callback: ((length: number, offset: number) => void) | undefined,
+    callback?: ((length: number, offset: number) => void) | undefined,
   ) {
     this.addToQueue(() =>
       this._writeRecordPair(
@@ -222,11 +222,17 @@ export class WARCWriter implements IndexerOffsetLength {
     });
   }
 
-  writeSingleRecord(record: WARCRecord) {
-    this.addToQueue(() => this._writeSingleRecord(record));
+  writeSingleRecord(
+    record: WARCRecord,
+    callback?: ((length: number, offset: number) => void) | undefined,
+  ) {
+    this.addToQueue(() => this._writeSingleRecord(record, callback));
   }
 
-  private async _writeSingleRecord(record: WARCRecord) {
+  private async _writeSingleRecord(
+    record: WARCRecord,
+    callback: ((length: number, offset: number) => void) | undefined,
+  ) {
     if (this.offset >= this.rolloverSize) {
       this.fh = await this.initFH();
     }
@@ -248,6 +254,10 @@ export class WARCWriter implements IndexerOffsetLength {
 
     this.recordLength = await this._writeRecord(record, requestSerializer);
 
+    if (callback) {
+      callback(this.recordLength, this.offset);
+    }
+
     this._writeCDX(record);
   }
 
@@ -255,21 +265,19 @@ export class WARCWriter implements IndexerOffsetLength {
     record: ResourceRecordData,
     details: LogDetails,
     logContext: LogContext,
+    callback?: ((length: number, offset: number) => void) | undefined,
   ) {
     this.addToQueue(
-      () => this._writeNewResourceRecord(record),
+      () => this._writeNewResourceRecord(record, callback),
       details,
       logContext,
     );
   }
 
-  private async _writeNewResourceRecord({
-    buffer,
-    resourceType,
-    contentType,
-    url,
-    date,
-  }: ResourceRecordData) {
+  private async _writeNewResourceRecord(
+    { buffer, resourceType, contentType, url, date }: ResourceRecordData,
+    callback: ((length: number, offset: number) => void) | undefined,
+  ) {
     const warcVersion = "WARC/1.1";
     const warcRecordType = "resource";
     const warcHeaders = { "Content-Type": contentType };
@@ -293,6 +301,7 @@ export class WARCWriter implements IndexerOffsetLength {
         },
         content(),
       ),
+      callback,
     );
   }
 
