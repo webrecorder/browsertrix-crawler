@@ -222,8 +222,15 @@ export class WARCWriter implements IndexerOffsetLength {
     });
   }
 
-  writeSingleRecord(record: WARCRecord) {
-    this.addToQueue(() => this._writeSingleRecord(record));
+  writeSingleRecord(record: WARCRecord, callback: (() => void) | undefined) {
+    this.addToQueue(() => {
+      let ret = this._writeSingleRecord(record);
+      if (callback) {
+        ret = ret.then(callback);
+      }
+
+      return ret;
+    });
   }
 
   private async _writeSingleRecord(record: WARCRecord) {
