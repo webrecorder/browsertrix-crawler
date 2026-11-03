@@ -817,14 +817,7 @@ export class Crawler {
       seedId,
     );
 
-    const res = seed.isIncluded(link, logDetails);
-
-    if (!res) {
-      const { url, depth } = link;
-      this.writeSkippedPage(url, seedId, depth, SkippedReason.OutOfScope);
-    }
-
-    return !!res;
+    return !!seed.isIncluded(link, logDetails);
   }
 
   async setupPage(opts: WorkerState) {
