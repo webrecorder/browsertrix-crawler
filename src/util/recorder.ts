@@ -81,7 +81,6 @@ export type PageInfoValue = {
   type?: string;
   error?: string;
   fromBrowserCache?: boolean;
-  darkColorSchemePreferred?: boolean | undefined;
 };
 
 // =================================================================
@@ -588,7 +587,7 @@ export class Recorder extends EventEmitter {
       returnByValue: true,
     });
     const darkPreferred = result.value;
-    reqresp.darkColorSchemePreferred = darkPreferred;
+    reqresp.extraOpts.darkColorSchemePreferred = darkPreferred;
 
     this.removeReqResp(requestId);
 
@@ -1191,14 +1190,9 @@ export class Recorder extends EventEmitter {
 
   addPageRecord(reqresp: RequestResponseInfo) {
     if (this.isValidUrl(reqresp.url)) {
-      const { status, resourceType: type, darkColorSchemePreferred } = reqresp;
+      const { status, resourceType: type } = reqresp;
       const mime = reqresp.getMimeType();
-      const info: PageInfoValue = {
-        status,
-        mime,
-        type,
-        darkColorSchemePreferred,
-      };
+      const info: PageInfoValue = { status, mime, type };
       if (reqresp.errorText) {
         info.error = reqresp.errorText;
       }
