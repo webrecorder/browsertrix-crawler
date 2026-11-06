@@ -1936,7 +1936,6 @@ export class Recorder extends EventEmitter {
     }
 
     let responseRecord = createResponse(reqresp, pageid, iter);
-    const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
     let serializer = new WARCSerializer(responseRecord, {
       gzip,
@@ -2042,6 +2041,10 @@ export class Recorder extends EventEmitter {
         // no dupe, continue
       }
     }
+
+    // Create the request record after dedupe handling so it references the
+    // response or revisit record that will actually be written.
+    const requestRecord = createRequest(reqresp, responseRecord, pageid);
 
     let modified = false;
 
