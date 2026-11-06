@@ -1238,7 +1238,7 @@
   resolved "https://registry.yarnpkg.com/@nodable/entities/-/entities-2.1.1.tgz#ce41931e9b72606d7f0598d665e46e889285d78a"
   integrity sha512-Pig3HxDIoMgjdEH8OCf/dkcTmLFjJRjWuq8jSnklu284/TKOPibSRERmOykiwmyXTtv61mP+44f3GMx0tLAyjg==
 
-"@nodable/entities@^3.0.1":
+"@nodable/entities@^3.1.0":
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/@nodable/entities/-/entities-3.1.0.tgz#2ab366e0e607fdef8d65c5d84c58d191812bbd4b"
   integrity sha512-LsS/DjHr+uDM647Gru/cA8+J3a3HfhttwCKLyuoyN7yXTFCxKBtSgMQBvrW9yNPa2/zDRUNuGPaH5QUFoa4arQ==
@@ -1777,22 +1777,22 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.2.0.tgz#756641adb587851b5ccb3e095daf27ae581c8406"
   integrity sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==
 
-"@webrecorder/wabac@^2.27.4":
-  version "2.27.4"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.27.4.tgz#695daa498ffee6a2fa94c6ada2319f5bc0897c20"
-  integrity sha512-UQwVQGq+SKeCG3FPY9p2qyeTwBSSG7K4uXySuYwOX1QElLSIPpezbm4QtM3j9mu1LrMbmcDSoDKKUs3bSjo9wA==
+"@webrecorder/wabac@^2.28.0":
+  version "2.28.0"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wabac/-/wabac-2.28.0.tgz#647639d934d693bd00c0ac6d1c9c00499ffcd70b"
+  integrity sha512-teqIZllIp9FeeYLUMfV2E5HzAEX6hqdJybdWJfvE7Oj4tb06PoH5kyE1wr+J7jGj29w0p3G8ENnmIRZwtz2u/A==
   dependencies:
     "@peculiar/asn1-ecc" "^2.3.4"
     "@peculiar/asn1-schema" "^2.3.3"
     "@peculiar/x509" "^1.9.2"
     "@types/js-levenshtein" "^1.1.3"
-    "@webrecorder/wombat" "^3.11.0"
+    "@webrecorder/wombat" "^3.11.2"
     acorn "^8.15.0"
     auto-js-ipfs "^2.3.0"
     base64-js "^1.5.1"
     brotli "^1.3.3"
     buffer "^6.0.3"
-    fast-xml-parser "^5.7.0"
+    fast-xml-parser "^5.12.0"
     hash-wasm "^4.9.0"
     http-status-codes "^2.1.4"
     idb "^7.1.1"
@@ -1807,10 +1807,10 @@
     stream-browserify "^3.0.0"
     warcio "^2.4.12"
 
-"@webrecorder/wombat@^3.11.0":
-  version "3.11.0"
-  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.11.0.tgz#c1a1230089e6fa7ed65ef1182a48b974cc2da129"
-  integrity sha512-Yd1nWNyxASZ5WYMUE9MHYF+XBaQpZjp2l6UzUihssM+Ws3uPRiwShIEG+iL6pLDly8ZgUs2YCqK6PpKTOrEM4Q==
+"@webrecorder/wombat@^3.11.2":
+  version "3.11.2"
+  resolved "https://registry.yarnpkg.com/@webrecorder/wombat/-/wombat-3.11.2.tgz#c0eac21cb66d71751da458dfc0b2773e77aa32e9"
+  integrity sha512-jL2YRheU4YwQaMz2iiaF8KzBCMeOwAzTkVpP3Ul7R4C7Z2A6dBxPkHcgwUiN9lQP3xLIdqtYymeUu0APW4dVuw==
   dependencies:
     warcio "^2.4.12"
 
@@ -3078,10 +3078,10 @@ fast-xml-builder@^1.1.7:
     path-expression-matcher "^1.5.0"
     xml-naming "^0.1.0"
 
-fast-xml-builder@^1.2.0:
-  version "1.3.1"
-  resolved "https://registry.yarnpkg.com/fast-xml-builder/-/fast-xml-builder-1.3.1.tgz#ef05b353b45597483dfb09d450a062a2baec3a82"
-  integrity sha512-pIM/1n3ntFXKYrUZwW7QCK0gAW7XY+wzj1YMIV3tLDvPj/V+zTGJK5e3/4WJfwj0qWw2ElNXiTixda/R+3YSug==
+fast-xml-builder@^1.3.2:
+  version "1.3.2"
+  resolved "https://registry.yarnpkg.com/fast-xml-builder/-/fast-xml-builder-1.3.2.tgz#08837335066983b7659f342ce1559869c068192e"
+  integrity sha512-OX91VSlShLPDgRZV7tk/YQ4l8tT75QziF5Ixg8g4PFbCVPjuTWwN+yQfAxLJ0dufJpprdOd6HlM74Jhd39TcBQ==
   dependencies:
     path-expression-matcher "^1.6.2"
     xml-naming "^0.3.0"
@@ -3096,16 +3096,16 @@ fast-xml-parser@5.7.3:
     path-expression-matcher "^1.5.0"
     strnum "^2.2.3"
 
-fast-xml-parser@^5.7.0:
-  version "5.11.2"
-  resolved "https://registry.yarnpkg.com/fast-xml-parser/-/fast-xml-parser-5.11.2.tgz#0d4987adf4e7934af11d82a73b2841eca9928a42"
-  integrity sha512-R9iDuNrQYeQut46cn2r2wHKn4HYzVDvDm5J1wW+koZewykv0yuO2HChTYeZtrULyHIDM9cj9TUXloCsueCQUog==
+fast-xml-parser@^5.12.0:
+  version "5.12.1"
+  resolved "https://registry.yarnpkg.com/fast-xml-parser/-/fast-xml-parser-5.12.1.tgz#a0f3ebed7a1107db9456c0dd0ed233cbc00ae709"
+  integrity sha512-wR8dO/fx+z8C5exuem1e7BKOWvjsuzvjS/tvA/Xu3Z1zQqJGcXrPzXbcAiaMgp2KjreEROcTkmnnisrcmJ2hYQ==
   dependencies:
-    "@nodable/entities" "^3.0.1"
-    fast-xml-builder "^1.2.0"
-    is-unsafe "^2.0.0"
+    "@nodable/entities" "^3.1.0"
+    fast-xml-builder "^1.3.2"
+    is-unsafe "^2.0.3"
     path-expression-matcher "^1.6.2"
-    strnum "^2.4.2"
+    strnum "^2.5.1"
     xml-naming "^0.3.0"
 
 fastq@^1.6.0:
@@ -3894,10 +3894,10 @@ is-typed-array@^1.1.14, is-typed-array@^1.1.15:
   dependencies:
     which-typed-array "^1.1.16"
 
-is-unsafe@^2.0.0:
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/is-unsafe/-/is-unsafe-2.0.2.tgz#bb1ead17f1aa688f6433258b561e98b1a45a1afc"
-  integrity sha512-HgbIHPBH0KHHCcjLfGsCvhtPTVxjaAZlXjwdz7/GQC40SjSe4sfQsar8J5VFo8JOSbarkpV0OLG95bbaNd9aAQ==
+is-unsafe@^2.0.3:
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/is-unsafe/-/is-unsafe-2.0.3.tgz#c8bc72c9d354dc9483dab9c26ff69bf5ec68d7b0"
+  integrity sha512-ZBllczCCO267vgdFb6Tq3pv+LhHaCiGMdr+ZsuL+OopruAg7S+3ZDs1vD0RPC0uSrkjzbraxaGjtX1YBxjPeFQ==
 
 is-weakmap@^2.0.2:
   version "2.0.2"
@@ -5683,7 +5683,7 @@ strnum@^2.2.3:
   dependencies:
     anynum "^1.0.0"
 
-strnum@^2.4.2:
+strnum@^2.5.1:
   version "2.5.1"
   resolved "https://registry.yarnpkg.com/strnum/-/strnum-2.5.1.tgz#6b2f52021fa47589c3cf643afd80032dfa312b78"
   integrity sha512-UM4nTLWzQiDBseVxUGxN0wJzIk0UU89Qi7pKXz9qISo+lhviJikTuikBsK/oFRlpvYHvSdz0TVoLyQ+sEpYwxA==
