@@ -129,6 +129,9 @@ test("check revisit records written on duplicate crawl, same collection, no wacz
 
   const parserOrig = loadFirstWARC(collName);
 
+  const responseID = new Set<string>();
+  const revisitID = new Set<string>();
+
   for await (const record of parserOrig) {
     if (record.warcTargetURI && record.warcTargetURI.startsWith("urn:")) {
       continue;
@@ -136,6 +139,16 @@ test("check revisit records written on duplicate crawl, same collection, no wacz
 
     if (record.warcType === "response") {
       response++;
+      const id = record.warcHeader("WARC-Record-ID");
+      if (id) {
+        responseID.add(id);
+      }
+    }
+
+    if (record.warcType === "request") {
+      expect(
+        responseID.has(record.warcHeader("WARC-Concurrent-To") || ""),
+      ).toBe(true);
     }
   }
 
@@ -152,6 +165,16 @@ test("check revisit records written on duplicate crawl, same collection, no wacz
 
     if (record.warcType === "revisit") {
       revisit++;
+      const id = record.warcHeader("WARC-Record-ID");
+      if (id) {
+        revisitID.add(id);
+      }
+    }
+
+    if (record.warcType === "request") {
+      expect(revisitID.has(record.warcHeader("WARC-Concurrent-To") || "")).toBe(
+        true,
+      );
     }
   }
 
