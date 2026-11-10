@@ -80,6 +80,13 @@ import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
 
+import {
+  YtdlpResponse,
+  isYoutubeVideo,
+  ytdlpInfo,
+  youtubeId,
+} from "./ytdlp.js";
+
 const execFile = util.promisify(child_process.execFile);
 
 const btrixBehaviors = fs.readFileSync(
@@ -111,16 +118,6 @@ type PageEntry = {
   ts?: string;
   status?: number;
   depth?: number;
-};
-
-type YtdlpFormat = {
-  protocol: string;
-  format: string;
-  url: string;
-};
-
-type YtdlpResponse = {
-  formats: YtdlpFormat[];
 };
 
 // ============================================================================
@@ -1325,7 +1322,7 @@ self.__bx_behaviors.selectMainBehavior();
       });
     }
 
-    if (isYoutubeWatchPage(url)) {
+    if (isYoutubeVideo(url)) {
       const metadata = await ytdlpInfo(url);
       if (metadata) {
         await this.queueYoutubeMedia(seedId, metadata);
@@ -3655,67 +3652,4 @@ function getDownloadResponse(req: HTTPRequest) {
   }
 
   return null;
-}
-
-function isYoutubeWatchPage(url: string) {
-  const parsed = new URL(url);
-  if (parsed.host.match(/(www.)?youtu.be/)) {
-    return true;
-  }
-  if (parsed.host.match(/(www.)?(youtube.com|youtube-nocookie.com)/)) {
-    return (
-      parsed.pathname === "/watch" || parsed.pathname.startsWith("/shorts")
-    );
-  }
-  return false;
-}
-
-async function ytdlpInfo(url: string): Promise<YtdlpResponse | undefined> {
-  let subprocess;
-  try {
-    subprocess = await execFile("yt-dlp", [
-      // --no-js-runtimes followed by --js-runtimes is so that we
-      // can skip the default deno runtime and force the use of node.
-      "--no-js-runtimes",
-      "--js-runtimes",
-      "node",
-      // dumps to stdout, as opposed to --write-info-json,
-      // which writes to disk.
-      "--dump-json",
-      // --skip-download ensures we only fetch metadata.
-      "--skip-download",
-      url,
-    ]);
-  } catch (e) {
-    logger.error(`Unable to fetch metadata for video at URL ${url}`, e);
-    return;
-  }
-
-  try {
-    return JSON.parse(subprocess.stdout);
-  } catch (e) {
-    logger.error(`yt-dlp returned invalid JSON for video at url ${url}`, e);
-    return;
-  }
-}
-
-function youtubeId(url: string): string | undefined {
-  const parsed = URL.parse(url);
-  if (!parsed) {
-    return;
-  }
-  // https://youtu.be/videoid
-  if (parsed.hostname.match(/(www.?)youtu.be/)) {
-    return parsed.pathname.replace(/^\//, "");
-  }
-  if (parsed.hostname.match(/(www.)youtube.com/)) {
-    // https://www.youtube.com/watch?v=videoid
-    if (parsed.pathname === "/watch") {
-      return parsed.searchParams.get("v") || undefined;
-    }
-    // https://www.youtube.com/embed/videoid
-    if (parsed.pathname.startsWith("/embed")) {
-      return parsed.pathname.replace(/^\/embed\//, "");
-    }
-  }
 }
