@@ -826,14 +826,17 @@ export class Crawler {
   async setupPage(opts: WorkerState) {
     const { page, cdp, workerid, frameIdToExecId, recorder } = opts;
 
-    const addLink = async (url: string, alwaysObeyScope: boolean = false) => {
+    const addLink = async (
+      url: string,
+      alwaysObeyScope: boolean = false,
+    ): Promise<number> => {
       const { seedId, depth, extraHops = 0, logDetails } = opts.data;
 
       // if not always obeying scope and allowed to ignore scope, set to true
       const ignoreScope =
         !alwaysObeyScope && this.params.alwaysAddBehaviorLinks;
 
-      await this.queueInScopeUrls({
+      return await this.queueInScopeUrls({
         seedId,
         urls: [url],
         depth,
@@ -847,7 +850,7 @@ export class Crawler {
     const addLinkBatch = async (
       urls: string,
       alwaysObeyScope: boolean = false,
-    ) => {
+    ): Promise<number> => {
       const { seedId, depth, extraHops = 0, logDetails } = opts.data;
 
       const urlsSplit = urls.split("\n\n");
@@ -856,7 +859,7 @@ export class Crawler {
       const ignoreScope =
         !alwaysObeyScope && this.params.alwaysAddBehaviorLinks;
 
-      await this.queueInScopeUrls({
+      return await this.queueInScopeUrls({
         seedId,
         urls: urlsSplit,
         depth,
@@ -2910,7 +2913,9 @@ self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
     pageUrl?: string;
     ignoreScope?: boolean;
     logDetails?: LogDetails;
-  }) {
+  }): Promise<number> {
+    let urlsAdded = 0;
+
     try {
       depth += 1;
 
@@ -2948,20 +2953,25 @@ self.__bx_behaviors.extractLinks(${JSON.stringify(selector)}, ${JSON.stringify(
 
         const { url, isOOS } = res;
 
-        if (url) {
-          await this.queueUrl({
+        if (
+          url &&
+          (await this.queueUrl({
             seedId,
             url,
             depth,
             extraHops: isOOS ? newExtraHops : extraHops,
             logDetails,
             ignoreScope,
-          });
+          }))
+        ) {
+          urlsAdded += 1;
         }
       }
     } catch (e) {
       logger.error("Queuing Error", e, "links");
     }
+
+    return urlsAdded;
   }
 
   async checkCF(page: Page, logDetails: LogDetails) {
