@@ -1109,7 +1109,7 @@ self.__bx_behaviors.selectMainBehavior();
       BxFunctionBindings.AddToSeenSet,
       (data: string) => {
         if (data && (data.startsWith("https:") || data.startsWith("http:"))) {
-          void addLink(data);
+          void addLink(data, true);
         }
         return this.crawlState.addToUserSet(data);
       },
