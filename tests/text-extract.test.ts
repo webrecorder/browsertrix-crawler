@@ -32,8 +32,8 @@ test("check that raw text extraction creates urn:text-from-response records", as
     child_process.execSync(
       "docker run -v $PWD/test-crawls:/crawls webrecorder/browsertrix-crawler crawl --collection raw-text-crawl --url https://example.com/ --scopeType page --generateCDX --text to-warc,to-warc-from-raw",
     );
-  } catch (error) {
-    console.log(error.stderr);
+  } catch (error: unknown) {
+    console.log((error as ExecException).stderr);
   }
 
   const data = fs.readFileSync(
