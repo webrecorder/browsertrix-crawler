@@ -1,6 +1,6 @@
 import child_process from "child_process";
 import Redis from "ioredis";
-import { sleep } from "./utils";
+import { markRedisStopped, redisOpts, sleep } from "./utils";
 
 test("test pushing behavior logs to redis", async () => {
   const child = child_process.exec(
@@ -11,18 +11,12 @@ test("test pushing behavior logs to redis", async () => {
 
   child.on("exit", function () {
     crawlFinished = true;
-  });
-
-  const redis = new Redis("redis://127.0.0.1:36398/0", {
-    lazyConnect: true,
-    retryStrategy: () => null,
+    markRedisStopped();
   });
 
   await sleep(3000);
 
-  redis.options.maxRetriesPerRequest = 50;
-
-  await redis.connect();
+  const redis = new Redis("redis://127.0.0.1:36398/0", redisOpts);
 
   let customLogLineCount = 0;
   let done = false;

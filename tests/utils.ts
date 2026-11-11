@@ -1,6 +1,7 @@
 import type { CrawlerArgs } from "../src/util/argParser";
 import type { PartialDeep } from "type-fest";
 import type { BlockRuleDecl } from "../src/util/blockrules";
+import { RedisOptions } from "ioredis";
 
 export type TestConfig = Omit<PartialDeep<CrawlerArgs>, "blockRules"> & {
   blockRules: BlockRuleDecl[];
@@ -18,3 +19,28 @@ export async function sleep(time: number) {
 }
 
 export type ErrorWithStatus = Error & { status: number };
+
+let redisStopped = false;
+
+export const markRedisStopped = () => {
+  redisStopped = true;
+};
+
+export const redisOpts: RedisOptions = {
+  //lazyConnect: true,
+  maxRetriesPerRequest: null,
+  connectTimeout: 30000,
+  retryStrategy: (retries: number) => {
+    // if redis already stopped, stop retrying
+    if (redisStopped) {
+      return null;
+    }
+
+    // retry 10 times every 1000ms
+    if (retries < 10) {
+      return 1000;
+    }
+    console.error("Max redis retries reached, failing connection");
+    return null;
+  },
+};

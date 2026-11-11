@@ -1,7 +1,7 @@
 import { exec, execSync } from "child_process";
 import fs from "fs";
 import { Redis } from "ioredis";
-import { sleep } from "./utils";
+import { markRedisStopped, redisOpts, sleep } from "./utils";
 
 let redisId: NonSharedBuffer;
 let crawler1: Promise<number | null>, crawler2: Promise<number | null>;
@@ -27,6 +27,8 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
+  markRedisStopped();
+
   execSync(`docker kill ${redisId}`);
 
   await sleep(3000);
@@ -49,16 +51,9 @@ function runCrawl(name: string) {
 }
 
 test("run crawlers with external redis", async () => {
-  const redis = new Redis("redis://127.0.0.1:37379/0", {
-    lazyConnect: true,
-    retryStrategy: () => null,
-  });
-
   await sleep(3000);
 
-  redis.options.maxRetriesPerRequest = 50;
-
-  await redis.connect();
+  const redis = new Redis("redis://127.0.0.1:37379/0", redisOpts);
 
   let count = 0;
 

@@ -1,7 +1,7 @@
 import child_process from "child_process";
 import fs from "fs";
 import { Redis } from "ioredis";
-import { sleep } from "./utils";
+import { sleep, redisOpts, markRedisStopped } from "./utils";
 
 test("run initial crawl with text and screenshots to prepare for QA", async () => {
   fs.rmSync("./test-crawls/collections/qa-wr-net", {
@@ -32,18 +32,12 @@ test("run QA comparison, with write pages to redis", async () => {
   let crawler_exited = false;
   child.on("exit", function () {
     crawler_exited = true;
-  });
-
-  const redis = new Redis("redis://127.0.0.1:36380/0", {
-    lazyConnect: true,
-    retryStrategy: () => null,
+    markRedisStopped();
   });
 
   await sleep(3000);
 
-  redis.options.maxRetriesPerRequest = 50;
-
-  await redis.connect();
+  const redis = new Redis("redis://127.0.0.1:36380/0", redisOpts);
 
   let count = 0;
 

@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import yaml from "js-yaml";
 import Redis from "ioredis";
-import { sleep } from "./utils";
+import { redisOpts, sleep } from "./utils";
 import { SaveState } from "../src/util/state";
 
 const pagesFile = "test-crawls/collections/int-state-test/pages/pages.jsonl";
@@ -130,20 +130,11 @@ test("check crawl restarted with saved state", async () => {
     console.log(error);
   }
 
-  await sleep(2000);
+  await sleep(4000);
 
-  const redis = new Redis(`redis://127.0.0.1:${port}/0`, {
-    lazyConnect: true,
-    retryStrategy: () => null,
-  });
+  const redis = new Redis(`redis://127.0.0.1:${port}/0`, redisOpts);
 
   try {
-    redis.options.maxRetriesPerRequest = 100;
-
-    await redis.connect();
-
-    await sleep(2000);
-
     expect(await redis.get("test:d")).toBe(numDone + "");
 
     for (const url of finished) {
@@ -153,6 +144,7 @@ test("check crawl restarted with saved state", async () => {
   } catch (e) {
     console.log(e);
   } finally {
+    redis.disconnect();
     await waitContainerDone(containerId!);
   }
 });
