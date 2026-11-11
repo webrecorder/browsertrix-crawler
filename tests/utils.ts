@@ -36,9 +36,9 @@ export const redisOpts: RedisOptions = {
       return null;
     }
 
-    // retry 20 times every 1000ms
-    if (retries < 20) {
-      return 750;
+    // retry 10 times every 1000ms
+    if (retries < 10) {
+      return 1000;
     }
     console.error("Max redis retries reached, failing connection");
     return null;
