@@ -76,8 +76,10 @@ test("verify that index entries are as expected", async () => {
 
   const remainder = allCdxLines.length % LINES_PER_BLOCK;
 
-  // should have the remainder
-  expect(blockLineCounts[blockLineCounts.length - 1]).toBe(remainder);
+  // should have the remainder, or if it is 0, the full block
+  expect(blockLineCounts[blockLineCounts.length - 1]).toBe(
+    remainder || LINES_PER_BLOCK,
+  );
 
   // ensure full sort of all cdx lines
   for (let i = 0; i < allCdxLines.length - 1; i++) {
