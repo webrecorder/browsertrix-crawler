@@ -46,9 +46,6 @@ async function runCrawl(
   let finished = 0;
 
   try {
-    redis.options.maxRetriesPerRequest = 100;
-    await redis.connect();
-
     for (let i = 0; i < 30; i++) {
       finished = await redis.zcard("test:q");
 
@@ -60,6 +57,7 @@ async function runCrawl(
   } catch (e) {
     console.error(e);
   } finally {
+    redis.disconnect();
     await waitContainer(containerId);
   }
 

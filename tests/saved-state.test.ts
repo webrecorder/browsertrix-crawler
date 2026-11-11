@@ -130,17 +130,11 @@ test("check crawl restarted with saved state", async () => {
     console.log(error);
   }
 
-  await sleep(2000);
+  await sleep(4000);
 
   const redis = new Redis(`redis://127.0.0.1:${port}/0`, redisOpts);
 
   try {
-    redis.options.maxRetriesPerRequest = 100;
-
-    await redis.connect();
-
-    await sleep(2000);
-
     expect(await redis.get("test:d")).toBe(numDone + "");
 
     for (const url of finished) {
@@ -150,6 +144,7 @@ test("check crawl restarted with saved state", async () => {
   } catch (e) {
     console.log(e);
   } finally {
+    redis.disconnect();
     await waitContainerDone(containerId!);
   }
 });

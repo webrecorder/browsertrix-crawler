@@ -2,7 +2,7 @@ import { execSync, exec } from "child_process";
 import { Redis } from "ioredis";
 
 import { S3Client, PutBucketPolicyCommand } from "@aws-sdk/client-s3";
-import { redisOpts, sleep } from "./utils";
+import { markRedisStopped, redisOpts, sleep } from "./utils";
 
 const ACCESS = "ROOT";
 const SECRET = "TESTSECRET";
@@ -44,15 +44,13 @@ test("run crawl with upload", async () => {
   let crawler_exited = false;
   child.on("exit", function () {
     crawler_exited = true;
+    markRedisStopped();
     resolve();
   });
 
-  const redis = new Redis("redis://127.0.0.1:36390/0", redisOpts);
-
   await sleep(3000);
 
-  redis.options.maxRetriesPerRequest = 50;
-  await redis.connect();
+  const redis = new Redis("redis://127.0.0.1:36390/0", redisOpts);
 
   let filename;
 

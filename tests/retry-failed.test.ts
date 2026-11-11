@@ -1,8 +1,8 @@
-import { exec, execSync } from "child_process";
+import { exec } from "child_process";
 import fs from "fs";
 import http from "http";
 import Redis from "ioredis";
-import { redisOpts, sleep } from "./utils";
+import { markRedisStopped, redisOpts, sleep } from "./utils";
 
 const DOCKER_HOST_NAME = process.env.DOCKER_HOST_NAME || "host.docker.internal";
 
@@ -33,20 +33,26 @@ afterAll(() => {
 });
 
 test("run crawl with retries for no response", async () => {
-  execSync(
+  const child = exec(
     `docker run -d -v $PWD/test-crawls:/crawls -e CRAWL_ID=test -p 36387:6379 --rm webrecorder/browsertrix-crawler crawl --url http://invalid-host-x:31501 --url https://example-com.webrecorder.net/ --limit 2 --pageExtraDelay 10 --debugAccessRedis --collection retry-fail --retries 5 --no-rateLimitStatusCodes`,
   );
 
-  const redis = new Redis("redis://127.0.0.1:36387/0", redisOpts);
+  let resolve: () => void;
+
+  const crawlFinished = new Promise<void>((r) => (resolve = r));
+
+  child.on("exit", function () {
+    markRedisStopped();
+    resolve();
+  });
 
   await sleep(3000);
+
+  const redis = new Redis("redis://127.0.0.1:36387/0", redisOpts);
 
   let numRetries = 0;
 
   try {
-    redis.options.maxRetriesPerRequest = 100;
-    await redis.connect();
-
     while (true) {
       const res = await redis.lrange("test:f", 0, -1);
       if (res.length) {
@@ -63,6 +69,8 @@ test("run crawl with retries for no response", async () => {
   } finally {
     expect(numRetries).toBe(5);
   }
+
+  await crawlFinished;
 });
 
 test("check only one failed page entry is made", () => {
@@ -95,9 +103,6 @@ test("run crawl with retries for 503, enough retries to succeed", async () => {
 
   const crawlFinished = new Promise<void>((r) => (resolve = r));
 
-  // detect crawler exit
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const crawler_exited = false;
   child.on("exit", function (code) {
     status = code;
     resolve();
@@ -126,9 +131,6 @@ test("run crawl with retries for 503, not enough retries, fail", async () => {
 
   const crawlFinished = new Promise<void>((r) => (resolve = r));
 
-  // detect crawler exit
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const crawler_exited = false;
   child.on("exit", function (code) {
     status = code;
     resolve();
@@ -156,9 +158,6 @@ test("run crawl with retries for 503, no retries, fail", async () => {
 
   const crawlFinished = new Promise<void>((r) => (resolve = r));
 
-  // detect crawler exit
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const crawler_exited = false;
   child.on("exit", function (code) {
     status = code;
     resolve();

@@ -1,6 +1,6 @@
 import { exec, ExecException } from "child_process";
 import Redis from "ioredis";
-import { redisOpts, sleep } from "./utils";
+import { markRedisStopped, redisOpts, sleep } from "./utils";
 
 test("dynamically add exclusion while crawl is running", async () => {
   let callback:
@@ -21,6 +21,7 @@ test("dynamically add exclusion while crawl is running", async () => {
       stdout: NonSharedBuffer,
       stderr: NonSharedBuffer,
     ) => {
+      markRedisStopped();
       resolve({ error, stdout, stderr } as const);
     };
   });
@@ -38,8 +39,6 @@ test("dynamically add exclusion while crawl is running", async () => {
   await sleep(3000);
 
   const redis = new Redis("redis://127.0.0.1:36382/0", redisOpts);
-
-  await redis.connect();
 
   while (true) {
     if (Number(await redis.zcard("test:q")) > 1) {
@@ -59,6 +58,7 @@ test("dynamically add exclusion while crawl is running", async () => {
 
   // ensure 'Add Exclusion is contained in the debug logs
   const { stdout } = await p;
+  redis.disconnect();
 
   expect(stdout.indexOf("Add Exclusion") > 0).toBe(true);
 

@@ -20,14 +20,27 @@ export async function sleep(time: number) {
 
 export type ErrorWithStatus = Error & { status: number };
 
+let redisStopped = false;
+
+export const markRedisStopped = () => {
+  redisStopped = true;
+};
+
 export const redisOpts: RedisOptions = {
-  lazyConnect: true,
+  //lazyConnect: true,
+  maxRetriesPerRequest: null,
   connectTimeout: 30000,
   retryStrategy: (retries: number) => {
-    // retry 5 times every 1000ms
-    if (retries < 5) {
-      return 1000;
+    // if redis already stopped, stop retrying
+    if (redisStopped) {
+      return null;
     }
+
+    // retry 20 times every 1000ms
+    if (retries < 20) {
+      return 750;
+    }
+    console.error("Max redis retries reached, failing connection");
     return null;
   },
 };

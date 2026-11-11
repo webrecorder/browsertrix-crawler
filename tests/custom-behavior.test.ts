@@ -1,6 +1,6 @@
 import child_process, { ExecException, type ChildProcess } from "child_process";
 import Redis from "ioredis";
-import { ErrorWithStatus, redisOpts, sleep } from "./utils";
+import { ErrorWithStatus, markRedisStopped, redisOpts, sleep } from "./utils";
 
 let proc: ChildProcess | null = null;
 
@@ -204,18 +204,15 @@ test("test pushing behavior logs to redis", async () => {
   const crawlFinished = new Promise<void>((r) => (resolve = r));
 
   child.on("exit", function () {
+    markRedisStopped();
     resolve!();
   });
 
   await crawlFinished;
 
-  const redis = new Redis("redis://127.0.0.1:36399/0", redisOpts);
-
   await sleep(3000);
 
-  redis.options.maxRetriesPerRequest = 50;
-
-  await redis.connect();
+  const redis = new Redis("redis://127.0.0.1:36399/0", redisOpts);
 
   let customLogLineCount = 0;
 
