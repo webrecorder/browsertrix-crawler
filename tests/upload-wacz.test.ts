@@ -2,7 +2,7 @@ import { execSync, exec } from "child_process";
 import { Redis } from "ioredis";
 
 import { S3Client, PutBucketPolicyCommand } from "@aws-sdk/client-s3";
-import { sleep } from "./utils";
+import { redisOpts, sleep } from "./utils";
 
 const ACCESS = "ROOT";
 const SECRET = "TESTSECRET";
@@ -47,10 +47,7 @@ test("run crawl with upload", async () => {
     resolve();
   });
 
-  const redis = new Redis("redis://127.0.0.1:36390/0", {
-    lazyConnect: true,
-    retryStrategy: () => null,
-  });
+  const redis = new Redis("redis://127.0.0.1:36390/0", redisOpts);
 
   await sleep(3000);
 

@@ -1,6 +1,6 @@
 import { exec, ExecException } from "child_process";
 import Redis from "ioredis";
-import { sleep } from "./utils";
+import { redisOpts, sleep } from "./utils";
 
 test("dynamically add exclusion while crawl is running", async () => {
   let callback:
@@ -37,10 +37,7 @@ test("dynamically add exclusion while crawl is running", async () => {
 
   await sleep(3000);
 
-  const redis = new Redis("redis://127.0.0.1:36382/0", {
-    lazyConnect: true,
-    retryStrategy: () => null,
-  });
+  const redis = new Redis("redis://127.0.0.1:36382/0", redisOpts);
 
   await redis.connect();
 

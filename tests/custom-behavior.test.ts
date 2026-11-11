@@ -1,6 +1,6 @@
 import child_process, { ExecException, type ChildProcess } from "child_process";
 import Redis from "ioredis";
-import { ErrorWithStatus, sleep } from "./utils";
+import { ErrorWithStatus, redisOpts, sleep } from "./utils";
 
 let proc: ChildProcess | null = null;
 
@@ -209,10 +209,7 @@ test("test pushing behavior logs to redis", async () => {
 
   await crawlFinished;
 
-  const redis = new Redis("redis://127.0.0.1:36399/0", {
-    lazyConnect: true,
-    retryStrategy: () => null,
-  });
+  const redis = new Redis("redis://127.0.0.1:36399/0", redisOpts);
 
   await sleep(3000);
 

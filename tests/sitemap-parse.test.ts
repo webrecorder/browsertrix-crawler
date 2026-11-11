@@ -1,6 +1,6 @@
 import child_process from "child_process";
 import Redis from "ioredis";
-import { sleep } from "./utils";
+import { redisOpts, sleep } from "./utils";
 
 async function waitContainer(containerId: string | null) {
   try {
@@ -41,10 +41,7 @@ async function runCrawl(
 
   await sleep(3000);
 
-  const redis = new Redis(`redis://127.0.0.1:${port}/0`, {
-    lazyConnect: true,
-    retryStrategy: () => null,
-  });
+  const redis = new Redis(`redis://127.0.0.1:${port}/0`, redisOpts);
 
   let finished = 0;
 

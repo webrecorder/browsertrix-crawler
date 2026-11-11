@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import Redis from "ioredis";
 import { WARCParser } from "warcio";
-import { sleep } from "./utils";
+import { redisOpts, sleep } from "./utils";
 
 let redisId: Uint8Array;
 let numResponses = 0;
@@ -89,10 +89,7 @@ function loadDataPackageRelated(name: string) {
 }
 
 async function initRedis(db = 0) {
-  const redis = new Redis(`redis://127.0.0.1:37379/${db}`, {
-    lazyConnect: true,
-    retryStrategy: () => null,
-  });
+  const redis = new Redis(`redis://127.0.0.1:37379/${db}`, redisOpts);
 
   redis.options.maxRetriesPerRequest = 50;
 
