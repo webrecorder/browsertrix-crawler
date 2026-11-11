@@ -2,7 +2,6 @@ import * as child_process from "child_process";
 import fs from "fs";
 import fsp from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
-import assert from "node:assert";
 import crypto from "crypto";
 
 import path from "path";
@@ -98,7 +97,11 @@ export class Browser {
     this.majorVersion = this.getMajorVersion();
 
     // must be provided, part of Dockerfile
-    assert(process.env.GEOMETRY);
+    if (!process.env.GEOMETRY) {
+      throw new Error(
+        "GEOMETRY is not set (normally provided by the Docker image); set it to WxHxD, e.g. 1360x1020x16",
+      );
+    }
 
     const geom = process.env.GEOMETRY.split("x");
 
@@ -149,10 +152,17 @@ export class Browser {
     const startTimeoutSecs =
       browserStartTimeout ?? BROWSER_STARTUP_TIMEOUT_SECS;
 
+    const browserExe = this.getBrowserExe();
+    if (!browserExe) {
+      throw new Error(
+        "No browser found; set BROWSER_BIN to a Chromium/Chrome executable",
+      );
+    }
+
     const launchOpts: LaunchOptions = {
       args,
       headless,
-      executablePath: this.getBrowserExe(),
+      executablePath: browserExe,
       ignoreDefaultArgs: ["--enable-automation", "--hide-scrollbars"],
       acceptInsecureCerts: true,
       handleSIGHUP: signals,

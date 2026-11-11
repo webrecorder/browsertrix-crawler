@@ -3,22 +3,34 @@ import fsp from "fs/promises";
 import http, { IncomingMessage, ServerResponse } from "http";
 import path from "path";
 
-const replayHTML = fs.readFileSync(
+function readAsset(fileUrl: URL, encoding: "utf8"): string;
+function readAsset(fileUrl: URL, encoding?: undefined): Buffer;
+function readAsset(fileUrl: URL, encoding?: "utf8"): string | Buffer {
+  try {
+    return encoding
+      ? fs.readFileSync(fileUrl, { encoding })
+      : fs.readFileSync(fileUrl);
+  } catch (err) {
+    throw new Error(
+      `Missing replay asset ${fileUrl.pathname.split("/").slice(-2).join("/")}: ` +
+        "this file is normally fetched from the CDN by the Dockerfile (replaywebpage); " +
+        "when building outside the Docker image, download it into html/rwp/ first.",
+      { cause: err },
+    );
+  }
+}
+
+const replayHTML = readAsset(
   new URL("../../html/replay.html", import.meta.url),
-  { encoding: "utf8" },
+  "utf8",
 );
 
-const swJS = fs.readFileSync(new URL("../../html/rwp/sw.js", import.meta.url), {
-  encoding: "utf8",
-});
+const swJS = readAsset(new URL("../../html/rwp/sw.js", import.meta.url), "utf8");
 
-const uiJS = fs.readFileSync(new URL("../../html/rwp/ui.js", import.meta.url), {
-  encoding: "utf8",
-});
+const uiJS = readAsset(new URL("../../html/rwp/ui.js", import.meta.url), "utf8");
 
-const adblockGZ = fs.readFileSync(
+const adblockGZ = readAsset(
   new URL("../../html/rwp/adblock.gz", import.meta.url),
-  {},
 );
 
 // ============================================================================
