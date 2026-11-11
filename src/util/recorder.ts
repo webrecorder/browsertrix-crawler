@@ -582,6 +582,13 @@ export class Recorder extends EventEmitter {
       return;
     }
 
+    const { result } = await cdp.send("Runtime.evaluate", {
+      expression: "window.matchMedia('(prefers-color-scheme: dark)').matches;",
+      returnByValue: true,
+    });
+    const darkPreferred = result.value;
+    reqresp.extraOpts.darkColorSchemePreferred = darkPreferred;
+
     this.removeReqResp(requestId);
 
     if (!this.isValidUrl(url)) {
