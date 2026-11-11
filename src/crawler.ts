@@ -1270,6 +1270,7 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
     const videoPath = `${this.downloadsDir}/${videoId}.mp4`;
+    logger.info("Downloading YouTube video", { videoId });
 
     try {
       await execFile("yt-dlp", [
