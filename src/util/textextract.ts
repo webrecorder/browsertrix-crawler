@@ -1,7 +1,7 @@
 import { logger } from "./logger.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { WARCWriter } from "./warcwriter.js";
-import { JSDOM } from "jsdom";
+//import { JSDOM } from "jsdom";
 
 // ============================================================================
 interface TextExtractOptsBase {
@@ -10,9 +10,9 @@ interface TextExtractOptsBase {
   skipDocs: number;
 }
 
-interface TextExtractViaResponseOpts extends TextExtractOptsBase {
-  requestId?: string;
-}
+// interface TextExtractViaResponseOpts extends TextExtractOptsBase {
+//   requestId?: string;
+// }
 
 // ============================================================================
 export abstract class BaseTextExtract {
@@ -84,79 +84,6 @@ export class TextExtractViaSnapshot extends BaseTextExtract {
       computedStyles: [],
     });
     return extractTextFromDOMSnapshot(result, this.skipDocs);
-  }
-}
-
-// ============================================================================
-export class TextExtractViaResponse extends BaseTextExtract {
-  protected requestId: string | undefined;
-
-  constructor(cdp: CDPSession, opts: TextExtractViaResponseOpts) {
-    super(cdp, opts);
-    this.requestId = opts.requestId;
-  }
-
-  async doGetText(): Promise<string> {
-    if (!this.requestId) {
-      logger.warn(
-        "Missing document request ID, skipping",
-        { url: this.url },
-        "text",
-      );
-      throw new Error("Missing document request ID");
-    }
-
-    logger.info(
-      "Fetching raw response body via CDP",
-      { url: this.url, requestId: this.requestId },
-      "text",
-    );
-
-    try {
-      const { body, base64Encoded } = await this.cdp.send(
-        "Network.getResponseBody",
-        {
-          requestId: this.requestId,
-        },
-      );
-
-      const text = base64Encoded
-        ? Buffer.from(body, "base64").toString()
-        : body;
-
-      logger.info(
-        "Got raw response body",
-        { url: this.url, size: text.length },
-        "text",
-      );
-
-      const dom = new JSDOM(text, {
-        runScripts: undefined,
-        resources: undefined,
-      });
-      try {
-        const extracted = this.parseTextFromDOM(dom.window.document);
-        logger.info(
-          "Extracted text from raw response",
-          { url: this.url, textLength: extracted.length },
-          "text",
-        );
-        return extracted;
-      } finally {
-        dom.window.close();
-      }
-    } catch (e) {
-      logger.error(
-        "Failed to get response body",
-        { url: this.url, requestId: this.requestId, error: String(e) },
-        "text",
-      );
-      throw e;
-    }
-  }
-
-  parseTextFromDOM(dom: Document): string {
-    return extractTextFromDOM(dom);
   }
 }
 
