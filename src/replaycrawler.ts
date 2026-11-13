@@ -42,12 +42,12 @@ type ReplayPage = {
   mime?: string;
 };
 
-type ComparisonData = {
+export type ComparisonData = {
   comparison: {
     screenshotMatch?: number;
     textMatch?: number;
     rawTextMatch?: number;
-    resourceCounts: {
+    resourceCounts?: {
       crawlGood?: number;
       crawlBad?: number;
       replayGood?: number;
@@ -58,12 +58,12 @@ type ComparisonData = {
       categories: Record<string, number>;
     };
   };
-  finalUrl: string;
+  finalUrl?: string;
 };
 
 type ReplayPageInfoRecord = PageInfoRecord & ComparisonData;
 
-type ComparisonPageState = PageState & ComparisonData;
+export type ComparisonPageState = PageState & ComparisonData;
 
 // ============================================================================
 // Crawler designed to run over replay of existing WACZ files to generate comparison
@@ -197,7 +197,7 @@ export class ReplayCrawler extends Crawler {
     return true;
   }
 
-  async loadPages(url: string) {
+  async loadPages(url: string, name = "") {
     let path = url;
 
     try {
@@ -207,7 +207,7 @@ export class ReplayCrawler extends Crawler {
     }
 
     if (path.endsWith(".wacz")) {
-      await this.loadPagesForWACZ(url);
+      await this.addWACZ(url, name);
     } else if (path.endsWith(".json")) {
       const json = await getFileOrUrlJson(url);
 
@@ -221,13 +221,17 @@ export class ReplayCrawler extends Crawler {
             continue;
           }
           if (entry.path) {
-            await this.loadPages(entry.path);
+            await this.loadPages(entry.path, entry.name);
           }
         }
       }
     } else {
       logger.warn("Unknown replay source", { url }, "replay");
     }
+  }
+
+  async addWACZ(url: string, _: string) {
+    await this.loadPagesForWACZ(url);
   }
 
   async loadPagesForWACZ(url: string) {
@@ -939,7 +943,7 @@ export class ReplayCrawler extends Crawler {
       pageInfo.ts = origResData.ts;
     }
 
-    const status = origResData.urls[pageInfo.finalUrl]?.status;
+    const status = origResData.urls[pageInfo.finalUrl!]?.status;
 
     logger.info("Page Resource Status", { status });
 
@@ -948,6 +952,10 @@ export class ReplayCrawler extends Crawler {
     }
 
     const { resourceCounts } = pageInfo.comparison;
+
+    if (!resourceCounts) {
+      return;
+    }
 
     const { good: crawlGood, bad: crawlBad } = this.countResources(origResData);
     const { good: replayGood, bad: replayBad } = this.countResources(pageInfo);

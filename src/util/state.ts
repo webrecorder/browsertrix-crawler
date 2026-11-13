@@ -2074,11 +2074,19 @@ return inx;
   }
 
   async isQAQueueDone() {
-    return (await this.redis.get(`${this.crawlId}:qaQ`)) == "1";
+    return (await this.redis.get(`${this.crawlId}:qaQdone`)) == "1";
   }
 
   async markQAQueueDone() {
     await this.queueReservoir();
-    await this.redis.set(`${this.crawlId}:qaQ`, "1");
+    await this.redis.set(`${this.crawlId}:qaQdone`, "1");
+  }
+
+  async addQAWACZ(path: string) {
+    await this.redis.rpush(`${this.crawlId}:qaQ`, path);
+  }
+
+  async nextQAWACZ() {
+    return await this.redis.lpop(`${this.crawlId}:qaQ`);
   }
 }

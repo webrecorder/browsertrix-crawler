@@ -6,6 +6,7 @@ import { Crawler } from "./crawler.js";
 import { ReplayCrawler } from "./replaycrawler.js";
 import fs from "node:fs";
 import { ExitCodes, InterruptReason } from "./util/constants.js";
+import { TextCompareCrawler } from "./textcomaprecrawler.js";
 
 let crawler: Crawler | null = null;
 
@@ -64,6 +65,8 @@ process.on("SIGABRT", async () => {
 
 if (process.argv[1].endsWith("qa")) {
   crawler = new ReplayCrawler();
+} else if (process.argv[1].endsWith("textcompare")) {
+  crawler = new TextCompareCrawler();
 } else {
   crawler = new Crawler();
 }

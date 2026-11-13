@@ -66,6 +66,7 @@ RUN chmod a+x /app/dist/main.js /app/dist/create-login-profile.js /app/dist/inde
 
 RUN ln -s /app/dist/main.js /usr/bin/crawl; \
     ln -s /app/dist/main.js /usr/bin/qa; \
+    ln -s /app/dist/main.js /usr/bin/textcompare; \
     ln -s /app/dist/create-login-profile.js /usr/bin/create-login-profile; \
     ln -s /app/dist/indexer.js /usr/bin/indexer;
 

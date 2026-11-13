@@ -489,14 +489,22 @@ export class WACZLoader {
     this.zipreader = new ZipRangeReader(loader);
   }
 
-  async loadFile(fileInZip: string) {
-    const { reader } = await this.zipreader!.loadFile(fileInZip);
+  async loadFile(
+    fileInZip: string,
+    opts: {
+      unzip?: boolean;
+      wrapIter?: boolean;
+      offset?: number;
+      length?: number;
+    } = { wrapIter: true },
+  ) {
+    const { reader } = await this.zipreader!.loadFile(fileInZip, opts);
 
     if (!reader) {
       return null;
     }
 
-    if (!reader.iterLines) {
+    if (!reader.iterLines && opts.wrapIter) {
       return new AsyncIterReader(reader);
     }
 
