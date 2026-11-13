@@ -2093,6 +2093,47 @@ self.__bx_behaviors.selectMainBehavior();
       );
     }
 
+    await this.launchBrowser();
+
+    const sitemapper = await this.createSitemapper();
+
+    await this._addInitialSeeds(sitemapper);
+
+    // --------------
+    // Run Crawl Here!
+    await runWorkers(
+      this,
+      this.params.workers,
+      this.maxPageTime,
+      false,
+      !!this.params.saveProfile,
+    );
+    // --------------
+
+    if (this.browser) {
+      await this.browser.close();
+    }
+
+    await this.serializeConfig(true);
+
+    await this.closePages();
+
+    await this.closeFiles();
+
+    await this.writeStats();
+
+    // if crawl has been stopped or finished, mark as final exit for post-crawl tasks
+    if (
+      (await this.crawlState.isCrawlStopped()) ||
+      (await this.crawlState.isFinished())
+    ) {
+      this.finalExit = true;
+    }
+
+    await this.postCrawl();
+  }
+
+  async launchBrowser() {
     await this.browser.launch({
       profileUrl: this.params.profile,
       headless: this.params.headless,
@@ -2118,41 +2159,6 @@ self.__bx_behaviors.selectMainBehavior();
       recording: this.recording,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-
-    const sitemapper = await this.createSitemapper();
-
-    await this._addInitialSeeds(sitemapper);
-
-    // --------------
-    // Run Crawl Here!
-    await runWorkers(
-      this,
-      this.params.workers,
-      this.maxPageTime,
-      false,
-      !!this.params.saveProfile,
-    );
-    // --------------
-
-    await this.browser.close();
-
-    await this.serializeConfig(true);
-
-    await this.closePages();
-
-    await this.closeFiles();
-
-    await this.writeStats();
-
-    // if crawl has been stopped or finished, mark as final exit for post-crawl tasks
-    if (
-      (await this.crawlState.isCrawlStopped()) ||
-      (await this.crawlState.isFinished())
-    ) {
-      this.finalExit = true;
-    }
-
-    await this.postCrawl();
   }
 
   async closePages() {

@@ -210,4 +210,17 @@ export const CSR_CLUES: CSRClue[] = [
     pattern: "<embed[^>]*>",
     description: "Embed element",
   },
+  {
+    name: "meta_refresh",
+    category: "client_side_navigation",
+    pattern: "<meta http-equiv=.*refresh",
+    description: "Redirect via meta refresh",
+  },
+  {
+    name: "history_manipulation",
+    category: "client_side_navigation",
+    pattern:
+      "(?:\\b\\w+\\s*\\??\\.\\s*(?:pushState|replaceState)\\s*\\(|\\[\\s*['\"](?:pushState|replaceState)['\"]\\s*\\]\\s*\\()|(?:\\bonpopstate\\b|addEventListener\\s*\\(\\s*['\"]popstate['\"])",
+    description: "History manipulation",
+  },
 ];

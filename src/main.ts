@@ -63,9 +63,9 @@ process.on("SIGABRT", async () => {
   forceTerm = true;
 });
 
-if (process.argv[1].endsWith("qa")) {
+if (process.argv[1].endsWith("qa2")) {
   crawler = new ReplayCrawler();
-} else if (process.argv[1].endsWith("textcompare")) {
+} else if (process.argv[1].endsWith("qa")) {
   crawler = new TextCompareCrawler();
 } else {
   crawler = new Crawler();
