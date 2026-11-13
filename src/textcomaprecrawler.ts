@@ -232,7 +232,7 @@ export class TextCompareCrawler extends ReplayCrawler {
     comparison.comparison.rawTextMatch = matchPercent;
 
     if (rawHTMLText) {
-      this.processClues(rawText, url, comparison);
+      this.processClues(rawHTMLText, url, comparison);
     }
 
     // save to WARC if text-from-response is set
