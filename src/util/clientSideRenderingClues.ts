@@ -142,6 +142,13 @@ export const CSR_CLUES: CSRClue[] = [
     description: "ES module script",
   },
   {
+    name: "custom_script_type",
+    category: "modern_script_loading",
+    pattern:
+      "<script\\b(?=[^>]*\\btype\\s*=\\s*(?![\"']?text/javascript\\b[\"']?))[^>]*>",
+    description: "non JS script type",
+  },
+  {
     name: "dynamic_import",
     category: "modern_script_loading",
     pattern: "import\\s*\\(",

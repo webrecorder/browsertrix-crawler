@@ -188,7 +188,7 @@ export class ReplayCrawler extends Crawler {
       return;
     }
 
-    await this.loadPages(this.qaSource);
+    await this.loadPages(this.qaSource, this.qaSource);
 
     await this.crawlState.markQAQueueDone();
   }

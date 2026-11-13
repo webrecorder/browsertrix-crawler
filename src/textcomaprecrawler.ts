@@ -92,20 +92,34 @@ export class TextCompareCrawler extends ReplayCrawler {
       return;
     }
 
+    logger.debug("Processing WACZ: " + waczurl);
+
     const redis = this.crawlState.redis;
 
     const cdxKey = `wacz:${name}:cdx`;
 
+    let cdxCount = 0;
+
     for await (const buff of index.iterLines()) {
       //if (buff.startsWith("urn:text:")) {
       //await redis.rpush(`wacz:${name}:urntext`, buff);
-      if (!buff.startsWith("urn:")) {
-        await redis.zadd(cdxKey, 0, buff);
+      if (buff.startsWith("urn:")) {
+        continue;
+      }
+
+      await redis.zadd(cdxKey, 0, buff);
+
+      if (cdxCount++ % 100 === 0) {
+        logger.debug("Parsing CDX lines", { cdxCount });
       }
     }
 
+    let warcCount = 0;
+
     for (const filename of textWARCs) {
       try {
+        warcCount++;
+        logger.debug(`Processing WARC ${warcCount} of ${textWARCs.length}`);
         const textWARCReader = await loader.loadFile(filename);
         if (!textWARCReader) {
           continue;
