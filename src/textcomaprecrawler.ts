@@ -73,6 +73,13 @@ export class TextCompareCrawler extends ReplayCrawler {
   }
 
   async processWACZ(waczurl: string, name: string) {
+    logger.debug("Processing WACZ: " + waczurl);
+
+    const redis = this.crawlState.redis;
+
+    // hack: add WACZ to seen list to allow parallelism
+    await redis.sadd(`${this.crawlState.crawlId}:s`, waczurl);
+
     const loader = new WACZLoader(waczurl);
     await loader.init();
 
@@ -92,13 +99,7 @@ export class TextCompareCrawler extends ReplayCrawler {
       return;
     }
 
-    logger.debug("Processing WACZ: " + waczurl);
-
-    const redis = this.crawlState.redis;
-
     const cdxKey = `wacz:${name}:cdx`;
-
-    let cdxCount = 0;
 
     for await (const buff of index.iterLines()) {
       //if (buff.startsWith("urn:text:")) {
@@ -108,10 +109,6 @@ export class TextCompareCrawler extends ReplayCrawler {
       }
 
       await redis.zadd(cdxKey, 0, buff);
-
-      if (cdxCount++ % 100 === 0) {
-        logger.debug("Parsing CDX lines", { cdxCount });
-      }
     }
 
     let warcCount = 0;
