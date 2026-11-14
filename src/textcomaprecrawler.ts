@@ -25,6 +25,9 @@ export class TextCompareCrawler extends ReplayCrawler {
 
   override async addWACZ(url: string, name: string): Promise<void> {
     await this.crawlState.redis.rpush(this.nextWACZKey, url + " " + name);
+
+    // hack: add WACZ to seen list to allow parallelism
+    await this.crawlState.redis.sadd(`${this.crawlState.crawlId}:s`, name);
   }
 
   override async initCrawlState() {
@@ -76,9 +79,6 @@ export class TextCompareCrawler extends ReplayCrawler {
     logger.debug("Processing WACZ: " + waczurl);
 
     const redis = this.crawlState.redis;
-
-    // hack: add WACZ to seen list to allow parallelism
-    await redis.sadd(`${this.crawlState.crawlId}:s`, waczurl);
 
     const loader = new WACZLoader(waczurl);
     await loader.init();

@@ -145,7 +145,7 @@ export const CSR_CLUES: CSRClue[] = [
     name: "custom_script_type",
     category: "modern_script_loading",
     pattern:
-      "<script\\b(?=[^>]*\\btype\\s*=\\s*(?![\"']?text/javascript\\b[\"']?))[^>]*>",
+      "<script\\b(?=[^>]*\\btype\\s*=\\s*(?![\"']?(?:text|application)/(?:ecmascript|javascript)\\b[\"']?))[^>]*>",
     description: "non JS script type",
   },
   {
