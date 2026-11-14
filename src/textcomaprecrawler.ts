@@ -42,13 +42,17 @@ export class TextCompareCrawler extends ReplayCrawler {
   protected override async _addInitialSeeds() {
     await super._addInitialSeeds();
 
+    const redis = this.crawlState.redis;
+
     while (true) {
-      const nextWACZ = await this.crawlState.redis.lpop(this.nextWACZKey);
+      const nextWACZ = await redis.lpop(this.nextWACZKey);
       if (!nextWACZ) {
         break;
       }
       const [url, name] = nextWACZ.split(" ");
-      await this.processWACZ(url, name);
+      await this.processWACZ(url, name, redis);
+
+      await redis.incr(`${this.crawlState.crawlId}:d`);
     }
   }
 
@@ -75,10 +79,8 @@ export class TextCompareCrawler extends ReplayCrawler {
     return [ExitCodes.Failed, "failed"];
   }
 
-  async processWACZ(waczurl: string, name: string) {
+  async processWACZ(waczurl: string, name: string, redis: Redis) {
     logger.debug("Processing WACZ: " + waczurl);
-
-    const redis = this.crawlState.redis;
 
     const loader = new WACZLoader(waczurl);
     await loader.init();
