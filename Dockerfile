@@ -3,6 +3,9 @@ ARG BROWSER_IMAGE_BASE=webrecorder/browsertrix-browser-base:brave-${BROWSER_VERS
 
 FROM ${BROWSER_IMAGE_BASE}
 
+ARG TARGETARCH
+ENV YTDLP_VERSION=2026.10.26
+
 LABEL org.opencontainers.image.vendor="Webrecorder <https://webrecorder.net/>"
 LABEL org.opencontainers.image.documentation="https://crawler.docs.browsertrix.com/"
 
@@ -79,6 +82,15 @@ WORKDIR /crawls
 # add brave/chromium group policies
 RUN mkdir -p /etc/brave/policies/managed/
 ADD config/policies /etc/brave/policies/managed/
+
+ADD ./scripts/install-ytdlp.sh /tmp/install-ytdlp.sh
+RUN /tmp/install-ytdlp.sh "$TARGETARCH" "$YTDLP_VERSION"
+
+# Needed for yt-dlp to get the best media
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get purge -y --auto-remove \
+    && rm -rf /var/lib/apt/lists/*
 
 ADD docker-entrypoint.sh /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
