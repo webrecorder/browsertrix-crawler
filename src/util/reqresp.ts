@@ -8,6 +8,7 @@ import { Protocol } from "puppeteer-core";
 import { postToGetUrl } from "warcio";
 import { HTML_TYPES } from "./constants.js";
 import { Dispatcher } from "undici";
+import { isIP } from "node:net";
 
 const CONTENT_LENGTH = "content-length";
 const CONTENT_RANGE = "content-range";
@@ -51,6 +52,10 @@ export class RequestResponseInfo {
   // response data
   status: number = 0;
   statusText?: string;
+
+  // Numeric address of the peer used for this retrieval. This is emitted as
+  // the standard WARC-IP-Address field when available.
+  remoteIPAddress?: string;
 
   errorText?: string;
 
@@ -103,6 +108,12 @@ export class RequestResponseInfo {
     this.statusText = statusText || getStatusText(this.status);
   }
 
+  setRemoteIPAddress(remoteIPAddress?: string) {
+    if (remoteIPAddress && isIP(remoteIPAddress)) {
+      this.remoteIPAddress = remoteIPAddress;
+    }
+  }
+
   fillFetchRequestPaused(params: Protocol.Fetch.RequestPausedEvent) {
     this.fillRequest(params.request, params.resourceType);
 
@@ -146,6 +157,8 @@ export class RequestResponseInfo {
     this.url = response.url.split("#")[0];
 
     this.setStatus(response.status, response.statusText);
+
+    this.setRemoteIPAddress(response.remoteIPAddress);
 
     if (response.protocol) {
       if (response.protocol === "http/1.0") {
