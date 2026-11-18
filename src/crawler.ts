@@ -3,7 +3,6 @@ import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp from "fs/promises";
-import util from "util";
 
 import { WARCRecord } from "warcio";
 
@@ -84,10 +83,9 @@ import {
   YtdlpResponse,
   isYoutubeVideo,
   ytdlpInfo,
+  ytdlpDownloadMp4,
   youtubeId,
 } from "./ytdlp.js";
-
-const execFile = util.promisify(child_process.execFile);
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -1273,21 +1271,7 @@ self.__bx_behaviors.selectMainBehavior();
     logger.info("Downloading YouTube video", { videoId });
 
     try {
-      await execFile("yt-dlp", [
-        // --no-js-runtimes followed by --js-runtimes is so that we
-        // can skip the default deno runtime and force the use of node.
-        "--no-js-runtimes",
-        "--js-runtimes",
-        "node",
-        "--preset-alias",
-        // Downloads best MP4-compatible audio/video and remuxes into
-        // a single MP4 file
-        "mp4",
-        url,
-        // Output to a known path
-        "--output",
-        videoPath,
-      ]);
+      await ytdlpDownloadMp4(url, videoPath);
     } catch (e) {
       logger.error(`Failed to download video at URL ${url}`, e);
       return;
