@@ -74,6 +74,24 @@ export async function ytdlpInfo(
   }
 }
 
+export async function ytdlpDownloadMp4(url: string, path: string) {
+  return execFile("yt-dlp", [
+    // --no-js-runtimes followed by --js-runtimes is so that we
+    // can skip the default deno runtime and force the use of node.
+    "--no-js-runtimes",
+    "--js-runtimes",
+    "node",
+    "--preset-alias",
+    // Downloads best MP4-compatible audio/video and remuxes into
+    // a single MP4 file
+    "mp4",
+    url,
+    // Output to a known path
+    "--output",
+    path,
+  ]);
+}
+
 export function youtubeId(url: string): string | undefined {
   const parsed = URL.parse(url);
   if (!parsed) {
