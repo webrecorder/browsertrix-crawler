@@ -890,10 +890,23 @@ export class Crawler {
       }
 
       const contextId = event.executionContextId;
-      const { linksStarted, behaviorsStarted, iframeContexts, url } = opts.data;
+      const { linksStarted, behaviorsStarted, iframeContexts, seedId, url } =
+        opts.data;
       const { workerid } = opts;
 
       iframeContexts.add(contextId);
+
+      // We already did this for the main URL, but we additionally need
+      // to do it for each iframe so that we grab youtube emebds.
+      logger.info("Possibly running yt-dlp", { url: event.payload }, "fetch");
+      if (isYoutubeVideo(event.payload)) {
+        logger.info("Running yt-dlp", { url: event.payload }, "fetch");
+        const metadata = await ytdlpInfo(event.payload);
+        if (metadata) {
+          await this.queueYoutubeMedia(seedId, metadata);
+        }
+        await this.downloadYoutubeMP4(seedId, event.payload);
+      }
 
       if (linksStarted || behaviorsStarted) {
         const processNewIframe = async () => {
@@ -1305,14 +1318,6 @@ self.__bx_behaviors.selectMainBehavior();
         seedId,
         seedUrl: this.seeds[seedId].url,
       });
-    }
-
-    if (isYoutubeVideo(url)) {
-      const metadata = await ytdlpInfo(url);
-      if (metadata) {
-        await this.queueYoutubeMedia(seedId, metadata);
-      }
-      await this.downloadYoutubeMP4(seedId, url);
     }
 
     const logDetails = { page: url, workerid };
