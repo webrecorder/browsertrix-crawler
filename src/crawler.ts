@@ -4,6 +4,8 @@ import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp from "fs/promises";
 
+import { WARCRecord } from "warcio";
+
 import {
   RedisCrawlState,
   LoadState,
@@ -76,6 +78,14 @@ import { initProxy } from "./util/proxy.js";
 import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
+
+import {
+  YtdlpResponse,
+  isYoutubeVideo,
+  ytdlpInfo,
+  ytdlpDownloadMp4,
+  youtubeId,
+} from "./ytdlp.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -880,10 +890,20 @@ export class Crawler {
       }
 
       const contextId = event.executionContextId;
-      const { linksStarted, behaviorsStarted, iframeContexts, url } = opts.data;
+      const { linksStarted, behaviorsStarted, iframeContexts, seedId, url } =
+        opts.data;
       const { workerid } = opts;
 
       iframeContexts.add(contextId);
+
+      if (isYoutubeVideo(event.payload)) {
+        logger.info("Running yt-dlp", { url: event.payload }, "fetch");
+        const metadata = await ytdlpInfo(event.payload);
+        if (metadata) {
+          await this.queueYoutubeMedia(seedId, metadata);
+        }
+        await this.downloadYoutubeMP4(seedId, event.payload);
+      }
 
       if (linksStarted || behaviorsStarted) {
         const processNewIframe = async () => {
@@ -1229,6 +1249,56 @@ self.__bx_behaviors.selectMainBehavior();
       logDetails,
     );
     return "";
+  }
+
+  async queueYoutubeMedia(seedId: number, metadata: YtdlpResponse) {
+    const urls = metadata.formats
+      .filter((format) => {
+        return format.protocol === "https";
+      })
+      .map((format) => format.url);
+
+    logger.info(`Queueing YouTube URLs: ${urls.join(", ")}`);
+
+    await this.queueInScopeUrls({
+      seedId,
+      urls,
+      depth: 0,
+      extraHops: 0,
+      noOOS: this.params.alwaysAddBehaviorLinks,
+    });
+  }
+
+  async downloadYoutubeMP4(seedId: number, url: string) {
+    const videoId = youtubeId(url);
+    if (videoId === undefined) {
+      logger.info(
+        `Unable to identify video ID for video at URL ${url}; not capturing`,
+      );
+      return;
+    }
+    const videoPath = `${this.downloadsDir}/${videoId}.mp4`;
+    logger.info("Downloading YouTube video", { videoId });
+
+    try {
+      await ytdlpDownloadMp4(url, videoPath);
+    } catch (e) {
+      logger.error(`Failed to download video at URL ${url}`, e);
+      return;
+    }
+
+    const reader = fs.createReadStream(videoPath);
+    const record = WARCRecord.create(
+      {
+        url: `https://youtube.fuzzy.replayweb.page/videoplayback?id=${videoId}`,
+        date: new Date().toISOString(),
+        type: "resource",
+        warcHeaders: { "Content-Type": "video/mp4" },
+      },
+      reader,
+    );
+    const writer = this.browser.recorders[0].writer;
+    writer.writeSingleRecord(record, () => fs.rmSync(videoPath));
   }
 
   async crawlPage(opts: WorkerState): Promise<void> {
