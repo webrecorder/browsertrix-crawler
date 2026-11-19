@@ -109,8 +109,16 @@ export function youtubeId(url: string): string | undefined {
       return parsed.searchParams.get("v") || undefined;
     }
     // https://www.youtube.com/embed/videoid
+    // Note that embedded playlists have a similar, overlapping format:
+    // https://www.youtube.com/embed/videoseries?list=playlistid
+    // We currently do NOT want to capture these.
     if (parsed.pathname.startsWith("/embed")) {
-      return parsed.pathname.replace(/^\/embed\//, "");
+      const id = parsed.pathname.replace(/^\/embed\//, "");
+      if (id === "videoseries") {
+        return;
+      } else {
+        return id;
+      }
     }
   }
 }
