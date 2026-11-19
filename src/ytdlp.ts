@@ -37,7 +37,9 @@ export function isYoutubeWatchPage(url: string) {
   }
   if (parsed.host.match(/(www.)?(youtube.com|youtube-nocookie.com)/)) {
     return (
-      parsed.pathname === "/watch" || parsed.pathname.startsWith("/shorts")
+      parsed.pathname === "/watch" ||
+      parsed.pathname.startsWith("/shorts") ||
+      parsed.pathname.startsWith("/embed")
     );
   }
   return false;
