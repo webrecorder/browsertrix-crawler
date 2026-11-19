@@ -896,9 +896,6 @@ export class Crawler {
 
       iframeContexts.add(contextId);
 
-      // We already did this for the main URL, but we additionally need
-      // to do it for each iframe so that we grab youtube emebds.
-      logger.info("Possibly running yt-dlp", { url: event.payload }, "fetch");
       if (isYoutubeVideo(event.payload)) {
         logger.info("Running yt-dlp", { url: event.payload }, "fetch");
         const metadata = await ytdlpInfo(event.payload);
