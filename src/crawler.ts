@@ -4,8 +4,6 @@ import fs, { WriteStream } from "fs";
 import os from "os";
 import fsp from "fs/promises";
 
-import { WARCRecord } from "warcio";
-
 import {
   RedisCrawlState,
   LoadState,
@@ -79,13 +77,7 @@ import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
 
-import {
-  YtdlpResponse,
-  isYoutubeVideo,
-  ytdlpInfo,
-  ytdlpDownloadMp4,
-  youtubeId,
-} from "./ytdlp.js";
+import { YtdlpResponse, maybeYtdlp } from "./ytdlp.js";
 
 const btrixBehaviors = fs.readFileSync(
   new URL(
@@ -179,6 +171,7 @@ export class Crawler {
 
   screenshotWriter: WARCWriter | null;
   textWriter: WARCWriter | null;
+  videoInfoWriter: WARCWriter | null;
 
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
@@ -333,6 +326,7 @@ export class Crawler {
 
     this.screenshotWriter = null;
     this.textWriter = null;
+    this.videoInfoWriter = null;
 
     this.blockRules = null;
     this.adBlockRules = null;
@@ -646,6 +640,7 @@ export class Crawler {
     if (this.params.text && !this.params.dryRun) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
     }
+    this.videoInfoWriter = this.createExtraResourceWarcWriter("videoinfo");
 
     await this.loadCrawlState();
 
@@ -890,19 +885,33 @@ export class Crawler {
       }
 
       const contextId = event.executionContextId;
-      const { linksStarted, behaviorsStarted, iframeContexts, seedId, url } =
-        opts.data;
+      const { linksStarted, behaviorsStarted, iframeContexts, url } = opts.data;
       const { workerid } = opts;
 
       iframeContexts.add(contextId);
 
-      if (isYoutubeVideo(event.payload)) {
-        logger.info("Running yt-dlp", { url: event.payload }, "fetch");
-        const metadata = await ytdlpInfo(event.payload);
-        if (metadata) {
-          await this.queueYoutubeMedia(seedId, metadata);
-        }
-        await this.downloadYoutubeMP4(seedId, event.payload);
+      const videoInfo = await maybeYtdlp(
+        event.payload,
+        this.browser.recorders[0].writer,
+        this.downloadsDir,
+      );
+      if (videoInfo && this.videoInfoWriter) {
+        const videoJson = JSON.stringify(videoInfo);
+
+        this.videoInfoWriter.writeNewResourceRecord(
+          {
+            buffer: new TextEncoder().encode(videoJson),
+            resourceType: "videoinfo",
+            contentType: "application/json",
+            url: event.payload,
+          },
+          {
+            resource: "videoinfo",
+            type: "videoinfo",
+            url: event.payload,
+          },
+          "recorder",
+        );
       }
 
       if (linksStarted || behaviorsStarted) {
@@ -1267,38 +1276,6 @@ self.__bx_behaviors.selectMainBehavior();
       extraHops: 0,
       noOOS: this.params.alwaysAddBehaviorLinks,
     });
-  }
-
-  async downloadYoutubeMP4(seedId: number, url: string) {
-    const videoId = youtubeId(url);
-    if (videoId === undefined) {
-      logger.info(
-        `Unable to identify video ID for video at URL ${url}; not capturing`,
-      );
-      return;
-    }
-    const videoPath = `${this.downloadsDir}/${videoId}.mp4`;
-    logger.info("Downloading YouTube video", { videoId });
-
-    try {
-      await ytdlpDownloadMp4(url, videoPath);
-    } catch (e) {
-      logger.error(`Failed to download video at URL ${url}`, e);
-      return;
-    }
-
-    const reader = fs.createReadStream(videoPath);
-    const record = WARCRecord.create(
-      {
-        url: `https://youtube.fuzzy.replayweb.page/videoplayback?id=${videoId}`,
-        date: new Date().toISOString(),
-        type: "resource",
-        warcHeaders: { "Content-Type": "video/mp4" },
-      },
-      reader,
-    );
-    const writer = this.browser.recorders[0].writer;
-    writer.writeSingleRecord(record, () => fs.rmSync(videoPath));
   }
 
   async crawlPage(opts: WorkerState): Promise<void> {

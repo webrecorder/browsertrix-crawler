@@ -1,7 +1,11 @@
 import child_process from "child_process";
+import fs from "fs";
 import util from "util";
 
 import { logger } from "./util/logger.js";
+import { WARCWriter } from "./util/warcwriter.js";
+
+import { WARCRecord } from "warcio";
 
 const execFile = util.promisify(child_process.execFile);
 
@@ -74,6 +78,77 @@ export async function ytdlpInfo(
     logger.error(`yt-dlp returned invalid JSON for video at url ${url}`, e);
     return;
   }
+}
+
+export async function maybeYtdlp(
+  url: string,
+  writer: WARCWriter,
+  downloadsDir: string,
+): Promise<object | undefined> {
+  // In the future we'll support more sites but right now we only check YouTube
+  if (!isYoutubeVideo(url)) {
+    return;
+  }
+
+  const metadata = await ytdlpInfo(url);
+  const videos = [];
+  if (metadata) {
+    const video = await ytdlpYoutube(url, writer, downloadsDir);
+    if (video) {
+      videos.push(video);
+    } else {
+      return;
+    }
+  }
+  const videoInfo = {
+    infoJson: metadata,
+    videos,
+  };
+
+  return videoInfo;
+}
+
+async function ytdlpYoutube(
+  url: string,
+  writer: WARCWriter,
+  downloadsDir: string,
+): Promise<object | undefined> {
+  const videoId = youtubeId(url);
+  if (videoId === undefined) {
+    logger.info(
+      `Unable to identify video ID for video at URL ${url}; not capturing`,
+    );
+    return;
+  }
+  const fuzzyUrl = `https://youtube.fuzzy.replayweb.page/videoplayback?id=${videoId}`;
+
+  const videoPath = `${downloadsDir}/${videoId}.mp4`;
+  logger.info("Downloading YouTube video", { videoId });
+
+  try {
+    await ytdlpDownloadMp4(url, videoPath);
+  } catch (e) {
+    logger.error(`Failed to download video at URL ${url}`, e);
+    return;
+  }
+
+  const reader = fs.createReadStream(videoPath);
+  const record = WARCRecord.create(
+    {
+      url: `https://youtube.fuzzy.replayweb.page/videoplayback?id=${videoId}`,
+      date: new Date().toISOString(),
+      type: "resource",
+      warcHeaders: { "Content-Type": "video/mp4" },
+    },
+    reader,
+  );
+  writer.writeSingleRecord(record, () => fs.rmSync(videoPath));
+
+  return {
+    format: "youtube",
+    videoId,
+    url: fuzzyUrl,
+  };
 }
 
 export async function ytdlpDownloadMp4(url: string, path: string) {

@@ -1183,6 +1183,7 @@ export class Recorder extends EventEmitter {
       tsStatus: 999,
     };
     this.mainFrameId = null;
+    logger.info("Page started", { pageInfo: this.pageInfo }, "recorder");
   }
 
   markRateLimited(status: number, retryAfterHeader: string | null) {
