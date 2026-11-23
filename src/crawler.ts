@@ -829,7 +829,7 @@ export class Crawler {
   }
 
   async setupPage(opts: WorkerState) {
-    const { page, cdp, workerid, frameIdToExecId, recorder } = opts;
+    const { page, cdp, workerid, frameIdToExecId, frameUrls, recorder } = opts;
 
     const addLink = async (url: string, alwaysObeyScope: boolean = false) => {
       const { seedId, depth, extraHops = 0, logDetails } = opts.data;
@@ -890,28 +890,8 @@ export class Crawler {
 
       iframeContexts.add(contextId);
 
-      const videoInfo = await maybeYtdlp(
-        event.payload,
-        this.browser.recorders[0].writer,
-        this.downloadsDir,
-      );
-      if (videoInfo && this.videoInfoWriter) {
-        const videoJson = JSON.stringify(videoInfo);
-
-        this.videoInfoWriter.writeNewResourceRecord(
-          {
-            buffer: new TextEncoder().encode(videoJson),
-            resourceType: "videoinfo",
-            contentType: "application/json",
-            url: event.payload,
-          },
-          {
-            resource: "videoinfo",
-            type: "videoinfo",
-            url: event.payload,
-          },
-          "recorder",
-        );
+      if (event.payload !== "about:blank") {
+        frameUrls.push(event.payload);
       }
 
       if (linksStarted || behaviorsStarted) {
@@ -1436,9 +1416,40 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.awaitPageExtraDelay(opts);
 
+    await this.checkFramesForVideo(opts);
+
     // wait for any browser network fetches to finish before moving on to another page
     if (recorder) {
       await recorder.browserFetchQ.onIdle();
+    }
+  }
+
+  async checkFramesForVideo(opts: WorkerState) {
+    const { frameUrls } = opts;
+    for (const frame of frameUrls) {
+      const videoInfo = await maybeYtdlp(
+        frame,
+        this.browser.recorders[0].writer,
+        this.downloadsDir,
+      );
+      if (videoInfo && this.videoInfoWriter) {
+        const videoJson = JSON.stringify(videoInfo);
+
+        this.videoInfoWriter.writeNewResourceRecord(
+          {
+            buffer: new TextEncoder().encode(videoJson),
+            resourceType: "videoinfo",
+            contentType: "application/json",
+            url: frame,
+          },
+          {
+            resource: "videoinfo",
+            type: "videoinfo",
+            url: frame,
+          },
+          "recorder",
+        );
+      }
     }
   }
 

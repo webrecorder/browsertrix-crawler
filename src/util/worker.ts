@@ -22,6 +22,7 @@ export type WorkerState = {
   recorder: Recorder | null;
   markPageUsed: () => void;
   frameIdToExecId: Map<string, number>;
+  frameUrls: string[];
   isAuthSet?: boolean;
   pageBlockUnload?: boolean;
   data: PageState;
@@ -173,6 +174,7 @@ export class PageWorker {
           workerid,
           recorder: this.recorder,
           frameIdToExecId: new Map<string, number>(),
+          frameUrls: [],
           markPageUsed: () => {
             if (!this.alwaysReuse) {
               this.reuseCount++;
