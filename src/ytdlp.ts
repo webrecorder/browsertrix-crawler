@@ -144,6 +144,8 @@ async function ytdlpYoutube(
   );
   writer.writeSingleRecord(record, () => fs.rmSync(videoPath));
 
+  logger.info("YouTube video written", { videoId });
+
   return {
     format: "youtube",
     videoId,

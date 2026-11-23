@@ -1451,6 +1451,10 @@ self.__bx_behaviors.selectMainBehavior();
         );
       }
     }
+
+    if (this.videoInfoWriter) {
+      await this.videoInfoWriter.flush();
+    }
   }
 
   async doPostLoadActions(opts: WorkerState, saveOutput = false) {
