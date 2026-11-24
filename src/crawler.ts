@@ -640,7 +640,9 @@ export class Crawler {
     if (this.params.text && !this.params.dryRun) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
     }
-    this.videoInfoWriter = this.createExtraResourceWarcWriter("videoinfo");
+    if (this.params.ytdlpCapture && !this.params.dryRun) {
+      this.videoInfoWriter = this.createExtraResourceWarcWriter("videoinfo");
+    }
 
     await this.loadCrawlState();
 
@@ -1425,6 +1427,10 @@ self.__bx_behaviors.selectMainBehavior();
   }
 
   async checkFramesForVideo(opts: WorkerState) {
+    if (!this.params.ytdlpCapture) {
+      return;
+    }
+
     const { frameUrls } = opts;
     for (const frame of frameUrls) {
       const videoInfo = await maybeYtdlp(

@@ -829,6 +829,13 @@ class ArgParser {
           type: "boolean",
           default: false,
         },
+
+        ytdlpCapture: {
+          describe:
+            "If set, runs yt-dlp on supported pages to download additional media",
+          type: "boolean",
+          default: true,
+        },
       });
   }
 
