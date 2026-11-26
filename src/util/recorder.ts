@@ -593,6 +593,7 @@ export class Recorder extends EventEmitter {
         await this.saveStorage(reqresp, cdp);
       }
       await this.saveDetectedContentType(reqresp, cdp);
+      await this.saveColorSchemeIsDark(reqresp, cdp);
     }
 
     try {
@@ -622,6 +623,19 @@ export class Recorder extends EventEmitter {
       }
     } catch (e) {
       logger.warn("Error getting detected content-type", e, "recorder");
+    }
+  }
+
+  async saveColorSchemeIsDark(reqresp: RequestResponseInfo, cdp: CDPSession) {
+    try {
+      const { result } = await cdp.send("Runtime.evaluate", {
+        expression:
+          "window.matchMedia('(prefers-color-scheme: dark)').matches;",
+        returnByValue: true,
+      });
+      reqresp.extraOpts.darkColorScheme = result.value;
+    } catch (e) {
+      logger.warn("Error getting preferred color scheme", e, "recorder");
     }
   }
 
