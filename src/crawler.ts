@@ -77,6 +77,8 @@ import { initFlow, nextFlowStep } from "./util/flowbehavior.js";
 import { isDisallowedByRobots, setRobotsConfig } from "./util/robots.js";
 import { request } from "undici";
 
+import { YtdlpResponse, maybeYtdlp } from "./ytdlp.js";
+
 const btrixBehaviors = fs.readFileSync(
   new URL(
     "../node_modules/browsertrix-behaviors/dist/behaviors.js",
@@ -169,6 +171,7 @@ export class Crawler {
 
   screenshotWriter: WARCWriter | null;
   textWriter: WARCWriter | null;
+  videoInfoWriter: WARCWriter | null;
 
   blockRules: BlockRules | null;
   adBlockRules: AdBlockRules | null;
@@ -323,6 +326,7 @@ export class Crawler {
 
     this.screenshotWriter = null;
     this.textWriter = null;
+    this.videoInfoWriter = null;
 
     this.blockRules = null;
     this.adBlockRules = null;
@@ -636,6 +640,9 @@ export class Crawler {
     if (this.params.text && !this.params.dryRun) {
       this.textWriter = this.createExtraResourceWarcWriter("text");
     }
+    if (this.params.ytdlpCapture && !this.params.dryRun) {
+      this.videoInfoWriter = this.createExtraResourceWarcWriter("videoinfo");
+    }
 
     await this.loadCrawlState();
 
@@ -824,7 +831,7 @@ export class Crawler {
   }
 
   async setupPage(opts: WorkerState) {
-    const { page, cdp, workerid, frameIdToExecId, recorder } = opts;
+    const { page, cdp, workerid, frameIdToExecId, frameUrls, recorder } = opts;
 
     const addLink = async (url: string, alwaysObeyScope: boolean = false) => {
       const { seedId, depth, extraHops = 0, logDetails } = opts.data;
@@ -884,6 +891,10 @@ export class Crawler {
       const { workerid } = opts;
 
       iframeContexts.add(contextId);
+
+      if (event.payload !== "about:blank") {
+        frameUrls.push(event.payload);
+      }
 
       if (linksStarted || behaviorsStarted) {
         const processNewIframe = async () => {
@@ -1231,6 +1242,24 @@ self.__bx_behaviors.selectMainBehavior();
     return "";
   }
 
+  async queueYoutubeMedia(seedId: number, metadata: YtdlpResponse) {
+    const urls = metadata.formats
+      .filter((format) => {
+        return format.protocol === "https";
+      })
+      .map((format) => format.url);
+
+    logger.info(`Queueing YouTube URLs: ${urls.join(", ")}`);
+
+    await this.queueInScopeUrls({
+      seedId,
+      urls,
+      depth: 0,
+      extraHops: 0,
+      noOOS: this.params.alwaysAddBehaviorLinks,
+    });
+  }
+
   async crawlPage(opts: WorkerState): Promise<void> {
     await this.writeStats();
 
@@ -1389,9 +1418,44 @@ self.__bx_behaviors.selectMainBehavior();
 
     await this.awaitPageExtraDelay(opts);
 
+    await this.checkFramesForVideo(opts);
+
     // wait for any browser network fetches to finish before moving on to another page
     if (recorder) {
       await recorder.browserFetchQ.onIdle();
+    }
+  }
+
+  async checkFramesForVideo(opts: WorkerState) {
+    if (!this.params.ytdlpCapture) {
+      return;
+    }
+
+    const { frameUrls } = opts;
+    for (const frame of frameUrls) {
+      const videoInfo = await maybeYtdlp(
+        frame,
+        this.browser.recorders[0].writer,
+        this.downloadsDir,
+      );
+      if (videoInfo && this.videoInfoWriter) {
+        const videoJson = JSON.stringify(videoInfo);
+
+        this.videoInfoWriter.writeNewResourceRecord(
+          {
+            buffer: new TextEncoder().encode(videoJson),
+            resourceType: "videoinfo",
+            contentType: "application/json",
+            url: frame,
+          },
+          {
+            resource: "videoinfo",
+            type: "videoinfo",
+            url: frame,
+          },
+          "recorder",
+        );
+      }
     }
   }
 
@@ -2193,6 +2257,9 @@ self.__bx_behaviors.selectMainBehavior();
     }
     if (this.screenshotWriter) {
       await this.screenshotWriter.flush();
+    }
+    if (this.videoInfoWriter) {
+      await this.videoInfoWriter.flush();
     }
   }
 
