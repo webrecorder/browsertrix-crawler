@@ -2,6 +2,8 @@ import { logger } from "./logger.js";
 import { CDPSession, Protocol } from "puppeteer-core";
 import { WARCWriter } from "./warcwriter.js";
 
+const encoder = new TextEncoder();
+
 // ============================================================================
 type TextExtractOpts = {
   url: string;
@@ -45,7 +47,7 @@ export abstract class BaseTextExtract {
       if (saveToWarc) {
         this.writer.writeNewResourceRecord(
           {
-            buffer: new TextEncoder().encode(text),
+            buffer: encoder.encode(text),
             resourceType,
             contentType: "text/plain",
             url: this.url,
@@ -73,10 +75,23 @@ export abstract class BaseTextExtract {
 
 // ============================================================================
 export class TextExtractViaSnapshot extends BaseTextExtract {
+  snapshot: Protocol.DOMSnapshot.CaptureSnapshotResponse | null;
+
+  constructor(
+    cdp: CDPSession,
+    opts: TextExtractOpts,
+    snapshot: Protocol.DOMSnapshot.CaptureSnapshotResponse | null = null,
+  ) {
+    super(cdp, opts);
+    this.snapshot = snapshot;
+  }
+
   async doGetText(): Promise<string> {
-    const result = await this.cdp.send("DOMSnapshot.captureSnapshot", {
-      computedStyles: [],
-    });
+    const result = this.snapshot
+      ? this.snapshot
+      : await this.cdp.send("DOMSnapshot.captureSnapshot", {
+          computedStyles: [],
+        });
     return this.parseTextFromDOMSnapshot(result);
   }
 
